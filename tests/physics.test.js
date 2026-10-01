@@ -104,3 +104,60 @@ test('le vent dévie la trajectoire', () => {
   assert.ok(land(1) > land(0) + 40)
   assert.ok(land(-1) < land(0) - 40)
 })
+
+/* ---------- Règles structurelles (v1.1) ---------- */
+
+/** Cabane en pierre stabilisée, puis une pierre lancée à plat sur le mur gauche. */
+function hitLeftWall(material, speed) {
+  const w = new PhysicsWorld(new EventBus())
+  const wall = w.add(new Block({ material, x: 1400, y: G - 50, w: 20, h: 100 }))
+  w.add(new Block({ material, x: 1480, y: G - 50, w: 20, h: 100 }))
+  const slab = w.add(new Block({ material, x: 1440, y: G - 110, w: 120, h: 20 }))
+  const t = w.add(new Target({ type: 'soldier', x: 1440, y: G - 25 }))
+  settle(w, 600)
+  const slabY = slab.y
+  const p = w.add(new Projectile('stone', 1250, G - 60))
+  Matter.Body.setVelocity(p.body, { x: speed, y: 0 })
+  settle(w, 500)
+  return { w, wall, slab, slabY, t }
+}
+
+test('rien ne reste suspendu quand un appui disparaît', () => {
+  const w = new PhysicsWorld(new EventBus())
+  const wall = w.add(new Block({ material: 'stone', x: 1400, y: G - 50, w: 20, h: 100 }))
+  w.add(new Block({ material: 'stone', x: 1480, y: G - 50, w: 20, h: 100 }))
+  const slab = w.add(new Block({ material: 'stone', x: 1440, y: G - 110, w: 120, h: 20 }))
+  settle(w, 600)
+  const before = slab.y
+  wall.kill('impact')
+  settle(w, 300)
+  assert.ok(slab.y > before + 30, `le plancher doit tomber (avant ${before}, après ${slab.y})`)
+})
+
+test('un mur porteur frappé fort fait s’effondrer le plancher et écrase la cible', () => {
+  const { slab, slabY, t } = hitLeftWall('stone', 9)
+  assert.ok(!slab.alive || slab.y > slabY + 30, 'le plancher doit s’effondrer')
+  assert.equal(t.alive, false)
+  assert.equal(t.deathCause, 'crush')
+})
+
+test('un bloc en mouvement qui touche une cible la tue', () => {
+  const w = new PhysicsWorld(new EventBus())
+  const t = w.add(new Target({ type: 'knight', x: 1440, y: G - 27 }))
+  settle(w, 200)
+  // Premier tir (arme les règles), loin de la scène.
+  w.add(new Projectile('stone', 200, 200))
+  const beam = w.add(new Block({ material: 'wood', x: 1440, y: G - 200, w: 80, h: 16 }))
+  Matter.Body.setVelocity(beam.body, { x: 0, y: 3 })
+  settle(w, 200)
+  assert.equal(t.alive, false)
+  assert.equal(t.deathCause, 'crush')
+})
+
+test('avant le premier tir, la mise en place de la structure ne tue personne', () => {
+  const w = new PhysicsWorld(new EventBus())
+  const t = w.add(new Target({ type: 'soldier', x: 1440, y: G - 25 }))
+  w.add(new Block({ material: 'wood', x: 1440, y: G - 70, w: 80, h: 16 }))
+  settle(w, 300)
+  assert.equal(t.alive, true)
+})

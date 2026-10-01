@@ -98,7 +98,7 @@ onBeforeUnmount(() => {
   destroyController()
 })
 watch(
-  () => [state.settings.trajectoryAid, state.settings.screenShake, state.settings.motion, state.systemReducedMotion],
+  () => [state.settings.trajectoryAid, state.settings.screenShake, state.settings.blood, state.settings.motion, state.systemReducedMotion],
   () => controller?.applySettings({ ...state.settings }, app.reducedMotion()),
 )
 

@@ -3,6 +3,7 @@ import { WORLD, CATEGORY } from './constants.js'
 import { Guard } from '../../core/utils/Guard.js'
 import { Projectile } from '../entities/Projectile.js'
 import { SeededRandom } from '../../core/utils/SeededRandom.js'
+import { StructuralIntegrity } from './StructuralIntegrity.js'
 
 const { Engine, Composite, Bodies, Body, Events, Sleeping } = Matter
 
@@ -19,6 +20,12 @@ const { Engine, Composite, Bodies, Body, Events, Sleeping } = Matter
  *   entity:destroyed { entity, cause }   impact { entity, energy, x, y, material }
  *   explosion { x, y, radius }            fire:start { entity }
  *   projectile:spent { entity }           projectile:split { entity }
+ *   structure:collapse { entity, loads }  (mur porteur qui cède)
+ *
+ * Règles de jeu physiques :
+ *  - une cible touchée par un bloc en mouvement (après le premier tir) meurt écrasée ;
+ *  - un mur porteur frappé assez fort cède et fait s'effondrer ce qu'il soutient ;
+ *  - rien ne reste suspendu dans le vide quand son appui disparaît.
  */
 export class PhysicsWorld {
   /** @type {Map<number, import('../entities/Entity.js').Entity>} */
@@ -30,6 +37,9 @@ export class PhysicsWorld {
   #wind = 0
   #fireTick = 0
   #rng
+  /** Vrai dès le premier tir : avant, la structure se met en place sans conséquence. */
+  #armed = false
+  structure = new StructuralIntegrity()
 
   /**
    * @param {import('../../core/utils/EventBus.js').EventBus} events
@@ -52,8 +62,10 @@ export class PhysicsWorld {
     Composite.add(this.engine.world, ground)
 
     this._onCollision = (e) => this.#handleCollisions(e.pairs)
+    this._onActive = (e) => this.#handleActiveContacts(e.pairs)
     this._onBeforeUpdate = () => this.#applyWind()
     Events.on(this.engine, 'collisionStart', this._onCollision)
+    Events.on(this.engine, 'collisionActive', this._onActive)
     Events.on(this.engine, 'beforeUpdate', this._onBeforeUpdate)
   }
 
@@ -80,6 +92,11 @@ export class PhysicsWorld {
   }
 
   add(entity) {
+    // Premier projectile : on relève les appuis de la structure stabilisée.
+    if (entity.kind === 'projectile' && !this.#armed) {
+      this.structure.map(this.engine, (b) => this.#entityOf(b))
+      this.#armed = true
+    }
     this.#entities.set(entity.body.id, entity)
     Composite.add(this.engine.world, entity.body)
     return entity
@@ -246,6 +263,8 @@ export class PhysicsWorld {
         }
       }
 
+      this.#checkCrush(a, b, rel)
+
       if (!this.settled || rel < WORLD.IMPACT_THRESHOLD) continue
       const ma = bodyA.isStatic ? Infinity : bodyA.mass
       const mb = bodyB.isStatic ? Infinity : bodyB.mass
@@ -264,7 +283,49 @@ export class PhysicsWorld {
           this.#events.emit('impact', { entity: e, energy, x: contact.x, y: contact.y, material: e.material || e.kind })
         }
       }
+
+      // Projectile contre mur porteur : le mur peut céder et entraîner les toits.
+      const hitBlock = projectile && (a === projectile ? b : a)
+      if (hitBlock?.kind === 'block' && hitBlock.alive) {
+        const loads = this.structure.onProjectileHit(hitBlock, energy, Body.getVelocity(projectile.body))
+        if (loads.length) this.#events.emit('structure:collapse', { entity: hitBlock, loads })
+      }
     }
+  }
+
+  /**
+   * Écrasement : une cible meurt dès qu'un bloc en mouvement la percute.
+   * Désactivé avant le premier tir (la structure se met en place).
+   */
+  #checkCrush(a, b, rel) {
+    if (!this.#armed) return
+    const target = a?.kind === 'target' ? a : b?.kind === 'target' ? b : null
+    if (!target || !target.alive) return
+    const other = target === a ? b : a
+    if (!other || other.kind !== 'block' || !other.alive) return
+    if (other.speed >= WORLD.CRUSH_BLOCK_SPEED && rel >= WORLD.CRUSH_REL_SPEED) target.kill('crush')
+  }
+
+  /** Contacts prolongés : un bloc déjà au contact qui se met à bouger écrase aussi. */
+  #handleActiveContacts(pairs) {
+    if (!this.#armed) return
+    for (const pair of pairs) {
+      const a = this.#entityOf(pair.bodyA)
+      const b = this.#entityOf(pair.bodyB)
+      if (!a || !b || (a.kind !== 'target' && b.kind !== 'target')) continue
+      const block = a.kind === 'block' ? a : b.kind === 'block' ? b : null
+      if (!block || block.speed < WORLD.CRUSH_BLOCK_SPEED * 1.6) continue
+      const va = Body.getVelocity(pair.bodyA.parent || pair.bodyA)
+      const vb = Body.getVelocity(pair.bodyB.parent || pair.bodyB)
+      const n = pair.collision.normal
+      const rel = Math.abs((va.x - vb.x) * n.x + (va.y - vb.y) * n.y)
+      this.#checkCrush(a, b, rel)
+    }
+  }
+
+  /** Réveille les corps proches d'un point (appui disparu, choc). */
+  #wakeAround(x, y, radius) {
+    for (const e of this.queryRadius(x, y, radius)) Sleeping.set(e.body, false)
   }
 
   #spreadFire() {
@@ -298,6 +359,10 @@ export class PhysicsWorld {
       }
       if (!e.alive) {
         this.remove(e)
+        if (e.kind === 'block') {
+          this.structure.onRemoved(e)
+          this.#wakeAround(e.x, e.y, Math.max(e.width, e.height) + 80)
+        }
         if (e.kind === 'barrel') {
           this.#pendingExplosions.push({ at: this.#time + 110, x: e.x, y: e.y, spec: { ...e.explosion, source: e } })
         }
@@ -309,6 +374,8 @@ export class PhysicsWorld {
 
   destroy() {
     Events.off(this.engine, 'collisionStart', this._onCollision)
+    Events.off(this.engine, 'collisionActive', this._onActive)
+    this.structure.clear()
     Events.off(this.engine, 'beforeUpdate', this._onBeforeUpdate)
     Composite.clear(this.engine.world, false)
     Engine.clear(this.engine)

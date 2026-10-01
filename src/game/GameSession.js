@@ -59,13 +59,13 @@ export class GameSession extends EventBus {
   #slowMo = 0
   #events = new EventBus()
   #time = 0
-  options = { trajectoryAid: false, reducedMotion: false }
+  options = { trajectoryAid: false, reducedMotion: false, blood: true }
 
   /**
    * @param {object} level niveau gelé issu du LevelRepository
-   * @param {{ difficulty: string, completedLevels: number, trajectoryAid?: boolean, reducedMotion?: boolean, screenShake?: boolean }} opts
+   * @param {{ difficulty: string, completedLevels: number, trajectoryAid?: boolean, reducedMotion?: boolean, screenShake?: boolean, blood?: boolean }} opts
    */
-  constructor(level, { difficulty, completedLevels, trajectoryAid = false, reducedMotion = false, screenShake = true }) {
+  constructor(level, { difficulty, completedLevels, trajectoryAid = false, reducedMotion = false, screenShake = true, blood = true }) {
     super()
     this.#level = level
     this.#difficulty = Guard.oneOf(difficulty, GAME.DIFFICULTIES, 'difficulty')
@@ -76,7 +76,7 @@ export class GameSession extends EventBus {
     this.#shotsLeft = this.#shotsTotal
     this.#ammo = { ...level.ammo }
     this.#windRng = new SeededRandom(level.seed)
-    this.options = { trajectoryAid, reducedMotion }
+    this.options = { trajectoryAid, reducedMotion, blood }
 
     this.world = new PhysicsWorld(this.#events, { seed: level.seed })
     this.catapult = new Catapult(170)
@@ -382,7 +382,13 @@ export class GameSession extends EventBus {
       const gained = this.score.registerDestroyed(entity)
       if (entity.kind === 'target') {
         if (gained) this.particles.text(entity.x, entity.y - 40, `+${gained}`)
-        this.particles.dust(entity.x, entity.y, 10)
+        if (this.options.blood) {
+          const vx = entity.body.velocity.x
+          const foot = Math.min(entity.y + entity.height / 2, WORLD.GROUND_Y)
+          this.particles.blood(entity.x, entity.y, foot, Math.abs(vx) > 0.5 ? Math.sign(vx) : 0)
+        } else {
+          this.particles.dust(entity.x, entity.y, 10)
+        }
         this.#feedback({ sound: 'down', x: entity.x, caption: `down.${entity.type}`, haptic: 'kill' })
         this.emit('announce', { key: 'a11y.targetDown', params: { left: this.targetsLeft } })
         if (this.targetsLeft === 0 && !this.options.reducedMotion) this.#slowMo = 900
@@ -403,6 +409,11 @@ export class GameSession extends EventBus {
       this.particles.explosion(x, y, radius)
       this.camera.shake(12)
       this.#feedback({ sound: 'explosion', x, intensity: 1, caption: 'explosion', haptic: 'explosion' })
+    })
+    ev.on('structure:collapse', ({ entity }) => {
+      this.particles.dust(entity.x, entity.y - entity.height / 2, 8)
+      this.camera.shake(5)
+      this.#feedback({ sound: entity.sound || 'wood', x: entity.x, intensity: 1, caption: 'collapse', haptic: 'impact' })
     })
     ev.on('fire:start', ({ entity }) => {
       this.#feedback({ sound: 'fire', x: entity.x, intensity: 0.6, caption: 'fire' })

@@ -84,6 +84,30 @@ export class ParticleSystem {
     this.#spawn({ kind: burning ? 'flame' : 'smoke', x, y, vx: 0, vy: -0.2, life: 0, max: burning ? 300 : 450, size: burning ? 7 : 5, color: burning ? '#ffb347' : 'rgba(230,225,215,' })
   }
 
+  /**
+   * Mort d'une cible : gerbe de gouttes de sang projetées dans le sens du choc,
+   * puis une tache au sol qui s'étale brièvement et s'efface en quelques secondes.
+   * @param {number} x
+   * @param {number} y centre de la cible
+   * @param {number} groundY hauteur où la tache se dépose (pied de la cible)
+   * @param {number} dir sens de projection (-1 gauche, 1 droite, 0 indifférent)
+   */
+  blood(x, y, groundY, dir = 0) {
+    const r = this.#rng
+    for (let i = 0; i < this.#n(16); i++) {
+      const a = -Math.PI / 2 + r.range(-1.1, 1.1) + dir * 0.5
+      const sp = r.range(2, 6.5)
+      this.#spawn({
+        kind: 'drop', x: x + r.range(-6, 6), y: y + r.range(-14, 6),
+        vx: Math.cos(a) * sp + dir * r.range(0.5, 2), vy: Math.sin(a) * sp, life: 0, max: r.range(450, 850),
+        size: r.range(2, 4.5), color: r.pick(['#8e1414', '#a51c1c', '#6d0d0d']), floor: groundY,
+      })
+    }
+    // Tache : quelques lobes irréguliers, posés au sol.
+    const lobes = Array.from({ length: 6 }, () => ({ dx: r.range(-22, 22), dy: r.range(-3, 3), r: r.range(6, 14) }))
+    this.#spawn({ kind: 'stain', x, y: groundY - 2, vx: 0, vy: 0, life: 0, max: 3600, size: 1, color: '#7a1010', lobes })
+  }
+
   /** Texte flottant (points gagnés). */
   text(x, y, text, color = '#f6d98a') {
     this.#spawn({ kind: 'text', x, y, vx: 0, vy: -0.9, life: 0, max: 1200, size: 28, color, text: String(text) })
@@ -99,7 +123,13 @@ export class ParticleSystem {
       p.life += dtMs
       p.x += p.vx * k
       p.y += p.vy * k
-      if (p.kind === 'chunk' || p.kind === 'spark') p.vy += 0.28 * k
+      if (p.kind === 'chunk' || p.kind === 'spark' || p.kind === 'drop') p.vy += 0.28 * k
+      // Les gouttes s'arrêtent au sol au lieu de le traverser.
+      if (p.kind === 'drop' && p.y > p.floor) {
+        p.y = p.floor
+        p.vx = 0
+        p.vy = 0
+      }
       if (p.kind === 'chunk') p.rot += p.vr * k
       if (p.kind === 'smoke') p.size += 0.25 * k
     }
@@ -147,6 +177,26 @@ export class ParticleSystem {
           ctx.fillStyle = g
           ctx.beginPath()
           ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
+          ctx.fill()
+          break
+        }
+        case 'drop':
+          ctx.globalAlpha = Math.min(1, alpha * 1.8)
+          ctx.fillStyle = p.color
+          ctx.beginPath()
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
+          ctx.fill()
+          break
+        case 'stain': {
+          // Étalement rapide (200 ms) puis disparition progressive sur le dernier tiers.
+          const grow = Math.min(1, p.life / 200)
+          ctx.globalAlpha = t < 0.65 ? 0.85 : 0.85 * (1 - (t - 0.65) / 0.35)
+          ctx.fillStyle = p.color
+          ctx.beginPath()
+          for (const l of p.lobes) {
+            ctx.moveTo(p.x + l.dx * grow + l.r * grow, p.y + l.dy)
+            ctx.ellipse(p.x + l.dx * grow, p.y + l.dy, l.r * grow, l.r * grow * 0.38, 0, 0, Math.PI * 2)
+          }
           ctx.fill()
           break
         }

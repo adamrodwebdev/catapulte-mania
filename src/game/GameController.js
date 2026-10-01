@@ -63,6 +63,7 @@ export class GameController extends EventBus {
       trajectoryAid: settings.trajectoryAid,
       reducedMotion,
       screenShake: settings.screenShake,
+      blood: settings.blood,
     })
     this.session.camera.setFocus(level.focus.left, level.focus.right, level.focus.top)
     this.session.on('hud', (h) => this.emit('hud', h))
@@ -85,6 +86,7 @@ export class GameController extends EventBus {
     this.session.options.trajectoryAid = settings.trajectoryAid
     this.session.options.reducedMotion = reducedMotion
     this.session.camera.shakeEnabled = settings.screenShake && !reducedMotion
+    this.session.options.blood = settings.blood
     this.session.camera.follow = !reducedMotion
     this.session.particles.density = reducedMotion ? 0.35 : 1
   }

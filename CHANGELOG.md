@@ -2,6 +2,19 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [1.1.0] – 2026-10-01
+### Ajouté
+- Écrasement : une cible touchée par un bloc en mouvement meurt sur le coup.
+- Murs porteurs : un projectile qui frappe assez fort un mur qui soutient un
+  toit ou un plancher le fait céder ; ce qu'il porte s'effondre. Le seuil
+  dépend du matériau (le bois cède plus facilement que la pierre ou le fer).
+- Mort d'une cible : gerbe de sang et brève tache au sol (option « Effets de
+  sang » dans les réglages ; désactivée, un nuage de poussière la remplace).
+- Sous-titre « Le mur porteur cède » pour les malentendants.
+### Corrigé
+- Un toit ou un plancher restait suspendu dans le vide quand son mur
+  disparaissait (corps en veille jamais réveillés par le moteur physique).
+
 ## [1.0.0] – 2026-10-01
 ### Ajouté
 - README accessible aux personnes qui ne connaissent pas Git/GitHub.

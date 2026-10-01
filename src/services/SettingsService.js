@@ -14,6 +14,7 @@ const DEFINITIONS = Object.freeze({
   announcements: { validate: Schema.boolean(), fallback: true },
   haptics: { validate: Schema.boolean(), fallback: true },
   screenShake: { validate: Schema.boolean(), fallback: true },
+  blood: { validate: Schema.boolean(), fallback: true },
   volume: { validate: Schema.number({ min: 0, max: 1 }), fallback: 0.7 },
   muted: { validate: Schema.boolean(), fallback: false },
 })

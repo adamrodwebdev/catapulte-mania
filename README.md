@@ -58,6 +58,7 @@ On peut l'envoyer par e-mail, le mettre sur une clé USB ou l'héberger sur n'im
 
 **Le but :** éliminer tous les personnages (soldats, chevaliers, rois) avant d'avoir épuisé ses tirs.
 **Le vent** (indiqué en haut à droite) dévie les projectiles.
+**La physique des bâtiments :** un bloc qui tombe sur un personnage l'écrase. Frappez assez fort un mur porteur : il cède et le toit ou le plancher qu'il soutenait s'effondre (le bois cède plus vite que la pierre ou le fer).
 **Les étoiles :** 1 à 3 étoiles selon le score et le nombre de tirs restants.
 
 ### La progression
@@ -97,6 +98,7 @@ Tout se règle dans **Réglages** (et une partie directement depuis la pause) :
 - **Vibrations** sur téléphone pour les impacts et explosions.
 - **Lecteur d'écran** (malvoyants) : l'interface est entièrement en HTML (pas seulement dessinée), chaque tour est annoncé (« Tour 2, 3 cibles restantes, vent 12 km/h vers la gauche »).
 - **Contraste élevé**, **taille du texte** (100 %, 115 %, 130 %) et **thème sombre**.
+- **Effets de sang** désactivables : un nuage de poussière les remplace.
 - **Animations réduites** : désactive les tremblements d'écran et le suivi de caméra. Respecte automatiquement le réglage du système.
 - **Jouable entièrement au clavier**, avec des zones tactiles d'au moins 44 pixels.
 
@@ -274,6 +276,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v0.5.0 | Interface : écrans, HUD, langues, thèmes, accessibilité |
 | v0.6.0 | Mode hors-ligne, référencement, équilibrage des niveaux |
 | v1.0.0 | Documentation et version de présentation |
+| v1.1.0 | Physique : écrasement des cibles, murs porteurs, effondrement des toits, effets de sang |
 
 Pour revenir à une version précise avec Git : `git checkout v0.4.0` (puis `git checkout main` pour revenir à la dernière).
 

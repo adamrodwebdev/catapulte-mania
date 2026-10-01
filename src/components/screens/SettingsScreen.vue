@@ -42,6 +42,7 @@ function onVolume(e) {
         <ToggleSwitch id="opt-captions" :model-value="s.captions" :label="t('settings.captions')" :description="t('settings.captionsDesc')" @update:model-value="set('captions')($event)" />
         <ToggleSwitch id="opt-announce" :model-value="s.announcements" :label="t('settings.announcements')" :description="t('settings.announcementsDesc')" @update:model-value="set('announcements')($event)" />
         <ToggleSwitch id="opt-shake" :model-value="s.screenShake" :label="t('settings.screenShake')" @update:model-value="set('screenShake')($event)" />
+        <ToggleSwitch id="opt-blood" :model-value="s.blood" :label="t('settings.blood')" :description="t('settings.bloodDesc')" @update:model-value="set('blood')($event)" />
         <ToggleSwitch id="opt-haptics" :model-value="s.haptics" :label="t('settings.haptics')" :description="t('settings.hapticsDesc')" @update:model-value="set('haptics')($event)" />
       </section>
 
