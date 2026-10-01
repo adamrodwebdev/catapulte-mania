@@ -1,0 +1,82 @@
+import { Schema } from '../core/utils/Guard.js'
+import { GAME } from '../config/gameConfig.js'
+import { EventBus } from '../core/utils/EventBus.js'
+
+/** Définition de chaque réglage : validateur + valeur par défaut. */
+const DEFINITIONS = Object.freeze({
+  language: { validate: Schema.enum(GAME.LANGUAGES), fallback: GAME.DEFAULT_LANGUAGE },
+  theme: { validate: Schema.enum(['system', 'light', 'dark']), fallback: 'system' },
+  contrast: { validate: Schema.enum(['normal', 'high']), fallback: 'normal' },
+  motion: { validate: Schema.enum(['system', 'reduced', 'full']), fallback: 'system' },
+  uiScale: { validate: Schema.enum([1, 1.15, 1.3]), fallback: 1 },
+  trajectoryAid: { validate: Schema.boolean(), fallback: false },
+  captions: { validate: Schema.boolean(), fallback: true },
+  announcements: { validate: Schema.boolean(), fallback: true },
+  haptics: { validate: Schema.boolean(), fallback: true },
+  screenShake: { validate: Schema.boolean(), fallback: true },
+  volume: { validate: Schema.number({ min: 0, max: 1 }), fallback: 0.7 },
+  muted: { validate: Schema.boolean(), fallback: false },
+})
+
+const STORAGE_KEY = 'settings'
+
+/**
+ * Préférences du joueur (langue, thème, accessibilité, son…).
+ * Chaque champ est validé individuellement : un champ altéré retombe sur sa
+ * valeur par défaut sans affecter les autres.
+ *
+ * Événement émis : `change` avec `{ key, value }`.
+ */
+export class SettingsService extends EventBus {
+  #storage
+  #values
+
+  /** @param {import('./StorageService.js').StorageService} storage */
+  constructor(storage) {
+    super()
+    this.#storage = storage
+    const stored = storage.readJson(STORAGE_KEY)
+    this.#values = {}
+    for (const [key, def] of Object.entries(DEFINITIONS)) {
+      try {
+        this.#values[key] = stored && Object.hasOwn(stored, key) ? def.validate(stored[key], key) : def.fallback
+      } catch {
+        this.#values[key] = def.fallback
+      }
+    }
+  }
+
+  static get keys() {
+    return Object.keys(DEFINITIONS)
+  }
+
+  /** Le joueur a-t-il déjà choisi une langue ? (sinon on détecte celle du navigateur) */
+  get hasStoredLanguage() {
+    const stored = this.#storage.readJson(STORAGE_KEY)
+    return Boolean(stored && typeof stored.language === 'string')
+  }
+
+  get(key) {
+    if (!Object.hasOwn(DEFINITIONS, key)) throw new Error(`Unknown setting "${key}"`)
+    return this.#values[key]
+  }
+
+  /** Valide puis enregistre un réglage. Lève une erreur si la valeur est invalide. */
+  set(key, value) {
+    if (!Object.hasOwn(DEFINITIONS, key)) throw new Error(`Unknown setting "${key}"`)
+    const valid = DEFINITIONS[key].validate(value, key)
+    if (this.#values[key] === valid) return
+    this.#values[key] = valid
+    this.#storage.writeJson(STORAGE_KEY, this.#values)
+    this.emit('change', { key, value: valid })
+  }
+
+  /** Copie de tous les réglages. */
+  snapshot() {
+    return { ...this.#values }
+  }
+
+  reset() {
+    for (const [key, def] of Object.entries(DEFINITIONS)) this.set(key, def.fallback)
+  }
+}
