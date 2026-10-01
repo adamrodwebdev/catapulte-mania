@@ -3,8 +3,7 @@ import { LEVEL_SPECS } from './levelSpecs.js'
 import { GAME } from '../../config/gameConfig.js'
 import { Schema, Guard, deepFreeze } from '../../core/utils/Guard.js'
 import { MATERIAL_NAMES } from '../entities/materials.js'
-import { TARGET_TYPES } from '../entities/Target.js'
-import { PROJECTILE_NAMES } from '../entities/Projectile.js'
+import { TARGET_TYPES, PROJECTILE_NAMES } from '../entities/catalog.js'
 import { referenceScore, maxScore } from '../score/ScoreRules.js'
 
 const coord = Schema.number({ min: -500, max: 4000 })

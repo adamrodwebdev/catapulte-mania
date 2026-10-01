@@ -1,10 +1,36 @@
 <script setup>
-// Squelette initial : les écrans du jeu seront ajoutés dans les étapes suivantes.
+import { computed, defineAsyncComponent } from 'vue'
+import { useApp } from './app/AppContext.js'
+import HomeScreen from './components/screens/HomeScreen.vue'
+import ProfilesScreen from './components/screens/ProfilesScreen.vue'
+import LevelSelectScreen from './components/screens/LevelSelectScreen.vue'
+import SettingsScreen from './components/screens/SettingsScreen.vue'
+import HelpScreen from './components/screens/HelpScreen.vue'
+
+/**
+ * Composant racine : affiche l'écran courant et la région d'annonces
+ * destinée aux lecteurs d'écran.
+ *
+ * L'écran de jeu (et le moteur physique) est chargé à la demande :
+ * la page d'accueil reste légère et s'affiche instantanément.
+ */
+const GameScreen = defineAsyncComponent(() => import('./components/screens/GameScreen.vue'))
+
+const { state } = useApp()
+const SCREENS = {
+  home: HomeScreen,
+  profiles: ProfilesScreen,
+  levels: LevelSelectScreen,
+  game: GameScreen,
+  settings: SettingsScreen,
+  help: HelpScreen,
+}
+const current = computed(() => SCREENS[state.screen] || HomeScreen)
 </script>
 
 <template>
-  <main class="boot">
-    <h1 class="boot__title">Crush the Castle</h1>
-    <p class="boot__text">Projet initialisé avec Vue 3 et Vite.</p>
-  </main>
+  <Transition name="screen" mode="out-in">
+    <component :is="current" :key="state.screen" />
+  </Transition>
+  <div class="visually-hidden" role="status" aria-live="polite" aria-atomic="true">{{ state.announcement }}</div>
 </template>

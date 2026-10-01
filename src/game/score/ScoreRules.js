@@ -1,5 +1,5 @@
 import { MATERIALS } from '../entities/materials.js'
-import { TARGET_TYPES } from '../entities/Target.js'
+import { TARGET_TYPES } from '../entities/catalog.js'
 import { deepFreeze } from '../../core/utils/Guard.js'
 
 /** Barème des points. */

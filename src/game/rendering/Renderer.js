@@ -81,9 +81,43 @@ export class Renderer {
       ctx.restore()
     }
 
+    if (scene.aim) this.#drawAim(ctx, scene.aim, pixel)
+
     scene.particles.draw(ctx, pixel)
 
     if (scene.trajectory && scene.trajectory.length) this.#drawTrajectory(ctx, scene.trajectory, pixel, scene.highContrast)
+  }
+
+  /** Flèche de visée : direction = angle, longueur = puissance. */
+  #drawAim(ctx, { x, y, angle, power }, pixel) {
+    const a = (-angle * Math.PI) / 180
+    const len = 60 + power * 150
+    ctx.save()
+    ctx.translate(x, y)
+    ctx.rotate(a)
+    ctx.lineCap = 'round'
+    ctx.setLineDash([10 * Math.max(1, pixel), 8 * Math.max(1, pixel)])
+    ctx.lineWidth = 7 * pixel
+    ctx.strokeStyle = 'rgba(30,26,43,0.65)'
+    ctx.beginPath()
+    ctx.moveTo(24, 0)
+    ctx.lineTo(len, 0)
+    ctx.stroke()
+    ctx.lineWidth = 3.5 * pixel
+    ctx.strokeStyle = '#f6d98a'
+    ctx.stroke()
+    ctx.setLineDash([])
+    ctx.beginPath()
+    ctx.moveTo(len + 16, 0)
+    ctx.lineTo(len - 4, -10)
+    ctx.lineTo(len - 4, 10)
+    ctx.closePath()
+    ctx.fillStyle = '#f6d98a'
+    ctx.fill()
+    ctx.lineWidth = 2 * pixel
+    ctx.strokeStyle = '#1e1a2b'
+    ctx.stroke()
+    ctx.restore()
   }
 
   #drawTrajectory(ctx, points, pixel, highContrast) {

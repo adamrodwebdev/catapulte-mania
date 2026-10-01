@@ -1,14 +1,10 @@
 import Matter from 'matter-js'
 import { Entity } from './Entity.js'
 import { CATEGORY } from '../physics/constants.js'
-import { Guard, deepFreeze } from '../../core/utils/Guard.js'
+import { Guard } from '../../core/utils/Guard.js'
+import { TARGET_TYPES } from './catalog.js'
 
-/** Types de cibles : le soldat, le chevalier en armure et le roi. */
-export const TARGET_TYPES = deepFreeze({
-  soldier: { w: 26, h: 50, hp: 16, density: 0.0012, score: 500 },
-  knight: { w: 30, h: 54, hp: 45, density: 0.0018, score: 800 },
-  king: { w: 32, h: 58, hp: 30, density: 0.0014, score: 1500 },
-})
+export { TARGET_TYPES }
 
 /** Personnage à éliminer, caché dans la structure. */
 export class Target extends Entity {

@@ -1,0 +1,710 @@
+/*
+ * Écran de jeu : canevas plein écran + HUD superposé.
+ * Disposition :
+ *   - bandeau haut (pause, niveau, statistiques, pouvoirs)
+ *   - bandeau bas (visée, munitions, bouton de tir)
+ * Le HUD est en HTML (et non dessiné dans le canevas) : il reste lisible
+ * par les lecteurs d'écran, zoomable et utilisable au clavier.
+ */
+
+.game {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--bg);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.game__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Panneaux translucides communs du HUD */
+.hud-top,
+.hud-bottom,
+.powers-menu {
+  position: absolute;
+  z-index: 10;
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(6px);
+}
+
+/* ---------- Bandeau haut ---------- */
+.hud-top {
+  top: max(var(--space-2), env(safe-area-inset-top));
+  left: max(var(--space-2), env(safe-area-inset-left));
+  right: max(var(--space-2), env(safe-area-inset-right));
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+}
+
+.hud-top__level {
+  display: grid;
+  line-height: 1.15;
+  min-width: 0;
+}
+
+.hud-top__name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-2);
+  white-space: nowrap;
+}
+
+.hud-top__chapter {
+  font-size: var(--fs-0);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hud-stats {
+  display: flex;
+  gap: var(--space-4);
+  margin: 0 0 0 auto;
+}
+
+.hud-stat {
+  display: grid;
+  justify-items: center;
+  line-height: 1.1;
+}
+
+.hud-stat dt {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.hud-stat dd {
+  margin: 0;
+}
+
+.hud-stat__value {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-stat__value--score {
+  color: var(--accent-text);
+  font-size: var(--fs-2);
+}
+
+.shots {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.shots__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text);
+  border: 2px solid var(--text);
+}
+
+.shots__dot--used {
+  background: transparent;
+  opacity: 0.45;
+}
+
+.shots__text {
+  display: none;
+}
+
+.wind-arrow {
+  transition: transform calc(0.3s * var(--speed));
+}
+
+.wind-arrow--left {
+  transform: scaleX(-1);
+}
+
+.hud-top__powers {
+  background: var(--accent);
+  color: var(--c-ink);
+  border-color: var(--c-ink);
+}
+
+/* ---------- Menu des pouvoirs ---------- */
+.powers-menu {
+  z-index: 20;
+  top: calc(var(--hud-size) + var(--space-6));
+  right: max(var(--space-2), env(safe-area-inset-right));
+  width: min(24rem, calc(100% - 1rem));
+  max-height: calc(100dvh - 9rem);
+  overflow: auto;
+  padding: var(--space-3);
+  background: var(--surface);
+  animation: fade-in calc(0.15s * var(--speed)) ease-out;
+}
+
+.powers-menu__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.powers-menu__title {
+  font-size: var(--fs-2);
+}
+
+.powers-menu__rule {
+  font-size: var(--fs-0);
+  color: var(--text-muted);
+  margin: var(--space-1) 0 var(--space-3);
+}
+
+.powers-menu__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.power-btn {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--hud-size);
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  background: var(--surface-2);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.power-btn:hover:not(:disabled) {
+  border-color: var(--action);
+}
+
+.power-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.power-btn--armed {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.power-btn__text {
+  display: grid;
+}
+
+.power-btn__name {
+  font-weight: 700;
+}
+
+.power-btn__desc {
+  font-size: var(--fs-0);
+  color: var(--text-muted);
+}
+
+.power-btn__cost {
+  font-size: var(--fs-0);
+  font-weight: 700;
+  color: var(--danger);
+  white-space: nowrap;
+}
+
+.power-btn--armed .power-btn__cost {
+  color: var(--accent-text);
+}
+
+/* ---------- Bandeau bas ---------- */
+.hud-bottom {
+  bottom: max(var(--space-2), env(safe-area-inset-bottom));
+  left: max(var(--space-2), env(safe-area-inset-left));
+  right: max(var(--space-2), env(safe-area-inset-right));
+  display: grid;
+  grid-template-columns: minmax(14rem, 1.4fr) auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+}
+
+.aim-panel {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.aim-row {
+  display: grid;
+  grid-template-columns: 4.5rem auto 1fr auto 3.5rem;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.aim-row__label {
+  font-size: var(--fs-0);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.aim-row__value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.range--aim {
+  min-height: var(--hud-size);
+}
+
+/* Munitions */
+.ammo {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.ammo__item {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-width: 3.6rem;
+  min-height: var(--hud-size);
+  padding: var(--space-1) var(--space-2);
+  color: inherit;
+  font: inherit;
+  font-size: 0.72rem;
+  background: var(--surface-2);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.ammo__item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ammo__item--on {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface-2));
+}
+
+.ammo__icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--c-ink);
+  background: radial-gradient(circle at 35% 30%, #b9b3a6, #6f6a60 70%);
+}
+
+.ammo__item--boulder .ammo__icon {
+  width: 26px;
+  height: 26px;
+  background: radial-gradient(circle at 35% 30%, #a39c8d, #4f4a42 70%);
+}
+
+.ammo__item--fire .ammo__icon {
+  background: radial-gradient(circle at 50% 60%, #ffe28a, #f07a1a 55%, #a3322b);
+}
+
+.ammo__item--bomb .ammo__icon {
+  background: radial-gradient(circle at 35% 30%, #59546a, #15121d 70%);
+  box-shadow: 6px -6px 0 -4px var(--c-gold);
+}
+
+.ammo__item--split .ammo__icon {
+  background:
+    radial-gradient(circle at 30% 35%, #8b857a 22%, transparent 24%),
+    radial-gradient(circle at 70% 35%, #8b857a 22%, transparent 24%),
+    radial-gradient(circle at 50% 72%, #8b857a 22%, transparent 24%),
+    var(--surface);
+}
+
+.ammo__name {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ammo__count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.ammo__key {
+  position: absolute;
+  top: -8px;
+  right: -6px;
+  font-size: 0.65rem;
+  padding: 0 4px;
+}
+
+/* Bouton de tir */
+.fire-btn {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 2px;
+  width: 5.5rem;
+  height: 5.5rem;
+  border-radius: 50%;
+  border: 3px solid var(--c-ink);
+  background: var(--danger);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-0);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  box-shadow: 0 5px 0 var(--c-ink);
+  transition: transform calc(0.08s * var(--speed));
+}
+
+.fire-btn:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--c-ink);
+}
+
+.fire-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fire-btn--split {
+  background: var(--accent);
+  color: var(--c-ink);
+  animation: pulse calc(0.8s * var(--speed)) ease-in-out infinite alternate;
+}
+
+@keyframes pulse {
+  to {
+    transform: scale(1.07);
+  }
+}
+
+/* Astuce pour débutants */
+.game__hint {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  top: 30%;
+  transform: translateX(-50%);
+  max-width: min(28rem, 90%);
+  padding: var(--space-2) var(--space-4);
+  text-align: center;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius);
+  pointer-events: none;
+}
+
+/* ---------- Sous-titres des sons ---------- */
+.captions {
+  position: absolute;
+  z-index: 15;
+  left: 50%;
+  top: calc(var(--hud-size) + var(--space-6));
+  transform: translateX(-50%);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+  justify-items: center;
+  pointer-events: none;
+}
+
+.captions__item {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  padding: 2px var(--space-3);
+  font-size: calc(var(--fs-1) * var(--ui-scale));
+  font-weight: 600;
+  color: #fff;
+  background: rgb(0 0 0 / 0.78);
+  border-radius: 4px;
+  animation: fade-in calc(0.15s * var(--speed)) ease-out;
+}
+
+.captions__dir {
+  color: var(--c-gold);
+}
+
+/* ---------- Écrans de fin / intro ---------- */
+.novelties {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+  text-align: left;
+  width: 100%;
+}
+
+.novelties__item {
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-2);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+}
+
+.novelties__tag {
+  display: inline-block;
+  margin-right: var(--space-2);
+  padding: 0 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--c-ink);
+  background: var(--accent);
+  border-radius: 3px;
+}
+
+.end__stars {
+  margin: calc(-1 * var(--space-2)) 0;
+}
+
+.end__scores {
+  display: flex;
+  gap: var(--space-6);
+  margin: 0;
+}
+
+.end__scores div {
+  display: grid;
+}
+
+.end__scores dt {
+  font-size: var(--fs-0);
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.end__scores dd {
+  margin: 0;
+  font-size: var(--fs-3);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.end__badge {
+  padding: 2px var(--space-3);
+  font-weight: 700;
+  color: var(--c-ink);
+  background: var(--accent);
+  border-radius: 999px;
+}
+
+.end__power {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 700;
+  color: var(--accent-text);
+}
+
+.end__note {
+  font-style: italic;
+}
+
+/* ---------- Orientation ---------- */
+.rotate-hint {
+  display: none;
+}
+
+@media (orientation: portrait) and (max-width: 600px) {
+  .rotate-hint {
+    display: block;
+    position: absolute;
+    z-index: 5;
+    top: 40%;
+    left: var(--space-4);
+    right: var(--space-4);
+    padding: var(--space-3);
+    text-align: center;
+    font-size: var(--fs-0);
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    pointer-events: none;
+  }
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 900px) {
+  .hud-bottom {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'aim fire'
+      'ammo fire';
+  }
+
+  .aim-panel {
+    grid-area: aim;
+  }
+
+  .ammo {
+    grid-area: ammo;
+    overflow-x: auto;
+  }
+
+  .fire-btn {
+    grid-area: fire;
+  }
+}
+
+@media (max-width: 640px), (max-height: 480px) {
+  .hud-top {
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-2);
+  }
+
+  .hud-top__chapter,
+  .hud-top__powers span,
+  .ammo__name,
+  .ammo__key {
+    display: none;
+  }
+
+  .hud-stats {
+    gap: var(--space-3);
+  }
+
+  .shots {
+    display: none;
+  }
+
+  .shots__text {
+    display: inline;
+  }
+
+  .hud-bottom {
+    padding: var(--space-1) var(--space-2);
+    gap: var(--space-2);
+  }
+
+  .aim-row {
+    grid-template-columns: 3.4rem auto 1fr auto 2.8rem;
+    gap: var(--space-1);
+  }
+
+  .aim-row__label {
+    font-size: 0.65rem;
+  }
+
+  .range--aim {
+    min-height: 36px;
+  }
+
+  .ammo__item {
+    min-width: 2.8rem;
+  }
+
+  .fire-btn {
+    width: 4.5rem;
+    height: 4.5rem;
+  }
+
+  .powers-menu {
+    top: auto;
+    bottom: var(--space-2);
+    max-height: calc(100dvh - 5rem);
+  }
+}
+
+/* Écrans bas (téléphone en paysage) : un seul bandeau compact pour laisser voir la scène */
+@media (max-height: 480px) {
+  .hud-bottom {
+    grid-template-columns: 1fr auto auto;
+    grid-template-areas: 'aim ammo fire';
+    padding: 2px var(--space-2);
+  }
+
+  .ammo {
+    flex-wrap: wrap;
+    max-width: 7.5rem;
+    gap: 4px;
+  }
+
+  .ammo__item {
+    min-width: 2.2rem;
+    min-height: 2.2rem;
+    padding: 2px;
+  }
+
+  .ammo__count {
+    font-size: 0.65rem;
+  }
+
+  .aim-panel {
+    gap: 0;
+  }
+
+  .aim-row .btn--step {
+    width: 2.25rem;
+    min-height: 2.25rem;
+  }
+
+  .range--aim {
+    min-height: 2.25rem;
+  }
+
+  .fire-btn {
+    width: 3.9rem;
+    height: 3.9rem;
+    font-size: 0.65rem;
+  }
+
+  .hud-top {
+    top: 4px;
+  }
+
+  .hud-top .btn--icon {
+    width: 2.4rem;
+    min-height: 2.4rem;
+  }
+
+  .hud-top__name {
+    font-size: var(--fs-1);
+  }
+
+  .hud-stat dt {
+    display: none;
+  }
+
+  .game__hint {
+    top: 22%;
+    font-size: var(--fs-0);
+  }
+}
+
+/* Contraste élevé : pas de transparence */
+:root[data-contrast='high'] .hud-top,
+:root[data-contrast='high'] .hud-bottom,
+:root[data-contrast='high'] .game__hint {
+  background: var(--surface);
+  backdrop-filter: none;
+}

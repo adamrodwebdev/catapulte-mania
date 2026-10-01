@@ -19,11 +19,34 @@ export class Camera {
   #shakeT = 0
   follow = true
   shakeEnabled = true
+  /** Marges (px) occupées par le HUD en haut et en bas : la scène est cadrée entre les deux. */
+  insetTop = 0
+  insetBottom = 0
 
   resize(w, h) {
     this.viewW = Math.max(1, w)
     this.viewH = Math.max(1, h)
     this.overview(true)
+  }
+
+  /**
+   * Déclare la place prise par l'interface (bandeaux haut/bas).
+   * Valeurs bornées : le HUD ne peut jamais masquer plus de 60 % de l'écran.
+   */
+  setInsets(top, bottom) {
+    const max = this.viewH * 0.3
+    this.insetTop = Number.isFinite(top) ? clamp(top, 0, max) : 0
+    this.insetBottom = Number.isFinite(bottom) ? clamp(bottom, 0, max) : 0
+    this.overview(true)
+  }
+
+  get #usableH() {
+    return Math.max(1, this.viewH - this.insetTop - this.insetBottom)
+  }
+
+  /** Centre vertical de caméra qui place le sol juste au-dessus du bandeau bas. */
+  #groundY(s) {
+    return WORLD.GROUND_Y + 90 - (this.viewH / 2 - this.insetBottom) / s
   }
 
   /** Zone d'intérêt du niveau (de la catapulte au bout du château). */
@@ -36,7 +59,7 @@ export class Camera {
     const { left, right, top } = this.#focus
     const w = right - left
     const h = WORLD.GROUND_Y + 90 - top
-    return Math.min(this.viewW / w, this.viewH / h)
+    return Math.min(this.viewW / w, this.#usableH / h)
   }
 
   /** Cadre toute la zone d'intérêt. */
@@ -44,7 +67,7 @@ export class Camera {
     const s = this.#fitScale()
     const { left, right } = this.#focus
     // Le sol est calé en bas de l'écran ; l'espace libre va au ciel.
-    this.#target = { x: (left + right) / 2, y: WORLD.GROUND_Y + 90 - this.viewH / s / 2, scale: s }
+    this.#target = { x: (left + right) / 2, y: this.#groundY(s), scale: s }
     if (immediate) Object.assign(this, this.#target)
   }
 
@@ -53,9 +76,8 @@ export class Camera {
     if (!this.follow) return
     const s = Math.min(this.#fitScale() * 1.35, 1.2)
     const halfW = this.viewW / s / 2
-    const halfH = this.viewH / s / 2
     const x = clamp(px, this.#focus.left - 100 + halfW, this.#focus.right + 300 - halfW)
-    const y = Math.min(clamp(py, WORLD.TOP + halfH, Infinity), WORLD.GROUND_Y + 90 - halfH)
+    const y = Math.min(Math.max(py, WORLD.TOP + (this.viewH / 2 - this.insetTop) / s), this.#groundY(s))
     this.#target = { x, y, scale: s }
   }
 

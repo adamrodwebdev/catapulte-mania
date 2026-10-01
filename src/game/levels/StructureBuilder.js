@@ -1,6 +1,6 @@
 import { Guard } from '../../core/utils/Guard.js'
 import { MATERIALS } from '../entities/materials.js'
-import { TARGET_TYPES } from '../entities/Target.js'
+import { TARGET_TYPES } from '../entities/catalog.js'
 import { WORLD } from '../physics/constants.js'
 
 /**
