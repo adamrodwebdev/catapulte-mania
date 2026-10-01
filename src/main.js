@@ -6,6 +6,7 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import { createAppContext, provideApp } from './app/AppContext.js'
+import { IS_DEMO } from './config/gameConfig.js'
 import './styles/tokens.css'
 import './styles/base.css'
 import './styles/ui.css'
@@ -22,6 +23,18 @@ app.config.errorHandler = (err) => {
 }
 
 app.mount('#app')
+
+/*
+ * Mode hors-ligne (PWA) : uniquement pour la version complète publiée en HTTPS.
+ * La démo en fichier unique n'en a pas besoin (elle fonctionne déjà hors-ligne).
+ */
+if (import.meta.env?.PROD !== false && !IS_DEMO && 'serviceWorker' in navigator && location.protocol === 'https:') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {
+      /* hors-ligne indisponible : le jeu fonctionne normalement */
+    })
+  })
+}
 
 try {
   history.replaceState({ screen: 'home' }, '')

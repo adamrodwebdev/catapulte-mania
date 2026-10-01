@@ -12,6 +12,7 @@ import vue from '@vitejs/plugin-vue'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { buildCsp } from './build/csp.js'
+import { buildServiceWorker, PUBLIC_PRECACHE } from './build/sw.js'
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
 const LANGS = ['fr', 'en', 'id']
@@ -104,6 +105,20 @@ function singleFilePlugin() {
   }
 }
 
+/** Service worker (version complète uniquement) : jeu jouable hors-ligne. */
+function serviceWorkerPlugin() {
+  return {
+    name: 'ctc-service-worker',
+    apply: 'build',
+    enforce: 'post',
+    generateBundle(_opts, bundle) {
+      const files = Object.keys(bundle).filter((f) => f !== 'index.html' && f !== 'sitemap.xml' && f !== 'robots.txt')
+      const version = createHash('sha256').update(files.sort().join('|')).digest('hex').slice(0, 12)
+      this.emitFile({ type: 'asset', fileName: 'sw.js', source: buildServiceWorker([...files, ...PUBLIC_PRECACHE], version) })
+    },
+  }
+}
+
 function escapeRe(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -115,7 +130,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: './',
-    plugins: [vue(), cspPlugin(), ...(isDemo ? [singleFilePlugin()] : [seoFilesPlugin(siteUrl)])],
+    plugins: [vue(), cspPlugin(), ...(isDemo ? [singleFilePlugin()] : [seoFilesPlugin(siteUrl), serviceWorkerPlugin()])],
     define: {
       __DEMO__: JSON.stringify(isDemo),
       __APP_VERSION__: JSON.stringify(pkg.version),

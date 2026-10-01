@@ -49,7 +49,7 @@ export const LEVEL_SPECS = [
     },
   },
   {
-    shots: 4, wind: 0.25, ammo: {},
+    shots: 5, wind: 0.25, ammo: {},
     build(b) {
       const [a1, a2] = b.tower(1350, { floors: 2 })
       b.target(a1)
@@ -208,14 +208,14 @@ export const LEVEL_SPECS = [
     },
   },
   {
-    shots: 6, wind: 0.55, ammo: { boulder: 2, fire: 2 },
+    shots: 7, wind: 0.55, ammo: { boulder: 3, fire: 2 },
     build(b) {
       b.wall(1200, { mat: 'stone', h: 160, n: 4, w: 34 })
       const left = b.tower(1420, { floors: 3, mat: 'stone', t: 26, roof: 'wood' })
       const keep = b.tower(1700, { floors: 2, mat: 'stone', w: 170, t: 26 })
       const right = b.tower(1980, { floors: 3, mats: ['stone', 'stone', 'wood'], t: 26, roof: 'straw' })
       b.target(left[2])
-      b.target(left[0], 'knight')
+      b.target(left[1], 'knight')
       b.target(keep[0], 'knight', -30)
       b.barrel(keep[0], 30)
       b.target(keep[1])
