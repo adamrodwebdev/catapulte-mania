@@ -126,7 +126,7 @@ function escapeRe(s) {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_')
   const isDemo = mode === 'demo'
-  const siteUrl = env.VITE_SITE_URL || 'https://crush-the-castle.netlify.app'
+  const siteUrl = env.VITE_SITE_URL || 'https://catapulte-mania.netlify.app'
 
   return {
     base: './',
