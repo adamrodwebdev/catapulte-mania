@@ -1,0 +1,301 @@
+import Matter from 'matter-js'
+import { WORLD, CATEGORY } from './constants.js'
+import { Guard } from '../../core/utils/Guard.js'
+import { Projectile } from '../entities/Projectile.js'
+import { SeededRandom } from '../../core/utils/SeededRandom.js'
+
+const { Engine, Composite, Bodies, Body, Events, Sleeping } = Matter
+
+/**
+ * Monde physique : encapsule Matter.js et applique les règles du jeu.
+ *
+ * - Pas de temps FIXE (120 Hz) : la simulation est identique sur un téléphone
+ *   à 30 images/s et sur un écran à 144 Hz.
+ * - Calcul des dégâts à partir de l'énergie de choc (masse réduite × vitesse²).
+ * - Explosions, feu et réactions en chaîne.
+ * - Vent appliqué aux projectiles.
+ *
+ * Événements émis sur `events` :
+ *   entity:destroyed { entity, cause }   impact { entity, energy, x, y, material }
+ *   explosion { x, y, radius }            fire:start { entity }
+ *   projectile:spent { entity }           projectile:split { entity }
+ */
+export class PhysicsWorld {
+  /** @type {Map<number, import('../entities/Entity.js').Entity>} */
+  #entities = new Map()
+  #accumulator = 0
+  #time = 0
+  #pendingExplosions = []
+  #events
+  #wind = 0
+  #fireTick = 0
+  #rng
+
+  /**
+   * @param {import('../../core/utils/EventBus.js').EventBus} events
+   * @param {{ wind?: number, seed?: number }} [opts] wind ∈ [-1, 1] ; graine du hasard (feu, éclats)
+   */
+  constructor(events, { wind = 0, seed = 1 } = {}) {
+    this.#events = events
+    this.#rng = new SeededRandom(seed)
+    this.engine = Engine.create({ enableSleeping: true, positionIterations: 8, velocityIterations: 6 })
+    this.engine.gravity.y = WORLD.GRAVITY
+    this.engine.gravity.scale = WORLD.GRAVITY_SCALE
+    this.wind = wind
+
+    const ground = Bodies.rectangle(WORLD.WIDTH / 2, WORLD.GROUND_Y + 100, WORLD.WIDTH * 3, 200, {
+      isStatic: true,
+      friction: 1,
+      label: 'ground',
+      collisionFilter: { category: CATEGORY.STATIC },
+    })
+    Composite.add(this.engine.world, ground)
+
+    this._onCollision = (e) => this.#handleCollisions(e.pairs)
+    this._onBeforeUpdate = () => this.#applyWind()
+    Events.on(this.engine, 'collisionStart', this._onCollision)
+    Events.on(this.engine, 'beforeUpdate', this._onBeforeUpdate)
+  }
+
+  get time() {
+    return this.#time
+  }
+
+  get wind() {
+    return this.#wind
+  }
+
+  set wind(v) {
+    this.#wind = Guard.number(v, 'wind', { min: -1, max: 1 })
+  }
+
+  /** @returns {IterableIterator<import('../entities/Entity.js').Entity>} */
+  entities() {
+    return this.#entities.values()
+  }
+
+  /** @param {(e: any) => boolean} predicate */
+  filter(predicate) {
+    return [...this.#entities.values()].filter(predicate)
+  }
+
+  add(entity) {
+    this.#entities.set(entity.body.id, entity)
+    Composite.add(this.engine.world, entity.body)
+    return entity
+  }
+
+  remove(entity) {
+    if (!this.#entities.has(entity.body.id)) return
+    this.#entities.delete(entity.body.id)
+    Composite.remove(this.engine.world, entity.body)
+  }
+
+  /** La structure a-t-elle fini de se stabiliser (période sans dégâts) ? */
+  get settled() {
+    return this.#time >= WORLD.SETTLE_MS
+  }
+
+  /**
+   * Avance la simulation du temps réel écoulé (ms), par pas fixes.
+   * @param {number} frameMs
+   * @param {number} [timeScale] ralenti éventuel
+   */
+  step(frameMs, timeScale = 1) {
+    this.#accumulator += Math.min(frameMs, 100) * timeScale
+    let steps = 0
+    while (this.#accumulator >= WORLD.STEP_MS && steps < WORLD.MAX_STEPS_PER_FRAME) {
+      this.stepOnce()
+      this.#accumulator -= WORLD.STEP_MS
+      steps++
+    }
+    if (steps === WORLD.MAX_STEPS_PER_FRAME) this.#accumulator = 0
+    return steps
+  }
+
+  /** Un pas de simulation (utilisé aussi par les tests et le solveur de niveaux). */
+  stepOnce() {
+    Engine.update(this.engine, WORLD.STEP_MS)
+    this.#time += WORLD.STEP_MS
+    for (const e of this.#entities.values()) e.update(WORLD.STEP_MS)
+    this.#fireTick += WORLD.STEP_MS
+    if (this.#fireTick >= 400) {
+      this.#fireTick = 0
+      this.#spreadFire()
+    }
+    this.#processExplosions()
+    this.#cleanup()
+  }
+
+  /** Tous les corps sont-ils (quasi) immobiles ? */
+  isAtRest(threshold = 0.12) {
+    for (const e of this.#entities.values()) {
+      if (e.kind === 'projectile') return false
+      if (!e.body.isSleeping && e.speed > threshold) return false
+    }
+    return this.#pendingExplosions.length === 0
+  }
+
+  /** Entités dont le centre est dans le rayon donné. */
+  queryRadius(x, y, radius) {
+    const r2 = radius * radius
+    return this.filter((e) => e.alive && (e.x - x) ** 2 + (e.y - y) ** 2 <= r2)
+  }
+
+  /**
+   * Explosion : souffle radial + dégâts dégressifs + mise à feu des matériaux inflammables.
+   * @param {number} x
+   * @param {number} y
+   * @param {{ radius: number, power: number, damage: number, source?: any }} spec
+   */
+  explode(x, y, { radius, power, damage, source = null }) {
+    this.#events.emit('explosion', { x, y, radius, source })
+    for (const e of this.queryRadius(x, y, radius + 30)) {
+      if (e === source) continue
+      const dx = e.x - x
+      const dy = e.y - y
+      const d = Math.max(1, Math.hypot(dx, dy) - Math.max(e.width, e.height) / 3)
+      const falloff = Math.max(0, 1 - d / radius)
+      if (falloff <= 0) continue
+      Sleeping.set(e.body, false)
+      const v = Body.getVelocity(e.body)
+      const kick = (power * falloff) / Math.sqrt(Math.max(0.5, e.mass))
+      Body.setVelocity(e.body, { x: v.x + (dx / (d || 1)) * kick, y: v.y + (dy / (d || 1)) * kick - kick * 0.35 })
+      Body.setAngularVelocity(e.body, e.body.angularVelocity + (this.#rng.next() - 0.5) * 0.2 * falloff)
+      if (e.kind !== 'projectile') {
+        e.damage(damage * falloff, 'explosion')
+        if (falloff > 0.35 && e.ignite(5000)) this.#events.emit('fire:start', { entity: e })
+      }
+    }
+  }
+
+  /** Divise un projectile en trois (mitraille). */
+  splitProjectile(p) {
+    if (!(p instanceof Projectile) || !p.canActivate) return []
+    p.hasSplit = true
+    const v = Body.getVelocity(p.body)
+    const speed = Math.hypot(v.x, v.y)
+    const base = Math.atan2(v.y, v.x)
+    const shards = [-0.14, 0, 0.14].map((da) => {
+      const shard = new Projectile('stone', p.x, p.y, { radius: 11 })
+      shard.splittable = false
+      this.add(shard)
+      Body.setVelocity(shard.body, { x: Math.cos(base + da) * speed, y: Math.sin(base + da) * speed })
+      return shard
+    })
+    p.kill('split')
+    this.#events.emit('projectile:split', { entity: p, shards })
+    return shards
+  }
+
+  #applyWind() {
+    if (this.#wind === 0) return
+    const ax = this.#wind * WORLD.WIND_RATIO * WORLD.GRAVITY * WORLD.GRAVITY_SCALE
+    for (const e of this.#entities.values()) {
+      if (e.kind === 'projectile' && !e.hasImpacted) e.body.force.x += e.body.mass * ax
+    }
+  }
+
+  #entityOf(body) {
+    const b = body.parent || body
+    return b.plugin && b.plugin.entity ? b.plugin.entity : null
+  }
+
+  #handleCollisions(pairs) {
+    for (const pair of pairs) {
+      const a = this.#entityOf(pair.bodyA)
+      const b = this.#entityOf(pair.bodyB)
+      if (!a && !b) continue
+      const bodyA = pair.bodyA.parent || pair.bodyA
+      const bodyB = pair.bodyB.parent || pair.bodyB
+      const va = Body.getVelocity(bodyA)
+      const vb = Body.getVelocity(bodyB)
+      const n = pair.collision.normal
+      const rel = Math.abs((va.x - vb.x) * n.x + (va.y - vb.y) * n.y)
+
+      // Premier contact d'un projectile : effets spéciaux (feu, explosion).
+      for (const [p, other] of [[a, b], [b, a]]) {
+        if (p && p.kind === 'projectile' && !p.hasImpacted && p.alive) {
+          p.hasImpacted = true
+          if (p.ignites && other && other.ignite(7000)) this.#events.emit('fire:start', { entity: other })
+          if (p.ignites) {
+            for (const near of this.queryRadius(p.x, p.y, 70)) {
+              if (near !== p && near.ignite(6000)) this.#events.emit('fire:start', { entity: near })
+            }
+          }
+          if (p.explodes) {
+            this.#pendingExplosions.push({ at: this.#time, x: p.x, y: p.y, spec: { radius: 150, power: 12, damage: 800, source: p } })
+            p.kill('explosion')
+          }
+        }
+      }
+
+      if (!this.settled || rel < WORLD.IMPACT_THRESHOLD) continue
+      const ma = bodyA.isStatic ? Infinity : bodyA.mass
+      const mb = bodyB.isStatic ? Infinity : bodyB.mass
+      const reduced = ma === Infinity ? mb : mb === Infinity ? ma : (ma * mb) / (ma + mb)
+      const v = rel - WORLD.IMPACT_THRESHOLD
+      let energy = 0.5 * reduced * v * v
+      const projectile = a?.kind === 'projectile' ? a : b?.kind === 'projectile' ? b : null
+      if (projectile) energy *= projectile.impactFactor
+      if (energy < 1) continue
+
+      const contact = pair.collision.supports[0] || bodyA.position
+      for (const [e, other] of [[a, b], [b, a]]) {
+        if (!e || !e.alive) continue
+        e.receiveImpact(energy, other)
+        if (energy > 8) {
+          this.#events.emit('impact', { entity: e, energy, x: contact.x, y: contact.y, material: e.material || e.kind })
+        }
+      }
+    }
+  }
+
+  #spreadFire() {
+    const burning = this.filter((e) => e.burning > 0 && e.alive && e.kind !== 'projectile')
+    for (const src of burning) {
+      const reach = Math.max(src.width, src.height) / 2 + 26
+      for (const near of this.queryRadius(src.x, src.y, reach + 30)) {
+        if (near !== src && near.flammable && near.burning === 0 && this.#rng.chance(0.3)) {
+          if (near.ignite(5500)) this.#events.emit('fire:start', { entity: near })
+        }
+      }
+    }
+  }
+
+  #processExplosions() {
+    const ready = this.#pendingExplosions.filter((x) => this.#time - x.at >= 0)
+    if (!ready.length) return
+    this.#pendingExplosions = this.#pendingExplosions.filter((x) => !ready.includes(x))
+    for (const x of ready) this.explode(x.x, x.y, x.spec)
+  }
+
+  /** Retire les entités détruites, sorties du monde ou épuisées, et déclenche les barils. */
+  #cleanup() {
+    for (const e of [...this.#entities.values()]) {
+      const out = e.y > WORLD.BOTTOM + WORLD.KILL_MARGIN || e.x < -WORLD.KILL_MARGIN || e.x > WORLD.WIDTH + WORLD.KILL_MARGIN
+      if (out && e.alive) e.kill(e.kind === 'projectile' ? 'out' : 'fall')
+      if (e.kind === 'projectile' && e.alive && e.spent) {
+        this.remove(e)
+        this.#events.emit('projectile:spent', { entity: e })
+        continue
+      }
+      if (!e.alive) {
+        this.remove(e)
+        if (e.kind === 'barrel') {
+          this.#pendingExplosions.push({ at: this.#time + 110, x: e.x, y: e.y, spec: { ...e.explosion, source: e } })
+        }
+        if (e.kind === 'projectile') this.#events.emit('projectile:spent', { entity: e })
+        else this.#events.emit('entity:destroyed', { entity: e, cause: e.deathCause || 'impact' })
+      }
+    }
+  }
+
+  destroy() {
+    Events.off(this.engine, 'collisionStart', this._onCollision)
+    Events.off(this.engine, 'beforeUpdate', this._onBeforeUpdate)
+    Composite.clear(this.engine.world, false)
+    Engine.clear(this.engine)
+    this.#entities.clear()
+  }
+}

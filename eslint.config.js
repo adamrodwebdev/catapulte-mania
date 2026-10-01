@@ -17,7 +17,7 @@ const browserGlobals = Object.fromEntries(
 )
 
 export default [
-  { ignores: ['dist/**', 'dist-demo/**', 'node_modules/**', 'coverage/**'] },
+  { ignores: ['dist/**', 'dist-demo/**', 'node_modules/**', 'coverage/**', '.scratch/**'] },
   js.configs.recommended,
   {
     files: ['**/*.{js,mjs}'],

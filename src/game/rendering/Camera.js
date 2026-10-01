@@ -1,0 +1,98 @@
+import { clamp, lerp } from '../../core/utils/math.js'
+import { WORLD } from '../physics/constants.js'
+
+/**
+ * Caméra 2D : cadre la scène à l'écran et suit le projectile.
+ * - Mode « vue d'ensemble » : la catapulte ET le château sont visibles.
+ * - Mode « suivi » : léger zoom qui accompagne le projectile en vol.
+ * Les tremblements d'écran sont désactivables (accessibilité).
+ */
+export class Camera {
+  viewW = 1
+  viewH = 1
+  x = WORLD.WIDTH / 2
+  y = 600
+  scale = 0.5
+  #target = { x: WORLD.WIDTH / 2, y: 600, scale: 0.5 }
+  #focus = { left: 0, right: WORLD.WIDTH, top: 200 }
+  #shake = 0
+  #shakeT = 0
+  follow = true
+  shakeEnabled = true
+
+  resize(w, h) {
+    this.viewW = Math.max(1, w)
+    this.viewH = Math.max(1, h)
+    this.overview(true)
+  }
+
+  /** Zone d'intérêt du niveau (de la catapulte au bout du château). */
+  setFocus(left, right, top) {
+    this.#focus = { left, right, top }
+    this.overview(true)
+  }
+
+  #fitScale() {
+    const { left, right, top } = this.#focus
+    const w = right - left
+    const h = WORLD.GROUND_Y + 90 - top
+    return Math.min(this.viewW / w, this.viewH / h)
+  }
+
+  /** Cadre toute la zone d'intérêt. */
+  overview(immediate = false) {
+    const s = this.#fitScale()
+    const { left, right } = this.#focus
+    // Le sol est calé en bas de l'écran ; l'espace libre va au ciel.
+    this.#target = { x: (left + right) / 2, y: WORLD.GROUND_Y + 90 - this.viewH / s / 2, scale: s }
+    if (immediate) Object.assign(this, this.#target)
+  }
+
+  /** Suit un point (projectile) avec un zoom modéré. */
+  track(px, py) {
+    if (!this.follow) return
+    const s = Math.min(this.#fitScale() * 1.35, 1.2)
+    const halfW = this.viewW / s / 2
+    const halfH = this.viewH / s / 2
+    const x = clamp(px, this.#focus.left - 100 + halfW, this.#focus.right + 300 - halfW)
+    const y = Math.min(clamp(py, WORLD.TOP + halfH, Infinity), WORLD.GROUND_Y + 90 - halfH)
+    this.#target = { x, y, scale: s }
+  }
+
+  shake(intensity) {
+    if (!this.shakeEnabled) return
+    this.#shake = Math.min(18, this.#shake + intensity)
+  }
+
+  update(dtMs) {
+    const k = 1 - Math.pow(0.0025, dtMs / 1000)
+    this.x = lerp(this.x, this.#target.x, k)
+    this.y = lerp(this.y, this.#target.y, k)
+    this.scale = lerp(this.scale, this.#target.scale, k)
+    this.#shakeT += dtMs
+    this.#shake = Math.max(0, this.#shake - dtMs * 0.03)
+  }
+
+  get offset() {
+    if (this.#shake <= 0) return { x: 0, y: 0 }
+    return { x: Math.sin(this.#shakeT * 0.09) * this.#shake, y: Math.cos(this.#shakeT * 0.11) * this.#shake * 0.6 }
+  }
+
+  /** Applique la transformation monde → écran au contexte. */
+  apply(ctx, dpr, parallax = 1) {
+    const o = this.offset
+    ctx.setTransform(
+      dpr * this.scale, 0, 0, dpr * this.scale,
+      dpr * (this.viewW / 2 - this.x * this.scale * parallax + o.x),
+      dpr * (this.viewH / 2 - this.y * this.scale + o.y),
+    )
+  }
+
+  screenToWorld(sx, sy) {
+    return { x: (sx - this.viewW / 2) / this.scale + this.x, y: (sy - this.viewH / 2) / this.scale + this.y }
+  }
+
+  worldToScreen(wx, wy) {
+    return { x: (wx - this.x) * this.scale + this.viewW / 2, y: (wy - this.y) * this.scale + this.viewH / 2 }
+  }
+}
