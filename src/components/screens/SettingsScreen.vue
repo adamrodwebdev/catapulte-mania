@@ -11,7 +11,8 @@ const app = useApp()
 const { state, t } = app
 const s = computed(() => state.settings)
 
-const opts = (key, values) => values.map((v) => ({ value: v, label: t(`settings.${key}.${v}`) }))
+// Les points sont des séparateurs de clés : « 1.15 » devient « 1_15 » dans les dictionnaires.
+const opts = (key, values) => values.map((v) => ({ value: v, label: t(`settings.${key}.${String(v).replace('.', '_')}`) }))
 const set = (key) => (value) => app.setSetting(key, value)
 const back = () => app.go(state.previous === 'game' || state.previous === 'settings' ? 'home' : state.previous)
 

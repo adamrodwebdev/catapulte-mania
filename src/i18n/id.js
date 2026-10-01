@@ -177,7 +177,7 @@ export default {
     motion: 'Animasi',
     motions: { system: 'Sistem', reduced: 'Dikurangi', full: 'Penuh' },
     uiScale: 'Ukuran teks',
-    scales: { 1: 'Normal', 1.15: 'Besar', 1.3: 'Sangat besar' },
+    scales: { 1: 'Normal', '1_15': 'Besar', '1_3': 'Sangat besar' },
     trajectoryAid: 'Bantuan lintasan',
     trajectoryAidDesc: 'Menampilkan kurva yang akan dilalui proyektil.',
     captions: 'Teks suara',

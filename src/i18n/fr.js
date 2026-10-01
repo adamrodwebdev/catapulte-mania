@@ -177,7 +177,7 @@ export default {
     motion: 'Animations',
     motions: { system: 'Système', reduced: 'Réduites', full: 'Complètes' },
     uiScale: 'Taille du texte',
-    scales: { 1: 'Normale', 1.15: 'Grande', 1.3: 'Très grande' },
+    scales: { 1: 'Normale', '1_15': 'Grande', '1_3': 'Très grande' },
     trajectoryAid: 'Aide à la trajectoire',
     trajectoryAidDesc: 'Affiche la courbe que suivra le projectile.',
     captions: 'Sous-titres des sons',
