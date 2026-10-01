@@ -5,9 +5,9 @@ import { Guard, deepFreeze } from '../../core/utils/Guard.js'
 
 /** Types de cibles : le soldat, le chevalier en armure et le roi. */
 export const TARGET_TYPES = deepFreeze({
-  soldier: { w: 26, h: 50, hp: 30, density: 0.0012, score: 500 },
-  knight: { w: 30, h: 54, hp: 75, density: 0.0018, score: 800 },
-  king: { w: 32, h: 58, hp: 55, density: 0.0014, score: 1500 },
+  soldier: { w: 26, h: 50, hp: 16, density: 0.0012, score: 500 },
+  knight: { w: 30, h: 54, hp: 45, density: 0.0018, score: 800 },
+  king: { w: 32, h: 58, hp: 30, density: 0.0014, score: 1500 },
 })
 
 /** Personnage à éliminer, caché dans la structure. */

@@ -1,0 +1,171 @@
+/**
+ * Contrôle qualité des 40 niveaux (npm run check:levels).
+ *
+ * Pour chaque niveau, ce script vérifie automatiquement :
+ *  1. STABILITÉ : la structure tient debout seule (aucun bloc détruit,
+ *     aucune cible morte) pendant 6 secondes sans aucun tir ;
+ *  2. FAISABILITÉ : un « joueur automatique » parvient à éliminer toutes les
+ *     cibles en mode DIFFICILE (le mode qui donne le moins de tirs).
+ *
+ * Le joueur automatique est volontairement simple : à chaque tour il vise
+ * chaque cible restante sous plusieurs angles, simule chaque tir et garde
+ * le meilleur. S'il réussit, un humain le peut aussi.
+ *
+ * Usage : node scripts/check-levels.mjs [--levels 1-10] [--difficulty hard]
+ */
+import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads'
+import { availableParallelism } from 'node:os'
+import { fileURLToPath } from 'node:url'
+
+const ANGLES = [10, 20, 30, 40, 50, 60, 70]
+
+async function loadGame() {
+  const { GameSession } = await import('../src/game/GameSession.js')
+  const { LevelRepository } = await import('../src/game/levels/LevelRepository.js')
+  const { TrajectoryPredictor } = await import('../src/game/TrajectoryPredictor.js')
+  const { AIM } = await import('../src/game/Catapult.js')
+  return { GameSession, LevelRepository, TrajectoryPredictor, AIM }
+}
+
+/** Joue une partie en appliquant une liste de tirs ; s'arrête au tour suivant. */
+function replay(G, level, difficulty, shots) {
+  const s = new G.GameSession(level, { difficulty, completedLevels: 0, reducedMotion: true })
+  let ended = null
+  s.on('end', (e) => (ended = e))
+  const tick = () => s.update(1000 / 30)
+  let guard = 0
+  while (s.state !== 'aiming' && guard++ < 200) tick()
+  for (const shot of shots) {
+    if (ended) break
+    s.selectAmmo(shot.ammo)
+    s.aim(shot.angle, shot.power)
+    s.fire()
+    guard = 0
+    while (s.state !== 'aiming' && !ended && guard++ < 600) tick()
+  }
+  return { session: s, ended }
+}
+
+/** Puissance qui fait passer la trajectoire par (tx, ty) pour un angle donné. */
+function solvePower(G, session, angle, tx, ty) {
+  const c = session.catapult
+  let lo = 0
+  let hi = 1
+  for (let i = 0; i < 18; i++) {
+    const mid = (lo + hi) / 2
+    c.setAim(angle, mid)
+    const pts = G.TrajectoryPredictor.predict(c.launchPoint, c.velocity, { wind: session.wind, maxPoints: 400, every: 1 })
+    const at = pts.find((p) => p.x >= tx)
+    const y = at ? at.y : Infinity
+    if (y > ty) lo = mid
+    else hi = mid
+  }
+  return (lo + hi) / 2
+}
+
+function candidates(G, session) {
+  const out = []
+  const targets = session.world.filter((e) => e.kind === 'target' && e.alive)
+  // Points visés : chaque cible, les barils, et les blocs les plus proches des cibles (supports).
+  const near = session.world
+    .filter((e) => e.kind === 'block' || e.kind === 'barrel')
+    .map((b) => ({ b, d: Math.min(...targets.map((t) => Math.hypot(t.x - b.x, t.y - b.y))) }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, 10)
+    .map((x) => x.b)
+  const points = [...targets, ...near]
+  const ammoTypes = session.ammo.filter((a) => a.count === null || a.count > 0).map((a) => a.type)
+  for (const t of points) {
+    for (const angle of ANGLES) {
+      const power = solvePower(G, session, angle, t.x, t.y)
+      if (power <= 0.001 || power >= 0.999) continue
+      for (const ammo of ammoTypes) out.push({ angle, power: Math.round(power * 1000) / 1000, ammo })
+    }
+  }
+  return out
+}
+
+function checkLevel(G, id, difficulty) {
+  const level = G.LevelRepository.get(id)
+  // 1. Stabilité
+  const s0 = new G.GameSession(level, { difficulty: 'normal', completedLevels: 0, reducedMotion: true })
+  s0.world.filter(() => true)
+  const blocksBefore = level.blocks.length
+  for (let i = 0; i < 360; i++) s0.update(1000 / 60)
+  const destroyed = blocksBefore - s0.world.filter((e) => e.kind === 'block').length
+  const stable = destroyed === 0 && s0.targetsLeft === level.targets.length
+  s0.destroy()
+
+  // 2. Faisabilité (glouton)
+  const history = []
+  let solved = false
+  let lastScore = 0
+  for (let turn = 0; turn < 12; turn++) {
+    const { session, ended } = replay(G, level, difficulty, history)
+    if (ended) {
+      solved = ended.won
+      lastScore = ended.result.score
+      session.destroy()
+      break
+    }
+    let best = null
+    for (const cand of candidates(G, session)) {
+      const r = replay(G, level, difficulty, [...history, cand])
+      const left = r.session.targetsLeft
+      const value = (level.targets.length - left) * 100000 + r.session.score.current
+      if (!best || value > best.value) best = { cand, value, won: r.ended?.won }
+      r.session.destroy()
+      if (best.won) break
+    }
+    session.destroy()
+    if (!best) break
+    history.push(best.cand)
+  }
+  return { id, stable, destroyedAtRest: destroyed, solved, shotsUsed: history.length, score: lastScore, plan: history }
+}
+
+function parseRange(arg, max) {
+  if (!arg) return Array.from({ length: max }, (_, i) => i + 1)
+  const [a, b] = arg.split('-').map(Number)
+  return Array.from({ length: (b || a) - a + 1 }, (_, i) => a + i)
+}
+
+if (isMainThread) {
+  const args = process.argv.slice(2)
+  const get = (k) => (args.includes(k) ? args[args.indexOf(k) + 1] : undefined)
+  const ids = parseRange(get('--levels'), 40)
+  const difficulty = get('--difficulty') || 'hard'
+  const workers = Math.max(1, Math.min(availableParallelism(), ids.length))
+  const chunks = Array.from({ length: workers }, (_, w) => ids.filter((_, i) => i % workers === w))
+  const t0 = Date.now()
+  const results = (
+    await Promise.all(
+      chunks.map(
+        (chunk) =>
+          new Promise((resolve, reject) => {
+            const w = new Worker(fileURLToPath(import.meta.url), { workerData: { ids: chunk, difficulty } })
+            const out = []
+            w.on('message', (m) => {
+              out.push(m)
+              const mark = m.stable && m.solved ? 'OK ' : 'KO '
+              console.log(`${mark} niveau ${String(m.id).padStart(2)}  stable=${m.stable}  résolu=${m.solved} en ${m.shotsUsed} tir(s)  score=${m.score}`)
+            })
+            w.on('error', reject)
+            w.on('exit', () => resolve(out))
+          }),
+      ),
+    )
+  )
+    .flat()
+    .sort((a, b) => a.id - b.id)
+  const bad = results.filter((r) => !r.stable || !r.solved)
+  console.log(`\n${results.length - bad.length}/${results.length} niveaux valides (difficulté ${difficulty}) en ${((Date.now() - t0) / 1000).toFixed(0)} s`)
+  if (process.env.CHECK_REPORT) {
+    const { writeFileSync } = await import('node:fs')
+    writeFileSync(process.env.CHECK_REPORT, JSON.stringify(results, null, 2))
+  }
+  process.exitCode = bad.length ? 1 : 0
+} else {
+  const G = await loadGame()
+  for (const id of workerData.ids) parentPort.postMessage(checkLevel(G, id, workerData.difficulty))
+}

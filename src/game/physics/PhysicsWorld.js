@@ -169,6 +169,22 @@ export class PhysicsWorld {
     }
   }
 
+  /**
+   * Séisme : secoue tous les corps posés et inflige des dégâts légers.
+   * @param {number} intensity 0..1
+   */
+  quake(intensity = 1) {
+    this.#events.emit('quake', { intensity })
+    for (const e of this.#entities.values()) {
+      if (e.kind === 'projectile') continue
+      Sleeping.set(e.body, false)
+      const v = Body.getVelocity(e.body)
+      const k = intensity * (2.4 + this.#rng.range(0, 1.6)) * (e.y < WORLD.GROUND_Y - 150 ? 1.4 : 1)
+      Body.setVelocity(e.body, { x: v.x + (this.#rng.next() < 0.5 ? -k : k), y: v.y - k * 0.6 })
+      e.damage(e.maxHp * 0.12 * intensity, 'impact')
+    }
+  }
+
   /** Divise un projectile en trois (mitraille). */
   splitProjectile(p) {
     if (!(p instanceof Projectile) || !p.canActivate) return []
