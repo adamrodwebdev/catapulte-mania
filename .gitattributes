@@ -1,0 +1,5 @@
+# Fins de ligne Unix (LF) pour tous les fichiers texte, quel que soit le système.
+# Évite que Windows convertisse les fichiers en CRLF (ex. .nvmrc illisible par Netlify).
+* text=auto eol=lf
+*.png binary
+*.woff2 binary
