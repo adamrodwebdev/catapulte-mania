@@ -24,8 +24,15 @@ export const WORLD = deepFreeze({
    * Vitesse minimale du bloc et vitesse de rapprochement (mêmes unités que
    * IMPACT_THRESHOLD) ; en dessous, c'est un simple frôlement.
    */
-  CRUSH_BLOCK_SPEED: 2.6,
-  CRUSH_REL_SPEED: 1.6,
+  CRUSH_BLOCK_SPEED: 1.2,
+  CRUSH_REL_SPEED: 0.8,
+  /**
+   * Coincement : une cible sur laquelle repose un bloc (mur, plancher, toit),
+   * ou prise en étau entre deux blocs, meurt écrasée. Distance (px) des points
+   * de contrôle autour de la cible et intervalle de contrôle (pas de simulation).
+   */
+  PIN_PROBE: 3,
+  PIN_CHECK_EVERY: 12,
   /** Délai pendant lequel la structure se stabilise sans subir de dégâts (ms). */
   SETTLE_MS: 900,
   /** Hors de ces limites, un corps est considéré comme sorti du monde. */

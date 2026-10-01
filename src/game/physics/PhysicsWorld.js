@@ -5,7 +5,7 @@ import { Projectile } from '../entities/Projectile.js'
 import { SeededRandom } from '../../core/utils/SeededRandom.js'
 import { StructuralIntegrity } from './StructuralIntegrity.js'
 
-const { Engine, Composite, Bodies, Body, Events, Sleeping } = Matter
+const { Engine, Composite, Bodies, Body, Events, Sleeping, Query, Vertices } = Matter
 
 /**
  * Monde physique : encapsule Matter.js et applique les règles du jeu.
@@ -24,6 +24,8 @@ const { Engine, Composite, Bodies, Body, Events, Sleeping } = Matter
  *
  * Règles de jeu physiques :
  *  - une cible touchée par un bloc en mouvement (après le premier tir) meurt écrasée ;
+ *  - une cible coincée (bloc posé sur elle, ou prise entre deux blocs) meurt aussi :
+ *    un niveau ne peut jamais rester bloqué avec une cible emmurée ;
  *  - un mur porteur frappé assez fort cède et fait s'effondrer ce qu'il soutient ;
  *  - rien ne reste suspendu dans le vide quand son appui disparaît.
  */
@@ -39,6 +41,7 @@ export class PhysicsWorld {
   #rng
   /** Vrai dès le premier tir : avant, la structure se met en place sans conséquence. */
   #armed = false
+  #pinTick = 0
   structure = new StructuralIntegrity()
 
   /**
@@ -141,7 +144,35 @@ export class PhysicsWorld {
       this.#spreadFire()
     }
     this.#processExplosions()
+    if (this.#armed && ++this.#pinTick >= WORLD.PIN_CHECK_EVERY) {
+      this.#pinTick = 0
+      this.#checkPinned()
+    }
     this.#cleanup()
+  }
+
+  /**
+   * Cibles coincées. On place des points de contrôle juste au-dessus et de part
+   * et d'autre de chaque cible (dans le repère du monde) :
+   *  - un bloc qui occupe un point du dessus repose sur la cible → écrasée ;
+   *  - des blocs qui occupent à la fois la gauche et la droite → prise en étau.
+   */
+  #checkPinned() {
+    const blocks = this.filter((e) => e.kind === 'block' && e.alive).map((e) => e.body)
+    if (!blocks.length) return
+    const d = WORLD.PIN_PROBE
+    for (const t of this.filter((e) => e.kind === 'target' && e.alive)) {
+      const b = t.body.bounds
+      const w = b.max.x - b.min.x
+      const h = b.max.y - b.min.y
+      const near = Query.region(blocks, { min: { x: b.min.x - d * 2, y: b.min.y - d * 2 }, max: { x: b.max.x + d * 2, y: b.max.y + d * 2 } })
+      if (!near.length) continue
+      const hit = (pts) => near.some((body) => pts.some((p) => Vertices.contains(body.vertices, p)))
+      const top = [0.3, 0.5, 0.7].map((k) => ({ x: b.min.x + w * k, y: b.min.y - d }))
+      const left = [0.35, 0.65].map((k) => ({ x: b.min.x - d, y: b.min.y + h * k }))
+      const right = [0.35, 0.65].map((k) => ({ x: b.max.x + d, y: b.min.y + h * k }))
+      if (hit(top) || (hit(left) && hit(right))) t.kill('crush')
+    }
   }
 
   /** Tous les corps sont-ils (quasi) immobiles ? */

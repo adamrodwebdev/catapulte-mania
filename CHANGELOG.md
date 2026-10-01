@@ -2,6 +2,17 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [1.4.0] – 2026-10-01
+### Corrigé
+- Cibles coincées : une cible sur laquelle repose un bloc (mur, plancher, toit)
+  ou prise en étau entre deux blocs meurt écrasée. Un niveau ne peut plus
+  rester bloqué avec une cible emmurée et intouchable.
+- Écrasement par un bloc en mouvement : seuils abaissés (un mur ou un toit qui
+  tombe ou glisse sur une cible la tue).
+### Qualité
+- Le contrôle des niveaux vérifie aussi qu'aucune cible n'est coincée dès le
+  départ ; 3 nouveaux tests (41 au total).
+
 ## [1.3.0] – 2026-10-01
 ### Modifié
 - Les 40 niveaux sont entièrement redessinés : châteaux plus hauts (jusqu'à

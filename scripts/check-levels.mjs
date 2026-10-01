@@ -3,7 +3,9 @@
  *
  * Pour chaque niveau, ce script vérifie automatiquement :
  *  1. STABILITÉ : la structure tient debout seule (aucun bloc détruit,
- *     aucune cible morte) pendant 6 secondes sans aucun tir ;
+ *     aucune cible morte) pendant 6 secondes sans aucun tir, puis encore
+ *     2 secondes une fois les règles d'écrasement armées par un tir perdu
+ *     (aucune cible ne doit être coincée dès le départ) ;
  *  2. FAISABILITÉ : un « joueur automatique » parvient à éliminer toutes les
  *     cibles en mode DIFFICILE (le mode qui donne le moins de tirs).
  *
@@ -85,13 +87,17 @@ function candidates(G, session) {
   return out
 }
 
-function checkLevel(G, id, difficulty) {
+async function checkLevel(G, id, difficulty) {
   const level = G.LevelRepository.get(id)
   // 1. Stabilité
   const s0 = new G.GameSession(level, { difficulty: 'normal', completedLevels: 0, reducedMotion: true })
   s0.world.filter(() => true)
   const blocksBefore = level.blocks.length
   for (let i = 0; i < 360; i++) s0.update(1000 / 60)
+  // Tir perdu loin derrière la catapulte : arme les règles d'écrasement.
+  const { Projectile } = await import('../src/game/entities/Projectile.js')
+  s0.world.add(new Projectile('stone', -300, 0))
+  for (let i = 0; i < 240; i++) s0.update(1000 / 60)
   const destroyed = blocksBefore - s0.world.filter((e) => e.kind === 'block').length
   const stable = destroyed === 0 && s0.targetsLeft === level.targets.length
   s0.destroy()
@@ -167,5 +173,5 @@ if (isMainThread) {
   process.exitCode = bad.length ? 1 : 0
 } else {
   const G = await loadGame()
-  for (const id of workerData.ids) parentPort.postMessage(checkLevel(G, id, workerData.difficulty))
+  for (const id of workerData.ids) parentPort.postMessage(await checkLevel(G, id, workerData.difficulty))
 }

@@ -161,3 +161,41 @@ test('avant le premier tir, la mise en place de la structure ne tue personne', (
   settle(w, 300)
   assert.equal(t.alive, true)
 })
+
+/* ---------- Cibles coincées (v1.4) ---------- */
+
+/** Arme les règles d'écrasement avec un tir perdu, loin de la scène. */
+const arm = (w) => w.add(new Projectile('stone', -300, 0))
+
+test('une cible sur laquelle repose un bloc meurt écrasée', () => {
+  const w = new PhysicsWorld(new EventBus())
+  const t = w.add(new Target({ type: 'soldier', x: 1440, y: G - 25 }))
+  settle(w, 200)
+  arm(w)
+  // Un toit posé doucement sur la tête (aucune vitesse : pas un impact).
+  w.add(new Block({ material: 'wood', x: 1440, y: G - 50 - 11, w: 90, h: 20 }))
+  settle(w, 120)
+  assert.equal(t.alive, false)
+  assert.equal(t.deathCause, 'crush')
+})
+
+test('une cible prise en étau entre deux murs meurt écrasée', () => {
+  const w = new PhysicsWorld(new EventBus())
+  const t = w.add(new Target({ type: 'soldier', x: 1440, y: G - 25 }))
+  w.add(new Block({ material: 'stone', x: 1440 - 13 - 15, y: G - 40, w: 30, h: 80 }))
+  w.add(new Block({ material: 'stone', x: 1440 + 13 + 15, y: G - 40, w: 30, h: 80 }))
+  settle(w, 200)
+  assert.equal(t.alive, true, 'avant le premier tir, rien ne tue')
+  arm(w)
+  settle(w, 60)
+  assert.equal(t.alive, false)
+})
+
+test('une cible dans une pièce, sans contact, reste en vie', () => {
+  const w = new PhysicsWorld(new EventBus())
+  const t = hut(w, 'stone')
+  settle(w, 300)
+  arm(w)
+  settle(w, 200)
+  assert.equal(t.alive, true)
+})

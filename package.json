@@ -1,6 +1,6 @@
 {
   "name": "crush-the-castle",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "description": "Jeu de catapulte médiéval 100 % front-end (Vue 3 + Vite + Matter.js) : 40 niveaux, pouvoirs spéciaux, multilingue (FR / EN / ID) et accessible.",
   "type": "module",
