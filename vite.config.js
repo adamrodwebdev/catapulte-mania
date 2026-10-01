@@ -28,6 +28,19 @@ function cspPlugin() {
   }
 }
 
+/**
+ * Remplace %VITE_SITE_URL% dans index.html (balise canonique, Open Graph, hreflang).
+ * Utilise la valeur par défaut si la variable n'est pas définie (ex. fichier .env
+ * absent lors d'un déploiement), pour ne jamais publier le texte brut.
+ */
+function siteUrlPlugin(siteUrl) {
+  const base = siteUrl.replace(/\/+$/, '')
+  return {
+    name: 'ctc-site-url',
+    transformIndexHtml: { order: 'pre', handler: (html) => html.replaceAll('%VITE_SITE_URL%', base) },
+  }
+}
+
 /** Génère robots.txt et sitemap.xml (avec alternatives hreflang) à partir de VITE_SITE_URL. */
 function seoFilesPlugin(siteUrl) {
   return {
@@ -130,7 +143,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: './',
-    plugins: [vue(), cspPlugin(), ...(isDemo ? [singleFilePlugin()] : [seoFilesPlugin(siteUrl), serviceWorkerPlugin()])],
+    plugins: [vue(), siteUrlPlugin(siteUrl), cspPlugin(), ...(isDemo ? [singleFilePlugin()] : [seoFilesPlugin(siteUrl), serviceWorkerPlugin()])],
     define: {
       __DEMO__: JSON.stringify(isDemo),
       __APP_VERSION__: JSON.stringify(pkg.version),
