@@ -2,6 +2,18 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [1.2.0] – 2026-10-01
+### Modifié
+- Murs porteurs plus exigeants : il faut les frapper de face (un projectile
+  qui retombe sur le sommet ne suffit pas) et avec une énergie propre au
+  matériau : 20 % de sa résistance pour le bois, 55 % pour la pierre (rocher
+  lancé fort), 80 % pour le fer (en pratique : explosifs).
+- Écrasement : le bloc doit être réellement lancé ou en chute (seuils relevés),
+  un simple glissement de mur ne suffit plus.
+### Corrigé
+- Le relevé des appuis ignorait les blocs « endormis » par le moteur : il est
+  désormais géométrique (bas d'un bloc posé sur le haut d'un autre).
+
 ## [1.1.0] – 2026-10-01
 ### Ajouté
 - Écrasement : une cible touchée par un bloc en mouvement meurt sur le coup.

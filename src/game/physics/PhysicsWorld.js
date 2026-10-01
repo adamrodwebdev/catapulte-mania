@@ -94,7 +94,7 @@ export class PhysicsWorld {
   add(entity) {
     // Premier projectile : on relève les appuis de la structure stabilisée.
     if (entity.kind === 'projectile' && !this.#armed) {
-      this.structure.map(this.engine, (b) => this.#entityOf(b))
+      this.structure.map(this.#entities.values())
       this.#armed = true
     }
     this.#entities.set(entity.body.id, entity)
@@ -287,7 +287,7 @@ export class PhysicsWorld {
       // Projectile contre mur porteur : le mur peut céder et entraîner les toits.
       const hitBlock = projectile && (a === projectile ? b : a)
       if (hitBlock?.kind === 'block' && hitBlock.alive) {
-        const loads = this.structure.onProjectileHit(hitBlock, energy, Body.getVelocity(projectile.body))
+        const loads = this.structure.onProjectileHit(hitBlock, energy, Body.getVelocity(projectile.body), n)
         if (loads.length) this.#events.emit('structure:collapse', { entity: hitBlock, loads })
       }
     }

@@ -1,4 +1,5 @@
 import Matter from 'matter-js'
+import { MATERIALS } from '../entities/materials.js'
 
 const { Sleeping, Body } = Matter
 
@@ -14,8 +15,11 @@ const { Sleeping, Body } = Matter
  *     suspendu dans le vide (le moteur met en veille les corps immobiles).
  *  2. Un projectile qui frappe assez fort un MUR PORTEUR le fragilise
  *     (fissure, poussée) et ébranle les toits et planchers qu'il soutient :
- *     ils glissent et s'effondrent. La pierre et le fer demandent un choc plus
- *     fort que le bois, car le seuil dépend de la résistance du matériau.
+ *     ils glissent et s'effondrent. Il faut un tir PRÉCIS :
+ *       - frapper le mur de face (pas en tombant sur son sommet) ;
+ *       - avec assez d'énergie : seuil propre à chaque matériau
+ *         (`bearing` dans materials.js) : le bois cède vite, la pierre
+ *         demande un tir appuyé, le fer un tir lourd ou explosif.
  */
 export class StructuralIntegrity {
   /** bloc → blocs posés dessus */
@@ -24,8 +28,14 @@ export class StructuralIntegrity {
   #restsOn = new Map()
   #mapped = false
 
-  /** Part de la résistance du mur à atteindre pour le fissurer. */
-  static FAILURE_RATIO = 0.18
+  /** Seuil par défaut si le matériau n'en précise pas (part de la résistance max). */
+  static FAILURE_RATIO = 0.25
+  /** Tolérance verticale (px) pour considérer deux blocs en appui. */
+  static CONTACT_GAP = 4
+  /** Chevauchement horizontal minimal (px) d'un appui. */
+  static MIN_OVERLAP = 4
+  /** Le choc doit arriver de face : composante horizontale minimale de la normale. */
+  static MIN_FRONTAL = 0.6
   /** Dégâts infligés au mur porteur fissuré (part de sa résistance max). */
   static WALL_DAMAGE = 0.45
   /** Dégâts infligés aux toits / planchers directement soutenus. */
@@ -36,22 +46,27 @@ export class StructuralIntegrity {
   }
 
   /**
-   * Relève les appuis à partir des contacts actifs du moteur.
-   * @param {Matter.Engine} engine
-   * @param {(body: Matter.Body) => any} entityOf
+   * Relève les appuis par la géométrie : A repose sur B si le bas de A touche
+   * le haut de B (à quelques pixels près) et qu'ils se chevauchent en largeur.
+   * (Les contacts du moteur ne suffisent pas : les corps immobiles « dorment »
+   * et leurs contacts ne sont plus suivis.)
+   * @param {Iterable<any>} entities
    */
-  map(engine, entityOf) {
+  map(entities) {
     this.#carries.clear()
     this.#restsOn.clear()
-    for (const pair of engine.pairs.list) {
-      if (!pair.isActive) continue
-      const a = entityOf(pair.bodyA)
-      const b = entityOf(pair.bodyB)
-      if (!a || !b || a.kind !== 'block' || b.kind !== 'block') continue
-      // Contact « posé sur » : normale presque verticale.
-      if (Math.abs(pair.collision.normal.y) < 0.7) continue
-      const [upper, lower] = a.y < b.y ? [a, b] : [b, a]
-      this.#link(lower, upper)
+    const blocks = [...entities].filter((e) => e.kind === 'block' && e.alive)
+    for (const upper of blocks) {
+      const u = upper.body.bounds
+      for (const lower of blocks) {
+        if (lower === upper) continue
+        const l = lower.body.bounds
+        const gap = Math.abs(u.max.y - l.min.y)
+        const overlap = Math.min(u.max.x, l.max.x) - Math.max(u.min.x, l.min.x)
+        if (gap <= StructuralIntegrity.CONTACT_GAP && overlap >= StructuralIntegrity.MIN_OVERLAP && upper.y < lower.y) {
+          this.#link(lower, upper)
+        }
+      }
     }
     this.#mapped = true
   }
@@ -101,11 +116,14 @@ export class StructuralIntegrity {
    * @param {any} block
    * @param {number} energy énergie du choc
    * @param {{x:number,y:number}} push direction du projectile (vitesse)
+   * @param {{x:number,y:number}} [normal] normale du contact (impact de face si horizontale)
    * @returns {any[]} charges ébranlées (vide si rien ne cède)
    */
-  onProjectileHit(block, energy, push) {
+  onProjectileHit(block, energy, push, normal = { x: 1, y: 0 }) {
     if (!block?.alive || block.kind !== 'block' || !this.isLoadBearing(block)) return []
-    if (!(energy >= block.maxHp * StructuralIntegrity.FAILURE_RATIO)) return []
+    if (Math.abs(normal.x) < StructuralIntegrity.MIN_FRONTAL) return []
+    const ratio = MATERIALS[block.material]?.bearing ?? StructuralIntegrity.FAILURE_RATIO
+    if (!(energy >= block.maxHp * ratio)) return []
 
     // Le mur se fissure et bascule dans le sens du tir.
     Sleeping.set(block.body, false)
