@@ -246,6 +246,17 @@ npm run check:levels  # un joueur automatique vérifie que les 40 niveaux sont s
 npm run lint          # vérification du style de code
 ```
 
+### Contrôles automatiques sur GitHub
+
+À chaque envoi sur GitHub, l'onglet **Actions** du dépôt lance tout seul :
+
+1. l'installation des outils, les tests et la vérification du style ;
+2. la fabrication de la version complète et de la démo (téléchargeables en bas de la page du contrôle, rubrique « Artifacts ») ;
+3. un audit **Lighthouse** sur mobile (3 passages) qui échoue si une note (Performance, Accessibilité, Bonnes pratiques, SEO) descend sous 95. Le rapport complet est accessible par un lien dans le détail de l'étape ;
+4. la vérification des 40 niveaux.
+
+Une coche verte ✅ à côté d'un commit signifie que tout est bon ; une croix rouge ❌ indique l'étape à corriger.
+
 **Performance** : mesurée avec le profil mobile de Lighthouse (processeur ralenti 4×, connexion 4G lente) : affichage en moins d'une seconde, aucun décalage de mise en page. Pour vérifier vous-même : dans Chrome, ouvrez le site publié, puis `F12` → onglet **Lighthouse** → **Analyze page load**.
 
 ---

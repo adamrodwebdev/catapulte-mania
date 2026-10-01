@@ -1,0 +1,72 @@
+# Contrôle qualité automatique.
+# Se lance à chaque envoi (push) sur GitHub et à chaque pull request.
+# Résultats : onglet « Actions » du dépôt (coche verte = tout va bien).
+name: Qualité
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Tests, build et démo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Installer les dépendances
+        run: npm install --no-audit --no-fund
+      - name: Tests automatiques
+        run: npm test
+      - name: Style du code
+        run: npm run lint
+      - name: Build de la version complète
+        run: npm run build
+      - name: Build de la démo (fichier unique)
+        run: npm run build:demo
+      - name: Conserver la version complète
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-dist
+          path: dist
+      - name: Conserver la démo
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo
+          path: dist-demo/index.html
+
+  lighthouse:
+    name: Lighthouse (minimum 95)
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: site-dist
+          path: dist
+      - name: Audit Lighthouse (mobile, 3 passages)
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          configPath: ./lighthouserc.json
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+
+  levels:
+    name: Les 40 niveaux sont gagnables
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run check:levels
