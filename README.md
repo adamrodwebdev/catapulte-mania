@@ -56,6 +56,8 @@ On peut l'envoyer par e-mail, le mettre sur une clé USB ou l'héberger sur n'im
 | Diviser la mitraille en vol | Bouton « Diviser » | Espace |
 | Pause | Bouton ⏸ en haut à gauche | P ou Échap |
 
+**Astuce :** certains châteaux ont un point faible (un pied en verre, un étage en paille, une poudrière…). Trouvez-le et tout s'écroule.
+
 **Le but :** éliminer tous les personnages (soldats, chevaliers, rois) avant d'avoir épuisé ses tirs.
 **Le vent** (indiqué en haut à droite) dévie les projectiles.
 **La physique des bâtiments :** un bloc qui tombe sur un personnage l'écrase. Frappez un mur porteur de face et assez fort : il cède et le toit ou le plancher qu'il soutenait s'effondre. Le bois cède facilement, la pierre demande un rocher lancé avec force, le fer pratiquement des explosifs.
@@ -278,6 +280,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v1.0.0 | Documentation et version de présentation |
 | v1.1.0 | Physique : écrasement des cibles, murs porteurs, effondrement des toits, effets de sang |
 | v1.2.0 | Murs en pierre et en fer plus exigeants (tirs de face et puissants) |
+| v1.3.0 | 40 niveaux redessinés : châteaux plus hauts, points de rupture, niveaux d'ingéniosité |
 
 Pour revenir à une version précise avec Git : `git checkout v0.4.0` (puis `git checkout main` pour revenir à la dernière).
 

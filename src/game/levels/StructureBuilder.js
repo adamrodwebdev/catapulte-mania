@@ -82,6 +82,26 @@ export class StructureBuilder {
     return this.block(mat, (x1 + x2) / 2, topY - t / 2, Math.abs(x2 - x1), t)
   }
 
+  /**
+   * Pilotis : une plateforme portée par des pieds fins. Point de rupture idéal :
+   * casser un pied (souvent en verre ou en paille) fait tomber tout ce qui est dessus.
+   * @returns {{ x: number, floorY: number, topY: number, w: number }} la plateforme (comme une pièce)
+   */
+  stilts(x, { legs = 2, mat = 'wood', deck = 'wood', w = 140, h = 120, legW = 16, t = 20, floorY = this.ground } = {}) {
+    const span = w - legW
+    for (let i = 0; i < legs; i++) {
+      const lx = legs === 1 ? x : x - span / 2 + (span * i) / (legs - 1)
+      this.block(mat, lx, floorY - h / 2, legW, h)
+    }
+    this.block(deck, x, floorY - h - t / 2, w + 10, t)
+    return { x, floorY: floorY - h - t, topY: floorY - h - t, w }
+  }
+
+  /** Point d'appui quelconque (planche, sommet de tour) où poser cible ou baril. */
+  spot(x, floorY) {
+    return { x, floorY, topY: floorY, w: 0 }
+  }
+
   /** Socle plein (colline, soubassement) : renvoie le niveau du dessus. */
   base(x, { w = 260, h = 60, mat = 'stone', rows = 2 } = {}) {
     const rh = h / rows

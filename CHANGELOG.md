@@ -2,6 +2,23 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [1.3.0] – 2026-10-01
+### Modifié
+- Les 40 niveaux sont entièrement redessinés : châteaux plus hauts (jusqu'à
+  huit étages), plus aucun rempart ni palissade devant les tirs, et plus de
+  cibles (2 à 3 au début, jusqu'à 8 à la fin) pour compenser.
+- Sous-titres des sons et astuce de visée déplacés en bas de l'écran, au-dessus
+  des commandes : ils ne masquent plus la trajectoire ni le haut des châteaux.
+### Ajouté
+- Niveaux à « point de rupture » qui font tomber un château entier : pilotis
+  de paille (3), rez-de-chaussée en paille (6), poudrière (13), pont de bois
+  sous une tour de pierre (17), pieds de verre (24, 37), aqueduc (27),
+  étage de paille (33).
+- Niveaux d'ingéniosité : dominos (9), tirs en cloche sur une colline (23, 32),
+  pont-levis à couper (28), tour d'ivoire à faire basculer par le haut (34),
+  forteresse en escalier (38), salles de fer sous une superstructure fragile (39).
+- Préfabriqués `stilts` (pilotis) et `spot` (poser une cible sur une passerelle).
+
 ## [1.2.0] – 2026-10-01
 ### Modifié
 - Murs porteurs plus exigeants : il faut les frapper de face (un projectile

@@ -77,7 +77,10 @@ function measureInsets() {
   const top = root.value.querySelector('.hud-top')?.getBoundingClientRect()
   const bottom = root.value.querySelector('.hud-bottom')?.getBoundingClientRect()
   const h = root.value.clientHeight
-  controller.setInsets(top ? top.bottom : 0, bottom && bottom.height ? h - bottom.top : 0)
+  const bottomInset = bottom && bottom.height ? h - bottom.top : 0
+  controller.setInsets(top ? top.bottom : 0, bottomInset)
+  // Les sous-titres et l'astuce se placent juste au-dessus des commandes.
+  root.value.style.setProperty('--hud-bottom-h', `${Math.round(bottomInset)}px`)
 }
 function observeHud() {
   hudObs?.disconnect()
