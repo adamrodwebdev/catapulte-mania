@@ -1,0 +1,29 @@
+{
+  "name": "crush-the-castle",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Jeu de catapulte médiéval 100 % front-end (Vue 3 + Vite + Matter.js) : 40 niveaux, pouvoirs spéciaux, multilingue (FR / EN / ID) et accessible.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:demo": "vite build --mode demo",
+    "preview": "vite preview",
+    "test": "node --test tests/",
+    "check:levels": "node scripts/check-levels.mjs",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "matter-js": "^0.20.0",
+    "vue": "^3.5.43"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.0",
+    "@vitejs/plugin-vue": "^6.0.9",
+    "eslint": "^10.1.0",
+    "vite": "^8.3.0"
+  }
+}

@@ -1,0 +1,7 @@
+# Déploiement Netlify : la commande de build et le dossier publié.
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
