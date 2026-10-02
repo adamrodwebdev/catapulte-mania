@@ -375,6 +375,7 @@ export class GameSession extends EventBus {
       time: this.#time,
       animate: !this.options.reducedMotion,
       catapults,
+      versus: this.#mode.id === 'versus',
     }
   }
 

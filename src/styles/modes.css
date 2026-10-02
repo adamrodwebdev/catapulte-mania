@@ -1,0 +1,531 @@
+/*
+ * Écrans et éléments ajoutés en v2 : atelier, mode libre, deux joueurs.
+ * Mêmes jetons de design que le reste de l'interface (tokens.css).
+ */
+
+/* --- Couleurs des joueurs (rouge / vert, toujours doublées d'un numéro ou d'un nom) --- */
+:root {
+  --p1: #a3322b;
+  --p2: #3d7a3a;
+  --gold: #b8860b;
+}
+
+:root[data-theme='dark'] {
+  --p1: #e0665d;
+  --p2: #7cbf6e;
+  --gold: #e9c35f;
+}
+
+:root[data-contrast='high'] {
+  --p1: #ff6b6b;
+  --p2: #7dff7d;
+  --gold: #ffd400;
+}
+
+.player-dot {
+  display: inline-block;
+  width: 0.75em;
+  height: 0.75em;
+  margin-right: 0.35em;
+  border-radius: 50%;
+  border: 2px solid var(--text);
+  vertical-align: -0.05em;
+}
+
+.player-dot--1 {
+  background: var(--p1);
+}
+
+.player-dot--2 {
+  background: var(--p2);
+  border-radius: 2px; /* forme différente : pas seulement la couleur */
+}
+
+/* --- Or --- */
+.gold-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 2px var(--space-3);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: color-mix(in srgb, var(--gold) 22%, var(--surface));
+  border: 2px solid var(--gold);
+  border-radius: 999px;
+}
+
+.gold-badge .icon {
+  color: var(--gold);
+}
+
+.gold-badge--small {
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  font-size: var(--fs-0);
+}
+
+/* --- Carte des niveaux : barre de mode --- */
+.levels__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.levels__toolbar .segmented {
+  min-width: min(22rem, 100%);
+}
+
+.levels__toolbar .segmented__option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  cursor: pointer;
+}
+
+.levels__toolbar .segmented__option[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.levels__mode-hint {
+  min-height: 1.4em;
+  margin: 0 0 var(--space-3);
+}
+
+/* --- Atelier --- */
+.workshop .panel {
+  margin-bottom: var(--space-4);
+}
+
+.shop-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.shop-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.shop-item__icon {
+  color: var(--action);
+}
+
+.shop-item__text {
+  min-width: 0;
+}
+
+.shop-item__name {
+  margin: 0;
+  font-size: var(--fs-2);
+}
+
+.shop-item__desc {
+  margin: 2px 0 var(--space-1);
+  font-size: var(--fs-0);
+  color: var(--text-muted);
+}
+
+.shop-item__done {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-weight: 700;
+  color: var(--success);
+}
+
+.pips {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+}
+
+.pips__pip {
+  width: 18px;
+  height: 8px;
+  border: 2px solid var(--border);
+  border-radius: 2px;
+}
+
+.pips__pip--on {
+  background: var(--accent);
+}
+
+.look-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: var(--space-3);
+}
+
+.look {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  text-align: center;
+  background: var(--surface-2);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.look--on {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.look__swatch {
+  width: 56px;
+  height: 36px;
+  border: 2px solid var(--c-ink);
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, #b07a43, #8a5a2b);
+}
+
+.look--royal .look__swatch { background: linear-gradient(90deg, #5d6f8f, #2f4b7c 60%, #d4a537 60%); }
+.look--ebony .look__swatch { background: linear-gradient(90deg, #4a3d36, #1e1a2b 60%, #b9b3a6 60%); }
+.look--dragon .look__swatch { background: linear-gradient(90deg, #9a4a3a, #a3322b 60%, #ffb347 60%); }
+.look--smoke .look__swatch { background: radial-gradient(circle at 70% 50%, #e6e2d6 20%, #b9b3a6 45%, transparent 46%), var(--surface); }
+.look--embers .look__swatch { background: radial-gradient(circle at 30% 40%, #ffd36b 8%, transparent 9%), radial-gradient(circle at 60% 60%, #ff8c3a 10%, transparent 11%), radial-gradient(circle at 80% 35%, #ff5a2a 7%, transparent 8%), #2b2540; }
+.look--stars .look__swatch { background: radial-gradient(circle at 25% 50%, #fff1c4 7%, transparent 8%), radial-gradient(circle at 55% 30%, #d4a537 9%, transparent 10%), radial-gradient(circle at 80% 65%, #fff 6%, transparent 7%), #2b2540; }
+
+.look__name {
+  font-weight: 700;
+}
+
+.look__state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--hud-size);
+  font-weight: 700;
+  color: var(--success);
+}
+
+/* --- Deux joueurs : préparation --- */
+.mp {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.mp fieldset.panel {
+  margin: 0;
+  min-width: 0;
+}
+
+.mp legend.panel__title {
+  padding: 0 var(--space-2);
+}
+
+.format-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: var(--space-3);
+}
+
+.format {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  background: var(--surface-2);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.format:focus-within {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.format--on {
+  border-color: var(--action);
+  box-shadow: inset 0 0 0 2px var(--action);
+}
+
+.format__icon {
+  color: var(--action);
+}
+
+.format__name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-2);
+}
+
+.format__desc {
+  font-size: var(--fs-0);
+  color: var(--text-muted);
+}
+
+.mp__names {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-3);
+}
+
+.level-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.level-pick__item {
+  display: grid;
+  place-items: center;
+  width: var(--hud-size);
+  height: var(--hud-size);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--surface-2);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.level-pick__item:focus-within,
+.arena:focus-within {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.level-pick__item--on {
+  color: var(--action-text);
+  background: var(--action);
+  border-color: var(--action);
+}
+
+.arena-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: var(--space-3);
+}
+
+.arena {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  color: #fff;
+  border: 2px solid var(--c-ink);
+  border-radius: var(--radius);
+  cursor: pointer;
+  background: linear-gradient(180deg, #6f9fd6, #b8d3ea 70%, #5c8a4a 70%);
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.7);
+}
+
+.arena--theme2 { background: linear-gradient(180deg, #8ea4bd, #c9d3dc 70%, #6b7a5a 70%); }
+.arena--theme3 { background: linear-gradient(180deg, #7a4f7a, #e3a06b 70%, #5a4a3a 70%); }
+.arena--theme4 { background: linear-gradient(180deg, #141a3a, #3a3f6e 70%, #2b2b3a 70%); }
+
+.arena--on {
+  box-shadow: 0 0 0 4px var(--accent);
+}
+
+.arena__num {
+  font-family: var(--font-display);
+  font-size: var(--fs-3);
+  font-weight: 700;
+}
+
+.arena__name {
+  font-weight: 700;
+}
+
+.mp__start {
+  justify-self: center;
+}
+
+/* --- En jeu : deux joueurs --- */
+.hud-stats--duo {
+  margin-left: auto;
+  gap: var(--space-3);
+}
+
+.hud-stats--duo + .hud-stats {
+  margin-left: var(--space-3);
+}
+
+.hud-player {
+  display: grid;
+  padding: 2px var(--space-2);
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  line-height: 1.15;
+}
+
+.hud-player dt {
+  font-size: var(--fs-0);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 9rem;
+}
+
+.hud-player dd {
+  margin: 0;
+}
+
+.hud-player--active.hud-player--1 {
+  border-color: var(--p1);
+  background: color-mix(in srgb, var(--p1) 14%, transparent);
+}
+
+.hud-player--active.hud-player--2 {
+  border-color: var(--p2);
+  background: color-mix(in srgb, var(--p2) 14%, transparent);
+}
+
+.hud-player__shots {
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-left: var(--space-1);
+}
+
+.turn-banner {
+  position: absolute;
+  z-index: 16;
+  left: 50%;
+  top: calc(var(--hud-top-h, 4rem) + var(--space-4));
+  transform: translateX(-50%);
+  margin: 0;
+  padding: var(--space-2) var(--space-5);
+  font-family: var(--font-display);
+  font-size: var(--fs-3);
+  font-weight: 700;
+  color: var(--text);
+  background: var(--surface);
+  border: 3px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  animation: fade-in calc(0.2s * var(--speed)) ease-out;
+}
+
+.intro-players {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-4);
+  font-weight: 700;
+}
+
+.versus-result {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.versus-result__row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-2);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  text-align: left;
+}
+
+.versus-result__row--win {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.versus-result__name {
+  font-weight: 700;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.versus-result__score {
+  font-variant-numeric: tabular-nums;
+}
+
+.end__gold {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 700;
+}
+
+.end__gold .icon {
+  color: var(--gold);
+}
+
+.end__big {
+  font-size: var(--fs-4);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px), (max-height: 480px) {
+  .hud-player dt {
+    max-width: 5.5rem;
+  }
+
+  .hud-stats--compact .hud-stat--wind dt {
+    display: none;
+  }
+
+  .turn-banner {
+    font-size: var(--fs-2);
+  }
+
+  .shop-item {
+    grid-template-columns: auto 1fr;
+  }
+
+  .shop-item > .btn,
+  .shop-item__done {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    justify-content: center;
+  }
+}
+
+/* Téléphone : à deux joueurs, le bandeau privilégie les joueurs (le titre est
+   déjà annoncé à l'introduction et reste lisible dans le menu pause). */
+@media (max-width: 640px) {
+  .hud-top--duo .hud-top__level,
+  .hud-top--duo .hud-stats--compact .hud-stat:not(.hud-stat--wind) {
+    display: none;
+  }
+
+  .hud-top--duo .hud-stats--duo {
+    margin-left: 0;
+    flex: 1;
+    justify-content: space-around;
+  }
+
+  .hud-top--duo .hud-player dt {
+    max-width: 7.5rem;
+  }
+
+  .hud-top--duo .hud-player__shots {
+    display: block;
+    margin-left: 0;
+  }
+}

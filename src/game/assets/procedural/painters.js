@@ -597,7 +597,7 @@ function sky(ctx, s) {
 
 /** Lointain (repère monde, parallaxe) : collines et silhouette de château. */
 function far(ctx, s) {
-  const { theme = 1 } = s.extra
+  const { theme = 1, castle = true } = s.extra
   const th = THEMES[theme]
   const r = new SeededRandom(23 + theme)
   const left = -1200
@@ -612,7 +612,8 @@ function far(ctx, s) {
     ctx.fillStyle = color
     ctx.fill()
   }
-  // Château lointain sur une colline.
+  // Château lointain sur une colline (masqué en face-à-face : il prêterait à confusion).
+  if (!castle) return
   const cx = 1450
   const cy = base - 250
   ctx.fillStyle = th.castle

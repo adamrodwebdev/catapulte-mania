@@ -2,6 +2,32 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [2.0.0] – 2026-10-02
+### Ajouté
+- **Mode libre** : rejouer les niveaux terminés avec tirs et munitions
+  illimités et pouvoirs gratuits ; rien n'est enregistré.
+- **Deux joueurs** sur le même appareil, trois formules :
+  duel (même château, tirs alternés, points au tireur), chacun sa partie
+  (deux manches, scores comparés), face-à-face (deux catapultes, deux
+  châteaux, 5 arènes symétriques, défenseurs verts pour le joueur 2).
+- **Atelier** : or gagné en campagne (victoire, étoiles, première victoire),
+  5 améliorations à plusieurs niveaux et 7 apparences (catapulte, traînée).
+- Boutique premium préparée mais désactivée (`StoreService`), documentée.
+- Sauvegarde v2 (migration automatique des profils existants) avec contrôle
+  de cohérence de l'or.
+### Corrigé
+- Personnages et blocs suspendus dans le vide quand leur appui disparaissait
+  (niveaux 4, 6, 7…) : les corps « endormis » sans appui sont réveillés.
+- Conditions de mort calculées en continu : chute lourde, renversé plus de
+  1,5 s, en plus de l'écrasement, du coincement, du choc et du feu.
+- Projectiles environ 25 % plus lourds (moins d'effet tunnel).
+- Téléphone en mode vertical : sous-titres compacts en haut, conseil de
+  rotation qui s'efface, bandeau à deux joueurs lisible.
+- Libellé « Puissance » tronqué dans le panneau de visée.
+### Qualité
+- 58 tests (dont 15 pour l'économie et les modes), 40/40 niveaux stables et
+  gagnables en Difficile.
+
 ## [1.4.0] – 2026-10-01
 ### Corrigé
 - Cibles coincées : une cible sur laquelle repose un bloc (mur, plancher, toit)

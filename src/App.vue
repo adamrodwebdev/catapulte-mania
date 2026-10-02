@@ -6,6 +6,8 @@ import ProfilesScreen from './components/screens/ProfilesScreen.vue'
 import LevelSelectScreen from './components/screens/LevelSelectScreen.vue'
 import SettingsScreen from './components/screens/SettingsScreen.vue'
 import HelpScreen from './components/screens/HelpScreen.vue'
+import WorkshopScreen from './components/screens/WorkshopScreen.vue'
+import MultiplayerScreen from './components/screens/MultiplayerScreen.vue'
 
 /**
  * Composant racine : affiche l'écran courant et la région d'annonces
@@ -24,6 +26,8 @@ const SCREENS = {
   game: GameScreen,
   settings: SettingsScreen,
   help: HelpScreen,
+  workshop: WorkshopScreen,
+  multiplayer: MultiplayerScreen,
 }
 const current = computed(() => SCREENS[state.screen] || HomeScreen)
 </script>

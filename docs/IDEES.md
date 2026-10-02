@@ -18,6 +18,6 @@ Idées pour aller plus loin, inspirées de jeux du genre (Angry Birds, Crush the
 
 ## Plus ambitieuses
 
-9. **Mode « deux joueurs sur le même appareil »** : chacun son château, tour par tour.
+9. ~~**Mode « deux joueurs sur le même appareil »**~~ : réalisé en v2.0 (duel, chacun sa partie, face-à-face).
 10. **Classement en ligne vérifié** : nécessite un petit serveur qui rejoue les tirs envoyés pour valider le score (seule façon de rendre un classement réellement inviolable).
 11. **Graphismes peints à la main** : la couche d'assets est déjà prête à recevoir des images (voir `src/game/assets/assets.config.js`).

@@ -23,7 +23,7 @@ function checkRecord(levelId, best, stars) {
 }
 
 /** Écrans de l'application (navigation interne, une seule URL pour le SEO). */
-export const SCREENS = Object.freeze(['home', 'profiles', 'levels', 'game', 'settings', 'help'])
+export const SCREENS = Object.freeze(['home', 'profiles', 'levels', 'game', 'settings', 'help', 'workshop', 'multiplayer'])
 
 /**
  * Contexte applicatif : instancie les services (une seule fois) et expose un
@@ -55,6 +55,11 @@ export function createAppContext() {
     /** Profil actif (copie d'affichage). */
     profile: null,
     levelId: 1,
+    /**
+     * Partie à lancer : mode ('story' | 'free' | 'duel' | 'hotseat' | 'versus'),
+     * niveau ou arène, noms des joueurs (modes à deux).
+     */
+    match: { mode: 'story', levelId: 1, arenaId: 1, players: [] },
     announcement: '',
     captions: [],
     systemDark: false,
@@ -134,6 +139,9 @@ export function createAppContext() {
       next: Math.min(slot.nextLevel, PLAYABLE_LEVELS),
       levels,
       powers: PowerRegistry.all().map((p) => ({ id: p.id, cost: p.cost, unlockAfter: p.unlockAfter, unlocked: p.isUnlocked(slot.completedCount) })),
+      gold: slot.gold,
+      upgrades: slot.upgrades,
+      cosmetics: slot.cosmetics,
     }
   }
 
@@ -179,7 +187,7 @@ export function createAppContext() {
    * @returns {Promise<{ newBest: boolean, firstClear: boolean, unlockedPower: string | null, saved: boolean }>}
    */
   async function recordResult(result) {
-    if (!activeSlot) return { newBest: false, firstClear: false, unlockedPower: null, saved: false }
+    if (!activeSlot) return { newBest: false, firstClear: false, unlockedPower: null, saved: false, gold: 0 }
     const before = activeSlot.completedCount
     const outcome = activeSlot.recordResult(result)
     let saved
@@ -193,6 +201,43 @@ export function createAppContext() {
     state.profile = profileView(activeSlot)
     await refreshSlots()
     return { ...outcome, unlockedPower: unlocked ? unlocked.id : null, saved }
+  }
+
+  /* ----- Atelier (or et améliorations) ----- */
+
+  /**
+   * Achat ou équipement à l'atelier, puis sauvegarde.
+   * @param {'upgrade' | 'cosmetic' | 'equip'} action
+   * @returns {Promise<boolean>}
+   */
+  async function workshop(action, id) {
+    if (!activeSlot) return false
+    const ok = action === 'upgrade' ? activeSlot.buyUpgrade(id) : action === 'cosmetic' ? activeSlot.buyCosmetic(id) : activeSlot.equip(id)
+    if (!ok) return false
+    try {
+      await saves.save(activeSlot)
+    } catch {
+      return false
+    }
+    state.profile = profileView(activeSlot)
+    return true
+  }
+
+  /* ----- Lancement d'une partie ----- */
+
+  /**
+   * @param {{ mode: string, levelId?: number, arenaId?: number, players?: string[] }} match
+   */
+  function startMatch(match) {
+    state.match = { mode: match.mode, levelId: match.levelId ?? state.levelId, arenaId: match.arenaId ?? 1, players: [...(match.players || [])] }
+    if (match.levelId) state.levelId = match.levelId
+    go('game')
+  }
+
+  /** Niveaux jouables à deux : chapitre 1 + tout ce qu'un profil a débloqué. */
+  function multiplayerLevels() {
+    const best = Math.max(0, ...state.slots.filter((s) => s.status === 'ok').map((s) => s.completed))
+    return Math.min(PLAYABLE_LEVELS, Math.max(GAME.LEVELS_PER_CHAPTER, best + 1))
   }
 
   /* ----- Annonces & sous-titres (accessibilité) ----- */
@@ -246,6 +291,9 @@ export function createAppContext() {
     deleteProfile,
     setDifficulty,
     recordResult,
+    workshop,
+    startMatch,
+    multiplayerLevels,
     announce,
     caption,
     get activeSlot() {

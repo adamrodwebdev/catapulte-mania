@@ -6,6 +6,9 @@ Réglez l'angle et la puissance, calculez la trajectoire, et faites tomber les f
 - 40 niveaux répartis en 4 chapitres : du bois et de la paille au début, puis la pierre, le fer, les barils explosifs et de nouveaux projectiles
 - 3 difficultés (Facile, Normal, Difficile)
 - 6 pouvoirs spéciaux à débloquer (un seul par tour, chaque utilisation coûte des points)
+- **Mode libre** : rejouer les niveaux terminés sans limite de tirs ni de munitions
+- **Deux joueurs** sur le même appareil : duel, chacun sa partie ou face-à-face
+- **Atelier** : de l'or gagné en jouant pour améliorer sa catapulte et changer son apparence
 - Français, English, Bahasa Indonesia
 - Thème clair, thème sombre et mode contraste élevé
 - Jouable sur téléphone, tablette et ordinateur, à la souris, au doigt ou au clavier
@@ -84,6 +87,36 @@ Un seul pouvoir par tour. Chaque utilisation retire des points au score final.
 | Volée | 18 niveaux | 350 | Tire trois projectiles en éventail |
 | Charge de poudre | 24 niveaux | 300 | Le projectile explose à l'impact |
 | Séisme | 30 niveaux | 400 | Secoue toutes les structures immédiatement |
+
+### Les modes de jeu
+
+| Mode | Où le trouver | Principe |
+|---|---|---|
+| **Campagne** | Jouer → profil → carte des niveaux | Les 40 niveaux dans l'ordre. Rapporte des étoiles et de l'or. |
+| **Mode libre** | Carte des niveaux → « Mode libre » | Rejouer un niveau déjà terminé avec tirs et munitions illimités (celles découvertes en campagne) et pouvoirs gratuits (toujours un par tour). Rien n'est enregistré. |
+| **Duel** | Accueil → Deux joueurs | Le même château, un tir chacun. Chaque destruction rapporte des points au tireur. Le meilleur score gagne. |
+| **Chacun sa partie** | Accueil → Deux joueurs | Le joueur 1 joue tout le niveau, puis le joueur 2. Le meilleur score gagne. |
+| **Face-à-face** | Accueil → Deux joueurs | Chaque joueur a sa catapulte et son château (5 arènes symétriques). Le premier qui abat tous les défenseurs adverses gagne. Si les tirs s'épuisent, celui qui a gardé le plus de défenseurs l'emporte. |
+
+À deux, les joueurs sont repérés par une couleur **et** une forme (rond rouge, carré vert) et par leur nom, pour rester lisibles par les personnes daltoniennes. Les niveaux proposés sont le chapitre 1 et tout ce que vos profils ont déjà débloqué.
+
+### L'atelier et l'or
+
+L'or se gagne **uniquement en remportant des niveaux de la campagne** : 15 pièces par victoire, 10 par étoile, et 50 de bonus la première fois. Une défaite ne rapporte rien.
+
+| Amélioration | Effet | Prix |
+|---|---|---|
+| Bras renforcé (3 niveaux) | Lancer 3 % plus puissant par niveau | 150 · 320 · 550 |
+| Boulets lestés (3 niveaux) | Projectiles 8 % plus lourds par niveau | 120 · 260 · 450 |
+| Réserve de munitions (2 niveaux) | +1 munition spéciale de chaque type, par niveau | 200 · 480 |
+| Stratège (2 niveaux) | Pouvoirs 15 % moins chers par niveau | 180 · 380 |
+| Éclaireur | Un tir supplémentaire dans chaque niveau | 650 |
+
+S'y ajoutent des **apparences** sans effet sur le jeu : catapulte (chêne, bannière royale, ébène, dragon) et traînée du projectile (fumée, braises, étincelles d'or).
+
+Les améliorations s'appliquent en campagne et en mode libre, **jamais à deux joueurs**, pour que les parties restent équitables.
+
+**Pour une future version payante (Play Store, site) :** une boutique « premium » est prête dans le code mais désactivée (`src/services/StoreService.js`). Le fichier explique comment brancher un système de paiement. Un petit serveur sera alors nécessaire pour vérifier les achats, sinon n'importe qui pourrait les simuler.
 
 ### Les sauvegardes
 
@@ -195,16 +228,18 @@ src/
 ├── config/gameConfig.js    Constantes du jeu (gelées)
 ├── core/utils/             Outils génériques : Guard (vérification des types), EventBus, hasard reproductible
 ├── domain/                 Objets métier : SaveSlot (profil), LevelResult (résultat de niveau)
-├── services/               Services : StorageService, SaveManager, SaveSigner, SettingsService, I18nService
+├── services/               Services : StorageService, SaveManager, SaveSigner, SettingsService, I18nService, StoreService
 ├── i18n/                   Traductions fr, en, id
 ├── game/
 │   ├── GameController.js   Relie le moteur au canevas (boucle, entrées, redimensionnement)
-│   ├── GameSession.js      Une partie : tours, tirs, fin de niveau
+│   ├── GameSession.js      Une partie : joueurs, tours, tirs, fin de partie
+│   ├── modes/              GameMode → StoryMode, FreeMode, DuelMode, HotSeatMode, VersusMode
+│   ├── progression/        UpgradeCatalog (atelier), GoldRules (barème de l'or)
 │   ├── Catapult.js         Visée et lancement
 │   ├── TrajectoryPredictor Calcul de la trajectoire prévue (aide à la visée)
 │   ├── physics/            Monde physique (Matter.js)
 │   ├── entities/           Entity → Block, Projectile, Target, Barrel
-│   ├── levels/             Les 40 niveaux et leur assemblage
+│   ├── levels/             Les 40 niveaux, les 5 arènes du face-à-face, leur assemblage
 │   ├── powers/             Power → les 6 pouvoirs, PowerRegistry
 │   ├── score/              ScoreKeeper, règles de score et d'étoiles
 │   ├── rendering/          Renderer, Camera
@@ -232,6 +267,7 @@ build/                      Sécurité (CSP) et service worker générés au bui
 - **Vérification des types à chaque entrée** : toute donnée venant de l'extérieur (sauvegarde, réglages, paramètres d'URL, saisies) passe par `Guard` et des schémas de validation. Une valeur invalide est rejetée ou remplacée par une valeur sûre.
 - **Sauvegardes signées** (HMAC-SHA256) : modifier une sauvegarde à la main la rend invalide.
 - **Contrôles de cohérence** : un score impossible, un niveau débloqué sans avoir fini le précédent, ou des étoiles incohérentes sont refusés.
+- **Or et améliorations vérifiés** : au chargement, le solde doit être exactement égal à l'or gagné moins l'or dépensé, et l'or gagné ne peut pas dépasser ce que les niveaux joués permettent. Une amélioration inconnue ou au-delà de son maximum est refusée.
 - **Score scellé** : le score ne peut changer qu'en réaction au moteur physique ; il n'est pas accessible depuis la console du navigateur.
 - **Objets gelés** : configuration, niveaux et règles sont figés (`Object.freeze`) et ne peuvent pas être modifiés pendant la partie.
 - **Content-Security-Policy stricte** : aucun script tiers, aucun `eval`, aucune connexion réseau sortante.
@@ -282,6 +318,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v1.2.0 | Murs en pierre et en fer plus exigeants (tirs de face et puissants) |
 | v1.3.0 | 40 niveaux redessinés : châteaux plus hauts, points de rupture, niveaux d'ingéniosité |
 | v1.4.0 | Les personnages coincés sous un toit ou entre deux murs meurent écrasés |
+| v2.0.0 | Plus rien ne flotte, boulets plus lourds, mode libre, deux joueurs (3 formules), atelier et or |
 
 Pour revenir à une version précise avec Git : `git checkout v0.4.0` (puis `git checkout main` pour revenir à la dernière).
 

@@ -13,6 +13,10 @@ const chapters = [1, 2, 3, 4]
 const POWER_ICONS = { calm: 'wind', titan: 'fist', greekfire: 'flame', volley: 'volley', powder: 'bomb', quake: 'quake' }
 
 const chapter = ref(1)
+/** Mode libre : seuls les niveaux déjà terminés sont jouables, sans limite. */
+const freeMode = ref(state.match.mode === 'free')
+const canFree = computed(() => (profile.value?.completed ?? 0) > 0)
+const playable = (id) => (freeMode.value ? profile.value.levels[id].completed : profile.value.levels[id].unlocked)
 onMounted(async () => {
   if (!profile.value) {
     app.go('profiles', { replace: true })
@@ -32,10 +36,9 @@ function tileLabel(id) {
 }
 
 function play(id) {
-  if (!profile.value.levels[id].unlocked) return
+  if (!playable(id)) return
   app.services.audio.unlock()
-  state.levelId = id
-  app.go('game')
+  app.startMatch({ mode: freeMode.value ? 'free' : 'story', levelId: id })
 }
 
 /** Navigation entre onglets au clavier (← →), selon le modèle ARIA « tabs ». */
@@ -58,6 +61,22 @@ function onTabKey(e) {
         <span class="levels__stat">{{ t('levels.totalScore', { score: profile.score }) }}</span>
       </div>
     </ScreenHeader>
+
+    <div class="levels__toolbar">
+      <div class="segmented" role="radiogroup" :aria-label="t('levels.free')">
+        <label :class="['segmented__option', { 'segmented__option--on': !freeMode }]">
+          <input v-model="freeMode" class="visually-hidden" type="radio" name="lvl-mode" :value="false">{{ t('levels.story') }}
+        </label>
+        <label :class="['segmented__option', { 'segmented__option--on': freeMode }]" :aria-disabled="!canFree ? 'true' : undefined">
+          <input v-model="freeMode" class="visually-hidden" type="radio" name="lvl-mode" :value="true" :disabled="!canFree"><AppIcon name="infinity" :size="18" />{{ t('levels.free') }}
+        </label>
+      </div>
+      <button type="button" class="btn" @click="app.go('workshop')">
+        <AppIcon name="hammer" :size="20" />{{ t('menu.workshop') }}
+        <span class="gold-badge gold-badge--small"><AppIcon name="coin" :size="16" />{{ profile.gold.toLocaleString(state.locale) }}</span>
+      </button>
+    </div>
+    <p class="field__desc levels__mode-hint">{{ canFree ? (freeMode ? t('levels.freeHint') : '') : t('levels.freeLocked') }}</p>
 
     <div class="tabs" role="tablist" :aria-label="t('levels.title')" @keydown="onTabKey">
       <button
@@ -94,17 +113,17 @@ function onTabKey(e) {
             :class="[
               'level-tile',
               {
-                'level-tile--locked': !profile.levels[id].unlocked,
+                'level-tile--locked': !playable(id),
                 'level-tile--done': profile.levels[id].completed,
                 'level-tile--next': id === profile.next && profile.levels[id].unlocked,
               },
             ]"
-            :aria-disabled="!profile.levels[id].unlocked ? 'true' : undefined"
+            :aria-disabled="!playable(id) ? 'true' : undefined"
             :aria-label="tileLabel(id)"
             @click="play(id)"
           >
             <span class="level-tile__num">{{ id }}</span>
-            <AppIcon v-if="!profile.levels[id].unlocked" name="lock" :size="18" class="level-tile__lock" />
+            <AppIcon v-if="!playable(id)" name="lock" :size="18" class="level-tile__lock" />
             <StarRow v-else :count="profile.levels[id].stars" :size="14" />
           </button>
         </li>

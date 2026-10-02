@@ -55,6 +55,12 @@ function open(screen) {
             </button>
           </li>
           <li>
+            <button type="button" class="banner__item" @click="open('multiplayer')">
+              <AppIcon name="users" />
+              <span class="banner__text">{{ t('menu.twoPlayers') }}</span>
+            </button>
+          </li>
+          <li>
             <button type="button" class="banner__item" @click="open('settings')">
               <AppIcon name="gear" />
               <span class="banner__text">{{ t('menu.settings') }}</span>
