@@ -269,3 +269,54 @@ test('le fer encaisse les boulets de pierre bien mieux que le bois', () => {
   assert.ok(hit('iron').damageRatio < 0.2, 'le fer est à peine entamé')
   assert.ok(!hit('wood').alive || hit('wood').damageRatio > hit('iron').damageRatio)
 })
+
+test('feu : le bois finit par brûler, la pierre jamais', async () => {
+  const { Block } = await import('../src/game/entities/Block.js')
+  const wood = new Block({ x: 0, y: 0, w: 20, h: 100, material: 'wood' })
+  const stone = new Block({ x: 0, y: 0, w: 20, h: 100, material: 'stone' })
+  assert.equal(wood.ignite(), true)
+  assert.equal(stone.ignite(), false)
+  for (let t = 0; t < 10000 && wood.alive; t += 50) wood.update(50)
+  assert.equal(wood.alive, false, 'le bois est consumé')
+  const straw = new Block({ x: 0, y: 0, w: 20, h: 100, material: 'straw' })
+  assert.ok(straw.catchChance > wood.catchChance * 4, 'la paille propage bien plus que le bois')
+})
+
+test('feu : le bois finit par brûler, la paille brûle et propage plus vite', () => {
+  const w = new PhysicsWorld(new EventBus(), { seed: 3 })
+  const wood = w.add(new Block({ material: 'wood', x: 1400, y: G - 50, w: 20, h: 100 }))
+  const straw = w.add(new Block({ material: 'straw', x: 1700, y: G - 50, w: 20, h: 100 }))
+  settle(w, 60)
+  wood.ignite()
+  straw.ignite()
+  let strawGone = null
+  let woodGone = null
+  for (let i = 0; i < 120 * 14 && woodGone === null; i++) {
+    w.stepOnce()
+    if (strawGone === null && !straw.alive) strawGone = i
+    if (woodGone === null && !wood.alive) woodGone = i
+  }
+  assert.ok(woodGone !== null, 'un mur de bois en feu finit par céder')
+  assert.ok(strawGone < woodGone, 'la paille se consume plus vite')
+  assert.ok(straw.catchChance > wood.catchChance * 3, 'la paille propage bien plus le feu')
+  w.destroy()
+})
+
+test('feu : une cible qui s’enflamme succombe', () => {
+  const w = new PhysicsWorld(new EventBus(), { seed: 4 })
+  const t = w.add(new Target({ type: 'knight', x: 1440, y: G - 27 }, 1.35))
+  settle(w, 30)
+  t.ignite()
+  settle(w, 120 * 2)
+  assert.equal(t.alive, false)
+  assert.equal(t.deathCause, 'fire')
+  w.destroy()
+})
+
+test('séisme avant le premier tir : les règles de chute sont armées', () => {
+  const w = new PhysicsWorld(new EventBus(), { seed: 5 })
+  assert.equal(w.armed, false)
+  w.arm()
+  assert.equal(w.armed, true)
+  w.destroy()
+})

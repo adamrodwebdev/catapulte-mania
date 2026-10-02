@@ -1,4 +1,5 @@
 import { SCORE, starsFor } from './ScoreRules.js'
+import { evaluateAchievements } from '../progression/Achievements.js'
 import { DIFFICULTY, GAME } from '../../config/gameConfig.js'
 import { LevelResult } from '../../domain/LevelResult.js'
 import { Guard } from '../../core/utils/Guard.js'
@@ -16,6 +17,8 @@ export class ScoreKeeper {
   #penalty = 0
   #chain = 0
   #stats = { targetsKilled: 0, blocksDestroyed: 0, barrelsExploded: 0, powersUsed: 0 }
+  /** Statistiques des succès (comptées ici, jamais transmises par l'interface). */
+  #run = { specialsUsed: 0, maxChain: 0, fireKills: 0, firstKill: null }
   #finalized = false
 
   constructor(level, difficulty) {
@@ -36,21 +39,27 @@ export class ScoreKeeper {
     return { ...this.#stats }
   }
 
-  /** Début d'un tir : la chaîne de destructions repart de zéro. */
-  startShot() {
+  /**
+   * Début d'un tir : la chaîne de destructions repart de zéro.
+   * @param {string} [ammo] type de projectile tiré
+   */
+  startShot(ammo = 'stone') {
     this.#chain = 0
+    if (ammo !== 'stone') this.#run.specialsUsed++
   }
 
   /**
    * Une entité vient d'être détruite.
    * @returns {number} points gagnés (avant multiplicateur de difficulté)
    */
-  registerDestroyed(entity) {
+  registerDestroyed(entity, cause = null) {
     if (this.#finalized) return 0
     let base = 0
     if (entity.kind === 'target') {
       base = entity.scoreValue
       this.#stats.targetsKilled++
+      if (cause === 'fire') this.#run.fireKills++
+      if (this.#run.firstKill === null) this.#run.firstKill = entity.type
     } else if (entity.kind === 'block') {
       base = entity.scoreValue
       this.#stats.blocksDestroyed++
@@ -61,6 +70,7 @@ export class ScoreKeeper {
     if (!base) return 0
     const mult = Math.min(SCORE.CHAIN_MAX, 1 + this.#chain * SCORE.CHAIN_STEP)
     this.#chain++
+    this.#run.maxChain = Math.max(this.#run.maxChain, this.#chain)
     const gained = Math.round(base * mult)
     this.#points += gained
     return Math.round(gained * this.factor)
@@ -95,7 +105,8 @@ export class ScoreKeeper {
     return LevelResult.issue({
       levelId: this.#level.id,
       score: won ? score : 0,
-      stars: won ? starsFor(this.#level, score) : 0,
+      stars: won ? starsFor(this.#level, shotsUsed) : 0,
+      achievements: won ? evaluateAchievements(this.#level, { ...this.#stats, ...this.#run, shotsUsed }) : 0,
       won,
       shotsUsed,
       difficulty: this.#difficulty,

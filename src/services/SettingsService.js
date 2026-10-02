@@ -10,6 +10,8 @@ const DEFINITIONS = Object.freeze({
   motion: { validate: Schema.enum(['system', 'reduced', 'full']), fallback: 'system' },
   uiScale: { validate: Schema.enum([1, 1.15, 1.3]), fallback: 1 },
   trajectoryAid: { validate: Schema.boolean(), fallback: false },
+  // Puissance réglée au début de chaque tour ('keep' : garder la dernière visée).
+  startPower: { validate: Schema.enum(['keep', 100, 75, 50]), fallback: 100 },
   captions: { validate: Schema.boolean(), fallback: true },
   announcements: { validate: Schema.boolean(), fallback: true },
   haptics: { validate: Schema.boolean(), fallback: true },

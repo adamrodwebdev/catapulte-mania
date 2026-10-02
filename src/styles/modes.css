@@ -499,11 +499,200 @@
   }
 
   .shop-item > .btn,
+  .shop-item__buy,
   .shop-item__done {
     grid-column: 1 / -1;
     justify-self: stretch;
     justify-content: center;
   }
+
+  .shop-item__buy .btn {
+    width: 100%;
+  }
+}
+
+/* ---------- Atelier : exigence d'étoiles ---------- */
+
+.shop-item__buy {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+}
+
+.shop-item__req {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: var(--fs-0, 0.85rem);
+  color: var(--text-muted);
+}
+
+.shop-item__req .icon {
+  color: var(--accent);
+}
+
+.shop-item__req--missing {
+  color: var(--danger, #b3261e);
+  font-weight: 700;
+}
+
+/* ---------- Succès ---------- */
+
+.ach-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+  text-align: left;
+}
+
+.ach {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2, transparent);
+}
+
+.ach__badge {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-muted);
+  border: 2px solid var(--border);
+}
+
+.ach__text {
+  display: grid;
+  min-width: 0;
+}
+
+.ach__name {
+  font-weight: 700;
+}
+
+.ach__desc {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.ach__state {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.ach--done {
+  border-style: solid;
+  border-color: var(--gold);
+}
+
+.ach--done .ach__badge {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #2b1d00;
+}
+
+.ach--done .ach__state {
+  color: var(--text);
+}
+
+.ach--fresh {
+  animation: ach-pop 600ms ease-out both;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 45%, transparent);
+}
+
+.ach--fresh .ach__state {
+  color: var(--gold-text, var(--text));
+}
+
+.ach-list--compact .ach {
+  padding: 6px var(--space-2);
+}
+
+.ach-list--compact .ach__badge {
+  width: 1.9rem;
+  height: 1.9rem;
+}
+
+@keyframes ach-pop {
+  0% {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.03);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ach--fresh {
+    animation: none;
+  }
+}
+
+.intro-stars {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-1) var(--space-3);
+  font-weight: 700;
+}
+
+.intro-stars > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.intro-ach__title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 var(--space-1);
+  font-size: var(--fs-1, 1rem);
+}
+
+.intro-ach__title .icon {
+  color: var(--gold);
+}
+
+.end__shots {
+  font-weight: 700;
+  margin: 0;
+}
+
+.level-tile__ach {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.ach-pip {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  opacity: 0.55;
+}
+
+.ach-pip--on {
+  background: var(--gold);
+  border-color: var(--gold);
+  opacity: 1;
 }
 
 /* Téléphone : à deux joueurs, le bandeau privilégie les joueurs (le titre est

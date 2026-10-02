@@ -18,13 +18,17 @@ const KEY = Symbol('app')
 /**
  * Contrôle métier d'un record chargé depuis la sauvegarde.
  * Les étoiles ne sont jamais crues sur parole : elles sont recalculées à partir
- * du meilleur score (ce qui adapte aussi les anciens profils aux barèmes actuels).
- * @returns {number} nombre d'étoiles correct pour ce score
+ * du plus petit nombre de tirs gagnants. Les profils antérieurs à la v3.1, dont
+ * ce nombre est inconnu (0), gardent les étoiles obtenues à l'époque.
+ * @param {number} levelId
+ * @param {{ best: number, stars: number, shots: number }} rec
+ * @returns {number} nombre d'étoiles correct pour ce record
  */
-function checkRecord(levelId, best) {
+function checkRecord(levelId, rec) {
   const level = LevelRepository.get(levelId)
-  if (best > level.maxScore) throw new ValidationError(`levels.${levelId}.best`, 'impossible score')
-  return starsFor(level, best)
+  if (rec.best > level.maxScore) throw new ValidationError(`levels.${levelId}.best`, 'impossible score')
+  if (rec.shots > level.shots + 10) throw new ValidationError(`levels.${levelId}.shots`, 'impossible shot count')
+  return rec.shots > 0 ? starsFor(level, rec.shots) : Math.max(1, rec.stars)
 }
 
 /** Écrans de l'application (navigation interne, une seule URL pour le SEO). */
@@ -132,7 +136,7 @@ export function createAppContext() {
     const levels = {}
     for (let id = 1; id <= GAME.LEVEL_COUNT; id++) {
       const rec = slot.levelRecord(id)
-      levels[id] = { unlocked: slot.isUnlocked(id) && id <= PLAYABLE_LEVELS, stars: rec?.stars ?? 0, best: rec?.best ?? 0, completed: Boolean(rec) }
+      levels[id] = { unlocked: slot.isUnlocked(id) && id <= PLAYABLE_LEVELS, stars: rec?.stars ?? 0, best: rec?.best ?? 0, completed: Boolean(rec), shots: rec?.shots ?? 0, ach: rec?.ach ?? 0 }
     }
     return {
       index: slot.index,
@@ -140,6 +144,7 @@ export function createAppContext() {
       difficulty: slot.difficulty,
       completed: slot.completedCount,
       stars: slot.starCount,
+      achievements: slot.achievementCount,
       score: slot.totalScore,
       next: Math.min(slot.nextLevel, PLAYABLE_LEVELS),
       levels,
@@ -192,7 +197,7 @@ export function createAppContext() {
    * @returns {Promise<{ newBest: boolean, firstClear: boolean, unlockedPower: string | null, saved: boolean }>}
    */
   async function recordResult(result) {
-    if (!activeSlot) return { newBest: false, firstClear: false, unlockedPower: null, saved: false, gold: 0 }
+    if (!activeSlot) return { newBest: false, firstClear: false, unlockedPower: null, saved: false, gold: 0, newAchievements: 0 }
     const before = activeSlot.completedCount
     const outcome = activeSlot.recordResult(result)
     let saved

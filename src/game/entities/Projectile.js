@@ -16,7 +16,7 @@ export class Projectile extends Entity {
    * @param {string} type
    * @param {number} x
    * @param {number} y
-   * @param {{ massFactor?: number, ignites?: boolean, explodes?: boolean, radius?: number }} [mods]
+   * @param {{ massFactor?: number, ignites?: boolean, explodes?: boolean, radius?: number, blastFactor?: number, fireFactor?: number }} [mods]
    */
   constructor(type, x, y, mods = {}) {
     Guard.oneOf(type, PROJECTILE_NAMES, 'projectile type')
@@ -37,6 +37,9 @@ export class Projectile extends Entity {
     this.ignites = Boolean(mods.ignites || t.ignites)
     this.explodes = Boolean(mods.explodes || t.explodes)
     this.splittable = t.splits
+    /** Améliorations de l'atelier : rayon d'explosion (Poudre fine) et de mise à feu (Poix). */
+    this.blastFactor = Guard.number(mods.blastFactor ?? 1, 'blastFactor', { min: 0.5, max: 3 })
+    this.fireFactor = Guard.number(mods.fireFactor ?? 1, 'fireFactor', { min: 0.5, max: 3 })
     this.empowered = massFactor > 1 || Boolean(mods.ignites) || Boolean(mods.explodes)
     this.hasImpacted = false
     this.hasSplit = false

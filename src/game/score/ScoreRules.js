@@ -10,12 +10,6 @@ export const SCORE = deepFreeze({
   CHAIN_STEP: 0.1,
   CHAIN_MAX: 2,
   BARREL: 100,
-  /**
-   * Seuils d'étoiles (fraction du score de référence). Relevés en v2.1 :
-   * 3 étoiles = un tir quasi parfait (victoire rapide ET beaucoup de dégâts).
-   */
-  STAR_2: 0.7,
-  STAR_3: 1.05,
 })
 
 /** Points « bruts » de tout ce qui peut être détruit dans le niveau. */
@@ -38,10 +32,16 @@ export function maxScore(level) {
 }
 
 /**
- * Nombre d'étoiles d'un niveau GAGNÉ selon le score.
- * Fonction croissante du score : la meilleure note correspond toujours au meilleur score.
+ * Nombre d'étoiles d'un niveau GAGNÉ selon le nombre de tirs utilisés (v3.1) :
+ *  - 3 étoiles : victoire en `level.par` tirs (1, ou 2 pour les grands châteaux) ;
+ *  - 2 étoiles : victoire en `level.star2` tirs au plus ;
+ *  - 1 étoile  : victoire.
+ * Fonction décroissante du nombre de tirs : le meilleur résultat (le moins de
+ * tirs) donne toujours la meilleure note.
+ * @param {{ par: number, star2: number }} level
+ * @param {number} shotsUsed
  */
-export function starsFor(level, score) {
-  const ref = referenceScore(level)
-  return 1 + (score >= ref * SCORE.STAR_2 ? 1 : 0) + (score >= ref * SCORE.STAR_3 ? 1 : 0)
+export function starsFor(level, shotsUsed) {
+  if (shotsUsed <= level.par) return 3
+  return shotsUsed <= level.star2 ? 2 : 1
 }

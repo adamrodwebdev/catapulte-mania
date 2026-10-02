@@ -7,6 +7,10 @@ import { deepFreeze } from '../../core/utils/Guard.js'
  * - density     : densité Matter.js (masse = densité × surface)
  * - hp          : énergie de choc nécessaire pour détruire le bloc
  * - flammable   : peut prendre feu (pot de feu, explosion)
+ * - burn        : { dps, ms, spread } combustion : dégâts par seconde, durée,
+ *                 probabilité de s'enflammer au contact d'un voisin (toutes les 0,4 s).
+ *                 La paille flambe vite et propage partout ; le bois brûle plus
+ *                 longtemps, finit par céder, mais propage beaucoup moins.
  * - score       : points accordés à la destruction
  * - sound       : famille de son et de sous-titre
  * - armor       : part des dégâts de choc réellement subis (1 = tous). Le fer
@@ -23,8 +27,8 @@ import { deepFreeze } from '../../core/utils/Guard.js'
  * il faut le bon projectile ou les améliorations de l'atelier pour les percer.
  */
 export const MATERIALS = deepFreeze({
-  straw: { density: 0.0025, hp: 90, friction: 0.9, restitution: 0.02, flammable: true, score: 20, sound: 'straw', bearing: 0.15 },
-  wood: { density: 0.005, hp: 260, friction: 0.75, restitution: 0.04, flammable: true, score: 50, sound: 'wood', bearing: 0.2 },
+  straw: { density: 0.0025, hp: 90, friction: 0.9, restitution: 0.02, flammable: true, burn: { dps: 45, ms: 4000, spread: 0.35 }, score: 20, sound: 'straw', bearing: 0.15 },
+  wood: { density: 0.005, hp: 260, friction: 0.75, restitution: 0.04, flammable: true, burn: { dps: 34, ms: 9000, spread: 0.07 }, score: 50, sound: 'wood', bearing: 0.2 },
   glass: { density: 0.006, hp: 55, friction: 0.4, restitution: 0.1, flammable: false, score: 40, sound: 'glass', bearing: 0.15 },
   stone: { density: 0.015, hp: 1150, friction: 0.85, restitution: 0.02, flammable: false, score: 120, sound: 'stone', bearing: 0.55 },
   // Nouveaux matériaux (v3), introduits aux chapitres 5 à 10.

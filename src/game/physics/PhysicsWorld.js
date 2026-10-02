@@ -99,12 +99,24 @@ export class PhysicsWorld {
     return [...this.#entities.values()].filter(predicate)
   }
 
+  /**
+   * Arme les règles de mort (écrasement, chute, renversement) et relève les
+   * appuis de la structure stabilisée. Appelé au premier projectile, mais aussi
+   * par un pouvoir immédiat (séisme) : sans cela, une cible renversée avant
+   * tout tir n'était pas comptée comme éliminée.
+   */
+  arm() {
+    if (this.#armed) return
+    this.structure.map(this.#entities.values())
+    this.#armed = true
+  }
+
+  get armed() {
+    return this.#armed
+  }
+
   add(entity) {
-    // Premier projectile : on relève les appuis de la structure stabilisée.
-    if (entity.kind === 'projectile' && !this.#armed) {
-      this.structure.map(this.#entities.values())
-      this.#armed = true
-    }
+    if (entity.kind === 'projectile') this.arm()
     this.#entities.set(entity.body.id, entity)
     Composite.add(this.engine.world, entity.body)
     return entity
@@ -331,12 +343,12 @@ export class PhysicsWorld {
           p.hasImpacted = true
           if (p.ignites && other && other.ignite(7000)) this.#events.emit('fire:start', { entity: other })
           if (p.ignites) {
-            for (const near of this.queryRadius(p.x, p.y, 70)) {
+            for (const near of this.queryRadius(p.x, p.y, 95 * p.fireFactor)) {
               if (near !== p && near.ignite(6000)) this.#events.emit('fire:start', { entity: near })
             }
           }
           if (p.explodes) {
-            this.#pendingExplosions.push({ at: this.#time, x: p.x, y: p.y, spec: { radius: 150, power: 12, damage: 800, source: p } })
+            this.#pendingExplosions.push({ at: this.#time, x: p.x, y: p.y, spec: { radius: 150 * p.blastFactor, power: 12 * Math.sqrt(p.blastFactor), damage: 800 * p.blastFactor, source: p } })
             p.kill('explosion')
           }
         }
@@ -420,7 +432,7 @@ export class PhysicsWorld {
     for (const src of burning) {
       const reach = Math.max(src.width, src.height) / 2 + 26
       for (const near of this.queryRadius(src.x, src.y, reach + 30)) {
-        if (near !== src && near.flammable && near.burning === 0 && this.#rng.chance(0.3)) {
+        if (near !== src && near.flammable && near.burning === 0 && this.#rng.chance(near.catchChance ?? 0.3)) {
           if (near.ignite(5500)) this.#events.emit('fire:start', { entity: near })
         }
       }

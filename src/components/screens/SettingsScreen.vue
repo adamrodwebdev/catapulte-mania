@@ -32,6 +32,7 @@ function onVolume(e) {
         <LanguagePicker id="settings-lang" />
         <SegmentedControl :model-value="s.theme" name="theme" :label="t('settings.theme')" :options="opts('themes', ['system', 'light', 'dark'])" @update:model-value="set('theme')($event)" />
         <SegmentedControl :model-value="s.uiScale" name="scale" :label="t('settings.uiScale')" :options="opts('scales', [1, 1.15, 1.3])" @update:model-value="set('uiScale')($event)" />
+        <SegmentedControl :model-value="s.startPower" name="start-power" :label="t('settings.startPower')" :options="opts('startPowers', ['keep', 100, 75, 50])" @update:model-value="set('startPower')($event)" />
         <SegmentedControl :model-value="s.motion" name="motion" :label="t('settings.motion')" :options="opts('motions', ['system', 'reduced', 'full'])" @update:model-value="set('motion')($event)" />
       </section>
 

@@ -8,6 +8,7 @@ Réglez l'angle et la puissance, calculez la trajectoire, et faites tomber les f
 - 6 pouvoirs spéciaux à débloquer (un seul par tour, chaque utilisation coûte des points)
 - **Mode libre** : rejouer les niveaux terminés sans limite de tirs ni de munitions
 - **Deux joueurs** sur le même appareil : duel, chacun sa partie ou face-à-face
+- **300 succès** : trois défis par niveau (gagner sans boulet spécial, faire sauter tous les barils, abattre le roi en premier…)
 - **Atelier** : de l'or gagné en jouant pour améliorer sa catapulte et changer son apparence
 - Français, English, Bahasa Indonesia
 - Thème clair, thème sombre et mode contraste élevé
@@ -64,7 +65,22 @@ On peut l'envoyer par e-mail, le mettre sur une clé USB ou l'héberger sur n'im
 **Le but :** éliminer tous les personnages (soldats, chevaliers, rois) avant d'avoir épuisé ses tirs.
 **Le vent** (indiqué en haut à droite) dévie les projectiles.
 **La physique :** les personnages tombent **au moindre choc** (un bloc qui bouge, un projectile, un débris, une chute). Ce sont les **châteaux** qui les protègent, et ils sont solides : une simple pierre ne renverse pas un mur de pierre. Il faut choisir le bon projectile (le rocher pour enfoncer, les explosifs pour la pierre, le marbre et le fer) ou améliorer sa catapulte à l'atelier. Frappez un mur porteur de face et assez fort : il cède et ce qu'il soutenait s'effondre. Rien ne reste jamais suspendu dans le vide.
-**Les étoiles :** 1 étoile pour une victoire, 2 pour une belle victoire, 3 pour un tir quasi parfait (victoire rapide et beaucoup de dégâts).
+**Le feu :** le feu grégeois enflamme ce qu'il touche. La paille flambe en deux secondes et propage le feu partout ; le bois brûle plus longtemps, finit par céder, mais propage beaucoup moins. Une cible qui prend feu succombe.
+
+**Les étoiles** dépendent du nombre de tirs : **3 étoiles en un seul tir** (deux pour les grands châteaux, indiqué avant chaque niveau), 2 étoiles en peu de tirs, 1 étoile pour une victoire. Si le feu ou un pouvoir (séisme) abat les derniers défenseurs pendant que vous visez, la victoire est accordée tout de suite, sans avoir à tirer.
+
+**Les succès :** chaque niveau propose trois défis, affichés avant la partie et à la fin. Ils se cumulent d'une partie à l'autre : on peut réussir « Puriste » (aucun boulet spécial) puis revenir pour « Feu d'artifice » (tous les barils). Il y en a 300 en tout.
+
+| Succès | Défi |
+|---|---|
+| Puriste | Gagner sans tirer de boulet spécial |
+| Économe | Gagner en utilisant au plus la moitié des tirs |
+| Feu d'artifice | Faire exploser tous les barils |
+| Régicide | Abattre le roi avant tous ses gardes |
+| Réaction en chaîne | Détruire 8 éléments en un seul tir |
+| Pyromane | Éliminer une cible par le feu |
+| Démolisseur | Raser au moins la moitié du château |
+| Sans artifice | Gagner sans utiliser de pouvoir |
 
 ### La progression
 
@@ -108,19 +124,25 @@ Un seul pouvoir par tour. Chaque utilisation retire des points au score final.
 
 ### L'atelier et l'or
 
-L'or se gagne **uniquement en remportant des niveaux de la campagne** : 15 pièces par victoire, 10 par étoile, et 50 de bonus la première fois. Une défaite ne rapporte rien.
+L'or récompense la **maîtrise**, pas la répétition : 30 pièces pour la première victoire d'un niveau, 15 pour chaque nouvelle étoile, 25 pour chaque nouveau succès. Rejouer une victoire déjà obtenue ne rapporte que 5 pièces, une défaite rien. Sur les 100 niveaux, on peut gagner environ 15 000 pièces, alors que tout acheter en coûterait plus de 25 000 : **il faut choisir**.
 
-| Amélioration | Effet | Prix |
-|---|---|---|
-| Bras renforcé (3 niveaux) | Lancer 7 % plus puissant par niveau | 150 · 320 · 550 |
-| Boulets lestés (3 niveaux) | Projectiles 20 % plus lourds par niveau | 120 · 260 · 450 |
-| Réserve de munitions (2 niveaux) | +1 munition spéciale de chaque type, par niveau | 200 · 480 |
-| Stratège (2 niveaux) | Pouvoirs 15 % moins chers par niveau | 180 · 380 |
-| Éclaireur | Un tir supplémentaire dans chaque niveau | 650 |
+Les meilleurs paliers demandent aussi des **étoiles** (colonne « Étoiles requises »).
+
+| Amélioration | Effet par niveau | Prix | Étoiles requises |
+|---|---|---|---|
+| Bras renforcé (4 niveaux) | Lancer 7 % plus rapide | 300 · 700 · 1 300 · 2 200 | 0 · 30 · 90 · 180 |
+| Boulets lestés (4 niveaux) | Projectiles 20 % plus lourds | 250 · 600 · 1 100 · 1 900 | 0 · 25 · 80 · 170 |
+| Poix (3 niveaux) | Le feu grégeois embrase une zone 35 % plus large | 350 · 900 · 1 600 | 10 · 50 · 120 |
+| Poudre fine (3 niveaux) | Explosions 15 % plus larges et plus fortes | 450 · 1 100 · 2 000 | 20 · 70 · 150 |
+| Réserve de munitions (3 niveaux) | +1 munition spéciale de chaque type | 500 · 1 200 · 2 200 | 15 · 60 · 140 |
+| Stratège (2 niveaux) | Pouvoirs 15 % moins chers | 400 · 1 000 | 10 · 60 |
+| Éclaireur (2 niveaux) | Un tir supplémentaire dans chaque niveau | 1 500 · 3 500 | 60 · 200 |
 
 S'y ajoutent des **apparences** sans effet sur le jeu : catapulte (chêne, bannière royale, ébène, dragon) et traînée du projectile (fumée, braises, étincelles d'or).
 
-Elles changent vraiment la façon de jouer : avec un bras renforcé et des boulets lestés au maximum, une simple pierre fait presque deux fois plus de dégâts. Les améliorations s’appliquent en campagne et en mode libre, **jamais à deux joueurs**, pour que les parties restent équitables.
+Elles changent vraiment la façon de jouer : avec un bras renforcé et des boulets lestés au maximum, une simple pierre fait plus de deux fois plus de dégâts ; la poix et la poudre fine font du feu et des explosifs une vraie stratégie.
+
+Les profils créés avant la v3.1 gardent leurs étoiles et leur or ; leurs améliorations sont remboursées car les prix ont changé. Les améliorations s’appliquent en campagne et en mode libre, **jamais à deux joueurs**, pour que les parties restent équitables.
 
 **Pour une future version payante (Play Store, site) :** une boutique « premium » est prête dans le code mais désactivée (`src/services/StoreService.js`). Le fichier explique comment brancher un système de paiement. Un petit serveur sera alors nécessaire pour vérifier les achats, sinon n'importe qui pourrait les simuler.
 
@@ -135,6 +157,7 @@ La partie est enregistrée automatiquement dans le navigateur (3 emplacements de
 Tout se règle dans **Réglages** (et une partie directement depuis la pause) :
 
 - **Aide à la visée** : affiche la trajectoire prévue du projectile en pointillés.
+- **Puissance au début du tour** : 100 % par défaut (ou 75 %, 50 %, ou « Garder » la dernière visée).
 - **Sous-titres des sons** (malentendants) : chaque bruit important est écrit à l'écran avec sa direction, par exemple `◀ [Bois brisé]`.
 - **Vibrations** sur téléphone pour les impacts et explosions.
 - **Lecteur d'écran** (malvoyants) : l'interface est entièrement en HTML (pas seulement dessinée), chaque tour est annoncé (« Tour 2, 3 cibles restantes, vent 12 km/h vers la gauche »).
@@ -273,6 +296,7 @@ build/                      Sécurité (CSP) et service worker générés au bui
 - **Vérification des types à chaque entrée** : toute donnée venant de l'extérieur (sauvegarde, réglages, paramètres d'URL, saisies) passe par `Guard` et des schémas de validation. Une valeur invalide est rejetée ou remplacée par une valeur sûre.
 - **Sauvegardes signées** (HMAC-SHA256) : modifier une sauvegarde à la main la rend invalide.
 - **Contrôles de cohérence** : un score impossible, un niveau débloqué sans avoir fini le précédent, ou des étoiles incohérentes sont refusés.
+- **Étoiles et succès non déclarables** : ils sont calculés par le moteur de jeu à partir de ce qui s'est réellement passé (tirs, munitions, destructions). Au chargement, les étoiles sont recalculées à partir du nombre de tirs enregistré, et une amélioration achetée sans les étoiles requises est refusée.
 - **Or et améliorations vérifiés** : au chargement, le solde doit être exactement égal à l'or gagné moins l'or dépensé, et l'or gagné ne peut pas dépasser ce que les niveaux joués permettent. Une amélioration inconnue ou au-delà de son maximum est refusée.
 - **Score scellé** : le score ne peut changer qu'en réaction au moteur physique ; il n'est pas accessible depuis la console du navigateur.
 - **Objets gelés** : configuration, niveaux et règles sont figés (`Object.freeze`) et ne peuvent pas être modifiés pendant la partie.
@@ -327,6 +351,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v2.0.0 | Plus rien ne flotte, boulets plus lourds, mode libre, deux joueurs (3 formules), atelier et or |
 | v2.1.0 | Équilibrage : pierre au poids d'origine, fer blindé, écrasement plus exigeant, étoiles plus dures |
 | v3.0.0 | 100 niveaux, 4 nouveaux matériaux et 6 climats, personnages fragiles et châteaux solides, grands châteaux de duel |
+| v3.1.0 | 300 succès, étoiles au nombre de tirs, atelier plus exigeant (poix, poudre fine, étoiles requises), le bois brûle, victoire immédiate par le feu ou un pouvoir |
 
 Pour revenir à une version précise avec Git : `git checkout v0.4.0` (puis `git checkout main` pour revenir à la dernière).
 

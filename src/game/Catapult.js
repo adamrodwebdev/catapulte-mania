@@ -31,7 +31,7 @@ export class Catapult {
   /** Angle de tir en degrés (0 = horizontal, 90 = vertical). */
   angle = 45
   /** Puissance de 0 à 1. */
-  power = 0.55
+  power = 1
   #phase = 'idle'
   #phaseT = 0
   #onRelease = null

@@ -64,6 +64,7 @@ export class GameController extends EventBus {
       reducedMotion,
       screenShake: settings.screenShake,
       blood: settings.blood,
+      startPower: settings.startPower,
       effects,
     }, mode)
     this.session.camera.setFocus(level.focus.left, level.focus.right, level.focus.top)
@@ -89,6 +90,7 @@ export class GameController extends EventBus {
     this.session.options.reducedMotion = reducedMotion
     this.session.camera.shakeEnabled = settings.screenShake && !reducedMotion
     this.session.options.blood = settings.blood
+    this.session.options.startPower = settings.startPower
     this.session.camera.follow = !reducedMotion
     this.session.particles.density = reducedMotion ? 0.35 : 1
   }

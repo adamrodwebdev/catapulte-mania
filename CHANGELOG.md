@@ -2,6 +2,32 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [3.1.0] – 2026-10-02
+### Ajouté
+- **Succès** : trois défis par niveau (300 en tout) : Puriste, Économe, Feu
+  d'artifice, Régicide, Réaction en chaîne, Pyromane, Démolisseur, Sans artifice.
+  Affichés avant et après chaque niveau, cumulables d'une partie à l'autre,
+  comptés par le moteur de score (impossible de les déclarer depuis la console).
+- **Atelier** : deux améliorations, Poix (zone de feu +35 %/niveau) et Poudre
+  fine (explosions +15 %/niveau) ; bras et lest passent à 4 niveaux.
+- Réglage **Puissance au début du tour** : 100 % par défaut (75 %, 50 % ou garder).
+### Modifié
+- **Étoiles au nombre de tirs** : 3 étoiles en un seul tir (deux pour les
+  châteaux de 6 défenseurs ou plus), 2 étoiles en peu de tirs, 1 étoile sinon.
+- **Or** : récompense la maîtrise (première victoire 30, nouvelle étoile 15,
+  nouveau succès 25, victoire rejouée 5). Les améliorations coûtent bien plus cher
+  et leurs meilleurs paliers exigent des étoiles : on ne peut pas tout acheter.
+- **Feu** : le bois brûle jusqu'à céder (plus lentement que la paille, et il
+  propage cinq fois moins) ; une cible qui s'enflamme succombe.
+- Sauvegarde v3 : les profils existants gardent étoiles et or, leurs
+  améliorations sont remboursées.
+### Corrigé
+- Si le feu ou un pouvoir abat les dernières cibles pendant la visée, la
+  victoire est accordée tout de suite (il fallait tirer un boulet dans le vide).
+- Un séisme lancé avant le premier tir arme désormais les règles de chute et de
+  renversement : les défenseurs renversés comptent comme éliminés.
+- Au dernier tir, la partie attend que le feu ait fini son œuvre avant de conclure.
+
 ## [3.0.0] – 2026-10-02
 ### Ajouté
 - **100 niveaux** (au lieu de 40) : six nouveaux chapitres (Marais, Désert,

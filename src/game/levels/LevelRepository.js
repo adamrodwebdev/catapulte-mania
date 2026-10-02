@@ -6,6 +6,7 @@ import { Schema, Guard, deepFreeze } from '../../core/utils/Guard.js'
 import { MATERIAL_NAMES } from '../entities/materials.js'
 import { TARGET_TYPES, PROJECTILE_NAMES } from '../entities/catalog.js'
 import { referenceScore, maxScore } from '../score/ScoreRules.js'
+import { achievementsFor } from '../progression/Achievements.js'
 
 const coord = Schema.number({ min: -500, max: 4000 })
 const size = Schema.number({ min: 6, max: 600 })
@@ -49,6 +50,10 @@ export function buildLevel(spec, id, chapter, seedSalt = 0) {
     ...data,
     focus: { left: 0, right: Math.max(1500, bounds.right + 160), top: Math.min(250, bounds.top - 180) },
   }
+  // Étoiles : 3 en `par` tirs (1, ou 2 pour les châteaux très garnis), 2 en `star2` tirs.
+  level.par = Guard.int(spec.par ?? (data.targets.length >= 6 ? 2 : 1), `level ${id} par`, { min: 1, max: data.shots })
+  level.star2 = Math.min(data.shots, level.par + Math.max(1, Math.floor((data.shots - level.par) / 2)))
+  level.achievements = achievementsFor(level)
   level.reference = referenceScore(level)
   level.maxScore = maxScore(level)
   return deepFreeze(level)

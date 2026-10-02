@@ -45,14 +45,21 @@ test('l’aide à la trajectoire prédit exactement le vol réel', () => {
   }
 })
 
-test('étoiles : fonction croissante du score', () => {
-  const l = LevelRepository.get(10)
-  let prev = 0
-  for (let s = 0; s <= l.maxScore; s += 250) {
-    const st = starsFor(l, s)
-    assert.ok(st >= prev && st >= 1 && st <= 3)
-    prev = st
+test('étoiles : 3 en par tirs, puis de moins en moins avec les tirs', () => {
+  for (const l of LevelRepository.all()) {
+    assert.ok(l.par >= 1 && l.par <= 2 && l.par <= l.star2 && l.star2 <= l.shots, `niveau ${l.id}`)
+    let prev = 3
+    for (let n = 1; n <= l.shots + 3; n++) {
+      const st = starsFor(l, n)
+      assert.ok(st <= prev && st >= 1 && st <= 3)
+      prev = st
+    }
+    assert.equal(starsFor(l, l.par), 3)
+    assert.equal(starsFor(l, l.par + 1), l.par + 1 <= l.star2 ? 2 : 1)
+    assert.equal(l.achievements.length, 3)
+    assert.equal(new Set(l.achievements).size, 3, `succès distincts niveau ${l.id}`)
   }
+  const l = LevelRepository.get(10)
   assert.ok(maxScore(l) > l.reference)
 })
 
@@ -112,4 +119,58 @@ test('fin de niveau : résultat authentifié et défaite sans tirs', () => {
   assert.ok(LevelResult.isAuthentic(end.result))
   assert.equal(end.result.score, 0)
   s.destroy()
+})
+
+test('victoire sans tir : les dernières cibles tombent pendant la visée (feu, séisme)', () => {
+  const s = new GameSession(LevelRepository.get(1), { difficulty: 'normal', completedLevels: 0 })
+  let ended = null
+  s.on('end', (e) => (ended = e))
+  playUntilAiming(s)
+  for (const t of s.world.filter((e) => e.kind === 'target')) t.kill('fire')
+  for (let i = 0; i < 60 && !ended; i++) s.update(1000 / 30)
+  assert.ok(ended, 'la partie se termine sans attendre un tir')
+  assert.equal(ended.won, true)
+  assert.equal(ended.result.shotsUsed, 0)
+  assert.equal(ended.result.stars, 3)
+  s.destroy()
+})
+
+test('succès : trois par niveau, évalués par le moteur', () => {
+  const l = LevelRepository.get(1)
+  const s = new GameSession(l, { difficulty: 'normal', completedLevels: 0 })
+  let ended = null
+  s.on('end', (e) => (ended = e))
+  playUntilAiming(s)
+  for (const t of s.world.filter((e) => e.kind === 'target')) t.kill('impact')
+  for (let i = 0; i < 60 && !ended; i++) s.update(1000 / 30)
+  // Aucun boulet spécial, aucun tir : au moins le premier succès (« puriste » ou « économe »).
+  assert.ok(ended.result.achievements & 1)
+  s.destroy()
+})
+
+test('séisme sans aucun tir : arme les règles et peut gagner le niveau', () => {
+  const s = new GameSession(LevelRepository.get(1), { difficulty: 'normal', completedLevels: 40 })
+  playUntilAiming(s)
+  assert.equal(s.world.armed, false)
+  assert.equal(s.usePower('quake'), true)
+  assert.equal(s.world.armed, true)
+  s.destroy()
+})
+
+test('puissance au début du tour : 100 % par défaut, réglable', () => {
+  const a = new GameSession(LevelRepository.get(1), { difficulty: 'normal', completedLevels: 0 })
+  assert.equal(a.hud.power, 100)
+  a.destroy()
+  const b = new GameSession(LevelRepository.get(1), { difficulty: 'normal', completedLevels: 0, startPower: 75 })
+  assert.equal(b.hud.power, 75)
+  b.destroy()
+})
+
+test('étoiles au nombre de tirs : 3 en un tir (deux pour les grands châteaux)', () => {
+  for (const l of LevelRepository.all()) {
+    assert.ok(l.par === 1 || l.par === 2, `niveau ${l.id}`)
+    assert.ok(l.star2 >= l.par && l.star2 <= l.shots, `niveau ${l.id}`)
+    assert.equal(l.achievements.length, 3, `niveau ${l.id}`)
+    assert.equal(new Set(l.achievements).size, 3, `niveau ${l.id} : succès distincts`)
+  }
 })

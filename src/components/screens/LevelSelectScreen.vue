@@ -25,6 +25,7 @@ onMounted(async () => {
   chapter.value = Math.ceil(Math.min(profile.value.next, GAME.LEVEL_COUNT) / GAME.LEVELS_PER_CHAPTER)
 })
 
+const achCount = (mask) => (mask & 1) + ((mask >> 1) & 1) + ((mask >> 2) & 1)
 const levelsOf = (c) => Array.from({ length: GAME.LEVELS_PER_CHAPTER }, (_, i) => (c - 1) * GAME.LEVELS_PER_CHAPTER + i + 1)
 
 function tileLabel(id) {
@@ -32,7 +33,8 @@ function tileLabel(id) {
   const name = t('levels.level', { n: id })
   if (!lvl.unlocked) return `${name}, ${IS_DEMO && id > PLAYABLE_LEVELS ? t('levels.demoLocked') : t('levels.locked')}`
   const best = lvl.best ? `, ${t('levels.best', { score: lvl.best })}` : ''
-  return `${name}, ${t('a11y.stars', { count: lvl.stars })}${best}`
+  const ach = lvl.completed ? `, ${t('levels.achCount', { count: achCount(lvl.ach) })}` : ''
+  return `${name}, ${t('a11y.stars', { count: lvl.stars })}${ach}${best}`
 }
 
 function play(id) {
@@ -58,6 +60,7 @@ function onTabKey(e) {
       <div class="levels__summary">
         <span class="levels__profile">{{ profile.name }} · {{ t(`difficulty.${profile.difficulty}`) }}</span>
         <span class="levels__stat"><AppIcon name="star" :size="16" />{{ t('levels.totalStars', { count: profile.stars, max: GAME.LEVEL_COUNT * 3 }) }}</span>
+        <span class="levels__stat"><AppIcon name="trophy" :size="16" />{{ t('levels.totalAch', { count: profile.achievements, max: GAME.LEVEL_COUNT * 3 }) }}</span>
         <span class="levels__stat">{{ t('levels.totalScore', { score: profile.score }) }}</span>
       </div>
     </ScreenHeader>
@@ -125,6 +128,9 @@ function onTabKey(e) {
             <span class="level-tile__num">{{ id }}</span>
             <AppIcon v-if="!playable(id)" name="lock" :size="18" class="level-tile__lock" />
             <StarRow v-else :count="profile.levels[id].stars" :size="14" />
+            <span v-if="profile.levels[id].completed" class="level-tile__ach" aria-hidden="true">
+              <span v-for="b in [0, 1, 2]" :key="b" :class="['ach-pip', { 'ach-pip--on': profile.levels[id].ach & (1 << b) }]" />
+            </span>
           </button>
         </li>
       </ol>

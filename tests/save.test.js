@@ -62,8 +62,8 @@ test('le contrôle métier rejette un score impossible', async () => {
   const backend = new MemoryStorage()
   const storage = new StorageService(backend)
   const signer = new SaveSigner(storage)
-  const strict = new SaveManager(storage, signer, (id, best) => {
-    if (best > 5000) throw new Error('impossible score')
+  const strict = new SaveManager(storage, signer, (id, rec) => {
+    if (rec.best > 5000) throw new Error('impossible score')
   })
   const slot = await strict.create(0, 'Test', 'normal')
   slot.recordResult(win(1, 9000, 3))

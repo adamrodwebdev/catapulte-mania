@@ -31,6 +31,8 @@ export const STATE = Object.freeze({
 const SETTLE_MS = 1200
 const REST_CONFIRM_MS = 450
 const MAX_TURN_MS = 11000
+const IDLE_WIN_MS = 1200
+const FIRE_WAIT_MS = 20000
 const AMMO_ORDER = Object.freeze(['stone', 'boulder', 'fire', 'bomb', 'split'])
 
 /** Couleurs des fanions des joueurs (modes à deux). */
@@ -58,6 +60,7 @@ export class GameSession extends EventBus {
   #state = STATE.SETTLING
   #stateT = 0
   #restT = 0
+  #idleWinT = 0
   #turn = 0
   #active = 0
   #pendingPower = null
@@ -78,7 +81,7 @@ export class GameSession extends EventBus {
    * @param {object} opts options d'affichage et de difficulté
    * @param {import('./modes/GameMode.js').GameMode} [mode] règles (histoire par défaut)
    */
-  constructor(level, { difficulty, completedLevels, trajectoryAid = false, reducedMotion = false, screenShake = true, blood = true, effects = NO_EFFECTS }, mode = null) {
+  constructor(level, { difficulty, completedLevels, trajectoryAid = false, reducedMotion = false, screenShake = true, blood = true, startPower = 100, effects = NO_EFFECTS }, mode = null) {
     super()
     this.#level = level
     this.#difficulty = Guard.oneOf(difficulty, GAME.DIFFICULTIES, 'difficulty')
@@ -88,7 +91,7 @@ export class GameSession extends EventBus {
     this.#unlockedPowers = new Set(this.#mode.powersEnabled ? PowerRegistry.unlocked(completedLevels).map((p) => p.id) : [])
     const diff = DIFFICULTY[this.#difficulty]
     this.#windRng = new SeededRandom(level.seed)
-    this.options = { trajectoryAid, reducedMotion, blood, trail: fx.trail || 'smoke' }
+    this.options = { trajectoryAid, reducedMotion, blood, startPower, trail: fx.trail || 'smoke' }
     const versus = this.#mode.id === 'versus'
 
     // Un état par joueur : catapulte (et sa visée), score, tirs, munitions.
@@ -118,6 +121,7 @@ export class GameSession extends EventBus {
     for (const b of level.blocks) this.world.add(new Block(b))
     for (const t of level.targets) this.world.add(new Target(t, diff.targetHp))
     for (const b of level.barrels) this.world.add(new Barrel(b))
+    this.#applyStartPower()
     this.#bindWorldEvents()
     this.#rollWind()
   }
@@ -258,6 +262,7 @@ export class GameSession extends EventBus {
     this.#powerUsedThisTurn = true
     this.score.spend(this.#mode.powerCost(power))
     if (power.immediate) {
+      this.world.arm()
       power.activate(this)
       this.camera.shake(14)
       this.#feedback({ sound: 'explosion', x: 1700, intensity: 0.8, caption: 'quake', haptic: 'explosion' })
@@ -284,9 +289,11 @@ export class GameSession extends EventBus {
     this.#pendingPower = null
     // Amélioration « Boulets lestés » : se cumule avec la Force du Titan.
     shot.mods.massFactor = (shot.mods.massFactor ?? 1) * (this.#mode.effects.massFactor ?? 1)
+    shot.mods.blastFactor = this.#mode.effects.blastFactor ?? 1
+    shot.mods.fireFactor = this.#mode.effects.fireFactor ?? 1
     if (shot.windOverride !== null) this.world.wind = shot.windOverride
     if (player.shotsLeft !== null) player.shotsLeft--
-    this.score.startShot()
+    this.score.startShot(type)
     this.#setState(STATE.FLYING)
     this.#feedback({ sound: 'creak', x: this.catapult.x, intensity: 0.6 })
     this.catapult.fire(() => {
@@ -339,10 +346,19 @@ export class GameSession extends EventBus {
       this.#setState(STATE.AIMING)
       this.emit('announce', { key: 'a11y.levelStart', params: { targets: this.targetsLeft, shots: this.player.shotsLeft ?? '∞' } })
       if (this.players.length > 1) this.emit('turn', { player: this.#active, name: this.player.name })
+    } else if (this.#state === STATE.AIMING) {
+      // Victoire sans tir : le feu ou un pouvoir (séisme) a éliminé les dernières
+      // cibles pendant la visée. On laisse 1,2 s pour voir la chute, puis on conclut.
+      this.#idleWinT = this.#mode.evaluate(this)?.won ? this.#idleWinT + dt : 0
+      if (this.#idleWinT >= IDLE_WIN_MS) this.#finish(this.#mode.evaluate(this))
     } else if (this.#state === STATE.FLYING) {
-      this.#restT = this.world.isAtRest() && !this.catapult.busy ? this.#restT + dt : 0
+      // Une cible en feu va succomber : on attend avant de rendre la main.
+      // Au dernier tir, on laisse aussi le feu finir son œuvre (jusqu'à 20 s).
+      const burning = this.world.filter((e) => e.alive && e.burning > 0 && e.kind !== 'projectile')
+      const waitFire = burning.some((e) => e.kind === 'target') || (this.player.shotsLeft === 0 && burning.length > 0 && this.#stateT < FIRE_WAIT_MS)
+      this.#restT = this.world.isAtRest() && !this.catapult.busy && !waitFire ? this.#restT + dt : 0
       const allDown = this.targetsLeft === 0
-      if (this.#restT >= REST_CONFIRM_MS || this.#stateT > MAX_TURN_MS || (allDown && this.#stateT > 3500)) this.#endTurn()
+      if (this.#restT >= REST_CONFIRM_MS || (this.#stateT > MAX_TURN_MS && !waitFire) || this.#stateT > FIRE_WAIT_MS || (allDown && this.#stateT > 3500)) this.#endTurn()
     }
   }
 
@@ -399,6 +415,13 @@ export class GameSession extends EventBus {
     this.emit('hud', this.hud)
   }
 
+  /** Réglage « Puissance au début du tour » (100 % par défaut). */
+  #applyStartPower() {
+    const p = this.options.startPower
+    if (p === 'keep' || !Number.isFinite(p)) return
+    for (const pl of this.players) pl.catapult.setAim(pl.catapult.angle, clamp(p / 100, 0, 1))
+  }
+
   #rollWind() {
     const max = this.#level.wind * DIFFICULTY[this.#difficulty].windFactor
     if (max <= 0) {
@@ -414,29 +437,32 @@ export class GameSession extends EventBus {
     this.#turn++
     this.#restT = 0
     const verdict = this.#mode.evaluate(this)
-    if (verdict) {
-      const { won, winner } = verdict
-      const p = this.player
-      // Seul le mode histoire produit un résultat authentifié (enregistrable).
-      const result = this.#mode.recordsResult
-        ? this.score.finalize({ won, shotsLeft: p.shotsLeft, shotsUsed: p.shotsTotal - p.shotsLeft })
-        : null
-      const scores = this.players.map((pl) => pl.score.finalScore({ won, shotsLeft: pl.shotsLeft ?? 0 }))
-      const happy = this.players.length > 1 || won
-      this.#setState(STATE.ENDED)
-      this.#feedback({ sound: happy ? 'victory' : 'defeat', x: 1000, caption: happy ? 'victory' : 'defeat', haptic: happy ? 'victory' : 'defeat' })
-      this.emit('end', { won, result, winner, scores, mode: this.#mode.id })
-      return
-    }
+    if (verdict) return this.#finish(verdict)
     const next = this.#mode.nextPlayer(this.#active, this)
     const changed = next !== this.#active
     this.#active = next
     this.#powerUsedThisTurn = false
     this.#pendingPower = null
     this.#rollWind()
+    this.#applyStartPower()
     this.#setState(STATE.AIMING)
     if (changed) this.emit('turn', { player: next, name: this.player.name })
     this.emit('announce', { key: 'a11y.turn', params: { targets: this.targetsLeft, shots: this.player.shotsLeft ?? '∞', wind: Math.round(this.world.wind * 10) } })
+  }
+
+  /** Fin de partie : résultat signé (histoire), scores, annonce. */
+  #finish({ won, winner }) {
+    if (this.#state === STATE.ENDED) return
+    const p = this.player
+    // Seul le mode histoire produit un résultat authentifié (enregistrable).
+    const result = this.#mode.recordsResult
+      ? this.score.finalize({ won, shotsLeft: p.shotsLeft, shotsUsed: p.shotsTotal - p.shotsLeft })
+      : null
+    const scores = this.players.map((pl) => pl.score.finalScore({ won, shotsLeft: pl.shotsLeft ?? 0 }))
+    const happy = this.players.length > 1 || won
+    this.#setState(STATE.ENDED)
+    this.#feedback({ sound: happy ? 'victory' : 'defeat', x: 1000, caption: happy ? 'victory' : 'defeat', haptic: happy ? 'victory' : 'defeat' })
+    this.emit('end', { won, result, winner, scores, mode: this.#mode.id })
   }
 
   #updateCamera(dt) {
@@ -465,7 +491,7 @@ export class GameSession extends EventBus {
   #bindWorldEvents() {
     const ev = this.#events
     ev.on('entity:destroyed', ({ entity, cause }) => {
-      const gained = this.score.registerDestroyed(entity)
+      const gained = this.score.registerDestroyed(entity, cause)
       if (entity.kind === 'target') {
         if (gained) this.particles.text(entity.x, entity.y - 40, `+${gained}`)
         if (this.options.blood) {

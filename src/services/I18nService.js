@@ -106,7 +106,8 @@ export class I18nService extends EventBus {
     if (entry && typeof entry === 'object') {
       const count = typeof params.count === 'number' ? params.count : 0
       const form = this.#pluralRules(locale).select(count)
-      entry = entry[form] ?? entry.other
+      // Forme « zero » facultative (« Victoire sans tirer ! »), sinon règles de la langue.
+      entry = (count === 0 && entry.zero) || entry[form] || entry.other
     }
     if (typeof entry !== 'string') return key
     return entry.replace(PARAM, (match, name) => {

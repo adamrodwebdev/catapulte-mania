@@ -2,7 +2,8 @@ import { Schema, Guard, ValidationError } from '../core/utils/Guard.js'
 import { GAME } from '../config/gameConfig.js'
 import { LevelResult } from './LevelResult.js'
 import { UpgradeCatalog } from '../game/progression/UpgradeCatalog.js'
-import { GOLD, goldFor, maxGoldFor } from '../game/progression/GoldRules.js'
+import { GOLD, goldFor, maxGoldFor, legacyMaxGoldFor } from '../game/progression/GoldRules.js'
+import { countAchievements } from '../game/progression/Achievements.js'
 
 /** Nom de profil : lettres (toutes langues), chiffres, espaces, tirets. */
 export const PROFILE_NAME = /^[\p{L}\p{N}][\p{L}\p{N} _'-]{0,15}$/u
@@ -12,7 +13,7 @@ const COUNTER = Schema.int({ min: 0, max: 1e9 })
 const GOLD_INT = Schema.int({ min: 0, max: GOLD.MAX_BALANCE })
 const COSMETIC_IDS = UpgradeCatalog.cosmetics().map((c) => c.id)
 
-/** Schéma de la sauvegarde (version 2). Toute clé inconnue est refusée. */
+/** Schéma de la sauvegarde (version 3). Toute clé inconnue est refusée. */
 export const saveSchema = Schema.object({
   version: Schema.enum([GAME.SAVE_VERSION]),
   name: Schema.string({ minLength: 1, maxLength: 16, pattern: PROFILE_NAME }),
@@ -25,6 +26,10 @@ export const saveSchema = Schema.object({
       stars: Schema.int({ min: 0, max: 3 }),
       best: Schema.int({ min: 0, max: GAME.MAX_LEVEL_SCORE }),
       attempts: Schema.int({ min: 0, max: 1e6 }),
+      // v3 : moins de tirs utilisés pour gagner (0 = inconnu, profil antérieur à la v3.1)
+      shots: Schema.int({ min: 0, max: 100 }),
+      // v3 : succès obtenus (masque de 3 bits)
+      ach: Schema.int({ min: 0, max: 7 }),
     }),
     { maxKeys: GAME.LEVEL_COUNT },
   ),
@@ -38,6 +43,8 @@ export const saveSchema = Schema.object({
   // v2 : économie (or gagné en jouant, améliorations, apparences).
   gold: GOLD_INT,
   goldEarned: GOLD_INT,
+  // v3 : or gagné avec l'ancien barème (profils migrés), contrôlé séparément.
+  legacyGold: GOLD_INT,
   upgrades: Schema.record(/^[a-z]{2,12}$/, Schema.int({ min: 0, max: 5 }), { maxKeys: 10 }),
   cosmetics: Schema.object({
     owned: Schema.array(Schema.enum(COSMETIC_IDS), { maxLength: COSMETIC_IDS.length }),
@@ -49,13 +56,25 @@ export const saveSchema = Schema.object({
 /**
  * Migration des anciennes sauvegardes (avant validation du schéma).
  * v1 → v2 : ajout de l'économie, vide.
+ * v2 → v3 : étoiles au nombre de tirs et succès. Les améliorations, dont les
+ *           prix ont changé, sont remboursées ; l'or déjà gagné est conservé
+ *           (et contrôlé selon l'ancien barème).
  * @param {any} raw
  */
 export function migrateSave(raw) {
-  if (raw && typeof raw === 'object' && raw.version === 1) {
-    return { ...raw, version: 2, gold: 0, goldEarned: 0, upgrades: {}, cosmetics: { owned: UpgradeCatalog.defaults(), skin: 'oak', trail: 'smoke' } }
+  let save = raw
+  if (save && typeof save === 'object' && save.version === 1) {
+    save = { ...save, version: 2, gold: 0, goldEarned: 0, upgrades: {}, cosmetics: { owned: UpgradeCatalog.defaults(), skin: 'oak', trail: 'smoke' } }
   }
-  return raw
+  if (save && typeof save === 'object' && save.version === 2 && save.levels && typeof save.levels === 'object' && save.cosmetics) {
+    const levels = {}
+    for (const [id, rec] of Object.entries(save.levels)) levels[id] = { ...rec, shots: 0, ach: 0 }
+    const owned = Array.isArray(save.cosmetics.owned) ? save.cosmetics.owned : []
+    const cosmeticSpend = owned.reduce((sum, id) => sum + (COSMETIC_IDS.includes(id) ? UpgradeCatalog.cosmetic(id).cost : 0), 0)
+    const earned = Number.isInteger(save.goldEarned) ? save.goldEarned : 0
+    save = { ...save, version: 3, levels, upgrades: {}, legacyGold: earned, gold: Math.max(0, earned - cosmeticSpend) }
+  }
+  return save
 }
 
 /**
@@ -88,6 +107,7 @@ export class SaveSlot {
       stats: { shots: 0, targets: 0, blocks: 0, barrels: 0, powers: 0 },
       gold: 0,
       goldEarned: 0,
+      legacyGold: 0,
       upgrades: {},
       cosmetics: { owned: UpgradeCatalog.defaults(), skin: 'oak', trail: 'smoke' },
     })
@@ -98,9 +118,9 @@ export class SaveSlot {
    * Reconstruit un profil depuis des données non fiables et vérifie leur cohérence.
    * @param {number} index
    * @param {unknown} raw
-   * @param {(levelId: number, best: number, stars: number) => number | void} [checkRecord]
+   * @param {(levelId: number, rec: { best: number, stars: number, shots: number }) => number | void} [checkRecord]
    *   contrôle métier optionnel (score possible) ; s'il renvoie un nombre,
-   *   c'est le nombre d'étoiles recalculé pour ce score
+   *   c'est le nombre d'étoiles recalculé pour ce niveau
    */
   static fromJSON(index, raw, checkRecord) {
     const data = saveSchema(migrateSave(raw), 'save')
@@ -111,7 +131,7 @@ export class SaveSlot {
       const rec = data.levels[id]
       if (rec.attempts < 1) throw new ValidationError(`save.levels.${id}`, 'no attempt recorded')
       if (checkRecord) {
-        const stars = checkRecord(id, rec.best, rec.stars)
+        const stars = checkRecord(id, { best: rec.best, stars: rec.stars, shots: rec.shots })
         if (Number.isInteger(stars)) rec.stars = stars
       }
     })
@@ -128,9 +148,11 @@ export class SaveSlot {
    */
   static #checkEconomy(data) {
     let spent = 0
+    const stars = Object.values(data.levels).reduce((sum, r) => sum + r.stars, 0)
     for (const [id, level] of Object.entries(data.upgrades)) {
       const u = UpgradeCatalog.upgrade(id)
       if (level > u.maxLevel) throw new ValidationError(`save.upgrades.${id}`, 'level above maximum')
+      if (level > 0 && u.stars[level - 1] > stars) throw new ValidationError(`save.upgrades.${id}`, 'not enough stars')
       spent += u.spentFor(level)
     }
     const owned = new Set(data.cosmetics.owned)
@@ -142,7 +164,8 @@ export class SaveSlot {
       if (!owned.has(id) || UpgradeCatalog.cosmetic(id).slot !== slot) throw new ValidationError(`save.cosmetics.${slot}`, 'not owned')
     }
     if (data.goldEarned - spent !== data.gold) throw new ValidationError('save.gold', 'balance mismatch')
-    if (data.goldEarned > maxGoldFor(data.levels)) throw new ValidationError('save.goldEarned', 'more gold than possible')
+    if (data.legacyGold > legacyMaxGoldFor(data.levels)) throw new ValidationError('save.legacyGold', 'more gold than possible')
+    if (data.goldEarned > data.legacyGold + maxGoldFor(data.levels)) throw new ValidationError('save.goldEarned', 'more gold than possible')
   }
 
   get index() {
@@ -186,13 +209,13 @@ export class SaveSlot {
 
   /**
    * Achète le niveau suivant d'une amélioration.
-   * @returns {boolean} faux si or insuffisant ou maximum atteint
+   * @returns {boolean} faux si or ou étoiles insuffisants, ou maximum atteint
    */
   buyUpgrade(id) {
     const u = UpgradeCatalog.upgrade(id)
     const level = this.#data.upgrades[id] || 0
     const cost = u.nextCost(level)
-    if (cost === null || cost > this.#data.gold) return false
+    if (cost === null || cost > this.#data.gold || u.nextStars(level) > this.starCount) return false
     this.#data.gold -= cost
     this.#data.upgrades[id] = level + 1
     return true
@@ -215,7 +238,7 @@ export class SaveSlot {
     return true
   }
 
-  /** @returns {{ stars: number, best: number, attempts: number } | null} */
+  /** @returns {{ stars: number, best: number, attempts: number, shots: number, ach: number } | null} */
   levelRecord(levelId) {
     const rec = this.#data.levels[levelId]
     return rec ? { ...rec } : null
@@ -240,6 +263,11 @@ export class SaveSlot {
 
   get starCount() {
     return Object.values(this.#data.levels).reduce((sum, r) => sum + r.stars, 0)
+  }
+
+  /** Nombre total de succès obtenus (3 par niveau au maximum). */
+  get achievementCount() {
+    return Object.values(this.#data.levels).reduce((sum, r) => sum + countAchievements(r.ach), 0)
   }
 
   /** Prochain niveau à jouer (le premier non réussi). */
@@ -267,21 +295,27 @@ export class SaveSlot {
     const prev = this.#data.levels[result.levelId]
     if (!result.won) {
       if (prev) prev.attempts += 1
-      return { newBest: false, firstClear: false, gold: 0 }
+      return { newBest: false, firstClear: false, gold: 0, newAchievements: 0 }
     }
     const firstClear = !prev
-    const gold = goldFor(result, firstClear)
+    const before = prev ?? { stars: 0, ach: 0 }
+    const newStars = Math.max(0, result.stars - before.stars)
+    const newAchievements = result.achievements & ~before.ach
+    const gold = goldFor(result, { firstClear, newStars, newAchievements: countAchievements(newAchievements) })
     this.#data.gold = Math.min(GOLD.MAX_BALANCE, this.#data.gold + gold)
     this.#data.goldEarned = Math.min(GOLD.MAX_BALANCE, this.#data.goldEarned + gold)
     if (firstClear) {
-      this.#data.levels[result.levelId] = { stars: result.stars, best: result.score, attempts: 1 }
-      return { newBest: true, firstClear: true, gold }
+      this.#data.levels[result.levelId] = { stars: result.stars, best: result.score, attempts: 1, shots: Math.max(1, result.shotsUsed), ach: result.achievements }
+      return { newBest: true, firstClear: true, gold, newAchievements }
     }
     prev.attempts += 1
     const newBest = result.score > prev.best
     if (newBest) prev.best = result.score
     prev.stars = Math.max(prev.stars, result.stars)
-    return { newBest, firstClear: false, gold }
+    const shots = Math.max(1, result.shotsUsed)
+    prev.shots = prev.shots > 0 ? Math.min(prev.shots, shots) : shots
+    prev.ach |= result.achievements
+    return { newBest, firstClear: false, gold, newAchievements }
   }
 
   /** Copie sérialisable (validée à nouveau avant écriture). */

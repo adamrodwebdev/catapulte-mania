@@ -14,7 +14,7 @@ export class LevelResult {
   /**
    * @param {{ levelId: number, score: number, stars: number, won: boolean,
    *   targetsKilled: number, blocksDestroyed: number, barrelsExploded: number,
-   *   shotsUsed: number, powersUsed: number, difficulty: string }} data
+   *   shotsUsed: number, powersUsed: number, difficulty: string, achievements?: number }} data
    */
   constructor(data) {
     this.levelId = Guard.int(data.levelId, 'levelId', { min: 1, max: GAME.LEVEL_COUNT })
@@ -26,6 +26,8 @@ export class LevelResult {
     this.barrelsExploded = Guard.int(data.barrelsExploded, 'barrelsExploded', { min: 0, max: 1000 })
     this.shotsUsed = Guard.int(data.shotsUsed, 'shotsUsed', { min: 0, max: 100 })
     this.powersUsed = Guard.int(data.powersUsed, 'powersUsed', { min: 0, max: 100 })
+    /** Masque des succès du niveau obtenus pendant cette partie (bit i = i-ème succès). */
+    this.achievements = Guard.int(data.achievements ?? 0, 'achievements', { min: 0, max: 7 })
     this.difficulty = Guard.oneOf(data.difficulty, GAME.DIFFICULTIES, 'difficulty')
     deepFreeze(this)
   }

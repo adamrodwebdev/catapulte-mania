@@ -13,6 +13,7 @@ import PowersMenu from '../game/PowersMenu.vue'
 import CaptionFeed from '../game/CaptionFeed.vue'
 import ModalPanel from '../ui/ModalPanel.vue'
 import StarRow from '../ui/StarRow.vue'
+import AchievementList from '../ui/AchievementList.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import ToggleSwitch from '../ui/ToggleSwitch.vue'
 
@@ -226,6 +227,7 @@ async function onEnd(e) {
 }
 
 async function onStoryEnd({ won, result }) {
+  const maskBefore = state.profile?.levels[result.levelId]?.ach ?? 0
   const outcome = await app.recordResult(result)
   const rec = state.profile?.levels[result.levelId]
   setTimeout(() => {
@@ -238,6 +240,9 @@ async function onStoryEnd({ won, result }) {
       newBest: won && outcome.newBest,
       unlockedPower: outcome.unlockedPower,
       gold: outcome.gold || 0,
+      achMask: maskBefore,
+      achFresh: outcome.newAchievements || 0,
+      shotsUsed: result.shotsUsed,
       saved: outcome.saved,
       hasNext: won && result.levelId < PLAYABLE_LEVELS,
       campaignDone: won && result.levelId === GAME.LEVEL_COUNT,
@@ -357,7 +362,15 @@ const canvasLabel = computed(() =>
     <ModalPanel v-if="phase === 'intro'" labelledby="intro-title" :closable="false">
       <p class="modal__eyebrow">{{ matchSubtitle }}</p>
       <h2 id="intro-title" class="modal__title">{{ matchTitle }}</h2>
-      <p v-if="mode === 'story'">{{ t('intro.goal') }} {{ t('intro.shots', { count: hud?.shotsTotal ?? level.shots }) }}</p>
+      <template v-if="mode === 'story'">
+        <p>{{ t('intro.goal') }} {{ t('intro.shots', { count: hud?.shotsTotal ?? level.shots }) }}</p>
+        <p class="intro-stars">
+          <span><StarRow :count="3" :size="16" />{{ t('intro.star3', { count: level.par }) }}</span>
+          <span><StarRow :count="2" :size="16" />{{ t('intro.star2', { count: level.star2 }) }}</span>
+        </p>
+        <h3 class="intro-ach__title"><AppIcon name="trophy" :size="18" />{{ t('ach.title') }}</h3>
+        <AchievementList :level="level" :mask="state.profile?.levels[state.levelId]?.ach ?? 0" compact />
+      </template>
       <p v-else-if="mode === 'free'">{{ t('levels.freeHint') }}</p>
       <template v-else>
         <p>{{ t(`mp.formats.${mode}.desc`) }}</p>
@@ -406,7 +419,9 @@ const canvasLabel = computed(() =>
           <div><dt>{{ t('end.score') }}</dt><dd>{{ end.score.toLocaleString(state.locale) }}</dd></div>
           <div><dt>{{ t('end.best') }}</dt><dd>{{ end.best.toLocaleString(state.locale) }}</dd></div>
         </dl>
+        <p class="end__shots">{{ t('end.shotsUsed', { count: end.shotsUsed }) }}<template v-if="end.stars < 3"> · {{ t('end.star3Hint', { count: level.par }) }}</template></p>
         <p v-if="end.newBest" class="end__badge">{{ t('end.newBest') }}</p>
+        <AchievementList :level="level" :mask="end.achMask" :fresh="end.achFresh" compact />
         <p v-if="end.gold" class="end__gold"><AppIcon name="coin" />{{ t('end.gold', { gold: end.gold }) }}</p>
         <p v-if="end.unlockedPower" class="end__power">
           <AppIcon name="flame" />{{ t('powers.unlocked', { name: t(`powers.${end.unlockedPower}`) }) }}

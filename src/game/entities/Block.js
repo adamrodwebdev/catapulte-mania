@@ -39,9 +39,17 @@ export class Block extends Entity {
     this.shape = shape
     this.scoreValue = m.score
     this.sound = m.sound
-    this.burnDps = material === 'straw' ? 30 : 20
+    this.burnDps = m.burn?.dps ?? 20
+    /** Durée de combustion et facilité à prendre feu (propagation). */
+    this.burnMs = m.burn?.ms ?? 6000
+    this.catchChance = m.burn?.spread ?? 0.3
     /** Blindage : part des dégâts de choc subis (le fer encaisse mieux). */
     this.armor = m.armor ?? 1
+  }
+
+  /** La durée de combustion dépend du matériau, pas de la source du feu. */
+  ignite() {
+    return super.ignite(this.burnMs)
   }
 
   /** Choc reçu : réduit par le blindage du matériau (explosions et feu passent par damage()). */

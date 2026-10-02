@@ -24,7 +24,9 @@ const upgrades = computed(() =>
   UpgradeCatalog.upgrades().map((u) => {
     const level = profile.value?.upgrades[u.id] || 0
     const cost = u.nextCost(level)
-    return { id: u.id, icon: u.icon, level, max: u.maxLevel, cost, affordable: cost !== null && cost <= (profile.value?.gold ?? 0) }
+    const stars = u.nextStars(level)
+    const starsOk = stars === null || stars <= (profile.value?.stars ?? 0)
+    return { id: u.id, icon: u.icon, level, max: u.maxLevel, cost, stars, starsOk, affordable: cost !== null && starsOk && cost <= (profile.value?.gold ?? 0) }
   }),
 )
 
@@ -45,7 +47,8 @@ const cosmetics = computed(() =>
 
 async function act(action, id) {
   const ok = await app.workshop(action, id)
-  message.value = ok ? (action === 'equip' ? '' : t('workshop.bought', { name: t(`workshop.names.${id}`) })) : t('workshop.notEnough')
+  const lacksStars = action === 'upgrade' && upgrades.value.find((u) => u.id === id)?.starsOk === false
+  message.value = ok ? (action === 'equip' ? '' : t('workshop.bought', { name: t(`workshop.names.${id}`) })) : t(lacksStars ? 'workshop.notEnoughStars' : 'workshop.notEnough')
   if (message.value) app.announce(message.value)
 }
 
@@ -77,9 +80,14 @@ const storeEnabled = StoreService.enabled
               <span v-for="i in u.max" :key="i" :class="['pips__pip', { 'pips__pip--on': i <= u.level }]" aria-hidden="true" />
             </p>
           </div>
-          <button v-if="u.cost !== null" type="button" class="btn btn--primary" :disabled="!u.affordable" @click="act('upgrade', u.id)">
-            <AppIcon name="coin" :size="18" />{{ t('workshop.buy', { cost: u.cost }) }}
-          </button>
+          <div v-if="u.cost !== null" class="shop-item__buy">
+            <button type="button" class="btn btn--primary" :disabled="!u.affordable" @click="act('upgrade', u.id)">
+              <AppIcon :name="u.starsOk ? 'coin' : 'lock'" :size="18" />{{ t('workshop.buy', { cost: u.cost }) }}
+            </button>
+            <span v-if="u.stars" :class="['shop-item__req', { 'shop-item__req--missing': !u.starsOk }]">
+              <AppIcon name="star" :size="14" />{{ t('workshop.needStars', { count: u.stars }) }}
+            </span>
+          </div>
           <span v-else class="shop-item__done"><AppIcon name="check" :size="18" />{{ t('workshop.max') }}</span>
         </li>
       </ul>
