@@ -8,7 +8,10 @@ Réglez l'angle et la puissance, calculez la trajectoire, et faites tomber les f
 - 6 pouvoirs spéciaux à débloquer (un seul par tour, chaque utilisation coûte des points)
 - **Mode libre** : rejouer les niveaux terminés sans limite de tirs ni de munitions
 - **Deux joueurs** sur le même appareil : duel, chacun sa partie ou face-à-face
-- **300 succès** : trois défis par niveau (gagner sans boulet spécial, faire sauter tous les barils, abattre le roi en premier…)
+- **Une histoire** : la Chronique, racontée entre les chapitres, du prologue à l'épilogue
+- **Tutoriels guidés** : chaque nouvelle munition et chaque nouveau pouvoir s'apprennent dans un niveau dédié
+- **Bande son médiévale** composée en direct, qui s'intensifie aux moments forts
+- **300 succès** : trois défis par niveau, tirés de 18 défis différents (sur le fil, carton, chirurgien, éboulement…)
 - **Atelier** : de l'or gagné en jouant pour améliorer sa catapulte et changer son apparence
 - Français, English, Bahasa Indonesia
 - Thème clair, thème sombre et mode contraste élevé
@@ -69,25 +72,40 @@ On peut l'envoyer par e-mail, le mettre sur une clé USB ou l'héberger sur n'im
 
 **Les étoiles** dépendent du nombre de tirs : **3 étoiles en un seul tir** (deux pour les grands châteaux, indiqué avant chaque niveau), 2 étoiles en peu de tirs, 1 étoile pour une victoire. Si le feu ou un pouvoir (séisme) abat les derniers défenseurs pendant que vous visez, la victoire est accordée tout de suite, sans avoir à tirer.
 
-**Les succès :** chaque niveau propose trois défis, affichés avant la partie et à la fin. Ils se cumulent d'une partie à l'autre : on peut réussir « Puriste » (aucun boulet spécial) puis revenir pour « Feu d'artifice » (tous les barils). Il y en a 300 en tout.
+**Les succès :** chaque niveau propose trois défis, un de chaque famille, affichés avant la partie et à la fin. Ils se cumulent d'une partie à l'autre et rapportent de l'or. Les seuils montent avec la progression (la chaîne demandée passe de 6 à 14 destructions, le « Carton » de 2 à 4 cibles). Il y en a 300 en tout, tirés de 18 défis :
 
-| Succès | Défi |
+| Famille | Défis |
 |---|---|
-| Puriste | Gagner sans tirer de boulet spécial |
-| Économe | Gagner en utilisant au plus la moitié des tirs |
-| Feu d'artifice | Faire exploser tous les barils |
-| Régicide | Abattre le roi avant tous ses gardes |
-| Réaction en chaîne | Détruire 8 éléments en un seul tir |
-| Pyromane | Éliminer une cible par le feu |
-| Démolisseur | Raser au moins la moitié du château |
-| Sans artifice | Gagner sans utiliser de pouvoir |
+| **Style** (comment on joue) | Puriste (aucun boulet spécial) · Sans artifice (aucun pouvoir) · Économe (au plus la moitié des tirs) · Parcimonie (au plus un boulet spécial) · Sur le fil (gagner au tout dernier tir) · Contre vents et marées (ni pouvoir ni boulet spécial, par grand vent) |
+| **Exploit** (adresse) | Réaction en chaîne (N destructions d'un tir) · Carton (N cibles d'un même tir) · Entrée fracassante (la moitié des cibles dès le premier tir) · D'un seul coup (toutes les cibles d'un même tir) · Démolisseur (raser une grande part du château) · Chirurgien (gagner en détruisant très peu) |
+| **Thème** (propre au niveau) | Feu d'artifice (tous les barils) · Régicide (le roi en premier) · Pyromane (deux cibles par le feu) · Artificier (deux cibles par une explosion) · Éboulement (deux cibles écrasées) · Chute libre (une cible tombée de haut) |
+
+**Les tutoriels :** la première fois qu'un outil apparaît, son niveau devient un tutoriel guidé : une bulle explique quoi faire, met en valeur le bon bouton et avance au rythme du joueur ; la trajectoire est affichée pendant l'apprentissage. Ils peuvent être désactivés dans les Réglages.
+
+| Niveau | Outil appris |
+|---|---|
+| 1 | Viser et tirer |
+| 5 | Accalmie (pouvoir) |
+| 8 | Force du Titan (pouvoir) |
+| 9 | Feu grégeois (munition) |
+| 11 | Rocher (munition) |
+| 16 | Feu grégeois (pouvoir) |
+| 19 | Salve (pouvoir) |
+| 21 | Bombe (munition) |
+| 22 | Charge de poudre (pouvoir) |
+| 25 | Mitraille (munition) |
+| 31 | Séisme (pouvoir) |
+
+**La Chronique :** un récit accompagne la campagne. Un prologue avant le premier niveau, un épisode à l'ouverture de chaque chapitre, un épilogue après la victoire finale. Les épisodes déjà lus se relisent depuis la carte des niveaux. L'histoire peut être masquée dans les Réglages.
+
+**La musique** est jouée note à note par des instruments médiévaux synthétiques (vielle, luth, flûte, tambourin, chalemie). Calme dans les menus, elle prend le tambour quand on vise, s'accélère quand le projectile vole et explose en contre-chant lors des effondrements, des explosions et face à la dernière cible. Son volume est réglable à part ; pour les personnes malentendantes, un sous-titre « ♪ La musique s'emballe » signale ces moments.
 
 ### La progression
 
 | Chapitre | Niveaux | Nouveautés |
 |---|---|---|
-| 1. La Palissade | 1 à 10 | Bois et paille, faciles à casser. On apprend à viser. |
-| 2. Le Fort de pierre | 11 à 20 | Pierre et vitraux, barils explosifs, chevaliers en armure, rocher, feu grégeois |
+| 1. La Palissade | 1 à 10 | Bois et paille, faciles à casser. On apprend à viser, puis le feu grégeois. |
+| 2. Le Fort de pierre | 11 à 20 | Pierre et vitraux, barils explosifs, chevaliers en armure, rocher |
 | 3. La Forteresse | 21 à 30 | Fer, boulets de poudre, mitraille, le roi |
 | 4. La Citadelle | 31 à 40 | Tout combiné, de nuit, vent fort |
 | 5. Les Marais | 41 à 50 | Brique, pilotis, brume |
@@ -104,10 +122,10 @@ Un seul pouvoir par tour. Chaque utilisation retire des points au score final.
 | Pouvoir | Débloqué après | Coût | Effet |
 |---|---|---|---|
 | Accalmie | 4 niveaux | 150 | Supprime le vent pour ce tir |
-| Force du Titan | 8 niveaux | 250 | Projectile beaucoup plus lourd et destructeur |
-| Feu grégeois | 12 niveaux | 200 | Le projectile enflamme ce qu'il touche |
-| Volée | 18 niveaux | 350 | Tire trois projectiles en éventail |
-| Charge de poudre | 24 niveaux | 300 | Le projectile explose à l'impact |
+| Force du Titan | 7 niveaux | 250 | Projectile beaucoup plus lourd et destructeur |
+| Feu grégeois | 15 niveaux | 200 | Le projectile enflamme ce qu'il touche |
+| Salve | 18 niveaux | 350 | Tire trois projectiles en éventail |
+| Charge de poudre | 21 niveaux | 300 | Le projectile explose à l'impact |
 | Séisme | 30 niveaux | 400 | Secoue toutes les structures immédiatement |
 
 ### Les modes de jeu
@@ -124,7 +142,9 @@ Un seul pouvoir par tour. Chaque utilisation retire des points au score final.
 
 ### L'atelier et l'or
 
-L'or récompense la **maîtrise**, pas la répétition : 30 pièces pour la première victoire d'un niveau, 15 pour chaque nouvelle étoile, 25 pour chaque nouveau succès. Rejouer une victoire déjà obtenue ne rapporte que 5 pièces, une défaite rien. Sur les 100 niveaux, on peut gagner environ 15 000 pièces, alors que tout acheter en coûterait plus de 25 000 : **il faut choisir**.
+L'or récompense la **maîtrise**, pas la répétition : 30 pièces pour la première victoire d'un niveau, 15 pour chaque nouvelle étoile, **100 pour chaque défi relevé**, et 50 de plus quand les trois défis d'un niveau sont réussis. Rejouer une victoire déjà obtenue ne rapporte que 5 pièces, une défaite rien.
+
+Le perfectionniste peut **tout débloquer** : la campagne rapporte jusqu'à 42 500 pièces, l'atelier complet (améliorations et apparences) en coûte 26 870. Avec environ 70 % des défis relevés, tout est déjà à portée ; sans les défis, il faut choisir.
 
 Les meilleurs paliers demandent aussi des **étoiles** (colonne « Étoiles requises »).
 
@@ -142,7 +162,7 @@ S'y ajoutent des **apparences** sans effet sur le jeu : catapulte (chêne, banni
 
 Elles changent vraiment la façon de jouer : avec un bras renforcé et des boulets lestés au maximum, une simple pierre fait plus de deux fois plus de dégâts ; la poix et la poudre fine font du feu et des explosifs une vraie stratégie.
 
-Les profils créés avant la v3.1 gardent leurs étoiles et leur or ; leurs améliorations sont remboursées car les prix ont changé. Les améliorations s’appliquent en campagne et en mode libre, **jamais à deux joueurs**, pour que les parties restent équitables.
+Les profils créés avant la v3.1 gardent leurs étoiles et leur or ; leurs améliorations sont remboursées car les prix ont changé. En v3.2, les défis ont été renouvelés : les anciens succès sont remis à zéro (l'or déjà gagné est conservé) et peuvent être relevés à nouveau. Les améliorations s’appliquent en campagne et en mode libre, **jamais à deux joueurs**, pour que les parties restent équitables.
 
 **Pour une future version payante (Play Store, site) :** une boutique « premium » est prête dans le code mais désactivée (`src/services/StoreService.js`). Le fichier explique comment brancher un système de paiement. Un petit serveur sera alors nécessaire pour vérifier les achats, sinon n'importe qui pourrait les simuler.
 
@@ -158,6 +178,8 @@ Tout se règle dans **Réglages** (et une partie directement depuis la pause) :
 
 - **Aide à la visée** : affiche la trajectoire prévue du projectile en pointillés.
 - **Puissance au début du tour** : 100 % par défaut (ou 75 %, 50 %, ou « Garder » la dernière visée).
+- **Tutoriels guidés** et **récit** (la Chronique) : activables ou non.
+- **Musique** : volume séparé des effets sonores (0 % pour la couper). Ses moments intenses sont aussi sous-titrés.
 - **Sous-titres des sons** (malentendants) : chaque bruit important est écrit à l'écran avec sa direction, par exemple `◀ [Bois brisé]`.
 - **Vibrations** sur téléphone pour les impacts et explosions.
 - **Lecteur d'écran** (malvoyants) : l'interface est entièrement en HTML (pas seulement dessinée), chaque tour est annoncé (« Tour 2, 3 cibles restantes, vent 12 km/h vers la gauche »).
@@ -263,7 +285,9 @@ src/
 │   ├── GameController.js   Relie le moteur au canevas (boucle, entrées, redimensionnement)
 │   ├── GameSession.js      Une partie : joueurs, tours, tirs, fin de partie
 │   ├── modes/              GameMode → StoryMode, FreeMode, DuelMode, HotSeatMode, VersusMode
-│   ├── progression/        UpgradeCatalog (atelier), GoldRules (barème de l'or)
+│   ├── progression/        UpgradeCatalog (atelier), GoldRules (barème de l'or), Achievements (les 18 défis)
+│   ├── tutorial/           TutorialCoach : les tutoriels guidés, étape par étape
+│   ├── story/              StoryRepository : la Chronique (récit et illustrations)
 │   ├── Catapult.js         Visée et lancement
 │   ├── TrajectoryPredictor Calcul de la trajectoire prévue (aide à la visée)
 │   ├── physics/            Monde physique (Matter.js)
@@ -273,7 +297,7 @@ src/
 │   ├── score/              ScoreKeeper, règles de score et d'étoiles
 │   ├── rendering/          Renderer, Camera
 │   ├── assets/             Graphismes (procéduraux ou images, interchangeables)
-│   ├── audio/              Sons synthétisés et vibrations
+│   ├── audio/              Sons synthétisés, musique adaptative (MusicDirector), vibrations
 │   └── effects/            Particules (éclats, fumée, feu)
 ├── components/             Composants Vue : écrans, HUD, éléments d'interface
 └── styles/                 CSS : jetons de design, thèmes, écrans
@@ -287,7 +311,7 @@ build/                      Sécurité (CSP) et service worker générés au bui
 - **Vue 3 + Vite** : interface réactive, build rapide, fichiers légers.
 - **Matter.js** : moteur physique 2D éprouvé. Il n'est téléchargé qu'à l'ouverture d'un niveau, pour que l'accueil s'affiche instantanément.
 - **Graphismes procéduraux** : tous les éléments médiévaux sont dessinés par le code. Le jeu pèse moins de 400 Ko et reste net sur tous les écrans.
-- **Sons synthétisés** (Web Audio) : aucun fichier audio à télécharger.
+- **Sons et musique synthétisés** (Web Audio) : aucun fichier audio à télécharger, la musique se compose en direct et s'adapte à l'action.
 
 ---
 
@@ -352,6 +376,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v2.1.0 | Équilibrage : pierre au poids d'origine, fer blindé, écrasement plus exigeant, étoiles plus dures |
 | v3.0.0 | 100 niveaux, 4 nouveaux matériaux et 6 climats, personnages fragiles et châteaux solides, grands châteaux de duel |
 | v3.1.0 | 300 succès, étoiles au nombre de tirs, atelier plus exigeant (poix, poudre fine, étoiles requises), le bois brûle, victoire immédiate par le feu ou un pouvoir |
+| v3.2.0 | Tutoriels guidés pour chaque outil, feu grégeois dès le niveau 9, 18 défis variés et or des défis (tout l'atelier devient accessible), bande son adaptative, la Chronique (récit entre les chapitres) |
 
 Pour revenir à une version précise avec Git : `git checkout v0.4.0` (puis `git checkout main` pour revenir à la dernière).
 
@@ -363,6 +388,7 @@ Pour revenir à une version précise avec Git : `git checkout v0.4.0` (puis `git
 - **Modifier un niveau** : `src/game/levels/levelSpecs.js` (chaque niveau est décrit en quelques lignes), puis lancer `npm run check:levels` pour vérifier qu'il reste gagnable.
 - **Remplacer les graphismes par des images** : déposer les images et les déclarer dans `src/game/assets/assets.config.js`. Le jeu bascule automatiquement de l'élément dessiné à l'image.
 - **Changer les couleurs de l'interface** : `src/styles/tokens.css`.
+- **Illustrer la Chronique** : déposer les images dans `public/story/` (WebP de 1280 × 720 conseillé) et indiquer leur nom sur la page voulue dans `src/game/story/StoryRepository.js`. Les textes sont dans les fichiers de traduction, rubrique `story`.
 
 ---
 

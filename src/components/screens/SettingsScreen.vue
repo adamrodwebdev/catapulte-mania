@@ -16,9 +16,9 @@ const opts = (key, values) => values.map((v) => ({ value: v, label: t(`settings.
 const set = (key) => (value) => app.setSetting(key, value)
 const back = () => app.go(state.previous === 'game' || state.previous === 'settings' ? 'home' : state.previous)
 
-function onVolume(e) {
+function onVolume(e, key = 'volume') {
   const v = Number(e.target.value) / 100
-  if (Number.isFinite(v)) app.setSetting('volume', Math.min(1, Math.max(0, v)))
+  if (Number.isFinite(v)) app.setSetting(key, Math.min(1, Math.max(0, v)))
 }
 </script>
 
@@ -38,6 +38,8 @@ function onVolume(e) {
 
       <section class="panel" aria-labelledby="set-a11y">
         <h2 id="set-a11y" class="panel__title">{{ t('settings.sections.accessibility') }}</h2>
+        <ToggleSwitch id="opt-story" :model-value="s.story" :label="t('settings.story')" :description="t('settings.storyDesc')" @update:model-value="set('story')($event)" />
+        <ToggleSwitch id="opt-tutorials" :model-value="s.tutorials" :label="t('settings.tutorials')" :description="t('settings.tutorialsDesc')" @update:model-value="set('tutorials')($event)" />
         <ToggleSwitch id="opt-aid" :model-value="s.trajectoryAid" :label="t('settings.trajectoryAid')" :description="t('settings.trajectoryAidDesc')" @update:model-value="set('trajectoryAid')($event)" />
         <ToggleSwitch id="opt-contrast" :model-value="s.contrast === 'high'" :label="t('settings.contrast')" @update:model-value="app.setSetting('contrast', $event ? 'high' : 'normal')" />
         <ToggleSwitch id="opt-captions" :model-value="s.captions" :label="t('settings.captions')" :description="t('settings.captionsDesc')" @update:model-value="set('captions')($event)" />
@@ -52,6 +54,11 @@ function onVolume(e) {
         <div class="field">
           <label for="opt-volume" class="field__label">{{ t('settings.volume') }} · {{ Math.round(s.volume * 100) }} %</label>
           <input id="opt-volume" class="range" type="range" min="0" max="100" step="5" :value="Math.round(s.volume * 100)" @input="onVolume">
+        </div>
+        <div class="field">
+          <label for="opt-music" class="field__label">{{ t('settings.music') }} · {{ Math.round(s.music * 100) }} %</label>
+          <input id="opt-music" class="range" type="range" min="0" max="100" step="5" :value="Math.round(s.music * 100)" @input="onVolume($event, 'music')">
+          <p class="field__desc">{{ t('settings.musicDesc') }}</p>
         </div>
         <ToggleSwitch id="opt-mute" :model-value="s.muted" :label="t('settings.mute')" @update:model-value="set('muted')($event)" />
       </section>

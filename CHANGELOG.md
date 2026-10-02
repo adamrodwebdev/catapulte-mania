@@ -2,6 +2,34 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [3.2.0] – 2026-10-02
+### Ajouté
+- **Tutoriels guidés** : chaque nouvel outil s'apprend dans un niveau dédié
+  (viser au niveau 1, Accalmie 5, Force du Titan 8, feu grégeois 9, rocher 11,
+  pouvoir Feu grégeois 16, Salve 19, bombe 21, Charge de poudre 22,
+  mitraille 25, Séisme 31). Une bulle guide pas à pas, met en valeur le bon
+  bouton et affiche la trajectoire ; la munition présentée reste disponible
+  en Difficile. Désactivables dans les Réglages.
+- **La Chronique** : récit de la campagne (prologue, un épisode par chapitre,
+  épilogue), avec un emplacement prévu pour les illustrations ; les épisodes
+  lus se relisent depuis la carte des niveaux. Texte provisoire, à enrichir.
+- **Bande son adaptative** composée en direct (vielle, luth, flûte, tambourin,
+  chalemie) : 4 morceaux selon le chapitre, 4 niveaux d'intensité qui suivent
+  l'action, sous-titre « ♪ La musique s'emballe ». Volume séparé.
+- **18 défis** au lieu de 8, en trois familles (style, exploit, thème) ; un de
+  chaque par niveau, choisis selon le contenu, seuils croissants.
+### Modifié
+- **Niveau 9** : il devient le tutoriel du feu grégeois (rez-de-chaussée en
+  paille, 2 pots de feu). Sans amélioration, il était presque impossible.
+- Pouvoirs : Force du Titan après 7 niveaux, Feu grégeois après 15, Charge de
+  poudre après 21, pour que chacun ait son niveau tutoriel. Niveau 5 plus venté
+  (Accalmie), niveaux 16 et 22 sans la munition qui rendait le pouvoir inutile.
+- **Or des défis** : 100 pièces par défi relevé, 50 de plus quand les trois
+  défis d'un niveau sont réussis. Tout l'atelier (26 870 pièces) devient
+  accessible au joueur perfectionniste (jusqu'à 42 500 pièces).
+- Sauvegarde v4 : les anciens succès sont remis à zéro (défis renouvelés),
+  l'or et les étoiles sont conservés.
+
 ## [3.1.0] – 2026-10-02
 ### Ajouté
 - **Succès** : trois défis par niveau (300 en tout) : Puriste, Économe, Feu

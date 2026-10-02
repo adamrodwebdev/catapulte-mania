@@ -5,6 +5,8 @@ import { GAME, IS_DEMO, PLAYABLE_LEVELS } from '../../config/gameConfig.js'
 import AppIcon from '../ui/AppIcon.vue'
 import StarRow from '../ui/StarRow.vue'
 import ScreenHeader from '../ui/ScreenHeader.vue'
+import StoryPanel from '../ui/StoryPanel.vue'
+import { StoryRepository } from '../../game/story/StoryRepository.js'
 
 const app = useApp()
 const { state, t } = app
@@ -13,6 +15,9 @@ const chapters = Array.from({ length: GAME.LEVEL_COUNT / GAME.LEVELS_PER_CHAPTER
 const POWER_ICONS = { calm: 'wind', titan: 'fist', greekfire: 'flame', volley: 'volley', powder: 'bomb', quake: 'quake' }
 
 const chapter = ref(1)
+/** La Chronique : épisodes déjà découverts, à relire. */
+const chronicle = computed(() => (profile.value ? StoryRepository.unlocked(profile.value.completed) : []))
+const reading = ref(null)
 /** Mode libre : seuls les niveaux déjà terminés sont jouables, sans limite. */
 const freeMode = ref(state.match.mode === 'free')
 const canFree = computed(() => (profile.value?.completed ?? 0) > 0)
@@ -150,5 +155,16 @@ function onTabKey(e) {
         </li>
       </ul>
     </section>
+
+    <section v-if="chronicle.length" class="powers-strip" aria-labelledby="chronicle-title">
+      <h2 id="chronicle-title" class="powers-strip__title">{{ t('story.chronicle') }}</h2>
+      <p class="powers-strip__rule">{{ t('story.chronicleIntro') }}</p>
+      <ul class="chronicle-list">
+        <li v-for="b in chronicle" :key="b.id">
+          <button type="button" class="btn" @click="reading = b"><AppIcon name="map" :size="18" />{{ t(`story.${b.id}.title`) }}</button>
+        </li>
+      </ul>
+    </section>
+    <StoryPanel v-if="reading" :key="reading.id" :beat="reading" @done="reading = null" />
   </main>
 </template>

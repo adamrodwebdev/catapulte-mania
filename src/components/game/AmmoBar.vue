@@ -4,6 +4,8 @@ import { useApp } from '../../app/AppContext.js'
 defineProps({
   ammo: { type: Array, required: true },
   disabled: { type: Boolean, default: false },
+  /** Élément mis en valeur par le tutoriel (voir Tutorial.js). */
+  coach: { type: String, default: '' },
 })
 const emit = defineEmits(['select'])
 const { t } = useApp()
@@ -17,7 +19,8 @@ const { t } = useApp()
       type="button"
       role="radio"
       :aria-checked="a.selected ? 'true' : 'false'"
-      :class="['ammo__item', `ammo__item--${a.type}`, { 'ammo__item--on': a.selected }]"
+      :class="['ammo__item', `ammo__item--${a.type}`, { 'ammo__item--on': a.selected, 'coach-focus': coach === `ammo:${a.type}` }]"
+      :data-coach="`ammo:${a.type}`"
       :disabled="disabled || a.count === 0"
       :title="t(`game.ammoDesc.${a.type}`)"
       @click="emit('select', a.type)"

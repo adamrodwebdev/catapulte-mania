@@ -7,7 +7,7 @@ import { SaveManager } from '../src/services/SaveManager.js'
 import { SaveSlot } from '../src/domain/SaveSlot.js'
 import { LevelResult } from '../src/domain/LevelResult.js'
 import { UpgradeCatalog } from '../src/game/progression/UpgradeCatalog.js'
-import { GOLD, goldFor } from '../src/game/progression/GoldRules.js'
+import { GOLD, goldFor, maxGoldFor } from '../src/game/progression/GoldRules.js'
 
 const win = (levelId, stars = 3, achievements = 7, shotsUsed = 1) =>
   LevelResult.issue({
@@ -31,7 +31,8 @@ test('l’or récompense la maîtrise (étoiles et succès nouveaux), pas la ré
   assert.equal(slot.recordResult(win(1, 2, 0b001)).gold, GOLD.REPLAY)
   // Une étoile et deux succès de plus.
   const r3 = slot.recordResult(win(1, 3, 0b111))
-  assert.equal(r3.gold, GOLD.REPLAY + GOLD.PER_STAR + 2 * GOLD.PER_ACHIEVEMENT)
+  // Les trois défis relevés : bonus « parfait » en plus.
+  assert.equal(r3.gold, GOLD.REPLAY + GOLD.PER_STAR + 2 * GOLD.PER_ACHIEVEMENT + GOLD.PERFECT)
   assert.equal(r3.newAchievements, 0b110)
   assert.equal(slot.achievementCount, 3)
   assert.equal(slot.levelRecord(1).ach, 7)
@@ -109,7 +110,7 @@ test('une ancienne sauvegarde (v1) est migrée sans perte', () => {
   assert.equal(slot.completedCount, 1)
   assert.equal(slot.gold, 0)
   assert.equal(slot.starCount, 3)
-  assert.equal(slot.toJSON().version, 3)
+  assert.equal(slot.toJSON().version, 4)
 })
 
 test('sauvegarde v2 : améliorations remboursées, or et étoiles conservés', () => {
@@ -138,4 +139,27 @@ test('or incohérent ou impossible : sauvegarde refusée', () => {
   assert.throws(() => SaveSlot.fromJSON(0, { ...json, legacyGold: 99999 }), /more gold/)
   assert.throws(() => SaveSlot.fromJSON(0, { ...json, levels: { ...json.levels, 1: { ...json.levels[1], ach: 9 } } }), /./)
   assert.throws(() => SaveSlot.fromJSON(0, { ...json, cosmetics: { ...json.cosmetics, skin: 'dragon' } }), /not owned/)
+})
+
+test('v3 → v4 : succès renouvelés remis à zéro, or conservé', () => {
+  const v3 = richSlot(3).toJSON()
+  // Or gagné au barème v3.1 (150 par niveau au plus) : 3 niveaux parfaits.
+  const legacy = { ...v3, version: 3, legacyGold: 0, gold: 450, goldEarned: 450 }
+  const slot = SaveSlot.fromJSON(0, legacy)
+  assert.equal(slot.toJSON().version, 4)
+  assert.equal(slot.achievementCount, 0)
+  assert.equal(slot.gold, 450)
+  assert.equal(slot.starCount, 9)
+})
+
+test('le perfectionniste peut tout acheter à l’atelier', () => {
+  const levels = Object.fromEntries(Array.from({ length: 100 }, (_, i) => [i + 1, { attempts: 1 }]))
+  const upgrades = UpgradeCatalog.upgrades().reduce((sum, u) => sum + u.spentFor(u.maxLevel), 0)
+  const cosmetics = UpgradeCatalog.cosmetics().reduce((sum, c) => sum + c.cost, 0)
+  const all = maxGoldFor(levels) - 100 * GOLD.REPLAY
+  assert.ok(all >= upgrades + cosmetics, `${all} < ${upgrades + cosmetics}`)
+  // Même sans les défis les plus durs (70 % relevés), l'atelier complet reste accessible.
+  const most = 100 * (GOLD.FIRST_CLEAR + 3 * GOLD.PER_STAR) + Math.floor(300 * 0.7) * GOLD.PER_ACHIEVEMENT
+  assert.ok(most >= upgrades + cosmetics, `${most} < ${upgrades + cosmetics}`)
+  assert.ok(UpgradeCatalog.upgrades().every((u) => u.stars.every((n) => n <= 300)))
 })

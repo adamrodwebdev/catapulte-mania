@@ -13,7 +13,7 @@ export class CalmPower extends Power {
 /** Force du Titan : projectile 2,2 fois plus lourd. */
 export class TitanPower extends Power {
   constructor() {
-    super({ id: 'titan', unlockAfter: 8, cost: 250, icon: 'fist' })
+    super({ id: 'titan', unlockAfter: 7, cost: 250, icon: 'fist' })
   }
   modifyShot(shot) {
     shot.mods.massFactor = 2.2
@@ -23,7 +23,7 @@ export class TitanPower extends Power {
 /** Feu grégeois : le projectile enflamme ce qu'il touche. */
 export class GreekFirePower extends Power {
   constructor() {
-    super({ id: 'greekfire', unlockAfter: 12, cost: 200, icon: 'flame' })
+    super({ id: 'greekfire', unlockAfter: 15, cost: 200, icon: 'flame' })
   }
   modifyShot(shot) {
     shot.mods.ignites = true
@@ -43,7 +43,7 @@ export class VolleyPower extends Power {
 /** Charge de poudre : le projectile explose à l'impact. */
 export class PowderPower extends Power {
   constructor() {
-    super({ id: 'powder', unlockAfter: 24, cost: 300, icon: 'bomb' })
+    super({ id: 'powder', unlockAfter: 21, cost: 300, icon: 'bomb' })
   }
   modifyShot(shot) {
     shot.mods.explodes = true

@@ -13,7 +13,7 @@ const COUNTER = Schema.int({ min: 0, max: 1e9 })
 const GOLD_INT = Schema.int({ min: 0, max: GOLD.MAX_BALANCE })
 const COSMETIC_IDS = UpgradeCatalog.cosmetics().map((c) => c.id)
 
-/** Schéma de la sauvegarde (version 3). Toute clé inconnue est refusée. */
+/** Schéma de la sauvegarde (version 4). Toute clé inconnue est refusée. */
 export const saveSchema = Schema.object({
   version: Schema.enum([GAME.SAVE_VERSION]),
   name: Schema.string({ minLength: 1, maxLength: 16, pattern: PROFILE_NAME }),
@@ -58,7 +58,8 @@ export const saveSchema = Schema.object({
  * v1 → v2 : ajout de l'économie, vide.
  * v2 → v3 : étoiles au nombre de tirs et succès. Les améliorations, dont les
  *           prix ont changé, sont remboursées ; l'or déjà gagné est conservé
- *           (et contrôlé selon l'ancien barème).
+ *            (et contrôlé selon l'ancien barème).
+ * v3 → v4 : succès renouvelés (masques remis à zéro, or conservé).
  * @param {any} raw
  */
 export function migrateSave(raw) {
@@ -73,6 +74,13 @@ export function migrateSave(raw) {
     const cosmeticSpend = owned.reduce((sum, id) => sum + (COSMETIC_IDS.includes(id) ? UpgradeCatalog.cosmetic(id).cost : 0), 0)
     const earned = Number.isInteger(save.goldEarned) ? save.goldEarned : 0
     save = { ...save, version: 3, levels, upgrades: {}, legacyGold: earned, gold: Math.max(0, earned - cosmeticSpend) }
+  }
+  if (save && typeof save === 'object' && save.version === 3 && save.levels && typeof save.levels === 'object') {
+    // v3 → v4 : les défis ont été renouvelés (18 au lieu de 8), les anciens
+    // masques ne correspondent plus ; tout l'or déjà gagné devient « hérité ».
+    const levels = {}
+    for (const [id, rec] of Object.entries(save.levels)) levels[id] = rec && typeof rec === 'object' ? { ...rec, ach: 0 } : rec
+    save = { ...save, version: 4, levels, legacyGold: Number.isInteger(save.goldEarned) ? save.goldEarned : 0 }
   }
   return save
 }
@@ -301,7 +309,8 @@ export class SaveSlot {
     const before = prev ?? { stars: 0, ach: 0 }
     const newStars = Math.max(0, result.stars - before.stars)
     const newAchievements = result.achievements & ~before.ach
-    const gold = goldFor(result, { firstClear, newStars, newAchievements: countAchievements(newAchievements) })
+    const perfect = newAchievements !== 0 && (before.ach | result.achievements) === 7
+    const gold = goldFor(result, { firstClear, newStars, newAchievements: countAchievements(newAchievements), perfect })
     this.#data.gold = Math.min(GOLD.MAX_BALANCE, this.#data.gold + gold)
     this.#data.goldEarned = Math.min(GOLD.MAX_BALANCE, this.#data.goldEarned + gold)
     if (firstClear) {

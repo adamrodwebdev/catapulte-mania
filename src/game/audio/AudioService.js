@@ -20,6 +20,11 @@ export class AudioService {
   #last = new Map()
   #volume = 0.7
   #muted = false
+  /** Bus de la musique (volume séparé des effets sonores). */
+  #musicBus = null
+  #musicVolume = 0.5
+  /** @type {Set<(ctx: AudioContext, bus: GainNode) => void>} */
+  #onReady = new Set()
 
   get volume() {
     return this.#volume
@@ -33,8 +38,39 @@ export class AudioService {
     this.#applyGain()
   }
 
+  get musicVolume() {
+    return this.#musicVolume
+  }
+  set musicVolume(v) {
+    this.#musicVolume = clamp(Number(v) || 0, 0, 1)
+    this.#applyGain()
+  }
+
+  get muted() {
+    return this.#muted
+  }
+
   #applyGain() {
     if (this.#master) this.#master.gain.value = this.#muted ? 0 : this.#volume * 0.8
+    if (this.#musicBus) this.#musicBus.gain.setTargetAtTime(this.#muted ? 0 : this.#musicVolume * 0.75, this.#ctx.currentTime, 0.1)
+  }
+
+  /**
+   * Appelle `fn(ctx, bus)` dès que le son est disponible (après un geste du joueur),
+   * immédiatement s'il l'est déjà. Sert à la musique (MusicDirector).
+   * @returns {() => void} désabonnement
+   */
+  whenReady(fn) {
+    if (this.#ctx) fn(this.#ctx, this.#musicBus)
+    else this.#onReady.add(fn)
+    return () => this.#onReady.delete(fn)
+  }
+
+  /** Met le son en veille (onglet caché) ou le réveille. */
+  suspend(on) {
+    if (!this.#ctx) return
+    if (on) this.#ctx.suspend().catch(() => {})
+    else this.#ctx.resume().catch(() => {})
   }
 
   /** À appeler lors d'un geste du joueur (clic, toucher, touche). */
@@ -49,6 +85,9 @@ export class AudioService {
       this.#ctx = new Ctx()
       this.#master = this.#ctx.createGain()
       this.#master.connect(this.#ctx.destination)
+      this.#musicBus = this.#ctx.createGain()
+      this.#musicBus.gain.value = 0
+      this.#musicBus.connect(this.#ctx.destination)
       this.#applyGain()
       const len = this.#ctx.sampleRate
       this.#noise = this.#ctx.createBuffer(1, len, this.#ctx.sampleRate)
@@ -56,7 +95,10 @@ export class AudioService {
       for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1
     } catch {
       this.#ctx = null
+      return
     }
+    for (const fn of this.#onReady) fn(this.#ctx, this.#musicBus)
+    this.#onReady.clear()
   }
 
   /**

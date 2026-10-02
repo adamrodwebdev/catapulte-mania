@@ -6,6 +6,7 @@ import { SaveSigner } from '../services/SaveSigner.js'
 import { SaveManager } from '../services/SaveManager.js'
 import { AudioService } from '../game/audio/AudioService.js'
 import { HapticService } from '../game/audio/HapticService.js'
+import { MusicDirector } from '../game/audio/MusicDirector.js'
 import { LevelRepository } from '../game/levels/LevelRepository.js'
 import { starsFor } from '../game/score/ScoreRules.js'
 import { PowerRegistry } from '../game/powers/PowerRegistry.js'
@@ -53,6 +54,7 @@ export function createAppContext() {
   const saves = new SaveManager(storage, new SaveSigner(storage), checkRecord)
   const audio = new AudioService()
   const haptics = new HapticService()
+  const music = new MusicDirector(audio)
 
   const state = reactive({
     screen: 'home',
@@ -78,7 +80,7 @@ export function createAppContext() {
   /** @type {import('../domain/SaveSlot.js').SaveSlot | null} */
   let activeSlot = null
 
-  const services = markRaw({ storage, settings, i18n, saves, audio, haptics })
+  const services = markRaw({ storage, settings, i18n, saves, audio, haptics, music })
 
   /* ----- Langue ----- */
   const t = (key, params) => {
@@ -94,10 +96,16 @@ export function createAppContext() {
     state.settings[key] = value
     if (key === 'volume') audio.volume = value
     if (key === 'muted') audio.muted = value
+    if (key === 'music') {
+      audio.musicVolume = value
+      music.setEnabled(value > 0)
+    }
     if (key === 'haptics') haptics.enabled = value
   })
   audio.volume = settings.get('volume')
   audio.muted = settings.get('muted')
+  audio.musicVolume = settings.get('music')
+  music.setEnabled(settings.get('music') > 0)
   haptics.enabled = settings.get('haptics')
 
   /* ----- Préférences système ----- */
@@ -268,6 +276,22 @@ export function createAppContext() {
     state.captions = [...state.captions.slice(-3), item]
     setTimeout(() => (state.captions = state.captions.filter((c) => c.id !== item.id)), 2600)
   }
+
+  /* ----- Musique ----- */
+  // Sous-titre pour les personnes malentendantes quand la musique s'emballe.
+  music.onClimax = () => caption('music')
+  // Hors partie : thème calme des menus. L'écran de jeu choisit lui-même son morceau.
+  watch(
+    () => state.screen,
+    (screen) => {
+      if (screen === 'game') return
+      music.setIntensity(0)
+      music.duck(false)
+      music.play('menu')
+    },
+    { immediate: true },
+  )
+  globalThis.document?.addEventListener?.('visibilitychange', () => audio.suspend(document.hidden))
 
   /* ----- Thème appliqué au document ----- */
   function applyDocument() {

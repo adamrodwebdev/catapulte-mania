@@ -71,9 +71,9 @@ export const LEVEL_SPECS = [
     },
   },
 
-  // 5. Le donjon de bois : large, quatre étages, six soldats.
+  // 5. Tutoriel de l'Accalmie : le donjon de bois dans un vent fort.
   {
-    shots: 4, wind: 0.2, ammo: {},
+    shots: 4, wind: 0.6, ammo: {},
     build(b) {
       const k = b.tower(1500, { floors: 4, w: 180, roof: 'wood' })
       b.target(k[0], 'soldier', -35)
@@ -112,7 +112,7 @@ export const LEVEL_SPECS = [
     },
   },
 
-  // 8. Le moulin : une tour fine de six étages. Faites-la basculer.
+  // 8. Tutoriel de la Force du Titan : le moulin, une tour fine de six étages à faire basculer.
   {
     shots: 4, wind: 0.3, ammo: {},
     build(b) {
@@ -124,14 +124,15 @@ export const LEVEL_SPECS = [
     },
   },
 
-  // 9. Les dominos : quatre tours serrées. La première entraîne les autres.
+  // 9. Tutoriel du feu grégeois : quatre greniers serrés, le rez-de-chaussée en
+  //    paille. Un pot de feu sur la paille, et l'incendie fait tomber les dominos.
   {
-    shots: 4, wind: 0.35, ammo: {},
+    shots: 4, wind: 0.2, ammo: { fire: 2 },
     build(b) {
       for (const x of [1300, 1440, 1580, 1720]) {
-        const t = b.tower(x, { floors: 3, w: 100, h: 110, roof: 'straw' })
+        const t = b.tower(x, { floors: 3, mats: ['straw', 'wood', 'wood'], slab: 'wood', w: 100, h: 105, roof: 'straw' })
         b.target(t[2])
-        if (x === 1440 || x === 1720) b.target(t[0])
+        if (x === 1440 || x === 1720) b.target(t[1])
       }
     },
   },
@@ -155,7 +156,7 @@ export const LEVEL_SPECS = [
 
   /* ===== Chapitre 2 — Le Fort de pierre ===== */
 
-  // 11. Pierre et bois : la base résiste, le haut beaucoup moins.
+  // 11. Tutoriel du rocher. Pierre et bois : la base résiste, le haut beaucoup moins.
   {
     shots: 4, wind: 0.3, ammo: { boulder: 1 },
     build(b) {
@@ -211,9 +212,10 @@ export const LEVEL_SPECS = [
     },
   },
 
-  // 16. Les granges : trois greniers de paille. Le feu grégeois fait le reste.
+  // 16. Tutoriel du pouvoir Feu grégeois : trois greniers de paille, aucun pot
+  //     de feu en réserve ; le pouvoir enflamme n'importe quel projectile.
   {
-    shots: 4, wind: 0.45, ammo: { boulder: 1, fire: 2 },
+    shots: 4, wind: 0.45, ammo: { boulder: 2 },
     build(b) {
       for (const x of [1300, 1520, 1740]) {
         const t = b.tower(x, { floors: 3, mats: ['wood', 'straw'], slab: 'wood', roof: 'straw' })
@@ -251,7 +253,7 @@ export const LEVEL_SPECS = [
     },
   },
 
-  // 19. La cathédrale : une nef de verre et un clocher de cinq étages.
+  // 19. Tutoriel de la Salve : une nef de verre et un clocher de cinq étages.
   {
     shots: 5, wind: 0.5, ammo: { boulder: 2, fire: 2 },
     build(b) {
@@ -286,7 +288,7 @@ export const LEVEL_SPECS = [
 
   /* ===== Chapitre 3 — La Forteresse ===== */
 
-  // 21. Planchers de fer : seuls les boulets explosifs les font céder.
+  // 21. Tutoriel de la bombe. Planchers de fer : seuls les boulets explosifs les font céder.
   {
     shots: 4, wind: 0.5, ammo: { boulder: 1, bomb: 2 },
     build(b) {
@@ -295,9 +297,10 @@ export const LEVEL_SPECS = [
     },
   },
 
-  // 22. Le coffre-fort : une salle de fer au sol, trois étages de bois au-dessus.
+  // 22. Tutoriel de la Charge de poudre : une salle de fer au sol, trois étages
+  //     de bois au-dessus. Sans bombe en réserve, le pouvoir ouvre le coffre.
   {
-    shots: 5, wind: 0.5, ammo: { boulder: 2, bomb: 1 },
+    shots: 5, wind: 0.5, ammo: { boulder: 2 },
     build(b) {
       const vault = b.room(1500, b.ground, { mat: 'iron', slab: 'iron', w: 150, t: 26 })
       b.target(vault, 'knight')
@@ -331,7 +334,7 @@ export const LEVEL_SPECS = [
     },
   },
 
-  // 25. Le hameau : six maisons éparpillées. La mitraille arrose large.
+  // 25. Tutoriel de la mitraille. Le hameau : six maisons éparpillées.
   {
     shots: 5, wind: 0.5, ammo: { split: 3, bomb: 2 },
     build(b) {
@@ -426,7 +429,7 @@ export const LEVEL_SPECS = [
 
   /* ===== Chapitre 4 — La Citadelle (de nuit) ===== */
 
-  // 31. Trois tours dans la nuit, une poudrière au centre.
+  // 31. Tutoriel du Séisme. Trois tours dans la nuit, une poudrière au centre.
   {
     shots: 5, wind: 0.6, ammo: { boulder: 2, bomb: 1, fire: 2 },
     build(b) {

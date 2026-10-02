@@ -7,6 +7,7 @@ import { MATERIAL_NAMES } from '../entities/materials.js'
 import { TARGET_TYPES, PROJECTILE_NAMES } from '../entities/catalog.js'
 import { referenceScore, maxScore } from '../score/ScoreRules.js'
 import { achievementsFor } from '../progression/Achievements.js'
+import { PowerRegistry } from '../powers/PowerRegistry.js'
 
 const coord = Schema.number({ min: -500, max: 4000 })
 const size = Schema.number({ min: 6, max: 600 })
@@ -34,7 +35,7 @@ const levelSchema = Schema.object(
  * @param {number} id
  * @param {number} chapter thème du décor (1 à 10)
  */
-export function buildLevel(spec, id, chapter, seedSalt = 0) {
+export function buildLevel(spec, id, chapter, seedSalt = 0, { tutorial = null } = {}) {
   const b = new StructureBuilder()
   spec.build(b)
   const data = levelSchema(
@@ -53,6 +54,8 @@ export function buildLevel(spec, id, chapter, seedSalt = 0) {
   // Étoiles : 3 en `par` tirs (1, ou 2 pour les châteaux très garnis), 2 en `star2` tirs.
   level.par = Guard.int(spec.par ?? (data.targets.length >= 6 ? 2 : 1), `level ${id} par`, { min: 1, max: data.shots })
   level.star2 = Math.min(data.shots, level.par + Math.max(1, Math.floor((data.shots - level.par) / 2)))
+  // Outil présenté par un tutoriel guidé (voir LevelRepository.tutorialFor).
+  level.tutorial = tutorial
   level.achievements = achievementsFor(level)
   level.reference = referenceScore(level)
   level.maxScore = maxScore(level)
@@ -68,7 +71,17 @@ export class LevelRepository {
   static #levels = null
 
   static #build() {
-    return [...LEVEL_SPECS, ...LEVEL_SPECS_2].map((spec, i) => buildLevel(spec, i + 1, Math.ceil((i + 1) / GAME.LEVELS_PER_CHAPTER)))
+    const seen = new Set()
+    return [...LEVEL_SPECS, ...LEVEL_SPECS_2].map((spec, i) => {
+      const id = i + 1
+      // Tutoriel : la visée au niveau 1, puis chaque munition et chaque pouvoir
+      // dans le niveau où ils apparaissent pour la première fois.
+      const fresh = Object.keys(spec.ammo).filter((a) => !seen.has(a))
+      fresh.forEach((a) => seen.add(a))
+      const power = PowerRegistry.all().find((p) => p.unlockAfter === id - 1)
+      const tutorial = id === 1 ? 'aim' : fresh.length ? `ammo:${fresh[0]}` : power ? `power:${power.id}` : null
+      return buildLevel(spec, id, Math.ceil(id / GAME.LEVELS_PER_CHAPTER), 0, { tutorial })
+    })
   }
 
   static all() {
@@ -91,6 +104,15 @@ export class LevelRepository {
     const cur = Object.keys(LevelRepository.get(id).ammo)
     const prev = new Set(LevelRepository.all().slice(0, id - 1).flatMap((l) => Object.keys(l.ammo)))
     return cur.filter((a) => !prev.has(a))
+  }
+
+  /**
+   * Outil présenté par un tutoriel guidé dans ce niveau : la visée au niveau 1,
+   * puis chaque munition et chaque pouvoir là où ils apparaissent pour la première fois.
+   * @returns {string | null} 'aim' | 'ammo:<type>' | 'power:<id>'
+   */
+  static tutorialFor(id) {
+    return LevelRepository.get(id).tutorial
   }
 
   /** Éléments de gameplay rencontrés pour la première fois (matériau, cible, baril). */

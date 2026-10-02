@@ -730,3 +730,137 @@
 .arena--theme8 { background: linear-gradient(180deg, #9db8d4, #eef3f8 70%, #f4f7fb 70%); }
 .arena--theme9 { background: linear-gradient(180deg, #2f3646, #7f8898 70%, #3f5a3a 70%); }
 .arena--theme10 { background: linear-gradient(180deg, #22132f, #b8464f 70%, #3d4a2c 70%); }
+
+/* ---------- La Chronique (récit entre les niveaux) ---------- */
+.story {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  background: #120e1c;
+  color: #f3ecd9;
+}
+.story__art {
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
+.story__art--theme1 { background: linear-gradient(180deg, #6f9bc8, #f0d9a8 72%, #5f7d3e 72%); }
+.story__art--theme2 { background: linear-gradient(180deg, #8ea4bd, #c9d3dc 72%, #6b7a5a 72%); }
+.story__art--theme3 { background: linear-gradient(180deg, #7a4f7a, #e3a06b 72%, #5a4a3a 72%); }
+.story__art--theme4 { background: linear-gradient(180deg, #141a3a, #3a3f6e 72%, #2b2b3a 72%); }
+.story__art--theme5 { background: linear-gradient(180deg, #7f9a8f, #d9e0c8 72%, #4e6b3a 72%); }
+.story__art--theme6 { background: linear-gradient(180deg, #4f93cf, #f7e3b0 72%, #c9ad6a 72%); }
+.story__art--theme7 { background: linear-gradient(180deg, #5f86b5, #dfe8f0 72%, #6f8a5a 72%); }
+.story__art--theme8 { background: linear-gradient(180deg, #9db8d4, #eef3f8 72%, #f4f7fb 72%); }
+.story__art--theme9 { background: linear-gradient(180deg, #2f3646, #7f8898 72%, #3f5a3a 72%); }
+.story__art--theme10 { background: linear-gradient(180deg, #22132f, #b8464f 72%, #3d4a2c 72%); }
+.story__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.story__scene {
+  position: absolute;
+  inset: auto 0 0;
+  width: 100%;
+  height: 70%;
+}
+.story__hill { fill: rgb(20 16 30 / 0.45); }
+.story__castle { fill: rgb(20 16 30 / 0.75); }
+.story__gate { fill: rgb(20 16 30 / 0.9); }
+.story__engine { fill: rgb(20 16 30 / 0.85); }
+.story__chapter {
+  position: absolute;
+  top: var(--space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: var(--space-1) var(--space-4);
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #f3ecd9;
+  background: rgb(18 14 28 / 0.7);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.story__book {
+  padding: var(--space-5) max(var(--space-4), calc((100% - 46rem) / 2)) max(var(--space-5), env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, #1d1729, #120e1c);
+  border-top: 3px solid var(--c-gold);
+}
+.story__title {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-display);
+  font-size: var(--fs-3);
+  color: var(--c-gold);
+}
+.story__text {
+  min-height: 4.5em;
+  margin: 0 0 var(--space-4);
+  font-size: calc(var(--fs-2) * 0.9);
+  line-height: 1.55;
+  animation: story-in calc(0.6s * var(--speed)) ease-out both;
+}
+@keyframes story-in {
+  from { opacity: 0; transform: translateY(6px); }
+}
+.story__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.story__dots {
+  display: flex;
+  gap: var(--space-2);
+  margin-right: auto;
+}
+.story__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--c-gold);
+}
+.story__dot--on {
+  background: var(--c-gold);
+}
+.story .btn--ghost {
+  color: #f3ecd9;
+  border-color: #6c6386;
+}
+@media (max-height: 520px) {
+  .story {
+    grid-template-rows: none;
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 46%);
+  }
+  .story__book {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: var(--space-4);
+    border-top: 0;
+    border-left: 3px solid var(--c-gold);
+    overflow-y: auto;
+  }
+  .story__text {
+    font-size: var(--fs-1);
+  }
+}
+.chronicle-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.chronicle-list .btn {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+}

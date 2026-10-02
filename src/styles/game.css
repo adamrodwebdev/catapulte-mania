@@ -751,3 +751,87 @@
     visibility: hidden;
   }
 }
+
+/* ---------- Tutoriel guidé ---------- */
+.coach {
+  position: absolute;
+  z-index: 6;
+  /* En haut à gauche, dans le ciel : ne masque ni le château ni les commandes. */
+  left: var(--space-4);
+  top: calc(var(--hud-top-h, 4rem) + var(--space-3));
+  width: min(26rem, calc(100% - 2 * var(--space-4)));
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  color: var(--text);
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.coach__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-1);
+  font-size: var(--fs-0);
+  font-weight: 700;
+  color: var(--accent-text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.coach__title {
+  flex: 1;
+}
+.coach__text {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.coach__skip {
+  display: block;
+  margin: var(--space-2) 0 0 auto;
+  min-height: var(--hud-size);
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: var(--fs-0);
+  font-weight: 700;
+  color: var(--action);
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.coach-focus {
+  position: relative;
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+  animation: coach-pulse calc(1.4s / max(var(--speed), 0.001)) ease-in-out infinite;
+}
+:root[data-motion='reduced'] .coach-focus {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='full']) .coach-focus {
+    animation: none;
+  }
+}
+@keyframes coach-pulse {
+  0%, 100% { outline-color: var(--accent); outline-offset: 3px; }
+  50% { outline-color: transparent; outline-offset: 7px; }
+}
+.intro-tutorial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-weight: 700;
+  color: var(--accent-text);
+}
+@media (max-height: 520px) {
+  .coach {
+    top: calc(var(--hud-top-h, 4rem) + var(--space-2));
+    padding: var(--space-2) var(--space-3);
+  }
+  .coach__text {
+    font-size: var(--fs-0);
+  }
+}

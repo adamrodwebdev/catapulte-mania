@@ -15,6 +15,10 @@ import ModalPanel from '../ui/ModalPanel.vue'
 import StarRow from '../ui/StarRow.vue'
 import AchievementList from '../ui/AchievementList.vue'
 import AppIcon from '../ui/AppIcon.vue'
+import CoachBubble from '../game/CoachBubble.vue'
+import StoryPanel from '../ui/StoryPanel.vue'
+import { StoryRepository } from '../../game/story/StoryRepository.js'
+import { TutorialCoach } from '../../game/tutorial/Tutorial.js'
 import ToggleSwitch from '../ui/ToggleSwitch.vue'
 
 const app = useApp()
@@ -24,7 +28,9 @@ const canvas = ref(null)
 /** Le contrôleur de jeu n'est pas réactif (markRaw) : Vue n'observe que le HUD. */
 let controller = null
 const hud = shallowRef(null)
-const phase = ref('loading') // loading | intro | playing | paused | ended
+const phase = ref('loading') // loading | story | intro | playing | paused | ended
+/** Épisode de la Chronique affiché (avant le niveau, ou épilogue). */
+const storyBeat = shallowRef(null)
 const showPowers = ref(false)
 const end = ref(null)
 /** Mode de la partie : histoire, libre, duel, chacun sa partie, face-à-face. */
@@ -43,6 +49,48 @@ const roundScores = ref([])
 const turnBanner = ref(null)
 let turnTimer = null
 const aiming = computed(() => phase.value === 'playing' && hud.value?.state === 'aiming')
+
+/* ---------- Tutoriel guidé ---------- */
+
+/** Tutoriel en cours (premier passage d'un niveau qui présente un outil). */
+let coach = null
+const coachStep = shallowRef(null)
+const coachProgress = ref({ index: 1, total: 1 })
+const coachTool = ref('')
+const coachAnchor = computed(() => (phase.value === 'playing' ? coachStep.value?.anchor ?? '' : ''))
+let coachTimer = null
+
+function startCoach(tool) {
+  stopCoach()
+  coach = markRaw(new TutorialCoach(tool))
+  coachTool.value = tool
+  coach.onChange = (step) => {
+    coachStep.value = step
+    coachProgress.value = coach?.progress ?? coachProgress.value
+    clearTimeout(coachTimer)
+    // Dernière bulle : elle s'efface d'elle-même.
+    if (step?.id === 'done') coachTimer = setTimeout(stopCoach, 9000)
+    if (!step) stopCoach()
+  }
+  coachStep.value = coach.step
+  coachProgress.value = coach.progress
+  // Pendant l'apprentissage, la trajectoire prévue est affichée.
+  if (controller) controller.session.options.trajectoryAid = true
+}
+function stopCoach() {
+  clearTimeout(coachTimer)
+  coach = null
+  coachStep.value = null
+  if (controller) controller.session.options.trajectoryAid = state.settings.trajectoryAid
+}
+const coachNotify = (event, detail) => coach?.notify(event, detail)
+watch(
+  () => hud.value?.turn,
+  (turn, prev) => {
+    if (turn > (prev ?? 0)) coachNotify('turn')
+  },
+)
+watch(showPowers, (open) => open && coachNotify('menu'))
 
 /* ---------- Cycle de vie ---------- */
 
@@ -82,20 +130,34 @@ async function startLevel() {
     }),
   )
   controller.on('turn', ({ name }) => showTurn(name))
+  controller.on('aimed', () => coachNotify('aim'))
   controller.on('hud', (h) => (hud.value = h))
-  controller.on('caption', (c) => app.caption(c.key, c.side))
+  controller.on('caption', (c) => {
+    app.caption(c.key, c.side)
+    // Les grands fracas font monter la musique.
+    if (c.key === 'explosion' || c.key === 'collapse' || c.key === 'quake') app.services.music.surge(3, 4)
+  })
   controller.on('announce', (a) => app.announce(formatAnnouncement(a)))
   controller.on('pause', (p) => {
     if (phase.value === 'playing' || phase.value === 'paused') phase.value = p ? 'paused' : 'playing'
+    app.services.music.duck(p)
   })
   controller.on('end', onEnd)
   hud.value = controller.session.hud
-  phase.value = 'intro'
+  stopCoach()
+  if (mode.value === 'story' && level.value.tutorial && !rec?.completed && state.settings.tutorials !== false) startCoach(level.value.tutorial)
+  // Premier passage d'un niveau qui ouvre un chapitre : la Chronique d'abord.
+  const beat = mode.value === 'story' && !rec?.completed && state.settings.story !== false ? StoryRepository.before(state.levelId) : null
+  storyBeat.value = beat
+  phase.value = beat ? 'story' : 'intro'
   await nextTick()
   observeHud()
 }
 
 function destroyController() {
+  clearTimeout(coachTimer)
+  coach = null
+  coachStep.value = null
   controller?.destroy()
   controller = null
 }
@@ -141,13 +203,18 @@ onBeforeUnmount(() => {
 })
 watch(
   () => [state.settings.trajectoryAid, state.settings.screenShake, state.settings.blood, state.settings.motion, state.systemReducedMotion],
-  () => controller?.applySettings({ ...state.settings }, app.reducedMotion()),
+  () => {
+    controller?.applySettings({ ...state.settings }, app.reducedMotion())
+    if (coach && controller) controller.session.options.trajectoryAid = true
+  },
 )
 
 /* ---------- Actions ---------- */
 
 const play = async () => {
   app.services.audio.unlock()
+  app.services.music.play('chapter', { chapter: level.value.chapter || 1 })
+  updateMusic()
   phase.value = 'playing'
   await nextTick()
   observeHud()
@@ -162,18 +229,30 @@ const fire = () => {
   if (!controller) return
   app.services.audio.unlock()
   if (hud.value?.canActivate) controller.session.activate()
-  else if (aiming.value) controller.session.fire()
+  else if (aiming.value) {
+    const ammo = controller.session.selectedAmmo
+    if (controller.session.fire()) coachNotify('fire', ammo)
+  }
 }
 function aim(kind, value) {
   const s = controller?.session
   if (!s) return
   if (kind === 'angle') s.aim(value, s.catapult.power)
   else s.aim(s.catapult.angle, value / 100)
+  coachNotify('aim')
 }
-const nudge = (da, dp) => controller?.session.nudge(da, dp)
-const selectAmmo = (type) => controller?.session.selectAmmo(type)
+function nudge(da, dp) {
+  controller?.session.nudge(da, dp)
+  coachNotify('aim')
+}
+function selectAmmo(type) {
+  if (controller?.session.selectAmmo(type)) coachNotify('select', type)
+}
 function usePower(id) {
-  if (controller?.session.usePower(id)) showPowers.value = false
+  if (controller?.session.usePower(id)) {
+    showPowers.value = false
+    coachNotify('power', id)
+  }
 }
 function quit() {
   destroyController()
@@ -198,8 +277,35 @@ function nextLevel() {
   startLevel()
 }
 
+/* ---------- Chronique ---------- */
+
+function storyDone() {
+  storyBeat.value = null
+  if (phase.value === 'story') phase.value = 'intro'
+}
+/** Épilogue, lu depuis l'écran de victoire finale. */
+function readEpilogue() {
+  storyBeat.value = StoryRepository.after(GAME.LEVEL_COUNT)
+}
+
+/* ---------- Musique ---------- */
+
+/** Dernier niveau d'un chapitre (tous les 10) : la tension reste élevée. */
+const isBoss = computed(() => mode.value === 'story' && state.levelId % GAME.LEVELS_PER_CHAPTER === 0)
+function updateMusic() {
+  const h = hud.value
+  const music = app.services.music
+  if (!h || phase.value === 'ended') return
+  if (h.state === 'flying') {
+    music.setIntensity(2)
+    if (h.targetsLeft === 1) music.surge(3, 3)
+  } else music.setIntensity(isBoss.value || h.targetsLeft === 1 ? 2 : 1)
+}
+watch(() => [hud.value?.state, hud.value?.targetsLeft], () => phase.value === 'playing' && updateMusic())
+
 /** Fin de partie : présentation propre à chaque mode. */
 async function onEnd(e) {
+  app.services.music.stop(1.5)
   if (mode.value === 'story') return onStoryEnd(e)
   const names = controller?.session.players.map((p) => p.name) ?? []
   let view
@@ -334,17 +440,18 @@ const canvasLabel = computed(() =>
     <canvas ref="canvas" class="game__canvas" role="img" :aria-label="canvasLabel" />
 
     <template v-if="hud">
-      <GameHud :hud="hud" :title="matchTitle" :subtitle="matchSubtitle" @pause="pause" @powers="showPowers = !showPowers" />
+      <GameHud :hud="hud" :title="matchTitle" :subtitle="matchSubtitle" :coach="coachAnchor" @pause="pause" @powers="showPowers = !showPowers" />
       <p v-if="turnBanner" class="turn-banner" aria-hidden="true">{{ turnBanner }}</p>
 
-      <PowersMenu v-if="showPowers && phase === 'playing'" :powers="hud.powers" @use="usePower" @close="showPowers = false" />
+      <PowersMenu v-if="showPowers && phase === 'playing'" :powers="hud.powers" :coach="coachAnchor" @use="usePower" @close="showPowers = false" />
 
       <div v-show="phase === 'playing'" class="hud-bottom">
-        <AimPanel :angle="hud.angle" :power="hud.power" :disabled="!aiming" @aim="aim" @nudge="nudge" />
-        <AmmoBar :ammo="hud.ammo" :disabled="!aiming" @select="selectAmmo" />
+        <AimPanel :angle="hud.angle" :power="hud.power" :disabled="!aiming" :coach="coachAnchor" @aim="aim" @nudge="nudge" />
+        <AmmoBar :ammo="hud.ammo" :disabled="!aiming" :coach="coachAnchor" @select="selectAmmo" />
         <button
           type="button"
-          :class="['fire-btn', { 'fire-btn--split': hud.canActivate }]"
+          :class="['fire-btn', { 'fire-btn--split': hud.canActivate, 'coach-focus': coachAnchor === 'fire' }]"
+          data-coach="fire"
           :disabled="!aiming && !hud.canActivate"
           @click="fire"
         >
@@ -352,10 +459,11 @@ const canvasLabel = computed(() =>
           <span>{{ hud.canActivate ? t('game.split') : t('game.fire') }}</span>
         </button>
       </div>
-      <p v-if="phase === 'playing' && mode === 'story' && hud.turn === 0 && hud.state === 'aiming' && state.levelId <= 2" class="game__hint">{{ t('game.aimHint') }}</p>
+      <CoachBubble v-if="coachStep && phase === 'playing'" :tool="coachTool" :step="coachStep" :progress="coachProgress" @skip="stopCoach" />
     </template>
 
     <CaptionFeed />
+    <StoryPanel v-if="storyBeat" :key="storyBeat.id" :beat="storyBeat" @done="storyDone" />
     <p class="rotate-hint">{{ t('rotate') }}</p>
 
     <!-- Introduction du niveau -->
@@ -383,6 +491,7 @@ const canvasLabel = computed(() =>
           </template>
         </p>
       </template>
+      <p v-if="coachStep" class="intro-tutorial"><AppIcon name="help" :size="18" />{{ coachTool === 'aim' ? t('tutorial.aimTitle') : t('tutorial.title', { name: coachTool.startsWith('ammo:') ? t(`game.ammo.${coachTool.slice(5)}`) : t(`powers.${coachTool.slice(6)}`) }) }}</p>
       <ul v-if="novelties.length" class="novelties">
         <li v-for="n in novelties" :key="n" class="novelties__item">
           <span class="novelties__tag">{{ t('intro.new') }}</span>
@@ -427,6 +536,7 @@ const canvasLabel = computed(() =>
           <AppIcon name="flame" />{{ t('powers.unlocked', { name: t(`powers.${end.unlockedPower}`) }) }}
         </p>
         <p v-if="end.campaignDone" class="end__note">{{ t('end.campaignDone') }}</p>
+        <button v-if="end.campaignDone" type="button" class="btn" @click="readEpilogue"><AppIcon name="map" />{{ t('story.readEpilogue') }}</button>
         <p v-if="end.demoDone" class="end__note">{{ t('end.demoDone') }}</p>
       </template>
       <p v-else>{{ t('end.defeatHint') }}</p>

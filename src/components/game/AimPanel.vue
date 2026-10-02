@@ -6,6 +6,8 @@ defineProps({
   angle: { type: Number, required: true },
   power: { type: Number, required: true },
   disabled: { type: Boolean, default: false },
+  /** Élément mis en valeur par le tutoriel (voir Tutorial.js). */
+  coach: { type: String, default: '' },
 })
 const emit = defineEmits(['aim', 'nudge'])
 const { t } = useApp()
@@ -18,7 +20,7 @@ function onRange(kind, e) {
 </script>
 
 <template>
-  <div class="aim-panel" role="group" :aria-label="`${t('game.angle')} / ${t('game.power')}`">
+  <div :class="['aim-panel', { 'coach-focus': coach === 'aim' }]" data-coach="aim" role="group" :aria-label="`${t('game.angle')} / ${t('game.power')}`">
     <div class="aim-row">
       <label for="aim-angle" class="aim-row__label">{{ t('game.angle') }}</label>
       <button type="button" class="btn btn--step" :disabled="disabled" :aria-label="`${t('game.angle')} −1`" @click="emit('nudge', -1, 0)">

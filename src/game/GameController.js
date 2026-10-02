@@ -23,7 +23,8 @@ async function assets() {
  * boucle d'animation, canvas, redimensionnement, saisie tactile/souris,
  * audio, vibrations, mise en pause automatique.
  *
- * Événements émis : `hud`, `caption` { key, side }, `announce` { key, params }, `end`, `pause`.
+ * Événements émis : `hud`, `caption` { key, side }, `announce` { key, params }, `end`, `pause`,
+ * `aimed` (visée modifiée au doigt ou à la souris).
  */
 export class GameController extends EventBus {
   /** @type {GameSession} */
@@ -177,6 +178,7 @@ export class GameController extends EventBus {
       const span = Math.min(rect.width, rect.height) * 0.42
       const angle = dx <= 0 && dy <= 0 ? d.angle : toDeg(Math.atan2(Math.max(dy, 0), Math.max(dx, 0.0001)))
       this.session.aim(angle, clamp(len / span, 0, 1))
+      this.emit('aimed')
     }
     const up = (e) => {
       const d = this.#drag

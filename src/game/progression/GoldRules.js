@@ -3,11 +3,16 @@ import { deepFreeze, Guard } from '../../core/utils/Guard.js'
 /**
  * Barème de l'or (monnaie gagnée uniquement en jouant le mode histoire).
  *
- * v3.1 : l'or récompense la MAÎTRISE, plus la répétition.
+ * L'or récompense la MAÎTRISE, pas la répétition.
  * - première victoire sur un niveau : FIRST_CLEAR
  * - chaque nouvelle étoile obtenue sur un niveau : PER_STAR (une seule fois)
- * - chaque nouveau succès décroché : PER_ACHIEVEMENT (une seule fois)
+ * - chaque nouveau défi (succès) relevé : PER_ACHIEVEMENT (une seule fois)
+ * - les trois défis d'un niveau relevés : PERFECT en plus (une seule fois)
  * - victoire rejouée : REPLAY (petite somme)
+ *
+ * v3.2 : les défis rapportent assez pour que le joueur perfectionniste puisse
+ * tout acheter à l'atelier (environ 42 000 pièces possibles, l'atelier complet
+ * en coûte moins de 27 000).
  * - défaite : rien (pas d'or « farmé » en perdant exprès)
  *
  * Les plafonds servent au contrôle de cohérence des sauvegardes : l'or total
@@ -16,25 +21,30 @@ import { deepFreeze, Guard } from '../../core/utils/Guard.js'
 export const GOLD = deepFreeze({
   FIRST_CLEAR: 30,
   PER_STAR: 15,
-  PER_ACHIEVEMENT: 25,
+  PER_ACHIEVEMENT: 100,
+  PERFECT: 50,
   REPLAY: 5,
   /** Plafond absolu du solde (garde-fou). */
   MAX_BALANCE: 1_000_000,
-  /** Ancien barème (v2) : sert uniquement à contrôler l'or hérité des anciennes sauvegardes. */
-  LEGACY_FIRST_CLEAR: 50,
-  LEGACY_MAX_PER_WIN: 45,
+  /**
+   * Anciens barèmes : servent uniquement à contrôler l'or hérité des anciennes
+   * sauvegardes (v2 : 50 + 45 par victoire ; v3.1 : 150 par niveau + 5 par victoire).
+   */
+  LEGACY_FIRST_CLEAR: 50 + 150,
+  LEGACY_MAX_PER_WIN: 45 + 5,
 })
 
 /**
  * Or gagné pour une victoire.
  * @param {{ won: boolean }} result
- * @param {{ firstClear: boolean, newStars: number, newAchievements: number }} gains
+ * @param {{ firstClear: boolean, newStars: number, newAchievements: number, perfect?: boolean }} gains
+ *   `perfect` : les trois défis du niveau viennent d'être tous relevés
  */
-export function goldFor(result, { firstClear, newStars, newAchievements }) {
+export function goldFor(result, { firstClear, newStars, newAchievements, perfect = false }) {
   if (!result.won) return 0
   Guard.int(newStars, 'newStars', { min: 0, max: 3 })
   Guard.int(newAchievements, 'newAchievements', { min: 0, max: 3 })
-  return (firstClear ? GOLD.FIRST_CLEAR : GOLD.REPLAY) + newStars * GOLD.PER_STAR + newAchievements * GOLD.PER_ACHIEVEMENT
+  return (firstClear ? GOLD.FIRST_CLEAR : GOLD.REPLAY) + newStars * GOLD.PER_STAR + newAchievements * GOLD.PER_ACHIEVEMENT + (perfect ? GOLD.PERFECT : 0)
 }
 
 /**
@@ -42,10 +52,10 @@ export function goldFor(result, { firstClear, newStars, newAchievements }) {
  * @param {Record<string, { attempts: number }>} levels niveaux réussis
  */
 export function maxGoldFor(levels) {
-  return Object.values(levels).reduce((sum, r) => sum + GOLD.FIRST_CLEAR + 3 * GOLD.PER_STAR + 3 * GOLD.PER_ACHIEVEMENT + r.attempts * GOLD.REPLAY, 0)
+  return Object.values(levels).reduce((sum, r) => sum + GOLD.FIRST_CLEAR + 3 * GOLD.PER_STAR + 3 * GOLD.PER_ACHIEVEMENT + GOLD.PERFECT + r.attempts * GOLD.REPLAY, 0)
 }
 
-/** Or maximal selon l'ancien barème (sauvegardes v2 migrées). */
+/** Or maximal selon les anciens barèmes (sauvegardes v2 et v3 migrées). */
 export function legacyMaxGoldFor(levels) {
   return Object.values(levels).reduce((sum, r) => sum + GOLD.LEGACY_FIRST_CLEAR + r.attempts * GOLD.LEGACY_MAX_PER_WIN, 0)
 }

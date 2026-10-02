@@ -49,8 +49,11 @@ export class GameMode {
    */
   ammoFor(level, difficulty = { ammoFactor: 1 }) {
     const out = {}
+    // Niveau tutoriel : la munition présentée reste disponible, même en Difficile.
+    const taught = typeof level.tutorial === 'string' && level.tutorial.startsWith('ammo:') ? level.tutorial.slice(5) : null
     for (const [type, n] of Object.entries(level.ammo)) {
-      const base = Math.floor(n * (difficulty.ammoFactor ?? 1))
+      const scaled = Math.floor(n * (difficulty.ammoFactor ?? 1))
+      const base = type === taught ? Math.max(1, scaled) : scaled
       const total = base + (this.effects.extraAmmo || 0)
       if (total > 0) out[type] = total
     }

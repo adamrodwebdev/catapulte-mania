@@ -1,5 +1,5 @@
 import { SCORE, starsFor } from './ScoreRules.js'
-import { evaluateAchievements } from '../progression/Achievements.js'
+import { evaluateAchievements, emptyRun, killFamily } from '../progression/Achievements.js'
 import { DIFFICULTY, GAME } from '../../config/gameConfig.js'
 import { LevelResult } from '../../domain/LevelResult.js'
 import { Guard } from '../../core/utils/Guard.js'
@@ -18,7 +18,10 @@ export class ScoreKeeper {
   #chain = 0
   #stats = { targetsKilled: 0, blocksDestroyed: 0, barrelsExploded: 0, powersUsed: 0 }
   /** Statistiques des succès (comptées ici, jamais transmises par l'interface). */
-  #run = { specialsUsed: 0, maxChain: 0, fireKills: 0, firstKill: null }
+  #run = emptyRun()
+  /** Numéro du tir en cours (0 avant le premier) et cibles abattues pendant ce tir. */
+  #shot = 0
+  #shotKills = 0
   #finalized = false
 
   constructor(level, difficulty) {
@@ -45,6 +48,8 @@ export class ScoreKeeper {
    */
   startShot(ammo = 'stone') {
     this.#chain = 0
+    this.#shot++
+    this.#shotKills = 0
     if (ammo !== 'stone') this.#run.specialsUsed++
   }
 
@@ -58,8 +63,12 @@ export class ScoreKeeper {
     if (entity.kind === 'target') {
       base = entity.scoreValue
       this.#stats.targetsKilled++
-      if (cause === 'fire') this.#run.fireKills++
+      const family = killFamily(cause)
+      if (family) this.#run.kills[family]++
       if (this.#run.firstKill === null) this.#run.firstKill = entity.type
+      this.#shotKills++
+      this.#run.maxShotKills = Math.max(this.#run.maxShotKills, this.#shotKills)
+      if (this.#shot === 1) this.#run.firstShotKills++
     } else if (entity.kind === 'block') {
       base = entity.scoreValue
       this.#stats.blocksDestroyed++
@@ -106,7 +115,7 @@ export class ScoreKeeper {
       levelId: this.#level.id,
       score: won ? score : 0,
       stars: won ? starsFor(this.#level, shotsUsed) : 0,
-      achievements: won ? evaluateAchievements(this.#level, { ...this.#stats, ...this.#run, shotsUsed }) : 0,
+      achievements: won ? evaluateAchievements(this.#level, { ...this.#stats, ...this.#run, shotsUsed, shotsLeft }) : 0,
       won,
       shotsUsed,
       difficulty: this.#difficulty,

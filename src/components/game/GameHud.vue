@@ -12,6 +12,8 @@ const props = defineProps({
   hud: { type: Object, required: true },
   title: { type: String, required: true },
   subtitle: { type: String, default: '' },
+  /** Élément mis en valeur par le tutoriel (voir Tutorial.js). */
+  coach: { type: String, default: '' },
 })
 const emit = defineEmits(['pause', 'powers'])
 const { t, state } = useApp()
@@ -78,7 +80,7 @@ const infinite = computed(() => props.hud.shotsTotal === null)
       </div>
     </dl>
 
-    <button v-if="hasPowers" type="button" class="btn hud-top__powers" @click="emit('powers')">
+    <button v-if="hasPowers" type="button" :class="['btn hud-top__powers', { 'coach-focus': coach === 'powers' }]" data-coach="powers" @click="emit('powers')">
       <AppIcon name="flame" :size="20" />
       <span>{{ t('game.powersTitle') }}</span>
     </button>

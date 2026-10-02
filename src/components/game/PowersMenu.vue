@@ -3,7 +3,11 @@ import { onMounted, ref } from 'vue'
 import { useApp } from '../../app/AppContext.js'
 import AppIcon from '../ui/AppIcon.vue'
 
-defineProps({ powers: { type: Array, required: true } })
+defineProps({
+  powers: { type: Array, required: true },
+  /** Élément mis en valeur par le tutoriel (voir Tutorial.js). */
+  coach: { type: String, default: '' },
+})
 const emit = defineEmits(['use', 'close'])
 const { t } = useApp()
 const ICONS = { calm: 'wind', titan: 'fist', greekfire: 'flame', volley: 'volley', powder: 'bomb', quake: 'quake' }
@@ -24,7 +28,8 @@ onMounted(() => panel.value?.querySelector('button:not([disabled])')?.focus())
       <li v-for="p in powers" :key="p.id">
         <button
           type="button"
-          :class="['power-btn', { 'power-btn--armed': p.armed }]"
+          :class="['power-btn', { 'power-btn--armed': p.armed, 'coach-focus': coach === `power:${p.id}` }]"
+          :data-coach="`power:${p.id}`"
           :disabled="!p.available"
           @click="emit('use', p.id)"
         >

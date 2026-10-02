@@ -10,6 +10,10 @@ const DEFINITIONS = Object.freeze({
   motion: { validate: Schema.enum(['system', 'reduced', 'full']), fallback: 'system' },
   uiScale: { validate: Schema.enum([1, 1.15, 1.3]), fallback: 1 },
   trajectoryAid: { validate: Schema.boolean(), fallback: false },
+  // Tutoriels guidés au premier passage des niveaux qui présentent un outil.
+  tutorials: { validate: Schema.boolean(), fallback: true },
+  // Récit (la Chronique) avant les niveaux qui ouvrent un chapitre.
+  story: { validate: Schema.boolean(), fallback: true },
   // Puissance réglée au début de chaque tour ('keep' : garder la dernière visée).
   startPower: { validate: Schema.enum(['keep', 100, 75, 50]), fallback: 100 },
   captions: { validate: Schema.boolean(), fallback: true },
@@ -18,6 +22,8 @@ const DEFINITIONS = Object.freeze({
   screenShake: { validate: Schema.boolean(), fallback: true },
   blood: { validate: Schema.boolean(), fallback: true },
   volume: { validate: Schema.number({ min: 0, max: 1 }), fallback: 0.7 },
+  // Volume de la musique (0 = coupée), séparé des effets sonores.
+  music: { validate: Schema.number({ min: 0, max: 1 }), fallback: 0.5 },
   muted: { validate: Schema.boolean(), fallback: false },
 })
 
