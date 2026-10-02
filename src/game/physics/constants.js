@@ -33,6 +33,16 @@ export const WORLD = deepFreeze({
    */
   PIN_PROBE: 3,
   PIN_CHECK_EVERY: 12,
+  /**
+   * Appuis : toutes les 30 étapes (0,25 s), un corps « endormi » qui n'a plus
+   * rien sous lui est réveillé et retombe. Rien ne flotte jamais dans le vide.
+   */
+  SUPPORT_CHECK_EVERY: 30,
+  /** Une cible qui retombe à cette vitesse (ou plus) sur un obstacle meurt de sa chute. */
+  TARGET_FALL_SPEED: 5,
+  /** Une cible renversée (inclinaison > 70°) pendant ce délai est mise hors de combat. */
+  KNOCKOUT_ANGLE: 1.2,
+  KNOCKOUT_MS: 1500,
   /** Délai pendant lequel la structure se stabilise sans subir de dégâts (ms). */
   SETTLE_MS: 900,
   /** Hors de ces limites, un corps est considéré comme sorti du monde. */

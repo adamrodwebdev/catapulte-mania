@@ -81,6 +81,7 @@ function measureInsets() {
   controller.setInsets(top ? top.bottom : 0, bottomInset)
   // Les sous-titres et l'astuce se placent juste au-dessus des commandes.
   root.value.style.setProperty('--hud-bottom-h', `${Math.round(bottomInset)}px`)
+  root.value.style.setProperty('--hud-top-h', `${Math.round(top ? top.bottom : 0)}px`)
 }
 function observeHud() {
   hudObs?.disconnect()

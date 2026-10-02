@@ -710,3 +710,43 @@
   background: var(--surface);
   backdrop-filter: none;
 }
+
+/* Téléphone en mode vertical : la scène occupe le bas de l'écran et le ciel au-dessus
+   est vide. Les sous-titres passent en haut, sous le bandeau, en format compact
+   (seulement les deux derniers), pour ne jamais couvrir le château ni la catapulte. */
+@media (orientation: portrait) and (max-width: 700px) {
+  .captions {
+    top: calc(var(--hud-top-h, 3.5rem) + var(--space-2));
+    bottom: auto;
+    max-width: calc(100% - 2 * var(--space-3));
+  }
+
+  .captions__item {
+    font-size: var(--fs-0);
+    padding: 1px var(--space-2);
+  }
+
+  .captions__item:nth-last-child(n + 3) {
+    display: none;
+  }
+
+  .game__hint {
+    top: calc(var(--hud-top-h, 3.5rem) + var(--space-2));
+    bottom: auto;
+  }
+
+  /* Conseil « tournez l'appareil » : en haut, puis il s'efface seul après 6 s. */
+  .rotate-hint {
+    top: calc(var(--hud-top-h, 3.5rem) + var(--space-2));
+    font-size: 0.75rem;
+    padding: var(--space-1) var(--space-2);
+    animation: hint-out 0.4s ease-in 6s forwards;
+  }
+}
+
+@keyframes hint-out {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}

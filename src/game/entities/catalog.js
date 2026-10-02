@@ -15,17 +15,19 @@ export const TARGET_TYPES = deepFreeze({
 
 /**
  * Types de projectiles, débloqués au fil des chapitres.
+ * Densités relevées d'environ 25 % en v2.0 : un boulet plus lourd traverse moins
+ * facilement les blocs (moins d'effet tunnel) et pousse les murs de façon crédible.
  * - impact   : multiplicateur d'énergie de choc
  * - ignites  : enflamme ce qu'il touche (pot de feu grégeois)
  * - explodes : explose au premier contact (boulet de poudre)
  * - splits   : se divise en 3 sur action du joueur pendant le vol (mitraille)
  */
 export const PROJECTILE_TYPES = deepFreeze({
-  stone: { radius: 17, density: 0.009, impact: 1, ignites: false, explodes: false, splits: false },
-  boulder: { radius: 25, density: 0.012, impact: 1.4, ignites: false, explodes: false, splits: false },
-  fire: { radius: 16, density: 0.007, impact: 0.8, ignites: true, explodes: false, splits: false },
-  bomb: { radius: 18, density: 0.008, impact: 0.8, ignites: false, explodes: true, splits: false },
-  split: { radius: 15, density: 0.009, impact: 1, ignites: false, explodes: false, splits: true },
+  stone: { radius: 17, density: 0.0115, impact: 1, ignites: false, explodes: false, splits: false },
+  boulder: { radius: 25, density: 0.015, impact: 1.4, ignites: false, explodes: false, splits: false },
+  fire: { radius: 16, density: 0.009, impact: 0.8, ignites: true, explodes: false, splits: false },
+  bomb: { radius: 18, density: 0.010, impact: 0.8, ignites: false, explodes: true, splits: false },
+  split: { radius: 15, density: 0.0115, impact: 1, ignites: false, explodes: false, splits: true },
 })
 
 export const PROJECTILE_NAMES = Object.freeze(Object.keys(PROJECTILE_TYPES))

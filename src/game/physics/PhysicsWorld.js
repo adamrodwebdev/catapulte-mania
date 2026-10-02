@@ -42,6 +42,8 @@ export class PhysicsWorld {
   /** Vrai dès le premier tir : avant, la structure se met en place sans conséquence. */
   #armed = false
   #pinTick = 0
+  #supportTick = 0
+  #ground
   structure = new StructuralIntegrity()
 
   /**
@@ -63,6 +65,7 @@ export class PhysicsWorld {
       collisionFilter: { category: CATEGORY.STATIC },
     })
     Composite.add(this.engine.world, ground)
+    this.#ground = ground
 
     this._onCollision = (e) => this.#handleCollisions(e.pairs)
     this._onActive = (e) => this.#handleActiveContacts(e.pairs)
@@ -147,8 +150,50 @@ export class PhysicsWorld {
     if (this.#armed && ++this.#pinTick >= WORLD.PIN_CHECK_EVERY) {
       this.#pinTick = 0
       this.#checkPinned()
+      this.#checkKnockouts(WORLD.STEP_MS * WORLD.PIN_CHECK_EVERY)
+    }
+    if (++this.#supportTick >= WORLD.SUPPORT_CHECK_EVERY) {
+      this.#supportTick = 0
+      this.#checkSupports()
     }
     this.#cleanup()
+  }
+
+  /**
+   * Appuis réels : un corps endormi (immobile) dont le dessous ne touche plus
+   * rien (ni sol, ni bloc, ni personnage) est réveillé. Le moteur, qui ne
+   * réveille un corps que lorsqu'on le heurte, laissait sinon des personnages
+   * et des toits suspendus dans le vide quand leur appui disparaissait.
+   */
+  #checkSupports() {
+    const bodies = [this.#ground, ...[...this.#entities.values()].filter((e) => e.alive && e.kind !== 'projectile').map((e) => e.body)]
+    for (const e of this.#entities.values()) {
+      if (!e.alive || !e.body.isSleeping) continue
+      const b = e.body.bounds
+      const w = b.max.x - b.min.x
+      const probes = [0.2, 0.5, 0.8].map((k) => ({ x: b.min.x + w * k, y: b.max.y + 4 }))
+      const supported = probes.some((p) => bodies.some((o) => o !== e.body && Vertices.contains(o.vertices, p)))
+      if (!supported) this.#wakeColumn(b)
+    }
+  }
+
+  /** Réveille un corps et tout ce qui se trouve au-dessus de lui (même colonne). */
+  #wakeColumn(bounds) {
+    for (const e of this.#entities.values()) {
+      const o = e.body.bounds
+      const overlapX = Math.min(o.max.x, bounds.max.x + 30) - Math.max(o.min.x, bounds.min.x - 30)
+      if (overlapX > 0 && o.min.y <= bounds.max.y + 5) Sleeping.set(e.body, false)
+    }
+  }
+
+  /** Cible renversée trop longtemps : hors de combat. */
+  #checkKnockouts(dtMs) {
+    for (const t of this.#entities.values()) {
+      if (t.kind !== 'target' || !t.alive) continue
+      const tilt = Math.abs(Math.atan2(Math.sin(t.angle), Math.cos(t.angle)))
+      t.downMs = tilt > WORLD.KNOCKOUT_ANGLE ? (t.downMs || 0) + dtMs : 0
+      if (t.downMs >= WORLD.KNOCKOUT_MS) t.kill('knockout')
+    }
   }
 
   /**
@@ -295,6 +340,12 @@ export class PhysicsWorld {
       }
 
       this.#checkCrush(a, b, rel)
+      // Chute : une cible qui retombe lourdement (sur le sol ou un bloc) meurt.
+      if (this.#armed && rel >= WORLD.TARGET_FALL_SPEED) {
+        for (const [t, o] of [[a, b], [b, a]]) {
+          if (t?.kind === 'target' && t.alive && (!o || o.kind === 'block') && t.speed >= WORLD.TARGET_FALL_SPEED * 0.8) t.kill('fall')
+        }
+      }
 
       if (!this.settled || rel < WORLD.IMPACT_THRESHOLD) continue
       const ma = bodyA.isStatic ? Infinity : bodyA.mass
@@ -390,6 +441,8 @@ export class PhysicsWorld {
       }
       if (!e.alive) {
         this.remove(e)
+        // Tout ce qui reposait (même indirectement) sur l'objet disparu se réveille.
+        this.#wakeColumn(e.body.bounds)
         if (e.kind === 'block') {
           this.structure.onRemoved(e)
           this.#wakeAround(e.x, e.y, Math.max(e.width, e.height) + 80)

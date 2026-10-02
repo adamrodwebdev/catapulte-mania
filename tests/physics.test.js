@@ -199,3 +199,30 @@ test('une cible dans une pièce, sans contact, reste en vie', () => {
   settle(w, 200)
   assert.equal(t.alive, true)
 })
+
+/* ---------- Appuis et conditions de mort (v2.0) ---------- */
+
+test('un personnage endormi sur une planche retombe quand la planche disparaît', () => {
+  const w = new PhysicsWorld(new EventBus())
+  w.add(new Block({ material: 'wood', x: 1300, y: G - 100, w: 20, h: 200 }))
+  w.add(new Block({ material: 'wood', x: 1600, y: G - 100, w: 20, h: 200 }))
+  const plank = w.add(new Block({ material: 'wood', x: 1450, y: G - 210, w: 320, h: 20 }))
+  const t = w.add(new Target({ type: 'soldier', x: 1450, y: G - 220 - 26 }))
+  settle(w, 600)
+  const y0 = t.y
+  plank.kill('impact')
+  settle(w, 240)
+  assert.ok(!t.alive || t.y > y0 + 100, `le personnage ne doit pas flotter (avant ${y0.toFixed(0)}, après ${t.y.toFixed(0)})`)
+})
+
+test('un personnage renversé trop longtemps est mis hors de combat', () => {
+  const w = new PhysicsWorld(new EventBus())
+  const t = w.add(new Target({ type: 'knight', x: 1440, y: G - 16, angle: 0 }))
+  Matter.Body.setAngle(t.body, Math.PI / 2)
+  Matter.Body.setPosition(t.body, { x: 1440, y: G - 16 })
+  settle(w, 100)
+  w.add(new Projectile('stone', -300, 0))
+  settle(w, 300)
+  assert.equal(t.alive, false)
+  assert.equal(t.deathCause, 'knockout')
+})
