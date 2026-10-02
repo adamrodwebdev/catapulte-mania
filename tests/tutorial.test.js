@@ -43,3 +43,13 @@ test('pouvoir immédiat (séisme) : pas d’étape de tir', () => {
   assert.deepEqual(ids, ['open', 'use', 'watch', 'done'])
   assert.throws(() => tutorialSteps('ammo:<script>'))
 })
+
+test('campagne : toute munition découverte reste disponible ensuite', () => {
+  const l = LevelRepository.get(30)
+  const fresh = new StoryMode({ completedLevels: 29 }).ammoFor(l, DIFFICULTY.hard)
+  for (const type of ['boulder', 'fire', 'bomb', 'split']) assert.ok(fresh[type] >= 1, type)
+  // Au niveau 5, rien n'a encore été découvert.
+  assert.deepEqual(new StoryMode({ completedLevels: 4 }).ammoFor(LevelRepository.get(5), DIFFICULTY.normal), {})
+  // Un niveau ancien rejoué après la découverte du feu en profite aussi.
+  assert.ok(new StoryMode({ completedLevels: 12 }).ammoFor(LevelRepository.get(3), DIFFICULTY.normal).fire >= 1)
+})

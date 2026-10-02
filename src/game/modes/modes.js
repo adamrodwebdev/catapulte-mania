@@ -6,6 +6,23 @@ import { LevelRepository } from '../levels/LevelRepository.js'
 export class StoryMode extends GameMode {
   id = 'story'
   recordsResult = true
+
+  /**
+   * Toute munition déjà découverte reste disponible pour le reste de la
+   * campagne, pour que le joueur puisse expérimenter : au moins une de chaque
+   * type débloqué dans chaque niveau (plus la Réserve de l'atelier), même en
+   * Difficile. Les niveaux qui en prévoient davantage gardent leur dotation.
+   */
+  ammoFor(level, difficulty) {
+    const out = super.ammoFor(level, difficulty)
+    const reached = Math.max(level.id ?? 0, this.completedLevels)
+    for (const l of LevelRepository.all().slice(0, reached)) {
+      for (const type of Object.keys(l.ammo)) {
+        if (!(out[type] > 0)) out[type] = 1 + (this.effects.extraAmmo || 0)
+      }
+    }
+    return out
+  }
 }
 
 /**

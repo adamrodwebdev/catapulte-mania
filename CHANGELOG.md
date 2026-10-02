@@ -2,6 +2,13 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [3.2.1] – 2026-10-02
+### Modifié
+- Campagne : toute munition découverte reste disponible jusqu'à la fin (au
+  moins une de chaque type dans chaque niveau, même en Difficile), pour que le
+  joueur puisse expérimenter librement. Les niveaux qui en prévoient davantage
+  gardent leur dotation.
+
 ## [3.2.0] – 2026-10-02
 ### Ajouté
 - **Tutoriels guidés** : chaque nouvel outil s'apprend dans un niveau dédié

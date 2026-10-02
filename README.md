@@ -115,6 +115,8 @@ On peut l'envoyer par e-mail, le mettre sur une clé USB ou l'héberger sur n'im
 | 9. L'Orage | 81 à 90 | Fer et brique sous la pluie, vent violent |
 | 10. Le Trône | 91 à 100 | Marbre, rois, citadelles finales |
 
+Une munition découverte reste ensuite disponible dans **tous** les niveaux de la campagne (au moins une de chaque type, même en Difficile) : à vous d'expérimenter.
+
 ### Les pouvoirs spéciaux
 
 Un seul pouvoir par tour. Chaque utilisation retire des points au score final.
@@ -377,6 +379,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v3.0.0 | 100 niveaux, 4 nouveaux matériaux et 6 climats, personnages fragiles et châteaux solides, grands châteaux de duel |
 | v3.1.0 | 300 succès, étoiles au nombre de tirs, atelier plus exigeant (poix, poudre fine, étoiles requises), le bois brûle, victoire immédiate par le feu ou un pouvoir |
 | v3.2.0 | Tutoriels guidés pour chaque outil, feu grégeois dès le niveau 9, 18 défis variés et or des défis (tout l'atelier devient accessible), bande son adaptative, la Chronique (récit entre les chapitres) |
+| v3.2.1 | Les munitions découvertes restent disponibles pendant toute la campagne |
 
 Pour revenir à une version précise avec Git : `git checkout v0.4.0` (puis `git checkout main` pour revenir à la dernière).
 
