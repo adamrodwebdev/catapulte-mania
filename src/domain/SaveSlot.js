@@ -98,8 +98,9 @@ export class SaveSlot {
    * Reconstruit un profil depuis des données non fiables et vérifie leur cohérence.
    * @param {number} index
    * @param {unknown} raw
-   * @param {(levelId: number, best: number, stars: number) => void} [checkRecord]
-   *   contrôle métier optionnel (score possible, étoiles cohérentes)
+   * @param {(levelId: number, best: number, stars: number) => number | void} [checkRecord]
+   *   contrôle métier optionnel (score possible) ; s'il renvoie un nombre,
+   *   c'est le nombre d'étoiles recalculé pour ce score
    */
   static fromJSON(index, raw, checkRecord) {
     const data = saveSchema(migrateSave(raw), 'save')
@@ -109,7 +110,10 @@ export class SaveSlot {
       if (id !== i + 1) throw new ValidationError(`save.levels.${id}`, 'progression gap')
       const rec = data.levels[id]
       if (rec.attempts < 1) throw new ValidationError(`save.levels.${id}`, 'no attempt recorded')
-      if (checkRecord) checkRecord(id, rec.best, rec.stars)
+      if (checkRecord) {
+        const stars = checkRecord(id, rec.best, rec.stars)
+        if (Number.isInteger(stars)) rec.stars = stars
+      }
     })
     if (data.updatedAt < data.createdAt) throw new ValidationError('save.updatedAt', 'before creation')
     SaveSlot.#checkEconomy(data)

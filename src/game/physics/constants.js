@@ -24,8 +24,15 @@ export const WORLD = deepFreeze({
    * Vitesse minimale du bloc et vitesse de rapprochement (mêmes unités que
    * IMPACT_THRESHOLD) ; en dessous, c'est un simple frôlement.
    */
-  CRUSH_BLOCK_SPEED: 1.2,
-  CRUSH_REL_SPEED: 0.8,
+  CRUSH_BLOCK_SPEED: 2,
+  CRUSH_REL_SPEED: 1.5,
+  /**
+   * Énergie du bloc (½·m·v²) nécessaire pour écraser, en multiple de la résistance
+   * de la cible : un chevalier en armure demande un bloc plus lourd ou plus rapide.
+   */
+  CRUSH_ENERGY_PER_HP: 5,
+  /** Masse minimale d'un bloc posé sur une cible pour l'écraser (une planchette ne suffit pas). */
+  PIN_MIN_MASS: 3.5,
   /**
    * Coincement : une cible sur laquelle repose un bloc (mur, plancher, toit),
    * ou prise en étau entre deux blocs, meurt écrasée. Distance (px) des points
@@ -40,9 +47,14 @@ export const WORLD = deepFreeze({
   SUPPORT_CHECK_EVERY: 30,
   /** Une cible qui retombe à cette vitesse (ou plus) sur un obstacle meurt de sa chute. */
   TARGET_FALL_SPEED: 5,
-  /** Une cible renversée (inclinaison > 70°) pendant ce délai est mise hors de combat. */
+  /**
+   * Une cible renversée (inclinaison > 70°) pendant ce délai, ET déjà blessée
+   * (au moins KNOCKOUT_DAMAGE de sa résistance perdue), est mise hors de combat.
+   * Un soldat simplement bousculé se relève… et reste à abattre.
+   */
   KNOCKOUT_ANGLE: 1.2,
-  KNOCKOUT_MS: 1500,
+  KNOCKOUT_MS: 2500,
+  KNOCKOUT_DAMAGE: 0.25,
   /** Délai pendant lequel la structure se stabilise sans subir de dégâts (ms). */
   SETTLE_MS: 900,
   /** Hors de ces limites, un corps est considéré comme sorti du monde. */

@@ -63,8 +63,8 @@ On peut l'envoyer par e-mail, le mettre sur une clé USB ou l'héberger sur n'im
 
 **Le but :** éliminer tous les personnages (soldats, chevaliers, rois) avant d'avoir épuisé ses tirs.
 **Le vent** (indiqué en haut à droite) dévie les projectiles.
-**La physique des bâtiments :** un bloc qui tombe sur un personnage l'écrase, et un personnage coincé sous un toit ou entre deux murs meurt aussi. Frappez un mur porteur de face et assez fort : il cède et le toit ou le plancher qu'il soutenait s'effondre. Le bois cède facilement, la pierre demande un rocher lancé avec force, le fer pratiquement des explosifs.
-**Les étoiles :** 1 à 3 étoiles selon le score et le nombre de tirs restants.
+**La physique des bâtiments :** un débris lourd ou rapide écrase les personnages, tout comme un plancher ou un toit qui leur tombe dessus, ou deux murs qui les prennent en étau. Un soldat simplement bousculé se relève : il faut l'abattre. Le fer encaisse les boulets de pierre : il faut des explosifs ou le feu. Frappez un mur porteur de face et assez fort : il cède et le toit ou le plancher qu'il soutenait s'effondre. Le bois cède facilement, la pierre demande un rocher lancé avec force, le fer pratiquement des explosifs.
+**Les étoiles :** 1 étoile pour une victoire, 2 pour une belle victoire, 3 pour un tir quasi parfait (victoire rapide et beaucoup de dégâts).
 
 ### La progression
 
@@ -319,6 +319,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v1.3.0 | 40 niveaux redessinés : châteaux plus hauts, points de rupture, niveaux d'ingéniosité |
 | v1.4.0 | Les personnages coincés sous un toit ou entre deux murs meurent écrasés |
 | v2.0.0 | Plus rien ne flotte, boulets plus lourds, mode libre, deux joueurs (3 formules), atelier et or |
+| v2.1.0 | Équilibrage : pierre au poids d'origine, fer blindé, écrasement plus exigeant, étoiles plus dures |
 
 Pour revenir à une version précise avec Git : `git checkout v0.4.0` (puis `git checkout main` pour revenir à la dernière).
 

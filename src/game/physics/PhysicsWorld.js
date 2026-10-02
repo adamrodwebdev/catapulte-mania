@@ -192,7 +192,7 @@ export class PhysicsWorld {
       if (t.kind !== 'target' || !t.alive) continue
       const tilt = Math.abs(Math.atan2(Math.sin(t.angle), Math.cos(t.angle)))
       t.downMs = tilt > WORLD.KNOCKOUT_ANGLE ? (t.downMs || 0) + dtMs : 0
-      if (t.downMs >= WORLD.KNOCKOUT_MS) t.kill('knockout')
+      if (t.downMs >= WORLD.KNOCKOUT_MS && t.damageRatio >= WORLD.KNOCKOUT_DAMAGE) t.kill('knockout')
     }
   }
 
@@ -212,11 +212,12 @@ export class PhysicsWorld {
       const h = b.max.y - b.min.y
       const near = Query.region(blocks, { min: { x: b.min.x - d * 2, y: b.min.y - d * 2 }, max: { x: b.max.x + d * 2, y: b.max.y + d * 2 } })
       if (!near.length) continue
-      const hit = (pts) => near.some((body) => pts.some((p) => Vertices.contains(body.vertices, p)))
+      const hit = (pts, minMass = 0) => near.some((body) => body.mass >= minMass && pts.some((p) => Vertices.contains(body.vertices, p)))
       const top = [0.3, 0.5, 0.7].map((k) => ({ x: b.min.x + w * k, y: b.min.y - d }))
       const left = [0.35, 0.65].map((k) => ({ x: b.min.x - d, y: b.min.y + h * k }))
       const right = [0.35, 0.65].map((k) => ({ x: b.max.x + d, y: b.min.y + h * k }))
-      if (hit(top) || (hit(left) && hit(right))) t.kill('crush')
+      if (hit(top, WORLD.PIN_MIN_MASS)) t.kill('pinned')
+      else if (hit(left) && hit(right)) t.kill('squeezed')
     }
   }
 
@@ -369,14 +370,15 @@ export class PhysicsWorld {
       // Projectile contre mur porteur : le mur peut céder et entraîner les toits.
       const hitBlock = projectile && (a === projectile ? b : a)
       if (hitBlock?.kind === 'block' && hitBlock.alive) {
-        const loads = this.structure.onProjectileHit(hitBlock, energy, Body.getVelocity(projectile.body), n)
+        const loads = this.structure.onProjectileHit(hitBlock, energy * (hitBlock.armor ?? 1), Body.getVelocity(projectile.body), n)
         if (loads.length) this.#events.emit('structure:collapse', { entity: hitBlock, loads })
       }
     }
   }
 
   /**
-   * Écrasement : une cible meurt dès qu'un bloc en mouvement la percute.
+   * Écrasement : une cible meurt quand un bloc lancé ou en chute la percute avec
+   * assez d'énergie (fonction de la masse du bloc et de la résistance de la cible).
    * Désactivé avant le premier tir (la structure se met en place).
    */
   #checkCrush(a, b, rel) {
@@ -385,7 +387,10 @@ export class PhysicsWorld {
     if (!target || !target.alive) return
     const other = target === a ? b : a
     if (!other || other.kind !== 'block' || !other.alive) return
-    if (other.speed >= WORLD.CRUSH_BLOCK_SPEED && rel >= WORLD.CRUSH_REL_SPEED) target.kill('crush')
+    if (other.speed < WORLD.CRUSH_BLOCK_SPEED || rel < WORLD.CRUSH_REL_SPEED) return
+    // Il faut une vraie énergie : un mur qui glisse doucement ne tue pas.
+    const energy = 0.5 * other.mass * other.speed * other.speed
+    if (energy >= target.maxHp * WORLD.CRUSH_ENERGY_PER_HP) target.kill('crush')
   }
 
   /** Contacts prolongés : un bloc déjà au contact qui se met à bouger écrase aussi. */

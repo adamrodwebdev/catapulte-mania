@@ -15,11 +15,16 @@ import { ValidationError } from '../core/utils/Guard.js'
 
 const KEY = Symbol('app')
 
-/** Contrôle métier d'un record chargé depuis la sauvegarde. */
-function checkRecord(levelId, best, stars) {
+/**
+ * Contrôle métier d'un record chargé depuis la sauvegarde.
+ * Les étoiles ne sont jamais crues sur parole : elles sont recalculées à partir
+ * du meilleur score (ce qui adapte aussi les anciens profils aux barèmes actuels).
+ * @returns {number} nombre d'étoiles correct pour ce score
+ */
+function checkRecord(levelId, best) {
   const level = LevelRepository.get(levelId)
   if (best > level.maxScore) throw new ValidationError(`levels.${levelId}.best`, 'impossible score')
-  if (stars !== starsFor(level, best)) throw new ValidationError(`levels.${levelId}.stars`, 'stars do not match score')
+  return starsFor(level, best)
 }
 
 /** Écrans de l'application (navigation interne, une seule URL pour le SEO). */

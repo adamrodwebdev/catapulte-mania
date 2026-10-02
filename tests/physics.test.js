@@ -138,20 +138,32 @@ test('un mur porteur frappé fort fait s’effondrer le plancher et écrase la c
   const { slab, slabY, t } = hitLeftWall('stone', 9)
   assert.ok(!slab.alive || slab.y > slabY + 30, 'le plancher doit s’effondrer')
   assert.equal(t.alive, false)
-  assert.equal(t.deathCause, 'crush')
+  assert.ok(['crush', 'pinned', 'squeezed'].includes(t.deathCause), `écrasée (cause : ${t.deathCause})`)
 })
 
 test('un bloc en mouvement qui touche une cible la tue', () => {
   const w = new PhysicsWorld(new EventBus())
-  const t = w.add(new Target({ type: 'knight', x: 1440, y: G - 27 }))
+  const t = w.add(new Target({ type: 'soldier', x: 1440, y: G - 25 }))
   settle(w, 200)
   // Premier tir (arme les règles), loin de la scène.
   w.add(new Projectile('stone', 200, 200))
-  const beam = w.add(new Block({ material: 'wood', x: 1440, y: G - 200, w: 80, h: 16 }))
-  Matter.Body.setVelocity(beam.body, { x: 0, y: 3 })
+  // Une poutre de pierre lancée (assez d'énergie pour écraser).
+  const beam = w.add(new Block({ material: 'stone', x: 1440, y: G - 200, w: 80, h: 30 }))
+  Matter.Body.setVelocity(beam.body, { x: 0, y: 6 })
   settle(w, 200)
   assert.equal(t.alive, false)
-  assert.equal(t.deathCause, 'crush')
+  assert.ok(['crush', 'pinned'].includes(t.deathCause))
+})
+
+test('un débris léger et lent ne tue pas', () => {
+  const w = new PhysicsWorld(new EventBus())
+  const t = w.add(new Target({ type: 'knight', x: 1440, y: G - 27 }))
+  settle(w, 200)
+  w.add(new Projectile('stone', 200, 200))
+  const twig = w.add(new Block({ material: 'straw', x: 1480, y: G - 20, w: 16, h: 40 }))
+  Matter.Body.setVelocity(twig.body, { x: -1.5, y: 0 })
+  settle(w, 200)
+  assert.equal(t.alive, true)
 })
 
 test('avant le premier tir, la mise en place de la structure ne tue personne', () => {
@@ -172,11 +184,11 @@ test('une cible sur laquelle repose un bloc meurt écrasée', () => {
   const t = w.add(new Target({ type: 'soldier', x: 1440, y: G - 25 }))
   settle(w, 200)
   arm(w)
-  // Un toit posé doucement sur la tête (aucune vitesse : pas un impact).
-  w.add(new Block({ material: 'wood', x: 1440, y: G - 50 - 11, w: 90, h: 20 }))
+  // Un lourd plancher de pierre posé doucement sur la tête (aucune vitesse : pas un impact).
+  w.add(new Block({ material: 'stone', x: 1440, y: G - 50 - 11, w: 90, h: 20 }))
   settle(w, 120)
   assert.equal(t.alive, false)
-  assert.equal(t.deathCause, 'crush')
+  assert.equal(t.deathCause, 'pinned')
 })
 
 test('une cible prise en étau entre deux murs meurt écrasée', () => {
@@ -220,9 +232,25 @@ test('un personnage renversé trop longtemps est mis hors de combat', () => {
   const t = w.add(new Target({ type: 'knight', x: 1440, y: G - 16, angle: 0 }))
   Matter.Body.setAngle(t.body, Math.PI / 2)
   Matter.Body.setPosition(t.body, { x: 1440, y: G - 16 })
+  t.damage(t.maxHp * 0.4) // déjà blessé
   settle(w, 100)
   w.add(new Projectile('stone', -300, 0))
-  settle(w, 300)
+  settle(w, 400)
   assert.equal(t.alive, false)
   assert.equal(t.deathCause, 'knockout')
+})
+
+test('le fer encaisse les boulets de pierre bien mieux que le bois', () => {
+  const hit = (material) => {
+    const w = new PhysicsWorld(new EventBus())
+    const b = w.add(new Block({ material, x: 1440, y: G - 50, w: 30, h: 100 }))
+    settle(w, 200)
+    const p = w.add(new Projectile('stone', 1300, G - 50))
+    Matter.Body.setVelocity(p.body, { x: 16, y: 0 })
+    settle(w, 200)
+    return b
+  }
+  assert.ok(hit('iron').alive, 'le fer tient')
+  assert.ok(hit('iron').damageRatio < 0.2, 'le fer est à peine entamé')
+  assert.ok(!hit('wood').alive || hit('wood').damageRatio > hit('iron').damageRatio)
 })

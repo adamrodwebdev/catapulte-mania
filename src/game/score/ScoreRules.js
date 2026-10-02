@@ -10,9 +10,12 @@ export const SCORE = deepFreeze({
   CHAIN_STEP: 0.1,
   CHAIN_MAX: 2,
   BARREL: 100,
-  /** Seuils d'étoiles (fraction du score de référence). */
-  STAR_2: 0.55,
-  STAR_3: 0.85,
+  /**
+   * Seuils d'étoiles (fraction du score de référence). Relevés en v2.1 :
+   * 3 étoiles = un tir quasi parfait (victoire rapide ET beaucoup de dégâts).
+   */
+  STAR_2: 0.7,
+  STAR_3: 1.05,
 })
 
 /** Points « bruts » de tout ce qui peut être détruit dans le niveau. */

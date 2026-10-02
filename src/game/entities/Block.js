@@ -24,7 +24,7 @@ export class Block extends Entity {
     const options = {
       density: m.density,
       friction: m.friction,
-      frictionStatic: 1.2,
+      frictionStatic: material === 'iron' ? 2 : 1.2,
       restitution: m.restitution,
       slop: 0.03,
       angle: def.angle ?? 0,
@@ -40,5 +40,12 @@ export class Block extends Entity {
     this.scoreValue = m.score
     this.sound = m.sound
     this.burnDps = material === 'straw' ? 30 : 20
+    /** Blindage : part des dégâts de choc subis (le fer encaisse mieux). */
+    this.armor = m.armor ?? 1
+  }
+
+  /** Choc reçu : réduit par le blindage du matériau (explosions et feu passent par damage()). */
+  receiveImpact(energy, other) {
+    return this.damage(energy * this.armor, 'impact')
   }
 }

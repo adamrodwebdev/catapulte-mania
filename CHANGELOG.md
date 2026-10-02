@@ -2,6 +2,28 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [2.1.0] – 2026-10-02
+### Modifié (équilibrage : le jeu était devenu trop facile)
+- Pierre de base ramenée à son poids d'origine : trop lourde, elle rendait les
+  munitions spéciales inutiles (rocher, feu et poudre restent plus lourds).
+- Fer : vrai blindage. Il ne subit que 40 % des dégâts de choc, glisse beaucoup
+  moins (frottement élevé) et ne cède plus aux boulets de pierre ; il faut des
+  explosifs ou le feu.
+- Écrasement : il faut un débris lourd ou rapide (énergie ≥ 5 × la résistance
+  de la cible) ; un mur qui glisse ou une planchette ne tue plus. Un bloc posé
+  sur une cible doit peser assez lourd pour l'écraser. Les chevaliers, plus
+  résistants, survivent mieux aux éboulements.
+- Une cible renversée n'est mise hors de combat que si elle est déjà blessée
+  (2,5 s au sol) : un soldat simplement bousculé reste à abattre.
+- Étoiles plus exigeantes : 2 étoiles à 70 % du score de référence, 3 étoiles à
+  105 % (tir quasi parfait). Les profils existants sont recalculés au chargement.
+### Mesures
+- Part des tirs au hasard qui gagnent un niveau d'un coup : niveau 5 de 45 % à
+  18 %, niveau 22 de 17 % à 2 %, niveau 34 de 12 % à 5 %.
+- Parties jouées au hasard sur les premiers niveaux : 3 étoiles dans environ
+  5 à 15 % des cas (contre 30 % avant).
+- 40/40 niveaux toujours gagnables en Difficile ; 60 tests.
+
 ## [2.0.0] – 2026-10-02
 ### Ajouté
 - **Mode libre** : rejouer les niveaux terminés avec tirs et munitions
