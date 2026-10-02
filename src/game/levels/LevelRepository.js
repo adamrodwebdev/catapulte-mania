@@ -1,5 +1,6 @@
 import { StructureBuilder } from './StructureBuilder.js'
 import { LEVEL_SPECS } from './levelSpecs.js'
+import { LEVEL_SPECS_2 } from './levelSpecs2.js'
 import { GAME } from '../../config/gameConfig.js'
 import { Schema, Guard, deepFreeze } from '../../core/utils/Guard.js'
 import { MATERIAL_NAMES } from '../entities/materials.js'
@@ -26,7 +27,35 @@ const levelSchema = Schema.object(
 )
 
 /**
- * Catalogue des niveaux : construit les 40 niveaux une seule fois, les valide,
+ * Construit, valide et gèle un niveau à partir de sa description.
+ * Partagé avec les châteaux de duel (DuelRepository).
+ * @param {{ shots: number, wind: number, ammo: object, build: (b: StructureBuilder) => void }} spec
+ * @param {number} id
+ * @param {number} chapter thème du décor (1 à 10)
+ */
+export function buildLevel(spec, id, chapter, seedSalt = 0) {
+  const b = new StructureBuilder()
+  spec.build(b)
+  const data = levelSchema(
+    { shots: spec.shots, wind: spec.wind, ammo: { ...spec.ammo }, blocks: b.blocks, targets: b.targets, barrels: b.barrels },
+    `level ${id}`,
+  )
+  if (!data.targets.length) throw new Error(`level ${id}: no target`)
+  const bounds = b.bounds()
+  const level = {
+    id,
+    chapter,
+    seed: ((id + seedSalt) * 2654435761) >>> 0,
+    ...data,
+    focus: { left: 0, right: Math.max(1500, bounds.right + 160), top: Math.min(250, bounds.top - 180) },
+  }
+  level.reference = referenceScore(level)
+  level.maxScore = maxScore(level)
+  return deepFreeze(level)
+}
+
+/**
+ * Catalogue des niveaux : construit les 100 niveaux une seule fois, les valide,
  * calcule leurs barèmes puis les gèle (lecture seule).
  */
 export class LevelRepository {
@@ -34,27 +63,7 @@ export class LevelRepository {
   static #levels = null
 
   static #build() {
-    return LEVEL_SPECS.map((spec, i) => {
-      const id = i + 1
-      const b = new StructureBuilder()
-      spec.build(b)
-      const data = levelSchema(
-        { shots: spec.shots, wind: spec.wind, ammo: { ...spec.ammo }, blocks: b.blocks, targets: b.targets, barrels: b.barrels },
-        `level ${id}`,
-      )
-      if (!data.targets.length) throw new Error(`level ${id}: no target`)
-      const bounds = b.bounds()
-      const level = {
-        id,
-        chapter: Math.ceil(id / GAME.LEVELS_PER_CHAPTER),
-        seed: (id * 2654435761) >>> 0,
-        ...data,
-        focus: { left: 0, right: Math.max(1500, bounds.right + 160), top: Math.min(250, bounds.top - 180) },
-      }
-      level.reference = referenceScore(level)
-      level.maxScore = maxScore(level)
-      return deepFreeze(level)
-    })
+    return [...LEVEL_SPECS, ...LEVEL_SPECS_2].map((spec, i) => buildLevel(spec, i + 1, Math.ceil((i + 1) / GAME.LEVELS_PER_CHAPTER)))
   }
 
   static all() {

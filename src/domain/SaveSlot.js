@@ -6,7 +6,7 @@ import { GOLD, goldFor, maxGoldFor } from '../game/progression/GoldRules.js'
 
 /** Nom de profil : lettres (toutes langues), chiffres, espaces, tirets. */
 export const PROFILE_NAME = /^[\p{L}\p{N}][\p{L}\p{N} _'-]{0,15}$/u
-const LEVEL_KEY = /^(?:[1-9]|[1-3][0-9]|40)$/
+const LEVEL_KEY = /^(?:[1-9]|[1-9][0-9]|100)$/
 const COUNTER = Schema.int({ min: 0, max: 1e9 })
 
 const GOLD_INT = Schema.int({ min: 0, max: GOLD.MAX_BALANCE })

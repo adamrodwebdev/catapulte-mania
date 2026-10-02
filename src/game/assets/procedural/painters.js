@@ -21,6 +21,13 @@ export const THEMES = Object.freeze({
   2: { skyTop: '#93acc4', skyBottom: '#e3e6e2', sun: '#fffdf0', far: '#8e97a6', farDark: '#727c8d', grass: '#5f7d45', dirt: '#6d5a48', castle: '#9097a4', night: false },
   3: { skyTop: '#3f2c5c', skyBottom: '#ef9653', sun: '#ffd27a', far: '#5b3a5a', farDark: '#432a47', grass: '#4d5e32', dirt: '#5a3f2c', castle: '#4b2f4c', night: false },
   4: { skyTop: '#0d1430', skyBottom: '#3c3c6e', sun: '#e9edf7', far: '#1f2446', farDark: '#161a36', grass: '#2f4a30', dirt: '#3b2e28', castle: '#262b52', night: true },
+  // v3 : chapitres 5 à 10, chacun avec son climat (brume, sable, neige, pluie…).
+  5: { skyTop: '#7f9a8f', skyBottom: '#d9e0c8', sun: '#f4f1d0', far: '#5f7a5a', farDark: '#4b6347', grass: '#4e6b3a', dirt: '#4a3d2e', castle: '#6f7f6a', night: false, weather: 'fog' },
+  6: { skyTop: '#4f93cf', skyBottom: '#f7e3b0', sun: '#fff5d6', far: '#d8b47a', farDark: '#c09a62', grass: '#c9ad6a', dirt: '#a9824f', castle: '#c9a36b', night: false, arid: true },
+  7: { skyTop: '#5f86b5', skyBottom: '#dfe8f0', sun: '#ffffff', far: '#8a96a8', farDark: '#5f6a7c', grass: '#6f8a5a', dirt: '#5d5248', castle: '#7c8597', night: false, peaks: true },
+  8: { skyTop: '#9db8d4', skyBottom: '#eef3f8', sun: '#ffffff', far: '#dfe7ef', farDark: '#c3cfdc', grass: '#f4f7fb', dirt: '#8a8f99', castle: '#aab6c6', night: false, arid: true, weather: 'snow' },
+  9: { skyTop: '#2f3646', skyBottom: '#7f8898', sun: '#c9cfda', far: '#4a5262', farDark: '#353c4a', grass: '#3f5a3a', dirt: '#3a312a', castle: '#2f3542', night: false, weather: 'rain' },
+  10: { skyTop: '#22132f', skyBottom: '#b8464f', sun: '#ffcc66', far: '#4a2440', farDark: '#331a30', grass: '#3d4a2c', dirt: '#3b2a22', castle: '#2b1a2e', night: true },
 })
 
 /* ---------- Outils communs ---------- */
@@ -579,8 +586,9 @@ function sky(ctx, s) {
     ctx.fillStyle = th.skyTop
     ctx.fill()
   }
+  weather(ctx, th, viewW, viewH, animate ? time : 0)
   const r = new SeededRandom(11 + theme)
-  ctx.fillStyle = th.night ? 'rgba(200,210,255,0.08)' : 'rgba(255,255,255,0.55)'
+  ctx.fillStyle = th.night ? 'rgba(200,210,255,0.08)' : th.weather === 'rain' ? 'rgba(90,98,115,0.6)' : 'rgba(255,255,255,0.55)'
   for (let i = 0; i < 6; i++) {
     const speed = r.range(0.004, 0.012)
     const span = viewW + 300
@@ -595,6 +603,42 @@ function sky(ctx, s) {
   }
 }
 
+/**
+ * Météo (repère écran) : neige qui tombe, pluie oblique, brume au ras du sol.
+ * Purement décoratif ; figée si les animations sont réduites (time = 0).
+ */
+function weather(ctx, th, viewW, viewH, time) {
+  if (!th.weather) return
+  const r = new SeededRandom(77)
+  if (th.weather === 'snow') {
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'
+    for (let i = 0; i < 90; i++) {
+      const x = (r.range(0, viewW) + Math.sin(time / 900 + i) * 12) % viewW
+      const y = (r.range(0, viewH) + time * r.range(0.02, 0.05)) % viewH
+      ctx.beginPath()
+      ctx.arc(x, y, r.range(1, 2.6), 0, TAU)
+      ctx.fill()
+    }
+  } else if (th.weather === 'rain') {
+    ctx.strokeStyle = 'rgba(200,215,235,0.35)'
+    ctx.lineWidth = 1.2
+    for (let i = 0; i < 120; i++) {
+      const x = (r.range(0, viewW + 200) - time * 0.15) % (viewW + 200)
+      const y = (r.range(0, viewH) + time * r.range(0.5, 0.8)) % viewH
+      ctx.beginPath()
+      ctx.moveTo(x, y)
+      ctx.lineTo(x - 6, y + 16)
+      ctx.stroke()
+    }
+  } else if (th.weather === 'fog') {
+    const g = ctx.createLinearGradient(0, viewH * 0.45, 0, viewH)
+    g.addColorStop(0, 'rgba(235,240,225,0)')
+    g.addColorStop(1, 'rgba(235,240,225,0.35)')
+    ctx.fillStyle = g
+    ctx.fillRect(0, viewH * 0.45, viewW, viewH * 0.55)
+  }
+}
+
 /** Lointain (repère monde, parallaxe) : collines et silhouette de château. */
 function far(ctx, s) {
   const { theme = 1, castle = true } = s.extra
@@ -603,14 +647,30 @@ function far(ctx, s) {
   const left = -1200
   const right = WORLD.WIDTH + 1600
   const base = WORLD.GROUND_Y
-  for (const [color, height, step] of [[th.farDark, 330, 170], [th.far, 210, 120]]) {
+  const layers = th.peaks ? [[th.farDark, 620, 260], [th.far, 300, 150]] : [[th.farDark, 330, 170], [th.far, 210, 120]]
+  for (const [color, height, step] of layers) {
+    const pts = []
+    for (let x = left; x <= right; x += step) pts.push([x, base - height * r.range(0.45, 1)])
     ctx.beginPath()
     ctx.moveTo(left, base)
-    for (let x = left; x <= right; x += step) ctx.lineTo(x, base - height * r.range(0.45, 1))
+    for (const [x, y] of pts) ctx.lineTo(x, y)
     ctx.lineTo(right, base)
     ctx.closePath()
     ctx.fillStyle = color
     ctx.fill()
+    // Montagnes : sommets enneigés.
+    if (th.peaks && height > 400) {
+      ctx.fillStyle = 'rgba(245,248,252,0.9)'
+      for (const [x, y] of pts) {
+        if (base - y < height * 0.75) continue
+        ctx.beginPath()
+        ctx.moveTo(x, y)
+        ctx.lineTo(x - step * 0.22, y + 70)
+        ctx.lineTo(x + step * 0.22, y + 70)
+        ctx.closePath()
+        ctx.fill()
+      }
+    }
   }
   // Château lointain sur une colline (masqué en face-à-face : il prêterait à confusion).
   if (!castle) return
@@ -664,7 +724,7 @@ function ground(ctx, s) {
     ctx.ellipse(x, yy, r.range(4, 12), r.range(2, 6), 0, 0, TAU)
     ctx.fill()
   }
-  if (!th.night) {
+  if (!th.night && !th.arid) {
     for (let i = 0; i < 40; i++) {
       ctx.fillStyle = r.pick(['#f4efe6', '#e2b13c', '#c55b8a'])
       ctx.beginPath()
@@ -687,6 +747,10 @@ export const PAINTERS = Object.freeze({
   'block.glass': blockPainter('glass'),
   'block.stone': blockPainter('stone'),
   'block.iron': blockPainter('iron'),
+  'block.brick': blockPainter('brick'),
+  'block.sandstone': blockPainter('sandstone'),
+  'block.ice': blockPainter('ice'),
+  'block.marble': blockPainter('marble'),
   'target.soldier': soldier,
   'target.knight': knight,
   'target.king': king,

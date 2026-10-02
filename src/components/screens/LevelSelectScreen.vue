@@ -9,7 +9,7 @@ import ScreenHeader from '../ui/ScreenHeader.vue'
 const app = useApp()
 const { state, t } = app
 const profile = computed(() => state.profile)
-const chapters = [1, 2, 3, 4]
+const chapters = Array.from({ length: GAME.LEVEL_COUNT / GAME.LEVELS_PER_CHAPTER }, (_, i) => i + 1)
 const POWER_ICONS = { calm: 'wind', titan: 'fist', greekfire: 'flame', volley: 'volley', powder: 'bomb', quake: 'quake' }
 
 const chapter = ref(1)
@@ -57,7 +57,7 @@ function onTabKey(e) {
     <ScreenHeader :title="t('levels.title')" @back="app.go('profiles')">
       <div class="levels__summary">
         <span class="levels__profile">{{ profile.name }} · {{ t(`difficulty.${profile.difficulty}`) }}</span>
-        <span class="levels__stat"><AppIcon name="star" :size="16" />{{ t('levels.totalStars', { count: profile.stars }) }}</span>
+        <span class="levels__stat"><AppIcon name="star" :size="16" />{{ t('levels.totalStars', { count: profile.stars, max: GAME.LEVEL_COUNT * 3 }) }}</span>
         <span class="levels__stat">{{ t('levels.totalScore', { score: profile.score }) }}</span>
       </div>
     </ScreenHeader>

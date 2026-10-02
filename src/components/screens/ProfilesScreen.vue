@@ -78,7 +78,7 @@ async function remove(index) {
         <template v-if="slot.status === 'ok'">
           <p class="slot__name">{{ slot.name }}</p>
           <p class="slot__meta">{{ t(`difficulty.${slot.difficulty}`) }}</p>
-          <p class="slot__meta">{{ t('profiles.progress', { done: slot.completed, stars: slot.stars }) }}</p>
+          <p class="slot__meta">{{ t('profiles.progress', { done: slot.completed, total: GAME.LEVEL_COUNT, stars: slot.stars }) }}</p>
           <p class="slot__meta">{{ t('profiles.score', { score: slot.score }) }}</p>
           <div v-if="confirming !== slot.index" class="slot__actions">
             <button type="button" class="btn btn--primary" @click="openSlot(slot.index)">

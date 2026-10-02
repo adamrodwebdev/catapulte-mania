@@ -48,10 +48,10 @@ export class Cosmetic {
 }
 
 const UPGRADES = Object.freeze([
-  // Bras renforcé : vitesse maximale de lancer +3 % par niveau.
-  new Upgrade({ id: 'arm', icon: 'fist', costs: [150, 320, 550], effect: (l) => ({ speedFactor: 1 + 0.03 * l }) }),
-  // Boulets lestés : projectiles +8 % plus lourds par niveau.
-  new Upgrade({ id: 'ballast', icon: 'target', costs: [120, 260, 450], effect: (l) => ({ massFactor: 1 + 0.08 * l }) }),
+  // Bras renforcé : vitesse de lancer +7 % par niveau (énergie de choc +15 % environ).
+  new Upgrade({ id: 'arm', icon: 'fist', costs: [150, 320, 550], effect: (l) => ({ speedFactor: 1 + 0.07 * l }) }),
+  // Boulets lestés : projectiles +20 % plus lourds par niveau.
+  new Upgrade({ id: 'ballast', icon: 'target', costs: [120, 260, 450], effect: (l) => ({ massFactor: 1 + 0.2 * l }) }),
   // Réserve : +1 munition spéciale de chaque type proposé par le niveau.
   new Upgrade({ id: 'quiver', icon: 'volley', costs: [200, 480], effect: (l) => ({ extraAmmo: l }) }),
   // Stratège : les pouvoirs coûtent 15 % de points en moins par niveau.

@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useApp } from '../../app/AppContext.js'
 import { PROFILE_NAME } from '../../domain/SaveSlot.js'
 import { ArenaRepository } from '../../game/levels/ArenaRepository.js'
+import { DuelRepository } from '../../game/levels/DuelRepository.js'
 import AppIcon from '../ui/AppIcon.vue'
 import ScreenHeader from '../ui/ScreenHeader.vue'
 
@@ -23,6 +24,8 @@ const names = ref([state.match.players?.[0] || '', state.match.players?.[1] || '
 const levelId = ref(1)
 const arenaId = ref(state.match.arenaId || 1)
 const arenas = ArenaRepository.all()
+const duels = DuelRepository.all()
+const duelId = ref(state.match.duelId || 1)
 
 onMounted(() => app.refreshSlots())
 const maxLevel = computed(() => app.multiplayerLevels())
@@ -35,7 +38,7 @@ function start() {
   if (!canStart.value) return
   app.services.audio.unlock()
   const players = names.value.map((n, i) => n.trim() || t('mp.defaultName', { n: i + 1 }))
-  app.startMatch({ mode: format.value, levelId: format.value === 'versus' ? undefined : levelId.value, arenaId: arenaId.value, players })
+  app.startMatch({ mode: format.value, levelId: format.value === 'hotseat' ? levelId.value : undefined, arenaId: arenaId.value, duelId: duelId.value, players })
 }
 </script>
 
@@ -78,7 +81,19 @@ function start() {
         </div>
       </fieldset>
 
-      <fieldset v-if="format !== 'versus'" class="panel">
+      <fieldset v-if="format === 'duel'" class="panel">
+        <legend class="panel__title">{{ t('mp.castle') }}</legend>
+        <div class="arena-grid">
+          <label v-for="d in duels" :key="d.id" :class="['arena', `arena--theme${d.chapter}`, { 'arena--on': duelId === d.id }]">
+            <input v-model="duelId" class="visually-hidden" type="radio" name="mp-duel" :value="d.id">
+            <span class="arena__num">{{ d.id }}</span>
+            <span class="arena__name">{{ t(`mp.duels.${d.id}`) }}</span>
+            <span class="arena__meta">{{ t('mp.castleMeta', { targets: d.targets.length, shots: d.shots }) }}</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset v-else-if="format === 'hotseat'" class="panel">
         <legend class="panel__title">{{ t('mp.level') }}</legend>
         <p class="field__desc">{{ t('mp.levelsHint') }}</p>
         <div class="level-pick" role="radiogroup" :aria-label="t('mp.level')">

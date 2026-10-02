@@ -60,7 +60,9 @@ export class PhysicsWorld {
 
     const ground = Bodies.rectangle(WORLD.WIDTH / 2, WORLD.GROUND_Y + 100, WORLD.WIDTH * 3, 200, {
       isStatic: true,
+      // Sol très adhérent : un mur posé au sol ne glisse pas sous un simple boulet.
       friction: 1,
+      frictionStatic: 8,
       label: 'ground',
       collisionFilter: { category: CATEGORY.STATIC },
     })
@@ -192,7 +194,7 @@ export class PhysicsWorld {
       if (t.kind !== 'target' || !t.alive) continue
       const tilt = Math.abs(Math.atan2(Math.sin(t.angle), Math.cos(t.angle)))
       t.downMs = tilt > WORLD.KNOCKOUT_ANGLE ? (t.downMs || 0) + dtMs : 0
-      if (t.downMs >= WORLD.KNOCKOUT_MS && t.damageRatio >= WORLD.KNOCKOUT_DAMAGE) t.kill('knockout')
+      if (t.downMs >= WORLD.KNOCKOUT_MS) t.kill('knockout')
     }
   }
 
@@ -212,11 +214,11 @@ export class PhysicsWorld {
       const h = b.max.y - b.min.y
       const near = Query.region(blocks, { min: { x: b.min.x - d * 2, y: b.min.y - d * 2 }, max: { x: b.max.x + d * 2, y: b.max.y + d * 2 } })
       if (!near.length) continue
-      const hit = (pts, minMass = 0) => near.some((body) => body.mass >= minMass && pts.some((p) => Vertices.contains(body.vertices, p)))
+      const hit = (pts) => near.some((body) => pts.some((p) => Vertices.contains(body.vertices, p)))
       const top = [0.3, 0.5, 0.7].map((k) => ({ x: b.min.x + w * k, y: b.min.y - d }))
       const left = [0.35, 0.65].map((k) => ({ x: b.min.x - d, y: b.min.y + h * k }))
       const right = [0.35, 0.65].map((k) => ({ x: b.max.x + d, y: b.min.y + h * k }))
-      if (hit(top, WORLD.PIN_MIN_MASS)) t.kill('pinned')
+      if (hit(top)) t.kill('pinned')
       else if (hit(left) && hit(right)) t.kill('squeezed')
     }
   }
@@ -377,8 +379,7 @@ export class PhysicsWorld {
   }
 
   /**
-   * Écrasement : une cible meurt quand un bloc lancé ou en chute la percute avec
-   * assez d'énergie (fonction de la masse du bloc et de la résistance de la cible).
+   * Personnages fragiles : la moindre collision avec un objet en mouvement tue.
    * Désactivé avant le premier tir (la structure se met en place).
    */
   #checkCrush(a, b, rel) {
@@ -386,22 +387,21 @@ export class PhysicsWorld {
     const target = a?.kind === 'target' ? a : b?.kind === 'target' ? b : null
     if (!target || !target.alive) return
     const other = target === a ? b : a
-    if (!other || other.kind !== 'block' || !other.alive) return
-    if (other.speed < WORLD.CRUSH_BLOCK_SPEED || rel < WORLD.CRUSH_REL_SPEED) return
-    // Il faut une vraie énergie : un mur qui glisse doucement ne tue pas.
-    const energy = 0.5 * other.mass * other.speed * other.speed
-    if (energy >= target.maxHp * WORLD.CRUSH_ENERGY_PER_HP) target.kill('crush')
+    if (!other || other.kind === 'target' || !other.alive) return
+    if (rel < WORLD.CONTACT_KILL_REL) return
+    // L'objet qui touche bouge, ou c'est la cible qui est projetée contre lui.
+    if (other.speed >= WORLD.CONTACT_KILL_SPEED || target.speed >= WORLD.CONTACT_KILL_SPEED * 3) target.kill('crush')
   }
 
-  /** Contacts prolongés : un bloc déjà au contact qui se met à bouger écrase aussi. */
+  /** Contacts prolongés : un objet déjà au contact qui se met à bouger tue aussi. */
   #handleActiveContacts(pairs) {
     if (!this.#armed) return
     for (const pair of pairs) {
       const a = this.#entityOf(pair.bodyA)
       const b = this.#entityOf(pair.bodyB)
       if (!a || !b || (a.kind !== 'target' && b.kind !== 'target')) continue
-      const block = a.kind === 'block' ? a : b.kind === 'block' ? b : null
-      if (!block || block.speed < WORLD.CRUSH_BLOCK_SPEED * 1.6) continue
+      const other = a.kind === 'target' ? b : a
+      if (other.kind === 'target' || other.speed < WORLD.CONTACT_KILL_SPEED * 2) continue
       const va = Body.getVelocity(pair.bodyA.parent || pair.bodyA)
       const vb = Body.getVelocity(pair.bodyB.parent || pair.bodyB)
       const n = pair.collision.normal

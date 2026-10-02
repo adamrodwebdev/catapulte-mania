@@ -3,6 +3,7 @@ import { ref, shallowRef, computed, onMounted, onBeforeUnmount, watch, markRaw, 
 import { useApp } from '../../app/AppContext.js'
 import { LevelRepository } from '../../game/levels/LevelRepository.js'
 import { ArenaRepository } from '../../game/levels/ArenaRepository.js'
+import { DuelRepository } from '../../game/levels/DuelRepository.js'
 import { createMode } from '../../game/modes/modes.js'
 import { GAME, IS_DEMO, PLAYABLE_LEVELS } from '../../config/gameConfig.js'
 import GameHud from '../game/GameHud.vue'
@@ -29,7 +30,10 @@ const end = ref(null)
 const mode = computed(() => state.match.mode || 'story')
 const isMulti = computed(() => ['duel', 'hotseat', 'versus'].includes(mode.value))
 const isVersus = computed(() => mode.value === 'versus')
-const level = computed(() => (isVersus.value ? ArenaRepository.get(state.match.arenaId) : LevelRepository.get(state.levelId)))
+const isDuel = computed(() => mode.value === 'duel')
+const level = computed(() =>
+  isVersus.value ? ArenaRepository.get(state.match.arenaId) : isDuel.value ? DuelRepository.get(state.match.duelId) : LevelRepository.get(state.levelId),
+)
 const novelties = computed(() => (mode.value === 'story' ? LevelRepository.novelties(state.levelId) : []))
 /** Chacun sa partie : manche en cours (0 = joueur 1, 1 = joueur 2) et scores des manches. */
 const round = ref(0)
@@ -245,7 +249,9 @@ async function onStoryEnd({ won, result }) {
 }
 
 /** Titre de l'introduction et du bandeau : niveau, ou arène en face-à-face. */
-const matchTitle = computed(() => (isVersus.value ? t(`mp.arenas.${state.match.arenaId}`) : t('game.level', { n: state.levelId })))
+const matchTitle = computed(() =>
+  isVersus.value ? t(`mp.arenas.${state.match.arenaId}`) : isDuel.value ? t(`mp.duels.${state.match.duelId}`) : t('game.level', { n: state.levelId }),
+)
 const matchSubtitle = computed(() => {
   if (isMulti.value) return t(`mp.formats.${mode.value}.name`)
   if (mode.value === 'free') return t('levels.free')

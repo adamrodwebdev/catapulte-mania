@@ -4,7 +4,7 @@ import { deepFreeze } from '../core/utils/Guard.js'
  * Constantes globales du jeu. Gelées : impossible de les modifier à l'exécution.
  */
 export const GAME = deepFreeze({
-  LEVEL_COUNT: 40,
+  LEVEL_COUNT: 100,
   LEVELS_PER_CHAPTER: 10,
   SAVE_SLOTS: 3,
   SAVE_VERSION: 2,
@@ -23,11 +23,12 @@ export const GAME = deepFreeze({
  * - windFactor   : intensité du vent
  * - targetHp     : multiplicateur de résistance des soldats
  * - scoreFactor  : multiplicateur de score final
+ * - ammoFactor   : part des munitions spéciales du niveau (arrondi inférieur)
  */
 export const DIFFICULTY = deepFreeze({
-  easy: { shotDelta: 2, windFactor: 0.4, targetHp: 0.75, scoreFactor: 0.75 },
-  normal: { shotDelta: 0, windFactor: 1, targetHp: 1, scoreFactor: 1 },
-  hard: { shotDelta: -1, windFactor: 1.5, targetHp: 1.35, scoreFactor: 1.5 },
+  easy: { shotDelta: 2, windFactor: 0.4, targetHp: 0.75, scoreFactor: 0.75, ammoFactor: 1 },
+  normal: { shotDelta: 0, windFactor: 1, targetHp: 1, scoreFactor: 1, ammoFactor: 1 },
+  hard: { shotDelta: -1, windFactor: 1.5, targetHp: 1.35, scoreFactor: 1.5, ammoFactor: 0.5 },
 })
 
 /** Est-on dans la build de démonstration ? (constante remplacée au build par Vite) */

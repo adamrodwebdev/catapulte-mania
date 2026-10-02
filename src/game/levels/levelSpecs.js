@@ -333,7 +333,7 @@ export const LEVEL_SPECS = [
 
   // 25. Le hameau : six maisons éparpillées. La mitraille arrose large.
   {
-    shots: 4, wind: 0.5, ammo: { split: 3, bomb: 1 },
+    shots: 5, wind: 0.5, ammo: { split: 3, bomb: 2 },
     build(b) {
       ;[1250, 1420, 1590, 1760, 1930, 2100].forEach((x, i) => {
         const h = b.tower(x, { floors: 1 + (i % 2), w: 100, roof: 'straw' })
@@ -357,7 +357,7 @@ export const LEVEL_SPECS = [
 
   // 27. L'aqueduc : une passerelle haute sur trois piliers. Abattez le pilier central.
   {
-    shots: 5, wind: 0.6, ammo: { boulder: 2, bomb: 2, fire: 1 },
+    shots: 6, wind: 0.6, ammo: { boulder: 2, bomb: 2, fire: 1 },
     build(b) {
       for (const x of [1350, 1550, 1750]) b.wall(x, { mat: 'stone', w: 36, h: 240, n: 4 })
       const top = b.ground - 240
@@ -369,7 +369,7 @@ export const LEVEL_SPECS = [
       b.target(a, 'knight', 25)
       b.target(c, 'soldier', -20)
       b.target(c, 'soldier', 25)
-      b.target(b.room(1450, b.ground, { mat: 'stone', slab: 'iron', w: 120, t: 24 }), 'knight')
+      b.target(b.room(1450, b.ground, { mat: 'wood', slab: 'stone', w: 120, t: 24 }), 'knight')
     },
   },
 
@@ -407,7 +407,7 @@ export const LEVEL_SPECS = [
 
   // 30. Le roi : il se cache au sommet du donjon, gardé par deux tours.
   {
-    shots: 6, wind: 0.65, ammo: { boulder: 3, bomb: 2, split: 1, fire: 1 },
+    shots: 7, wind: 0.65, ammo: { boulder: 4, bomb: 2, split: 1, fire: 1 },
     build(b) {
       const l = b.tower(1320, { floors: 4, mat: 'stone', slab: 'iron', t: 26, roof: 'wood' })
       const k = b.tower(1580, { floors: 6, mats: ['iron', 'stone', 'stone', 'stone', 'wood'], slab: 'stone', w: 150, t: 26, h: 92, roof: 'wood' })

@@ -18,7 +18,7 @@ export class Power {
    */
   constructor({ id, unlockAfter, cost, icon, immediate = false }) {
     this.id = Guard.string(id, 'power id', { pattern: /^[a-z]+$/ })
-    this.unlockAfter = Guard.int(unlockAfter, 'unlockAfter', { min: 0, max: 40 })
+    this.unlockAfter = Guard.int(unlockAfter, 'unlockAfter', { min: 0, max: 100 })
     this.cost = Guard.int(cost, 'cost', { min: 0, max: 5000 })
     this.icon = icon
     this.immediate = immediate

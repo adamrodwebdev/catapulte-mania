@@ -3,8 +3,8 @@
 **Jeu de catapulte médiéval, 100 % dans le navigateur.**
 Réglez l'angle et la puissance, calculez la trajectoire, et faites tomber les forteresses pour atteindre les soldats cachés à l'intérieur.
 
-- 40 niveaux répartis en 4 chapitres : du bois et de la paille au début, puis la pierre, le fer, les barils explosifs et de nouveaux projectiles
-- 3 difficultés (Facile, Normal, Difficile)
+- 100 niveaux répartis en 10 chapitres : du bois et de la paille au début, puis la pierre, le fer, la brique, le grès, la glace et le marbre, des barils explosifs et de nouveaux projectiles
+- 3 difficultés (Facile, Normal, Difficile : un tir et la moitié des munitions spéciales en moins)
 - 6 pouvoirs spéciaux à débloquer (un seul par tour, chaque utilisation coûte des points)
 - **Mode libre** : rejouer les niveaux terminés sans limite de tirs ni de munitions
 - **Deux joueurs** sur le même appareil : duel, chacun sa partie ou face-à-face
@@ -63,7 +63,7 @@ On peut l'envoyer par e-mail, le mettre sur une clé USB ou l'héberger sur n'im
 
 **Le but :** éliminer tous les personnages (soldats, chevaliers, rois) avant d'avoir épuisé ses tirs.
 **Le vent** (indiqué en haut à droite) dévie les projectiles.
-**La physique des bâtiments :** un débris lourd ou rapide écrase les personnages, tout comme un plancher ou un toit qui leur tombe dessus, ou deux murs qui les prennent en étau. Un soldat simplement bousculé se relève : il faut l'abattre. Le fer encaisse les boulets de pierre : il faut des explosifs ou le feu. Frappez un mur porteur de face et assez fort : il cède et le toit ou le plancher qu'il soutenait s'effondre. Le bois cède facilement, la pierre demande un rocher lancé avec force, le fer pratiquement des explosifs.
+**La physique :** les personnages tombent **au moindre choc** (un bloc qui bouge, un projectile, un débris, une chute). Ce sont les **châteaux** qui les protègent, et ils sont solides : une simple pierre ne renverse pas un mur de pierre. Il faut choisir le bon projectile (le rocher pour enfoncer, les explosifs pour la pierre, le marbre et le fer) ou améliorer sa catapulte à l'atelier. Frappez un mur porteur de face et assez fort : il cède et ce qu'il soutenait s'effondre. Rien ne reste jamais suspendu dans le vide.
 **Les étoiles :** 1 étoile pour une victoire, 2 pour une belle victoire, 3 pour un tir quasi parfait (victoire rapide et beaucoup de dégâts).
 
 ### La progression
@@ -74,6 +74,12 @@ On peut l'envoyer par e-mail, le mettre sur une clé USB ou l'héberger sur n'im
 | 2. Le Fort de pierre | 11 à 20 | Pierre et vitraux, barils explosifs, chevaliers en armure, rocher, feu grégeois |
 | 3. La Forteresse | 21 à 30 | Fer, boulets de poudre, mitraille, le roi |
 | 4. La Citadelle | 31 à 40 | Tout combiné, de nuit, vent fort |
+| 5. Les Marais | 41 à 50 | Brique, pilotis, brume |
+| 6. Le Désert | 51 à 60 | Grès, forts massifs, plateaux à viser en cloche |
+| 7. La Montagne | 61 à 70 | Nids d'aigle sur les rochers, sommets enneigés |
+| 8. L'Hiver | 71 à 80 | Glace glissante, neige |
+| 9. L'Orage | 81 à 90 | Fer et brique sous la pluie, vent violent |
+| 10. Le Trône | 91 à 100 | Marbre, rois, citadelles finales |
 
 ### Les pouvoirs spéciaux
 
@@ -92,9 +98,9 @@ Un seul pouvoir par tour. Chaque utilisation retire des points au score final.
 
 | Mode | Où le trouver | Principe |
 |---|---|---|
-| **Campagne** | Jouer → profil → carte des niveaux | Les 40 niveaux dans l'ordre. Rapporte des étoiles et de l'or. |
+| **Campagne** | Jouer → profil → carte des niveaux | Les 100 niveaux dans l'ordre. Rapporte des étoiles et de l'or. |
 | **Mode libre** | Carte des niveaux → « Mode libre » | Rejouer un niveau déjà terminé avec tirs et munitions illimités (celles découvertes en campagne) et pouvoirs gratuits (toujours un par tour). Rien n'est enregistré. |
-| **Duel** | Accueil → Deux joueurs | Le même château, un tir chacun. Chaque destruction rapporte des points au tireur. Le meilleur score gagne. |
+| **Duel** | Accueil → Deux joueurs | Six grands châteaux dédiés (10 à 15 défenseurs, 8 à 9 tirs chacun). Un tir chacun, chaque destruction rapporte des points au tireur. Le meilleur score gagne. |
 | **Chacun sa partie** | Accueil → Deux joueurs | Le joueur 1 joue tout le niveau, puis le joueur 2. Le meilleur score gagne. |
 | **Face-à-face** | Accueil → Deux joueurs | Chaque joueur a sa catapulte et son château (5 arènes symétriques). Le premier qui abat tous les défenseurs adverses gagne. Si les tirs s'épuisent, celui qui a gardé le plus de défenseurs l'emporte. |
 
@@ -106,15 +112,15 @@ L'or se gagne **uniquement en remportant des niveaux de la campagne** : 15 pièc
 
 | Amélioration | Effet | Prix |
 |---|---|---|
-| Bras renforcé (3 niveaux) | Lancer 3 % plus puissant par niveau | 150 · 320 · 550 |
-| Boulets lestés (3 niveaux) | Projectiles 8 % plus lourds par niveau | 120 · 260 · 450 |
+| Bras renforcé (3 niveaux) | Lancer 7 % plus puissant par niveau | 150 · 320 · 550 |
+| Boulets lestés (3 niveaux) | Projectiles 20 % plus lourds par niveau | 120 · 260 · 450 |
 | Réserve de munitions (2 niveaux) | +1 munition spéciale de chaque type, par niveau | 200 · 480 |
 | Stratège (2 niveaux) | Pouvoirs 15 % moins chers par niveau | 180 · 380 |
 | Éclaireur | Un tir supplémentaire dans chaque niveau | 650 |
 
 S'y ajoutent des **apparences** sans effet sur le jeu : catapulte (chêne, bannière royale, ébène, dragon) et traînée du projectile (fumée, braises, étincelles d'or).
 
-Les améliorations s'appliquent en campagne et en mode libre, **jamais à deux joueurs**, pour que les parties restent équitables.
+Elles changent vraiment la façon de jouer : avec un bras renforcé et des boulets lestés au maximum, une simple pierre fait presque deux fois plus de dégâts. Les améliorations s’appliquent en campagne et en mode libre, **jamais à deux joueurs**, pour que les parties restent équitables.
 
 **Pour une future version payante (Play Store, site) :** une boutique « premium » est prête dans le code mais désactivée (`src/services/StoreService.js`). Le fichier explique comment brancher un système de paiement. Un petit serveur sera alors nécessaire pour vérifier les achats, sinon n'importe qui pourrait les simuler.
 
@@ -239,7 +245,7 @@ src/
 │   ├── TrajectoryPredictor Calcul de la trajectoire prévue (aide à la visée)
 │   ├── physics/            Monde physique (Matter.js)
 │   ├── entities/           Entity → Block, Projectile, Target, Barrel
-│   ├── levels/             Les 40 niveaux, les 5 arènes du face-à-face, leur assemblage
+│   ├── levels/             Les 100 niveaux (plans réutilisables), les arènes du face-à-face, les châteaux de duel
 │   ├── powers/             Power → les 6 pouvoirs, PowerRegistry
 │   ├── score/              ScoreKeeper, règles de score et d'étoiles
 │   ├── rendering/          Renderer, Camera
@@ -249,7 +255,7 @@ src/
 ├── components/             Composants Vue : écrans, HUD, éléments d'interface
 └── styles/                 CSS : jetons de design, thèmes, écrans
 tests/                      Tests automatiques
-scripts/check-levels.mjs    Contrôle automatique des 40 niveaux
+scripts/check-levels.mjs    Contrôle automatique des 100 niveaux
 build/                      Sécurité (CSP) et service worker générés au build
 ```
 
@@ -282,7 +288,7 @@ build/                      Sécurité (CSP) et service worker générés au bui
 
 ```bash
 npm test              # tests automatiques (validation, sauvegarde, physique, gameplay, traductions)
-npm run check:levels  # un joueur automatique vérifie que les 40 niveaux sont stables et gagnables en Difficile
+npm run check:levels  # un joueur automatique vérifie que les 100 niveaux sont stables et gagnables en Difficile
 npm run lint          # vérification du style de code
 ```
 
@@ -293,7 +299,7 @@ npm run lint          # vérification du style de code
 1. l'installation des outils, les tests et la vérification du style ;
 2. la fabrication de la version complète et de la démo (téléchargeables en bas de la page du contrôle, rubrique « Artifacts ») ;
 3. un audit **Lighthouse** sur mobile (3 passages) qui échoue si une note (Performance, Accessibilité, Bonnes pratiques, SEO) descend sous 95. Le rapport complet est accessible par un lien dans le détail de l'étape ;
-4. la vérification des 40 niveaux.
+4. la vérification des 100 niveaux.
 
 Une coche verte ✅ à côté d'un commit signifie que tout est bon ; une croix rouge ❌ indique l'étape à corriger.
 
@@ -320,6 +326,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v1.4.0 | Les personnages coincés sous un toit ou entre deux murs meurent écrasés |
 | v2.0.0 | Plus rien ne flotte, boulets plus lourds, mode libre, deux joueurs (3 formules), atelier et or |
 | v2.1.0 | Équilibrage : pierre au poids d'origine, fer blindé, écrasement plus exigeant, étoiles plus dures |
+| v3.0.0 | 100 niveaux, 4 nouveaux matériaux et 6 climats, personnages fragiles et châteaux solides, grands châteaux de duel |
 
 Pour revenir à une version précise avec Git : `git checkout v0.4.0` (puis `git checkout main` pour revenir à la dernière).
 

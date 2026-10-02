@@ -364,9 +364,24 @@
 
 .tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: var(--space-2);
   margin-bottom: var(--space-4);
+}
+
+/* 10 chapitres : deux rangées de 5 sur grand écran, défilement horizontal sur téléphone. */
+@media (max-width: 760px) {
+  .tabs {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding-bottom: var(--space-1);
+  }
+
+  .tabs__tab {
+    flex: 0 0 9.5rem;
+    scroll-snap-align: start;
+  }
 }
 
 .tabs__tab {

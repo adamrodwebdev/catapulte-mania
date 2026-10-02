@@ -2,6 +2,33 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [3.0.0] – 2026-10-02
+### Ajouté
+- **100 niveaux** (au lieu de 40) : six nouveaux chapitres (Marais, Désert,
+  Montagne, Hiver, Orage, Salle du trône), construits à partir de plans de
+  châteaux réutilisables (donjon, tours jumelles, forteresse, pilotis, plateau,
+  escalier, aqueduc, crypte blindée, dominos, poudrière, pont-levis, hameau,
+  rempart).
+- **Nouvelles textures et matériaux** : brique, grès, glace (glissante, fragile)
+  et marbre (le plus solide après le fer), avec leurs débris et leurs sons.
+- **Nouveaux décors** : brume des marais, désert aride, sommets enneigés, neige,
+  pluie d'orage et salle du trône nocturne.
+- **Duel** : six châteaux dédiés, bien plus grands, avec 10 à 15 défenseurs et
+  8 à 9 tirs chacun ; le second joueur a toujours l'occasion de tirer.
+### Modifié
+- **Personnages fragiles** : retour à l'ancienne règle, en plus strict. Le
+  moindre contact avec un bloc en mouvement, un bloc posé sur la tête ou deux
+  blocs qui les serrent les tuent ; une cible renversée est hors de combat.
+- **Structures beaucoup plus solides** : tous les matériaux sont 4 à 6 fois plus
+  lourds et 2,2 fois plus résistants ; le sol retient mieux les murs. Un boulet
+  de pierre ne renverse plus une cabane de pierre ; il faut viser juste ou
+  choisir la bonne munition.
+- **Atelier** : le bras renforcé (+7 % de vitesse par niveau) et le lest
+  (+20 % de masse par niveau) changent réellement ce qu'on peut abattre.
+- **Difficile** : moitié moins de munitions spéciales (arrondi vers le bas).
+### Vérifié
+- Les 100 niveaux sont stables au repos et gagnables en Difficile.
+
 ## [2.1.0] – 2026-10-02
 ### Modifié (équilibrage : le jeu était devenu trop facile)
 - Pierre de base ramenée à son poids d'origine : trop lourde, elle rendait les

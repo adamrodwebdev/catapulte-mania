@@ -24,7 +24,7 @@ export class Block extends Entity {
     const options = {
       density: m.density,
       friction: m.friction,
-      frictionStatic: material === 'iron' ? 2 : 1.2,
+      frictionStatic: material === 'iron' ? 2.2 : 1.6,
       restitution: m.restitution,
       slop: 0.03,
       angle: def.angle ?? 0,

@@ -38,7 +38,7 @@ test('acheter une amélioration débite l’or et applique l’effet', () => {
   assert.equal(slot.buyUpgrade('arm'), true)
   assert.equal(slot.gold, before - UpgradeCatalog.upgrade('arm').costs[0])
   assert.equal(slot.upgrades.arm, 1)
-  assert.ok(Math.abs(slot.effects.speedFactor - 1.03) < 1e-9)
+  assert.ok(Math.abs(slot.effects.speedFactor - 1.07) < 1e-9)
 })
 
 test('impossible d’acheter sans assez d’or ou au-delà du maximum', () => {

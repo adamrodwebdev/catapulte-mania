@@ -29,7 +29,7 @@ export class GameMode {
     if (!Array.isArray(players) || players.length < 1 || players.length > 2) throw new TypeError('players: 1 or 2 names expected')
     this.players = Object.freeze(players.map((n, i) => GameMode.cleanName(n, i)))
     this.effects = effects
-    this.completedLevels = Guard.int(completedLevels, 'completedLevels', { min: 0, max: 40 })
+    this.completedLevels = Guard.int(completedLevels, 'completedLevels', { min: 0, max: 100 })
   }
 
   /** Nom de joueur validé (même règle que les profils), ou nom par défaut. */
@@ -43,10 +43,17 @@ export class GameMode {
     return Math.max(2, level.shots + difficulty.shotDelta + (this.effects.extraShots || 0))
   }
 
-  /** Munitions spéciales de départ de chaque joueur (Infinity = illimité). */
-  ammoFor(level) {
+  /**
+   * Munitions spéciales de départ de chaque joueur (Infinity = illimité).
+   * En Difficile, la moitié seulement (arrondi inférieur) ; la Réserve de l'atelier s'ajoute ensuite.
+   */
+  ammoFor(level, difficulty = { ammoFactor: 1 }) {
     const out = {}
-    for (const [type, n] of Object.entries(level.ammo)) out[type] = n + (this.effects.extraAmmo || 0)
+    for (const [type, n] of Object.entries(level.ammo)) {
+      const base = Math.floor(n * (difficulty.ammoFactor ?? 1))
+      const total = base + (this.effects.extraAmmo || 0)
+      if (total > 0) out[type] = total
+    }
     return out
   }
 

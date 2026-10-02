@@ -44,7 +44,7 @@ export class Catapult {
   constructor(x = 170, { dir = 1, speedFactor = 1 } = {}) {
     this.x = Guard.number(x, 'catapult x', { min: 0, max: WORLD.WIDTH })
     this.dir = dir === -1 ? -1 : 1
-    this.speedFactor = Guard.number(speedFactor, 'speedFactor', { min: 0.5, max: 1.5 })
+    this.speedFactor = Guard.number(speedFactor, 'speedFactor', { min: 0.5, max: 1.6 })
   }
 
   /** @param {number} angle degrés @param {number} power 0..1 */

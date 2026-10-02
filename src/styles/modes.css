@@ -529,3 +529,15 @@
     margin-left: 0;
   }
 }
+
+.arena__meta {
+  font-size: var(--fs-0);
+  opacity: 0.9;
+}
+
+.arena--theme5 { background: linear-gradient(180deg, #7f9a8f, #d9e0c8 70%, #4e6b3a 70%); }
+.arena--theme6 { background: linear-gradient(180deg, #4f93cf, #f7e3b0 70%, #c9ad6a 70%); }
+.arena--theme7 { background: linear-gradient(180deg, #5f86b5, #dfe8f0 70%, #6f8a5a 70%); }
+.arena--theme8 { background: linear-gradient(180deg, #9db8d4, #eef3f8 70%, #f4f7fb 70%); }
+.arena--theme9 { background: linear-gradient(180deg, #2f3646, #7f8898 70%, #3f5a3a 70%); }
+.arena--theme10 { background: linear-gradient(180deg, #22132f, #b8464f 70%, #3d4a2c 70%); }

@@ -134,12 +134,121 @@ const PAINT = {
       }
     }
   },
+  /** Brique : appareil en panneresse, joints de mortier clair, briques flammées. */
+  brick(g, r) {
+    g.fillStyle = '#d8cbb3'
+    g.fillRect(0, 0, SIZE, SIZE)
+    const bh = 16
+    for (let row = 0; row < SIZE / bh; row++) {
+      const offset = row % 2 ? 16 : 0
+      for (let col = -1; col < 5; col++) {
+        const x = col * 32 + offset
+        const y = row * bh
+        const tone = r.int(-18, 18)
+        g.fillStyle = `rgb(${158 + tone},${70 + tone / 2},${50 + tone / 3})`
+        g.fillRect(x + 1.5, y + 1.5, 29, bh - 3)
+        g.fillStyle = 'rgba(255,220,190,0.15)'
+        g.fillRect(x + 1.5, y + 1.5, 29, 2)
+        if (r.chance(0.3)) {
+          g.fillStyle = 'rgba(40,15,10,0.25)'
+          g.fillRect(x + r.range(4, 22), y + 4, r.range(4, 9), bh - 8)
+        }
+      }
+    }
+  },
+  /** Grès : grands blocs ocre, strates horizontales et érosion. */
+  sandstone(g, r) {
+    g.fillStyle = '#b8935c'
+    g.fillRect(0, 0, SIZE, SIZE)
+    for (let row = 0; row < 2; row++) {
+      for (let col = 0; col < 2; col++) {
+        const x = col * 64 + (row % 2 ? 32 : 0)
+        const y = row * 64
+        for (const dx of [0, -128, 128]) {
+          const tone = r.int(-12, 12)
+          g.fillStyle = `rgb(${214 + tone},${176 + tone},${118 + tone})`
+          g.fillRect(x + dx + 2, y + 2, 60, 60)
+          for (let k = 0; k < 6; k++) {
+            g.fillStyle = `rgba(150,105,55,${r.range(0.12, 0.3)})`
+            g.fillRect(x + dx + 2, y + 6 + k * 9 + r.range(-1, 1), 60, r.range(1, 2.5))
+          }
+          for (let k = 0; k < 8; k++) {
+            g.fillStyle = 'rgba(120,80,40,0.3)'
+            g.beginPath()
+            g.arc(x + dx + r.range(6, 58), y + r.range(6, 58), r.range(1, 2.5), 0, Math.PI * 2)
+            g.fill()
+          }
+        }
+      }
+    }
+  },
+  /** Glace : bleu translucide, reflets obliques, bulles prisonnières. */
+  ice(g, r) {
+    const grad = g.createLinearGradient(0, 0, SIZE, SIZE)
+    grad.addColorStop(0, '#d8f0fb')
+    grad.addColorStop(0.5, '#a9d6ee')
+    grad.addColorStop(1, '#7fb9db')
+    g.fillStyle = grad
+    g.fillRect(0, 0, SIZE, SIZE)
+    g.strokeStyle = 'rgba(255,255,255,0.65)'
+    g.lineWidth = 2
+    for (let i = 0; i < 6; i++) {
+      const x = r.range(-40, SIZE)
+      g.beginPath()
+      g.moveTo(x, SIZE)
+      g.lineTo(x + 50, 0)
+      g.stroke()
+    }
+    g.strokeStyle = 'rgba(60,110,150,0.35)'
+    g.lineWidth = 1
+    for (let i = 0; i < 10; i++) {
+      g.beginPath()
+      let x = r.range(0, SIZE)
+      let y = r.range(0, SIZE)
+      g.moveTo(x, y)
+      for (let k = 0; k < 3; k++) {
+        x += r.range(-14, 14)
+        y += r.range(-14, 14)
+        g.lineTo(x, y)
+      }
+      g.stroke()
+    }
+    for (let i = 0; i < 14; i++) {
+      g.fillStyle = 'rgba(255,255,255,0.6)'
+      g.beginPath()
+      g.arc(r.range(0, SIZE), r.range(0, SIZE), r.range(0.8, 2.2), 0, Math.PI * 2)
+      g.fill()
+    }
+  },
+  /** Marbre : fond crème veiné de gris et d'or. */
+  marble(g, r) {
+    g.fillStyle = '#efe9df'
+    g.fillRect(0, 0, SIZE, SIZE)
+    for (let i = 0; i < 7; i++) {
+      g.strokeStyle = i < 2 ? 'rgba(190,150,70,0.45)' : `rgba(110,105,120,${r.range(0.15, 0.4)})`
+      g.lineWidth = r.range(0.6, 2.2)
+      g.beginPath()
+      let x = r.range(-20, SIZE)
+      let y = 0
+      g.moveTo(x, y)
+      while (y < SIZE) {
+        x += r.range(-10, 14)
+        y += r.range(8, 18)
+        g.lineTo(x, y)
+      }
+      g.stroke()
+    }
+    g.strokeStyle = 'rgba(150,140,130,0.5)'
+    g.lineWidth = 1
+    g.strokeRect(0.5, 0.5, 63, 127)
+    g.strokeRect(64.5, 0.5, 63, 127)
+  },
 }
 
 /**
  * Motif répétable d'un matériau, utilisable comme `fillStyle`.
  * @param {CanvasRenderingContext2D} ctx
- * @param {'wood'|'straw'|'stone'|'iron'|'glass'} name
+ * @param {'wood'|'straw'|'stone'|'iron'|'glass'|'brick'|'sandstone'|'ice'|'marble'} name
  */
 export function materialPattern(ctx, name) {
   let cache = patterns.get(ctx)

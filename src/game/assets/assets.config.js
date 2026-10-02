@@ -24,6 +24,10 @@ export const ASSET_MANIFEST = Object.freeze({
   'block.glass': { type: 'procedural' },
   'block.stone': { type: 'procedural' },
   'block.iron': { type: 'procedural' },
+  'block.brick': { type: 'procedural' },
+  'block.sandstone': { type: 'procedural' },
+  'block.ice': { type: 'procedural' },
+  'block.marble': { type: 'procedural' },
   // Personnages
   'target.soldier': { type: 'procedural' },
   'target.knight': { type: 'procedural' },

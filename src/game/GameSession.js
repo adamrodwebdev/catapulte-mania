@@ -102,7 +102,7 @@ export class GameSession extends EventBus {
         score: new ScoreKeeper(level, this.#difficulty),
         shotsTotal: shots,
         shotsLeft: shots,
-        ammo: this.#mode.ammoFor(level),
+        ammo: this.#mode.ammoFor(level, diff),
         selectedAmmo: 'stone',
         flag: this.#mode.players.length > 1 ? PLAYER_FLAGS[i] : null,
       }

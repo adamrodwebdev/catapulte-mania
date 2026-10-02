@@ -139,7 +139,7 @@ function parseRange(arg, max) {
 if (isMainThread) {
   const args = process.argv.slice(2)
   const get = (k) => (args.includes(k) ? args[args.indexOf(k) + 1] : undefined)
-  const ids = parseRange(get('--levels'), 40)
+  const ids = parseRange(get('--levels'), 100)
   const difficulty = get('--difficulty') || 'hard'
   const workers = Math.max(1, Math.min(availableParallelism(), ids.length))
   const chunks = Array.from({ length: workers }, (_, w) => ids.filter((_, i) => i % workers === w))

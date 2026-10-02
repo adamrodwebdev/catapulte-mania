@@ -12,9 +12,9 @@ import { PowerRegistry } from '../src/game/powers/PowerRegistry.js'
 import { starsFor, maxScore } from '../src/game/score/ScoreRules.js'
 import { LevelResult } from '../src/domain/LevelResult.js'
 
-test('les 40 niveaux sont construits, valides et gelés', () => {
+test('les 100 niveaux sont construits, valides et gelés', () => {
   const all = LevelRepository.all()
-  assert.equal(all.length, 40)
+  assert.equal(all.length, 100)
   for (const l of all) {
     assert.ok(Object.isFrozen(l) && Object.isFrozen(l.blocks))
     assert.ok(l.targets.length > 0)
@@ -89,7 +89,7 @@ test('pouvoirs : verrouillés, un seul par tour, coût déduit', () => {
   assert.equal(s.usePower('titan'), true)
   assert.equal(s.usePower('calm'), false, 'un seul pouvoir par tour')
   assert.equal(s.hud.powers.find((p) => p.id === 'titan').armed, true)
-  s.aim(40, 0.6)
+  s.aim(80, 0.05) // tir perdu : la partie continue
   s.fire()
   playUntilAiming(s)
   assert.equal(s.usePower('calm'), true, 'nouveau tour : pouvoir à nouveau disponible')

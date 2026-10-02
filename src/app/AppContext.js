@@ -64,7 +64,7 @@ export function createAppContext() {
      * Partie à lancer : mode ('story' | 'free' | 'duel' | 'hotseat' | 'versus'),
      * niveau ou arène, noms des joueurs (modes à deux).
      */
-    match: { mode: 'story', levelId: 1, arenaId: 1, players: [] },
+    match: { mode: 'story', levelId: 1, arenaId: 1, duelId: 1, players: [] },
     announcement: '',
     captions: [],
     systemDark: false,
@@ -231,10 +231,10 @@ export function createAppContext() {
   /* ----- Lancement d'une partie ----- */
 
   /**
-   * @param {{ mode: string, levelId?: number, arenaId?: number, players?: string[] }} match
+   * @param {{ mode: string, levelId?: number, arenaId?: number, duelId?: number, players?: string[] }} match
    */
   function startMatch(match) {
-    state.match = { mode: match.mode, levelId: match.levelId ?? state.levelId, arenaId: match.arenaId ?? 1, players: [...(match.players || [])] }
+    state.match = { mode: match.mode, levelId: match.levelId ?? state.levelId, arenaId: match.arenaId ?? 1, duelId: match.duelId ?? 1, players: [...(match.players || [])] }
     if (match.levelId) state.levelId = match.levelId
     go('game')
   }
