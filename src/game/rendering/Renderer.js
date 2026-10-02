@@ -68,16 +68,17 @@ export class Renderer {
       assets.draw(ctx, e.assetKey, {
         w: e.width, h: e.height, vertices: e.localVertices, shape: e.shape, damage: e.damageRatio,
         burning: e.burning > 0, time, seed: e.id, pixel,
-        extra: e.kind === 'target' ? { hurt: time - e.hurtAt < 600 || e.damageRatio > 0.6 } : undefined,
+        extra: e.kind === 'target' ? { hurt: time - e.hurtAt < 600 || e.damageRatio > 0.6, team: e.team } : undefined,
       })
       ctx.restore()
     }
 
-    const c = scene.catapult
-    if (c) {
+    // Catapultes (une en solo, deux en face-à-face ; celle de droite est dessinée en miroir).
+    for (const c of scene.catapults || []) {
       ctx.save()
       ctx.translate(c.x, c.y)
-      assets.draw(ctx, 'catapult', { w: 180, h: 140, pixel, time, extra: { armAngle: c.armAngle, load: c.load, loadRadius: c.loadRadius, registry: assets } })
+      if (c.dir === -1) ctx.scale(-1, 1)
+      assets.draw(ctx, 'catapult', { w: 180, h: 140, pixel, time, extra: { armAngle: c.armAngle, load: c.load, loadRadius: c.loadRadius, registry: assets, skin: c.skin, flag: c.flag } })
       ctx.restore()
     }
 
@@ -89,11 +90,12 @@ export class Renderer {
   }
 
   /** Flèche de visée : direction = angle, longueur = puissance. */
-  #drawAim(ctx, { x, y, angle, power }, pixel) {
+  #drawAim(ctx, { x, y, angle, power, dir = 1 }, pixel) {
     const a = (-angle * Math.PI) / 180
     const len = 60 + power * 150
     ctx.save()
     ctx.translate(x, y)
+    if (dir === -1) ctx.scale(-1, 1)
     ctx.rotate(a)
     ctx.lineCap = 'round'
     ctx.setLineDash([10 * Math.max(1, pixel), 8 * Math.max(1, pixel)])

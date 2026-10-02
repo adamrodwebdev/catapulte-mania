@@ -163,13 +163,16 @@ function legs(ctx, s, color) {
   }
 }
 
+/** Couleur de l'équipe du joueur 2 (face-à-face). */
+const TEAM2 = '#3d7a3a'
+
 function soldier(ctx, s) {
   const { w, h } = s
   legs(ctx, s, '#3b3346')
-  // Tunique (tabard) aux couleurs du château.
+  // Tunique (tabard) aux couleurs du château (vert pour le joueur 2 en face-à-face).
   ctx.beginPath()
   roundRect(ctx, -w / 2, -h * 0.12, w, h * 0.44, 5)
-  ctx.fillStyle = '#a3322b'
+  ctx.fillStyle = s.extra?.team === 2 ? TEAM2 : '#a3322b'
   ctx.fill()
   outline(ctx, s)
   ctx.fillStyle = '#d4a537'
@@ -235,7 +238,7 @@ function knight(ctx, s) {
   // Plumet.
   ctx.beginPath()
   ctx.ellipse(w * 0.1, -h * 0.56, w * 0.18, h * 0.07, -0.4, 0, TAU)
-  ctx.fillStyle = '#a3322b'
+  ctx.fillStyle = s.extra?.team === 2 ? TEAM2 : '#a3322b'
   ctx.fill()
   outline(ctx, s, 1)
 }
@@ -414,15 +417,36 @@ const projectiles = {
  */
 export const CATAPULT_GEOMETRY = Object.freeze({ pivotX: 6, pivotY: -78, armLength: 118 })
 
+/**
+ * Apparences de catapulte (atelier) : teinte posée sur le bois, ferrures,
+ * couleur du fanion. `oak` = bois naturel, sans fanion.
+ */
+export const CATAPULT_SKINS = Object.freeze({
+  oak: { tint: null, metal: '#4b515b', flag: null },
+  royal: { tint: 'rgba(47,75,124,0.32)', metal: '#d4a537', flag: '#2f4b7c' },
+  ebony: { tint: 'rgba(20,16,30,0.5)', metal: '#b9b3a6', flag: '#1e1a2b' },
+  dragon: { tint: 'rgba(163,50,43,0.32)', metal: '#ffb347', flag: '#a3322b' },
+})
+
 function catapult(ctx, s) {
-  const { armAngle = Math.PI - 0.25, load = null, loadRadius = 16, registry = null } = s.extra ?? {}
-  const wood = materialPattern(ctx, 'wood')
+  const { armAngle = Math.PI - 0.25, load = null, loadRadius = 16, registry = null, skin = 'oak', flag = null } = s.extra ?? {}
+  const look = CATAPULT_SKINS[skin] || CATAPULT_SKINS.oak
+  const baseWood = materialPattern(ctx, 'wood')
+  // Bois teinté selon l'apparence : on remplit puis on voile chaque pièce.
+  const wood = baseWood
+  const tintFill = () => {
+    if (!look.tint) return
+    ctx.fillStyle = look.tint
+    ctx.fill()
+  }
+  const banner = flag || look.flag
   const { pivotX, pivotY, armLength } = CATAPULT_GEOMETRY
   // Châssis.
   ctx.beginPath()
   roundRect(ctx, -86, -30, 172, 16, 3)
   ctx.fillStyle = wood
   ctx.fill()
+  tintFill()
   outline(ctx, s)
   // Montants en A.
   for (const [x1, x2] of [[-40, pivotX], [52, pivotX]]) {
@@ -434,6 +458,7 @@ function catapult(ctx, s) {
     ctx.closePath()
     ctx.fillStyle = wood
     ctx.fill()
+    tintFill()
     outline(ctx, s)
   }
   // Traverse d'arrêt.
@@ -441,6 +466,7 @@ function catapult(ctx, s) {
   roundRect(ctx, pivotX + 26, -128, 12, 100, 3)
   ctx.fillStyle = wood
   ctx.fill()
+  tintFill()
   outline(ctx, s)
   ctx.beginPath()
   roundRect(ctx, pivotX + 14, -134, 36, 12, 3)
@@ -455,6 +481,7 @@ function catapult(ctx, s) {
   roundRect(ctx, -14, -6, armLength + 14, 12, 4)
   ctx.fillStyle = wood
   ctx.fill()
+  tintFill()
   outline(ctx, s)
   ctx.beginPath()
   ctx.ellipse(armLength, -10, 18, 11, 0, 0, TAU)
@@ -469,10 +496,28 @@ function catapult(ctx, s) {
     ctx.restore()
   }
   ctx.restore()
+  // Fanion (apparence ou couleur du joueur en face-à-face).
+  if (banner) {
+    const px = pivotX + 32
+    ctx.strokeStyle = INK
+    ctx.lineWidth = 2 * (s.pixel ?? 1)
+    ctx.beginPath()
+    ctx.moveTo(px, -134)
+    ctx.lineTo(px, -178)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(px, -178)
+    ctx.lineTo(px - 30, -170)
+    ctx.lineTo(px, -160)
+    ctx.closePath()
+    ctx.fillStyle = banner
+    ctx.fill()
+    outline(ctx, s)
+  }
   // Moyeu.
   ctx.beginPath()
   ctx.arc(pivotX, pivotY, 7, 0, TAU)
-  ctx.fillStyle = '#4b515b'
+  ctx.fillStyle = look.metal
   ctx.fill()
   outline(ctx, s)
   // Roues.

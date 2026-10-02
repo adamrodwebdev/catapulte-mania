@@ -51,7 +51,7 @@ export class GameController extends EventBus {
     return c
   }
 
-  constructor(canvas, level, { difficulty, completedLevels, settings, reducedMotion, audio, haptics }, registry) {
+  constructor(canvas, level, { difficulty, completedLevels, settings, reducedMotion, audio, haptics, effects, mode }, registry) {
     super()
     this.#canvas = canvas
     this.#audio = audio
@@ -64,11 +64,13 @@ export class GameController extends EventBus {
       reducedMotion,
       screenShake: settings.screenShake,
       blood: settings.blood,
-    })
+      effects,
+    }, mode)
     this.session.camera.setFocus(level.focus.left, level.focus.right, level.focus.top)
     this.session.on('hud', (h) => this.emit('hud', h))
     this.session.on('announce', (a) => this.emit('announce', a))
     this.session.on('end', (e) => this.emit('end', e))
+    this.session.on('turn', (e) => this.emit('turn', e))
     this.session.on('feedback', (f) => this.#feedback(f))
   }
 
@@ -132,7 +134,7 @@ export class GameController extends EventBus {
     const scene = this.session.scene()
     if (this.session.state === STATE.AIMING) {
       const c = this.session.catapult
-      scene.aim = { ...c.launchPoint, angle: c.angle, power: c.power }
+      scene.aim = { ...c.launchPoint, angle: c.angle, power: c.power, dir: c.dir }
     }
     return scene
   }
@@ -163,7 +165,8 @@ export class GameController extends EventBus {
     const move = (e) => {
       const d = this.#drag
       if (!d || d.id !== e.pointerId || this.session.state !== STATE.AIMING) return
-      const dx = d.x - e.clientX
+      // On tire vers l'arrière, comme une fronde (inversé pour la catapulte de droite).
+      const dx = (d.x - e.clientX) * this.session.catapult.dir
       const dy = e.clientY - d.y
       const len = Math.hypot(dx, dy)
       if (len < TAP_MAX_PX && !d.moved) return

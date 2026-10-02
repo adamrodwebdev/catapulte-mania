@@ -79,9 +79,22 @@ export class ParticleSystem {
     this.#spawn({ kind: 'flame', x: x + r.range(-w / 2, w / 2), y, vx: r.range(-0.3, 0.3), vy: r.range(-1.6, -0.8), life: 0, max: r.range(350, 700), size: r.range(5, 11), color: r.pick(['#ffb347', '#ff7a2f', '#ffd36b']) })
   }
 
-  trail(x, y, burning) {
+  /**
+   * Traînée du projectile en vol. `style` vient de l'apparence choisie à l'atelier :
+   * smoke (fumée), embers (braises), stars (étincelles dorées).
+   */
+  trail(x, y, burning, style = 'smoke') {
     if (this.#rng.next() > 0.6 * this.density) return
-    this.#spawn({ kind: burning ? 'flame' : 'smoke', x, y, vx: 0, vy: -0.2, life: 0, max: burning ? 300 : 450, size: burning ? 7 : 5, color: burning ? '#ffb347' : 'rgba(230,225,215,' })
+    const r = this.#rng
+    if (burning) {
+      this.#spawn({ kind: 'flame', x, y, vx: 0, vy: -0.2, life: 0, max: 300, size: 7, color: '#ffb347' })
+    } else if (style === 'embers') {
+      this.#spawn({ kind: 'spark', x, y, vx: r.range(-0.4, 0.4), vy: r.range(-0.6, 0), life: 0, max: 420, size: r.range(2, 3.5), color: r.pick(['#ff8c3a', '#ffd36b', '#ff5a2a']) })
+    } else if (style === 'stars') {
+      this.#spawn({ kind: 'flame', x: x + r.range(-4, 4), y: y + r.range(-4, 4), vx: 0, vy: 0, life: 0, max: 520, size: r.range(2, 4), color: r.pick(['#fff1c4', '#d4a537', '#ffffff']) })
+    } else {
+      this.#spawn({ kind: 'smoke', x, y, vx: 0, vy: -0.2, life: 0, max: 450, size: 5, color: 'rgba(230,225,215,' })
+    }
   }
 
   /**

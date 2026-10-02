@@ -24,6 +24,10 @@ const RECOIL_MS = 900
 export class Catapult {
   x
   y = WORLD.GROUND_Y
+  /** Sens de tir : 1 vers la droite, -1 vers la gauche (face-à-face). */
+  dir = 1
+  /** Multiplicateur de vitesse (amélioration « Bras renforcé »). */
+  speedFactor = 1
   /** Angle de tir en degrés (0 = horizontal, 90 = vertical). */
   angle = 45
   /** Puissance de 0 à 1. */
@@ -33,8 +37,14 @@ export class Catapult {
   #onRelease = null
   armAngle = REST_ANGLE
 
-  constructor(x = 170) {
+  /**
+   * @param {number} [x] position au sol
+   * @param {{ dir?: 1 | -1, speedFactor?: number }} [opts]
+   */
+  constructor(x = 170, { dir = 1, speedFactor = 1 } = {}) {
     this.x = Guard.number(x, 'catapult x', { min: 0, max: WORLD.WIDTH })
+    this.dir = dir === -1 ? -1 : 1
+    this.speedFactor = Guard.number(speedFactor, 'speedFactor', { min: 0.5, max: 1.5 })
   }
 
   /** @param {number} angle degrés @param {number} power 0..1 */
@@ -44,13 +54,13 @@ export class Catapult {
   }
 
   get speed() {
-    return AIM.MIN_SPEED + (AIM.MAX_SPEED - AIM.MIN_SPEED) * this.power
+    return (AIM.MIN_SPEED + (AIM.MAX_SPEED - AIM.MIN_SPEED) * this.power) * this.speedFactor
   }
 
   /** Vitesse initiale (unités Matter normalisées, Y vers le bas). */
   get velocity() {
     const a = toRad(this.angle)
-    return { x: Math.cos(a) * this.speed, y: -Math.sin(a) * this.speed }
+    return { x: Math.cos(a) * this.speed * this.dir, y: -Math.sin(a) * this.speed }
   }
 
   /** Position du godet au moment du lâcher. */
@@ -58,7 +68,7 @@ export class Catapult {
     const { pivotX, pivotY, armLength } = CATAPULT_GEOMETRY
     const c = Math.cos(RELEASE_ANGLE)
     const s = Math.sin(RELEASE_ANGLE)
-    return { x: this.x + pivotX + c * armLength + s * 14, y: this.y + pivotY + s * armLength - c * 14 }
+    return { x: this.x + this.dir * (pivotX + c * armLength + s * 14), y: this.y + pivotY + s * armLength - c * 14 }
   }
 
   get busy() {

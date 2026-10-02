@@ -9,7 +9,7 @@ export { TARGET_TYPES }
 /** Personnage à éliminer, caché dans la structure. */
 export class Target extends Entity {
   /**
-   * @param {{ type: string, x: number, y: number }} def
+   * @param {{ type: string, x: number, y: number, team?: number }} def
    * @param {number} hpFactor multiplicateur de difficulté
    */
   constructor(def, hpFactor = 1) {
@@ -25,6 +25,8 @@ export class Target extends Entity {
     })
     super({ kind: 'target', body, assetKey: `target.${type}`, hp: t.hp * hpFactor, width: t.w, height: t.h, flammable: true })
     this.type = type
+    /** Équipe (face-à-face) : 1 ou 2 ; 0 hors face-à-face. */
+    this.team = def.team === 1 || def.team === 2 ? def.team : 0
     this.scoreValue = t.score
     this.burnDps = 25
     /** Instant (ms de jeu) du dernier coup encaissé, pour l'animation. */

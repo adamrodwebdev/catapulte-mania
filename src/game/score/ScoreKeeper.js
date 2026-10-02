@@ -74,6 +74,15 @@ export class ScoreKeeper {
   }
 
   /**
+   * Score final (bonus de tirs restants compris) sans clore le niveau.
+   * Sert aux modes qui n'enregistrent rien (libre, deux joueurs).
+   */
+  finalScore({ won, shotsLeft }) {
+    const bonus = won ? Math.max(0, shotsLeft) * SCORE.SHOT_BONUS : 0
+    return Math.max(0, Math.round((this.#points + bonus - this.#penalty) * this.factor))
+  }
+
+  /**
    * Clôt le niveau et produit le résultat authentifié.
    * @param {{ won: boolean, shotsLeft: number, shotsUsed: number }} end
    */
