@@ -39,7 +39,8 @@ const infinite = computed(() => props.hud.shotsTotal === null)
       <div v-for="(p, i) in hud.players" :key="i" :class="['hud-player', `hud-player--${i + 1}`, { 'hud-player--active': p.active }]">
         <dt><span :class="['player-dot', `player-dot--${i + 1}`]" aria-hidden="true" />{{ p.name }}<span v-if="p.active" class="visually-hidden">, {{ t('game.turnOf', { name: p.name }) }}</span></dt>
         <dd class="hud-stat__value">
-          <template v-if="hud.mode === 'versus'"><AppIcon name="crown" :size="14" />{{ p.defenders }}</template>
+          <template v-if="hud.mode === 'versus'"><AppIcon name="crown" :size="14" />{{ p.defenders }}<span class="visually-hidden"> {{ t('mp.defenders') }}</span></template>
+          <template v-else-if="hud.mode === 'duel' || hud.mode === 'coop'"><AppIcon name="trophy" :size="14" />{{ p.renown }}<span class="visually-hidden"> {{ t('mp.renown') }}</span></template>
           <template v-else>{{ p.score.toLocaleString(state.locale) }}</template>
           <span class="hud-player__shots">· {{ p.shotsLeft }} <span class="visually-hidden">{{ t('game.shots') }}</span></span>
         </dd>

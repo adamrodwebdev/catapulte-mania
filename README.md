@@ -7,7 +7,7 @@ Réglez l'angle et la puissance, calculez la trajectoire, et faites tomber les f
 - 3 difficultés (Facile, Normal, Difficile : un tir et la moitié des munitions spéciales en moins)
 - 6 pouvoirs spéciaux à débloquer (un seul par tour, chaque utilisation coûte des points)
 - **Mode libre** : rejouer les niveaux terminés sans limite de tirs ni de munitions
-- **Deux joueurs** sur le même appareil : duel, chacun sa partie ou face-à-face
+- **Deux joueurs** sur le même appareil : la campagne à deux en coopération, le duel, le tournoi et le face-à-face, chacun avec ses propres conditions de victoire
 - **Une histoire** : la Chronique, avec quatre personnages en pixel art, une réplique avant chaque niveau et un épisode à chaque chapitre
 - **Tutoriels guidés** : chaque nouvelle munition et chaque nouveau pouvoir s'apprennent dans un niveau dédié
 - **Bande son médiévale** composée en direct, qui s'intensifie aux moments forts
@@ -147,11 +147,21 @@ Un seul pouvoir par tour. Chaque utilisation retire des points au score final.
 |---|---|---|
 | **Campagne** | Jouer → profil → carte des niveaux | Les 100 niveaux dans l'ordre. Rapporte des étoiles et de l'or. |
 | **Mode libre** | Carte des niveaux → « Mode libre » | Rejouer un niveau déjà terminé avec tirs et munitions illimités (celles découvertes en campagne) et pouvoirs gratuits (toujours un par tour). Rien n'est enregistré. |
-| **Duel** | Accueil → Deux joueurs | Six grands châteaux dédiés (10 à 15 défenseurs, 8 à 9 tirs chacun). Un tir chacun, chaque destruction rapporte des points au tireur. Le meilleur score gagne. |
-| **Chacun sa partie** | Accueil → Deux joueurs | Le joueur 1 joue tout le niveau, puis le joueur 2. Le meilleur score gagne. |
-| **Face-à-face** | Accueil → Deux joueurs | Chaque joueur a sa catapulte et son château (5 arènes symétriques). Le premier qui abat tous les défenseurs adverses gagne. Si les tirs s'épuisent, celui qui a gardé le plus de défenseurs l'emporte. |
+| **Campagne à deux** | Accueil → Deux joueurs | Les 100 niveaux de l'histoire, à deux et en coopération (voir ci-dessous). |
+| **Duel : la conquête** | Accueil → Deux joueurs | Le même grand château, un tir chacun (voir ci-dessous). |
+| **Chacun sa partie : le tournoi** | Accueil → Deux joueurs | Trois manches sur trois niveaux, au meilleur des trois. |
+| **Face-à-face : le siège** | Accueil → Deux joueurs | Chacun sa catapulte, son château et son roi (6 arènes symétriques). |
 
-À deux, les joueurs sont repérés par une couleur **et** une forme (rond rouge, carré vert) et par leur nom, pour rester lisibles par les personnes daltoniennes. Les niveaux proposés sont le chapitre 1 et tout ce que vos profils ont déjà débloqué.
+**À deux, tout se joue en Difficile** : deux humains face aux châteaux, il fallait des défis à leur mesure (un tir de moins, vent plus fort, défenseurs plus résistants, moitié moins de munitions spéciales). Chaque défenseur abattu rapporte de la **renommée** à celui qui a tiré : soldat 1, chevalier 2, roi 4, et 2 de plus pour le **coup de grâce** (le dernier défenseur).
+
+| Mode | Comment on gagne |
+|---|---|
+| **Campagne à deux** | Ensemble : les deux joueurs tirent à tour de rôle, se partagent les tirs du niveau et les munitions, et ont un score commun. Les étoiles se gagnent au nombre total de tirs. Le plus renommé est désigné **meilleur joueur**. La progression à deux est enregistrée à part dans le profil choisi, avec la Chronique et ses répliques. |
+| **Duel** | Le plus renommé l'emporte. Dès que l'écart ne peut plus être rattrapé, la partie s'arrête (**victoire assurée**). À égalité de renommée, le meilleur score départage. Six grands châteaux de 10 à 15 défenseurs. |
+| **Tournoi** | Chacun joue le niveau à son tour (celui qui commence alterne). Une manche est gagnée par celui qui prend le château, et s'ils le prennent tous les deux, par celui qui a utilisé **le moins de tirs**. S'ils échouent tous les deux, c'est le plus de défenseurs abattus qui compte, puis le score. Le premier à deux manches gagne. |
+| **Face-à-face** | **Régicide** : abattre le roi adverse donne la victoire aussitôt. Sinon, il faut abattre tous ses défenseurs. Si les tirs s'épuisent, le château le plus solide encore debout l'emporte (renommée des survivants, puis leur nombre). Abattre ses propres défenseurs ne rapporte rien : tirez en cloche par-dessus votre château ! |
+
+À deux, les joueurs sont repérés par une couleur **et** une forme (rond rouge, carré vert) et par leur nom, pour rester lisibles par les personnes daltoniennes. Le tournoi propose le chapitre 1 et tout ce que vos profils ont déjà débloqué.
 
 ### L'atelier et l'or
 
@@ -297,7 +307,7 @@ src/
 ├── game/
 │   ├── GameController.js   Relie le moteur au canevas (boucle, entrées, redimensionnement)
 │   ├── GameSession.js      Une partie : joueurs, tours, tirs, fin de partie
-│   ├── modes/              GameMode → StoryMode, FreeMode, DuelMode, HotSeatMode, VersusMode
+│   ├── modes/              GameMode → StoryMode, FreeMode, CoopMode, DuelMode, HotSeatMode, VersusMode ; HotSeatMatch (tournoi), Renown
 │   ├── progression/        UpgradeCatalog (atelier), GoldRules (barème de l'or), Achievements (les 18 défis)
 │   ├── tutorial/           TutorialCoach : les tutoriels guidés, étape par étape
 │   ├── story/              StoryRepository (la Chronique), Portraits (personnages pixel art dessinés par le code)
@@ -392,6 +402,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v3.2.0 | Tutoriels guidés pour chaque outil, feu grégeois dès le niveau 9, 18 défis variés et or des défis (tout l'atelier devient accessible), bande son adaptative, la Chronique (récit entre les chapitres) |
 | v3.2.1 | Les munitions découvertes restent disponibles pendant toute la campagne |
 | v3.3.0 | Les personnages de la Chronique en pixel art (sans images), une réplique avant chaque niveau, histoire réécrite |
+| v3.4.0 | Campagne à deux en coopération, nouvelles conditions de victoire (renommée, tournoi, régicide), tout en Difficile à deux, 6 arènes avec un roi |
 
 Pour revenir à une version précise avec Git : `git checkout v0.4.0` (puis `git checkout main` pour revenir à la dernière).
 

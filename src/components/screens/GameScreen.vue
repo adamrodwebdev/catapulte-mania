@@ -20,6 +20,7 @@ import StoryPanel from '../ui/StoryPanel.vue'
 import PixelPortrait from '../ui/PixelPortrait.vue'
 import { StoryRepository } from '../../game/story/StoryRepository.js'
 import { TutorialCoach } from '../../game/tutorial/Tutorial.js'
+import { HotSeatMatch } from '../../game/modes/HotSeatMatch.js'
 import ToggleSwitch from '../ui/ToggleSwitch.vue'
 
 const app = useApp()
@@ -34,18 +35,30 @@ const phase = ref('loading') // loading | story | intro | playing | paused | end
 const storyBeat = shallowRef(null)
 const showPowers = ref(false)
 const end = ref(null)
-/** Mode de la partie : histoire, libre, duel, chacun sa partie, face-à-face. */
+/** Mode de la partie : histoire, libre, duel, chacun sa partie, face-à-face, campagne à deux. */
 const mode = computed(() => state.match.mode || 'story')
-const isMulti = computed(() => ['duel', 'hotseat', 'versus'].includes(mode.value))
+const isMulti = computed(() => ['duel', 'hotseat', 'versus', 'coop'].includes(mode.value))
+const isCoop = computed(() => mode.value === 'coop')
+/** Modes qui suivent la campagne (récit, répliques). */
+const isCampaign = computed(() => mode.value === 'story' || isCoop.value)
 const isVersus = computed(() => mode.value === 'versus')
 const isDuel = computed(() => mode.value === 'duel')
 const level = computed(() =>
   isVersus.value ? ArenaRepository.get(state.match.arenaId) : isDuel.value ? DuelRepository.get(state.match.duelId) : LevelRepository.get(state.levelId),
 )
-const novelties = computed(() => (mode.value === 'story' ? LevelRepository.novelties(state.levelId) : []))
-/** Chacun sa partie : manche en cours (0 = joueur 1, 1 = joueur 2) et scores des manches. */
-const round = ref(0)
-const roundScores = ref([])
+const novelties = computed(() => (isCampaign.value ? LevelRepository.novelties(state.levelId) : []))
+/** Chacun sa partie : le tournoi en trois manches (objet non réactif) et sa copie d'affichage. */
+let tourney = null
+const tourneyView = shallowRef(null)
+function refreshTourney() {
+  tourneyView.value = tourney ? { round: tourney.round, player: tourney.player, wins: tourney.wins, table: tourney.table, finished: tourney.finished, winner: tourney.winner, totals: tourney.totals } : null
+}
+function newTourney() {
+  const names = state.match.players.length === 2 ? state.match.players : [t('mp.defaultName', { n: 1 }), t('mp.defaultName', { n: 2 })]
+  const levels = state.match.levels?.length === 3 ? state.match.levels : HotSeatMatch.levelsFrom(state.levelId, app.multiplayerLevels())
+  tourney = markRaw(new HotSeatMatch(levels, names))
+  refreshTourney()
+}
 /** Bandeau « Au tour de… » (modes à deux). */
 const turnBanner = ref(null)
 let turnTimer = null
@@ -101,26 +114,32 @@ async function startLevel() {
   showPowers.value = false
   phase.value = 'loading'
   const profile = state.profile
-  const rec = profile?.levels[state.levelId]
-  // Contrôles d'accès : la campagne suit la progression, le mode libre exige un niveau terminé.
-  if ((mode.value === 'story' && !rec?.unlocked) || (mode.value === 'free' && !rec?.completed)) {
-    app.go(profile ? 'levels' : 'profiles', { replace: true })
+  if (mode.value === 'hotseat') {
+    if (!tourney || tourney.finished) newTourney()
+    state.levelId = tourney.levelId
+  }
+  const rec = isCoop.value ? profile?.coop?.levels[state.levelId] : profile?.levels[state.levelId]
+  // Contrôles d'accès : la campagne (seul ou à deux) suit la progression, le mode libre exige un niveau terminé.
+  if ((isCampaign.value && !rec?.unlocked) || (mode.value === 'free' && !rec?.completed)) {
+    app.go(profile ? (isCoop.value ? 'multiplayer' : 'levels') : 'profiles', { replace: true })
     return
   }
   const players = state.match.players.length === 2 ? state.match.players : [t('mp.defaultName', { n: 1 }), t('mp.defaultName', { n: 2 })]
-  const completedLevels = profile?.completed ?? 0
+  // Pouvoirs : ceux débloqués par le profil, en solo comme à deux.
+  const completedLevels = Math.max(profile?.completed ?? 0, isCoop.value ? (profile?.coop?.completed ?? 0) : 0)
   const effects = app.activeSlot?.effects
   const rules =
     mode.value === 'story' || mode.value === 'free'
       ? createMode(mode.value, { effects, completedLevels })
       : mode.value === 'hotseat'
-        ? createMode('hotseat', { players: [players[round.value]], completedLevels })
+        ? createMode('hotseat', { players: [players[tourney.player]], completedLevels })
         : createMode(mode.value, { players, completedLevels })
   const { GameController } = await import('../../game/GameController.js')
   if (!canvas.value) return
   controller = markRaw(
     await GameController.create(canvas.value, level.value, {
-      difficulty: isMulti.value ? 'normal' : profile.difficulty,
+      // À deux, tout se joue en Difficile : deux humains, des châteaux à leur mesure.
+      difficulty: isMulti.value ? 'hard' : profile.difficulty,
       completedLevels,
       settings: { ...state.settings },
       reducedMotion: app.reducedMotion(),
@@ -148,7 +167,7 @@ async function startLevel() {
   stopCoach()
   if (mode.value === 'story' && level.value.tutorial && !rec?.completed && state.settings.tutorials !== false) startCoach(level.value.tutorial)
   // Premier passage d'un niveau qui ouvre un chapitre : la Chronique d'abord.
-  const beat = mode.value === 'story' && !rec?.completed && state.settings.story !== false ? StoryRepository.before(state.levelId) : null
+  const beat = isCampaign.value && !rec?.completed && state.settings.story !== false ? StoryRepository.before(state.levelId) : null
   storyBeat.value = beat
   phase.value = beat ? 'story' : 'intro'
   await nextTick()
@@ -257,20 +276,17 @@ function usePower(id) {
 }
 function quit() {
   destroyController()
-  round.value = 0
-  roundScores.value = []
+  tourney = null
+  refreshTourney()
   app.go(isMulti.value ? 'multiplayer' : 'levels')
 }
-/** Rejouer : en « chacun sa partie », on repart de la manche du joueur 1. */
+/** Rejouer : en « chacun sa partie », la revanche repart d'un tournoi neuf. */
 function restart() {
-  if (mode.value === 'hotseat' && phase.value === 'ended') {
-    round.value = 0
-    roundScores.value = []
-  }
+  if (mode.value === 'hotseat' && phase.value === 'ended' && end.value?.kind === 'tourney') tourney = null
   startLevel()
 }
+/** Chacun sa partie : au joueur suivant, ou à la manche suivante. */
 function nextRound() {
-  round.value = 1
   startLevel()
 }
 function nextLevel() {
@@ -281,7 +297,7 @@ function nextLevel() {
 /* ---------- Chronique ---------- */
 
 /** Réplique d'un personnage avant le niveau (campagne, si le récit est affiché). */
-const interlude = computed(() => (mode.value === 'story' && state.settings.story !== false ? StoryRepository.line(state.levelId) : null))
+const interlude = computed(() => (isCampaign.value && state.settings.story !== false ? StoryRepository.line(state.levelId) : null))
 
 function storyDone() {
   storyBeat.value = null
@@ -295,7 +311,7 @@ function readEpilogue() {
 /* ---------- Musique ---------- */
 
 /** Dernier niveau d'un chapitre (tous les 10) : la tension reste élevée. */
-const isBoss = computed(() => mode.value === 'story' && state.levelId % GAME.LEVELS_PER_CHAPTER === 0)
+const isBoss = computed(() => isCampaign.value && state.levelId % GAME.LEVELS_PER_CHAPTER === 0)
 function updateMusic() {
   const h = hud.value
   const music = app.services.music
@@ -311,29 +327,66 @@ watch(() => [hud.value?.state, hud.value?.targetsLeft], () => phase.value === 'p
 async function onEnd(e) {
   app.services.music.stop(1.5)
   if (mode.value === 'story') return onStoryEnd(e)
-  const names = controller?.session.players.map((p) => p.name) ?? []
+  if (isCoop.value) return onCoopEnd(e)
+  const session = controller?.session
+  const names = session?.players.map((p) => p.name) ?? []
   let view
   if (mode.value === 'free') {
     view = { kind: 'free' }
   } else if (mode.value === 'hotseat') {
-    roundScores.value = [...roundScores.value, e.scores[0]]
-    if (round.value === 0) {
-      view = { kind: 'round', name: names[0], score: e.scores[0], next: state.match.players[1] || t('mp.defaultName', { n: 2 }) }
-    } else {
-      const [a, b] = roundScores.value
-      const winner = a === b ? null : a > b ? 0 : 1
-      view = { kind: 'compare', winner, names: state.match.players, scores: roundScores.value }
-    }
+    const p = session.players[0]
+    const shots = p.shotsTotal - p.shotsLeft
+    const kills = session.level.targets.length - session.targetsLeft
+    const who = tourney.player
+    const step = tourney.record({ cleared: e.won, shots, kills, score: e.scores[0] })
+    refreshTourney()
+    const result = { name: state.match.players[who] || names[0], cleared: e.won, shots, kills, score: e.scores[0] }
+    if (step === 'next-player') view = { kind: 'round', who, result, next: tourney.player, nextName: tourney.players[tourney.player] }
+    else if (step === 'round-over') view = { kind: 'roundEnd', round: tourney.round - 1, winner: tourney.roundWinner(tourney.round - 1) }
+    else view = { kind: 'tourney', winner: tourney.winner, names: [...tourney.players] }
   } else {
-    view = { kind: 'compare', winner: e.winner, names, scores: e.scores, defenders: isVersus.value ? controller?.session.hud.players.map((p) => p.defenders) : null }
+    view = {
+      kind: 'compare',
+      winner: e.winner,
+      reason: e.reason,
+      names,
+      scores: e.scores,
+      renown: e.renown,
+      defenders: isVersus.value ? session?.hud.players.map((p) => p.defenders) : null,
+    }
   }
   setTimeout(() => {
     end.value = view
     phase.value = 'ended'
-    if (view.kind === 'compare') app.announce(view.winner === null ? t('end.draw') : t('end.winner', { name: view.names[view.winner] }))
-    else if (view.kind === 'round') app.announce(`${t('end.roundDone', { name: view.name })}. ${t('end.points', { score: view.score })}`)
+    if (view.kind === 'compare' || view.kind === 'tourney') app.announce(view.winner === null ? t('end.draw') : t('end.winner', { name: view.names[view.winner] }))
+    else if (view.kind === 'round') app.announce(t('end.roundDone', { name: view.result.name }))
+    else if (view.kind === 'roundEnd') app.announce(view.winner === null ? t('end.roundDraw') : t('end.roundWon', { name: tourney.players[view.winner] }))
     else app.announce(t('end.cleared'))
   }, 1200)
+}
+
+/** Fin d'un niveau de la campagne à deux : progression commune, meilleur joueur. */
+async function onCoopEnd({ won, result, renown }) {
+  const outcome = result ? await app.recordCoop(result) : { saved: true }
+  const names = controller?.session.players.map((p) => p.name) ?? []
+  const [a, b] = renown ?? [0, 0]
+  setTimeout(() => {
+    end.value = {
+      kind: 'coop',
+      won,
+      score: result?.score ?? 0,
+      stars: result?.stars ?? 0,
+      shotsUsed: result?.shotsUsed ?? 0,
+      names,
+      renown: [a, b],
+      mvp: a === b ? null : a > b ? 0 : 1,
+      newBest: won && outcome.newBest,
+      saved: outcome.saved !== false,
+      hasNext: won && state.levelId < PLAYABLE_LEVELS,
+    }
+    phase.value = 'ended'
+    app.announce(won ? `${t('end.victory')} ${t('a11y.stars', { count: result.stars })}` : t('end.defeat'))
+  }, won ? 1400 : 900)
 }
 
 async function onStoryEnd({ won, result }) {
@@ -368,6 +421,8 @@ const matchTitle = computed(() =>
   isVersus.value ? t(`mp.arenas.${state.match.arenaId}`) : isDuel.value ? t(`mp.duels.${state.match.duelId}`) : t('game.level', { n: state.levelId }),
 )
 const matchSubtitle = computed(() => {
+  if (isCoop.value) return `${t('mp.formats.coop.name')} · ${t('levels.chapter', { n: level.value.chapter })} · ${t(`levels.chapters.${level.value.chapter}`)}`
+  if (mode.value === 'hotseat' && tourneyView.value) return `${t('mp.formats.hotseat.name')} · ${t('mp.roundOf', { n: Math.min(tourneyView.value.round + 1, 3) })}`
   if (isMulti.value) return t(`mp.formats.${mode.value}.name`)
   if (mode.value === 'free') return t('levels.free')
   return `${t('levels.chapter', { n: level.value.chapter })} · ${t(`levels.chapters.${level.value.chapter}`)}`
@@ -474,7 +529,7 @@ const canvasLabel = computed(() =>
     <ModalPanel v-if="phase === 'intro'" labelledby="intro-title" :closable="false">
       <p class="modal__eyebrow">{{ matchSubtitle }}</p>
       <h2 id="intro-title" class="modal__title">{{ matchTitle }}</h2>
-      <template v-if="mode === 'story'">
+      <template v-if="isCampaign">
         <figure v-if="interlude" class="interlude">
           <PixelPortrait :id="interlude.speaker" height="5.5rem" decorative class="interlude__portrait" />
           <figcaption class="interlude__text">
@@ -482,20 +537,27 @@ const canvasLabel = computed(() =>
             <q>{{ t(interlude.key) }}</q>
           </figcaption>
         </figure>
-        <p>{{ t('intro.goal') }} {{ t('intro.shots', { count: hud?.shotsTotal ?? level.shots }) }}</p>
+        <p v-if="isCoop">{{ t('mp.formats.coop.desc') }}</p>
+        <p class="intro-players" v-if="isCoop">
+          <span v-for="(p, i) in hud?.players" :key="i" class="intro-players__name"><span :class="['player-dot', `player-dot--${i + 1}`]" aria-hidden="true" />{{ t('mp.shotsEach', { name: p.name, count: p.shotsLeft }) }}</span>
+        </p>
+        <p v-else>{{ t('intro.goal') }} {{ t('intro.shots', { count: hud?.shotsTotal ?? level.shots }) }}</p>
         <p class="intro-stars">
           <span><StarRow :count="3" :size="16" />{{ t('intro.star3', { count: level.par }) }}</span>
           <span><StarRow :count="2" :size="16" />{{ t('intro.star2', { count: level.star2 }) }}</span>
         </p>
-        <h3 class="intro-ach__title"><AppIcon name="trophy" :size="18" />{{ t('ach.title') }}</h3>
-        <AchievementList :level="level" :mask="state.profile?.levels[state.levelId]?.ach ?? 0" compact />
+        <template v-if="!isCoop">
+          <h3 class="intro-ach__title"><AppIcon name="trophy" :size="18" />{{ t('ach.title') }}</h3>
+          <AchievementList :level="level" :mask="state.profile?.levels[state.levelId]?.ach ?? 0" compact />
+        </template>
       </template>
       <p v-else-if="mode === 'free'">{{ t('levels.freeHint') }}</p>
       <template v-else>
         <p>{{ t(`mp.formats.${mode}.desc`) }}</p>
         <p class="intro-players">
           <template v-if="mode === 'hotseat'">
-            <span :class="['player-dot', `player-dot--${round + 1}`]" aria-hidden="true" />{{ t('game.turnOf', { name: hud?.players[0]?.name }) }}
+            <span :class="['player-dot', `player-dot--${(tourneyView?.player ?? 0) + 1}`]" aria-hidden="true" />{{ t('game.turnOf', { name: hud?.players[0]?.name }) }}
+            <span v-if="tourneyView" class="intro-players__meta">{{ t('mp.roundsWon', { a: tourneyView.wins[0], b: tourneyView.wins[1] }) }}</span>
           </template>
           <template v-else>
             <span v-for="(p, i) in hud?.players" :key="i" class="intro-players__name"><span :class="['player-dot', `player-dot--${i + 1}`]" aria-hidden="true" />{{ p.name }}</span>
@@ -573,28 +635,66 @@ const canvasLabel = computed(() =>
       </div>
     </ModalPanel>
 
-    <!-- Fin de manche : chacun sa partie -->
+    <!-- Chacun sa partie : un joueur a fini, au suivant -->
     <ModalPanel v-if="phase === 'ended' && end?.kind === 'round'" labelledby="end-title" :closable="false">
-      <h2 id="end-title" class="modal__title">{{ t('end.roundDone', { name: end.name }) }}</h2>
-      <p class="end__big">{{ t('end.points', { score: end.score.toLocaleString(state.locale) }) }}</p>
+      <h2 id="end-title" class="modal__title">{{ t('end.roundDone', { name: end.result.name }) }}</h2>
+      <p class="end__big">{{ end.result.cleared ? t('mp.clearedIn', { count: end.result.shots }) : t('mp.felled', { count: end.result.kills }) }}</p>
+      <p>{{ t('end.points', { score: end.result.score.toLocaleString(state.locale) }) }}</p>
+      <p class="notice">{{ end.result.cleared ? t('mp.toBeatCleared', { name: end.nextName, count: end.result.shots }) : t('mp.toBeatKills', { name: end.nextName, count: end.result.kills }) }}</p>
       <div class="modal__actions">
         <button type="button" class="btn btn--primary btn--large" data-autofocus @click="nextRound">
-          <span class="player-dot player-dot--2" aria-hidden="true" />{{ t('end.nextRound', { name: end.next }) }}
+          <span :class="['player-dot', `player-dot--${end.next + 1}`]" aria-hidden="true" />{{ t('end.nextRound', { name: end.nextName }) }}
         </button>
         <button type="button" class="btn btn--ghost" @click="quit">{{ t('game.quit') }}</button>
       </div>
     </ModalPanel>
 
-    <!-- Fin : résultat à deux joueurs -->
+    <!-- Chacun sa partie : fin de manche, ou fin du tournoi -->
+    <ModalPanel v-if="phase === 'ended' && (end?.kind === 'roundEnd' || end?.kind === 'tourney') && tourneyView" labelledby="end-title" :tone="end.kind === 'tourney' ? 'victory' : 'neutral'" :closable="false">
+      <p class="modal__eyebrow">{{ t('mp.formats.hotseat.name') }}</p>
+      <h2 id="end-title" class="modal__title">
+        <template v-if="end.kind === 'tourney'">{{ end.winner === null ? t('end.draw') : t('end.winner', { name: end.names[end.winner] }) }}</template>
+        <template v-else>{{ end.winner === null ? t('end.roundDraw') : t('end.roundWon', { name: tourney?.players[end.winner] }) }}</template>
+      </h2>
+      <table class="tourney">
+        <caption class="visually-hidden">{{ t('mp.tourneyTable') }}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{{ t('mp.round') }}</th>
+            <th v-for="(n, i) in state.match.players" :key="i" scope="col"><span :class="['player-dot', `player-dot--${i + 1}`]" aria-hidden="true" />{{ n }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(r, k) in tourneyView.table" :key="k" :class="{ 'tourney__row--pending': !r.played }">
+            <th scope="row">{{ t('game.level', { n: r.levelId }) }}</th>
+            <td v-for="(x, i) in r.results" :key="i" :class="{ 'tourney__win': r.played && r.winner === i }">
+              <template v-if="x">{{ x.cleared ? t('mp.clearedShort', { count: x.shots }) : t('mp.felledShort', { count: x.kills }) }}<AppIcon v-if="r.played && r.winner === i" name="crown" :size="14" /></template>
+              <template v-else>–</template>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="end__big">{{ t('mp.roundsWon', { a: tourneyView.wins[0], b: tourneyView.wins[1] }) }}</p>
+      <div class="modal__actions">
+        <button v-if="end.kind === 'roundEnd'" type="button" class="btn btn--primary btn--large" data-autofocus @click="nextRound">
+          <span :class="['player-dot', `player-dot--${(tourneyView.player ?? 0) + 1}`]" aria-hidden="true" />{{ t('mp.nextRoundOf', { n: tourneyView.round + 1, name: tourney?.players[tourneyView.player] }) }}
+        </button>
+        <button v-else type="button" class="btn btn--primary btn--large" data-autofocus @click="restart"><AppIcon name="refresh" />{{ t('end.rematch') }}</button>
+        <button type="button" class="btn btn--ghost" @click="quit"><AppIcon name="users" />{{ t('end.otherMatch') }}</button>
+      </div>
+    </ModalPanel>
+
+    <!-- Duel et face-à-face : résultat -->
     <ModalPanel v-if="phase === 'ended' && end?.kind === 'compare'" labelledby="end-title" tone="victory" :closable="false">
       <h2 id="end-title" class="modal__title">{{ end.winner === null ? t('end.draw') : t('end.winner', { name: end.names[end.winner] }) }}</h2>
+      <p v-if="end.reason" class="end__reason">{{ t(`mp.reasons.${end.reason}`) }}</p>
       <ol class="versus-result">
         <li v-for="(name, i) in end.names" :key="i" :class="['versus-result__row', { 'versus-result__row--win': end.winner === i }]">
           <span :class="['player-dot', `player-dot--${i + 1}`]" aria-hidden="true" />
           <span class="versus-result__name">{{ name }}</span>
           <span class="versus-result__score">
             <template v-if="end.defenders">{{ t('end.defendersLeft', { count: end.defenders[i] }) }}</template>
-            <template v-else>{{ t('end.points', { score: end.scores[i].toLocaleString(state.locale) }) }}</template>
+            <template v-else>{{ t('mp.renownPts', { count: end.renown[i] }) }} · {{ t('end.points', { score: end.scores[i].toLocaleString(state.locale) }) }}</template>
           </span>
           <AppIcon v-if="end.winner === i" name="crown" :size="20" />
         </li>
@@ -602,6 +702,32 @@ const canvasLabel = computed(() =>
       <div class="modal__actions">
         <button type="button" class="btn btn--primary btn--large" data-autofocus @click="restart"><AppIcon name="refresh" />{{ t('end.rematch') }}</button>
         <button type="button" class="btn btn--ghost" @click="quit"><AppIcon name="users" />{{ t('end.otherMatch') }}</button>
+      </div>
+    </ModalPanel>
+
+    <!-- Campagne à deux : fin de niveau -->
+    <ModalPanel v-if="phase === 'ended' && end?.kind === 'coop'" labelledby="end-title" :tone="end.won ? 'victory' : 'defeat'" :closable="false">
+      <p class="modal__eyebrow">{{ t('mp.formats.coop.name') }}</p>
+      <h2 id="end-title" class="modal__title">{{ end.won ? t('end.victory') : t('end.defeat') }}</h2>
+      <template v-if="end.won">
+        <StarRow :count="end.stars" :size="40" class="end__stars" />
+        <p class="end__shots">{{ t('end.shotsUsed', { count: end.shotsUsed }) }} · {{ t('end.points', { score: end.score.toLocaleString(state.locale) }) }}</p>
+        <p v-if="end.newBest" class="end__badge">{{ t('end.newBest') }}</p>
+      </template>
+      <p v-else>{{ t('mp.coopDefeat') }}</p>
+      <ol class="versus-result">
+        <li v-for="(name, i) in end.names" :key="i" :class="['versus-result__row', { 'versus-result__row--win': end.mvp === i }]">
+          <span :class="['player-dot', `player-dot--${i + 1}`]" aria-hidden="true" />
+          <span class="versus-result__name">{{ name }}</span>
+          <span class="versus-result__score">{{ t('mp.renownPts', { count: end.renown[i] }) }}</span>
+          <span v-if="end.mvp === i" class="mvp-badge">{{ t('mp.mvp') }}</span>
+        </li>
+      </ol>
+      <p v-if="!end.saved" class="notice notice--warning" role="alert">{{ t('end.saveError') }}</p>
+      <div class="modal__actions">
+        <button v-if="end.hasNext" type="button" class="btn btn--primary btn--large" data-autofocus @click="nextLevel">{{ t('end.next') }}</button>
+        <button type="button" :class="['btn', { 'btn--primary btn--large': !end.won }]" :data-autofocus="!end.hasNext ? '' : undefined" @click="restart"><AppIcon name="refresh" />{{ t('end.retry') }}</button>
+        <button type="button" class="btn btn--ghost" @click="quit"><AppIcon name="users" />{{ t('mp.backToMenu') }}</button>
       </div>
     </ModalPanel>
   </main>

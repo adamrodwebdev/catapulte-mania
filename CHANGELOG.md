@@ -2,6 +2,26 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [3.4.0] – 2026-10-03
+### Ajouté
+- **Campagne à deux** : les 100 niveaux de l'histoire en coopération. Les
+  joueurs tirent à tour de rôle, partagent tirs, munitions et score, gagnent
+  ensemble ; meilleur joueur désigné à la renommée ; progression enregistrée à
+  part dans le profil choisi (sauvegarde v5), Chronique et répliques comprises.
+- **Renommée** (modes à deux) : soldat 1, chevalier 2, roi 4, +2 pour le coup
+  de grâce, créditée à l'auteur du tir (même si la chute finit au tour suivant).
+### Modifié
+- **Duel : la conquête** : le plus renommé gagne ; « victoire assurée » dès que
+  l'écart ne peut plus être rattrapé ; départage au score.
+- **Chacun sa partie : le tournoi** en trois manches sur trois niveaux : manche
+  gagnée par le château pris en moins de tirs (ou le plus de défenseurs
+  abattus) ; match au meilleur des trois ; celui qui commence alterne.
+- **Face-à-face : le siège** : un roi dans chaque château ; régicide = victoire
+  immédiate ; sinon conquête, ou château le plus solide quand les tirs sont
+  épuisés. Six nouvelles arènes, plus grandes et plus solides.
+- **Tous les modes à deux se jouent en Difficile.**
+- Écrans de fin dédiés : tableau du tournoi, raison de la victoire, meilleur joueur.
+
 ## [3.3.0] – 2026-10-03
 ### Ajouté
 - **Personnages en pixel art** : Ysolde, Maître Gontran, le duc Mordrac et le

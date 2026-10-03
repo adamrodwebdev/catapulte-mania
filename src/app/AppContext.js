@@ -70,7 +70,7 @@ export function createAppContext() {
      * Partie à lancer : mode ('story' | 'free' | 'duel' | 'hotseat' | 'versus'),
      * niveau ou arène, noms des joueurs (modes à deux).
      */
-    match: { mode: 'story', levelId: 1, arenaId: 1, duelId: 1, players: [] },
+    match: { mode: 'story', levelId: 1, levels: null, arenaId: 1, duelId: 1, players: [] },
     announcement: '',
     captions: [],
     systemDark: false,
@@ -153,6 +153,17 @@ export function createAppContext() {
       completed: slot.completedCount,
       stars: slot.starCount,
       achievements: slot.achievementCount,
+      coop: {
+        completed: slot.coopCompleted,
+        stars: slot.coopStars,
+        next: Math.min(slot.coopCompleted + 1, PLAYABLE_LEVELS),
+        levels: Object.fromEntries(
+          Array.from({ length: PLAYABLE_LEVELS }, (_, i) => {
+            const rec = slot.coopRecord(i + 1)
+            return [i + 1, { stars: rec?.stars ?? 0, completed: Boolean(rec), unlocked: slot.isCoopUnlocked(i + 1) }]
+          }),
+        ),
+      },
       score: slot.totalScore,
       next: Math.min(slot.nextLevel, PLAYABLE_LEVELS),
       levels,
@@ -221,6 +232,23 @@ export function createAppContext() {
     return { ...outcome, unlockedPower: unlocked ? unlocked.id : null, saved }
   }
 
+  /**
+   * Enregistre une partie de la campagne à deux dans le profil actif.
+   * @returns {Promise<{ newBest: boolean, firstClear: boolean, saved: boolean }>}
+   */
+  async function recordCoop(result) {
+    if (!activeSlot) return { newBest: false, firstClear: false, saved: false }
+    const outcome = activeSlot.recordCoop(result)
+    let saved
+    try {
+      saved = await saves.save(activeSlot)
+    } catch {
+      saved = false
+    }
+    state.profile = profileView(activeSlot)
+    return { ...outcome, saved }
+  }
+
   /* ----- Atelier (or et améliorations) ----- */
 
   /**
@@ -247,7 +275,8 @@ export function createAppContext() {
    * @param {{ mode: string, levelId?: number, arenaId?: number, duelId?: number, players?: string[] }} match
    */
   function startMatch(match) {
-    state.match = { mode: match.mode, levelId: match.levelId ?? state.levelId, arenaId: match.arenaId ?? 1, duelId: match.duelId ?? 1, players: [...(match.players || [])] }
+    const levels = Array.isArray(match.levels) && match.levels.length === 3 && match.levels.every((id) => Number.isInteger(id) && id >= 1 && id <= GAME.LEVEL_COUNT) ? [...match.levels] : null
+    state.match = { mode: match.mode, levelId: match.levelId ?? state.levelId, levels, arenaId: match.arenaId ?? 1, duelId: match.duelId ?? 1, players: [...(match.players || [])] }
     if (match.levelId) state.levelId = match.levelId
     go('game')
   }
@@ -327,6 +356,7 @@ export function createAppContext() {
     recordResult,
     workshop,
     startMatch,
+    recordCoop,
     multiplayerLevels,
     announce,
     caption,

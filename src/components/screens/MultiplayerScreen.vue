@@ -4,22 +4,25 @@ import { useApp } from '../../app/AppContext.js'
 import { PROFILE_NAME } from '../../domain/SaveSlot.js'
 import { ArenaRepository } from '../../game/levels/ArenaRepository.js'
 import { DuelRepository } from '../../game/levels/DuelRepository.js'
+import { HotSeatMatch } from '../../game/modes/HotSeatMatch.js'
+import StarRow from '../ui/StarRow.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import ScreenHeader from '../ui/ScreenHeader.vue'
 
 /**
  * Préparation d'une partie à deux sur le même appareil :
- * formule (duel, chacun sa partie, face-à-face), noms, niveau ou arène.
+ * formule (campagne à deux, duel, tournoi, face-à-face), noms, niveau ou arène.
  */
 const app = useApp()
 const { state, t } = app
 
 const FORMATS = [
+  { id: 'coop', icon: 'map' },
   { id: 'duel', icon: 'target' },
   { id: 'hotseat', icon: 'users' },
   { id: 'versus', icon: 'swords' },
 ]
-const format = ref(state.match.mode && FORMATS.some((f) => f.id === state.match.mode) ? state.match.mode : 'duel')
+const format = ref(state.match.mode && FORMATS.some((f) => f.id === state.match.mode) ? state.match.mode : 'coop')
 const names = ref([state.match.players?.[0] || '', state.match.players?.[1] || ''])
 const levelId = ref(1)
 const arenaId = ref(state.match.arenaId || 1)
@@ -30,15 +33,30 @@ const duelId = ref(state.match.duelId || 1)
 onMounted(() => app.refreshSlots())
 const maxLevel = computed(() => app.multiplayerLevels())
 const levels = computed(() => Array.from({ length: maxLevel.value }, (_, i) => i + 1))
+/** Tournoi : trois niveaux consécutifs à partir du niveau choisi. */
+const tourneyLevels = computed(() => HotSeatMatch.levelsFrom(levelId.value, maxLevel.value))
+/** Campagne à deux : progression du profil actif. */
+const coop = computed(() => state.profile?.coop ?? null)
+const coopLevel = ref(state.profile?.coop?.next ?? 1)
+/** Profils existants, à choisir sans quitter l'écran. */
+const readySlots = computed(() => state.slots.filter((x) => x.status === 'ok'))
+async function pickProfile(index) {
+  await app.openProfile(index)
+  coopLevel.value = state.profile?.coop?.next ?? 1
+  coopChapter.value = Math.ceil(coopLevel.value / 10)
+}
+const coopChapter = ref(Math.ceil((state.profile?.coop?.next ?? 1) / 10))
+const coopLevels = computed(() => Array.from({ length: 10 }, (_, i) => (coopChapter.value - 1) * 10 + i + 1).filter((id) => coop.value?.levels[id]))
 
 const nameError = (i) => names.value[i].trim() !== '' && !PROFILE_NAME.test(names.value[i].trim())
-const canStart = computed(() => !nameError(0) && !nameError(1))
+const canStart = computed(() => !nameError(0) && !nameError(1) && (format.value !== 'coop' || (coop.value && coop.value.levels[coopLevel.value]?.unlocked)))
 
 function start() {
   if (!canStart.value) return
   app.services.audio.unlock()
   const players = names.value.map((n, i) => n.trim() || t('mp.defaultName', { n: i + 1 }))
-  app.startMatch({ mode: format.value, levelId: format.value === 'hotseat' ? levelId.value : undefined, arenaId: arenaId.value, duelId: duelId.value, players })
+  const levelFor = format.value === 'coop' ? coopLevel.value : format.value === 'hotseat' ? tourneyLevels.value[0] : undefined
+  app.startMatch({ mode: format.value, levelId: levelFor, levels: format.value === 'hotseat' ? tourneyLevels.value : undefined, arenaId: arenaId.value, duelId: duelId.value, players })
 }
 </script>
 
@@ -81,7 +99,42 @@ function start() {
         </div>
       </fieldset>
 
-      <fieldset v-if="format === 'duel'" class="panel">
+      <fieldset v-if="format === 'coop'" class="panel">
+        <legend class="panel__title">{{ t('mp.level') }}</legend>
+        <template v-if="coop">
+          <p class="field__desc">{{ t('mp.coopProfile') }} <strong>{{ state.profile.name }}</strong> · {{ t('mp.coopProgress', { done: coop.completed, stars: coop.stars }) }}</p>
+          <div class="coop-chapters" role="group" :aria-label="t('mp.chaptersLabel')">
+            <button
+              v-for="c in 10"
+              :key="c"
+              type="button"
+              :class="['btn', 'btn--chip', { 'btn--chip-on': coopChapter === c }]"
+              :disabled="!coop.levels[(c - 1) * 10 + 1]?.unlocked"
+              :aria-pressed="coopChapter === c ? 'true' : 'false'"
+              @click="coopChapter = c"
+            >{{ t('mp.chapterShort', { n: c }) }}</button>
+          </div>
+          <div class="level-pick" role="radiogroup" :aria-label="t('mp.level')">
+            <label v-for="id in coopLevels" :key="id" :class="['level-pick__item', { 'level-pick__item--on': coopLevel === id, 'level-pick__item--locked': !coop.levels[id].unlocked }]">
+              <input v-model="coopLevel" class="visually-hidden" type="radio" name="mp-coop" :value="id" :disabled="!coop.levels[id].unlocked">
+              <span>{{ id }}</span>
+              <StarRow v-if="coop.levels[id].completed" :count="coop.levels[id].stars" :size="10" />
+              <AppIcon v-else-if="!coop.levels[id].unlocked" name="lock" :size="12" />
+            </label>
+          </div>
+        </template>
+        <template v-else>
+          <p class="notice">{{ t('mp.coopNoProfile') }}</p>
+          <div class="coop-profiles">
+            <button v-for="slot in readySlots" :key="slot.index" type="button" class="btn" @click="pickProfile(slot.index)">
+              <AppIcon name="users" />{{ slot.name }}
+            </button>
+            <button type="button" class="btn btn--ghost" @click="app.go('profiles')">{{ t('mp.coopChoose') }}</button>
+          </div>
+        </template>
+      </fieldset>
+
+      <fieldset v-else-if="format === 'duel'" class="panel">
         <legend class="panel__title">{{ t('mp.castle') }}</legend>
         <div class="arena-grid">
           <label v-for="d in duels" :key="d.id" :class="['arena', `arena--theme${d.chapter}`, { 'arena--on': duelId === d.id }]">
@@ -96,6 +149,7 @@ function start() {
       <fieldset v-else-if="format === 'hotseat'" class="panel">
         <legend class="panel__title">{{ t('mp.level') }}</legend>
         <p class="field__desc">{{ t('mp.levelsHint') }}</p>
+        <p class="field__desc"><strong>{{ t('mp.tourneyLevels', { a: tourneyLevels[0], b: tourneyLevels[1], c: tourneyLevels[2] }) }}</strong></p>
         <div class="level-pick" role="radiogroup" :aria-label="t('mp.level')">
           <label v-for="id in levels" :key="id" :class="['level-pick__item', { 'level-pick__item--on': levelId === id }]">
             <input v-model="levelId" class="visually-hidden" type="radio" name="mp-level" :value="id">

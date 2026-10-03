@@ -13,7 +13,15 @@ const COUNTER = Schema.int({ min: 0, max: 1e9 })
 const GOLD_INT = Schema.int({ min: 0, max: GOLD.MAX_BALANCE })
 const COSMETIC_IDS = UpgradeCatalog.cosmetics().map((c) => c.id)
 
-/** Schéma de la sauvegarde (version 4). Toute clé inconnue est refusée. */
+/** Record d'un niveau de la campagne à deux. */
+const COOP_RECORD = Schema.object({
+  stars: Schema.int({ min: 1, max: 3 }),
+  best: Schema.int({ min: 0, max: GAME.MAX_LEVEL_SCORE }),
+  shots: Schema.int({ min: 1, max: 100 }),
+  attempts: Schema.int({ min: 1, max: 1e6 }),
+})
+
+/** Schéma de la sauvegarde (version 5). Toute clé inconnue est refusée. */
 export const saveSchema = Schema.object({
   version: Schema.enum([GAME.SAVE_VERSION]),
   name: Schema.string({ minLength: 1, maxLength: 16, pattern: PROFILE_NAME }),
@@ -51,6 +59,8 @@ export const saveSchema = Schema.object({
     skin: Schema.enum(COSMETIC_IDS),
     trail: Schema.enum(COSMETIC_IDS),
   }),
+  // v5 : campagne à deux (progression séparée, sans or).
+  coop: Schema.record(LEVEL_KEY, COOP_RECORD, { maxKeys: GAME.LEVEL_COUNT }),
 })
 
 /**
@@ -60,6 +70,7 @@ export const saveSchema = Schema.object({
  *           prix ont changé, sont remboursées ; l'or déjà gagné est conservé
  *            (et contrôlé selon l'ancien barème).
  * v3 → v4 : succès renouvelés (masques remis à zéro, or conservé).
+ * v4 → v5 : ajout de la campagne à deux, vide.
  * @param {any} raw
  */
 export function migrateSave(raw) {
@@ -82,6 +93,7 @@ export function migrateSave(raw) {
     for (const [id, rec] of Object.entries(save.levels)) levels[id] = rec && typeof rec === 'object' ? { ...rec, ach: 0 } : rec
     save = { ...save, version: 4, levels, legacyGold: Number.isInteger(save.goldEarned) ? save.goldEarned : 0 }
   }
+  if (save && typeof save === 'object' && save.version === 4) save = { ...save, version: 5, coop: {} }
   return save
 }
 
@@ -118,6 +130,7 @@ export class SaveSlot {
       legacyGold: 0,
       upgrades: {},
       cosmetics: { owned: UpgradeCatalog.defaults(), skin: 'oak', trail: 'smoke' },
+      coop: {},
     })
     return new SaveSlot(index, data)
   }
@@ -138,6 +151,15 @@ export class SaveSlot {
       if (id !== i + 1) throw new ValidationError(`save.levels.${id}`, 'progression gap')
       const rec = data.levels[id]
       if (rec.attempts < 1) throw new ValidationError(`save.levels.${id}`, 'no attempt recorded')
+      if (checkRecord) {
+        const stars = checkRecord(id, { best: rec.best, stars: rec.stars, shots: rec.shots })
+        if (Number.isInteger(stars)) rec.stars = stars
+      }
+    })
+    // Campagne à deux : progression continue elle aussi, étoiles recalculées.
+    Object.keys(data.coop).map(Number).sort((a, b) => a - b).forEach((id, i) => {
+      if (id !== i + 1) throw new ValidationError(`save.coop.${id}`, 'progression gap')
+      const rec = data.coop[id]
       if (checkRecord) {
         const stars = checkRecord(id, { best: rec.best, stars: rec.stars, shots: rec.shots })
         if (Number.isInteger(stars)) rec.stars = stars
@@ -328,6 +350,54 @@ export class SaveSlot {
   }
 
   /** Copie sérialisable (validée à nouveau avant écriture). */
+  /* ---------- Campagne à deux ---------- */
+
+  /** @returns {{ stars: number, best: number, shots: number, attempts: number } | null} */
+  coopRecord(levelId) {
+    const rec = this.#data.coop[levelId]
+    return rec ? { ...rec } : null
+  }
+
+  /** Niveaux réussis à deux. */
+  get coopCompleted() {
+    return Object.keys(this.#data.coop).length
+  }
+
+  /** Étoiles obtenues à deux. */
+  get coopStars() {
+    return Object.values(this.#data.coop).reduce((sum, r) => sum + r.stars, 0)
+  }
+
+  /** Un niveau est jouable à deux si le précédent a été réussi à deux. */
+  isCoopUnlocked(levelId) {
+    Guard.int(levelId, 'levelId', { min: 1, max: GAME.LEVEL_COUNT })
+    return levelId === 1 || Boolean(this.#data.coop[levelId - 1])
+  }
+
+  /**
+   * Enregistre une partie de la campagne à deux (résultat authentifié uniquement).
+   * Pas d'or ni de succès : la campagne à deux a sa propre progression.
+   * @returns {{ newBest: boolean, firstClear: boolean }}
+   */
+  recordCoop(result) {
+    if (!LevelResult.isAuthentic(result)) throw new ValidationError('result', 'not issued by the game engine')
+    if (!this.isCoopUnlocked(result.levelId)) throw new ValidationError('result.levelId', 'level locked')
+    if (!result.won) return { newBest: false, firstClear: false }
+    const prev = this.#data.coop[result.levelId]
+    const shots = Math.max(1, result.shotsUsed)
+    if (!prev) {
+      this.#data.coop[result.levelId] = { stars: Math.max(1, result.stars), best: result.score, shots, attempts: 1 }
+      this.#data.updatedAt = Math.max(this.#data.updatedAt, Date.now())
+      return { newBest: true, firstClear: true }
+    }
+    prev.attempts += 1
+    const newBest = result.score > prev.best
+    if (newBest) prev.best = result.score
+    prev.stars = Math.max(prev.stars, result.stars)
+    prev.shots = Math.min(prev.shots, shots)
+    return { newBest, firstClear: false }
+  }
+
   toJSON() {
     return structuredClone(this.#data)
   }

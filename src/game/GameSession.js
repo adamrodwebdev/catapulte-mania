@@ -19,6 +19,7 @@ import { PowerRegistry } from './powers/PowerRegistry.js'
 import { StoryMode } from './modes/modes.js'
 import { CATAPULT_X } from './levels/ArenaRepository.js'
 import { NO_EFFECTS } from './progression/UpgradeCatalog.js'
+import { renownOf, COUP_DE_GRACE } from './modes/Renown.js'
 
 /** États d'une partie. */
 export const STATE = Object.freeze({
@@ -62,6 +63,10 @@ export class GameSession extends EventBus {
   #restT = 0
   #idleWinT = 0
   #turn = 0
+  /** Renommée gagnée par chaque joueur (modes à deux). */
+  #renown = [0, 0]
+  /** Joueur auteur du dernier tir : c'est lui qui est crédité des destructions. */
+  #shooter = 0
   #active = 0
   #pendingPower = null
   #powerUsedThisTurn = false
@@ -95,17 +100,19 @@ export class GameSession extends EventBus {
     const versus = this.#mode.id === 'versus'
 
     // Un état par joueur : catapulte (et sa visée), score, tirs, munitions.
+    // Campagne à deux : un seul score commun aux deux joueurs.
+    const shared = this.#mode.sharedScore ? new ScoreKeeper(level, this.#difficulty) : null
     this.players = this.#mode.players.map((name, i) => {
-      const shots = this.#mode.shotsFor(level, diff)
+      const shots = this.#mode.shotsFor(level, diff, i)
       const right = versus && i === 1
       return {
         index: i,
         name,
         catapult: new Catapult(right ? CATAPULT_X.right : CATAPULT_X.left, { dir: right ? -1 : 1, speedFactor: fx.speedFactor }),
-        score: new ScoreKeeper(level, this.#difficulty),
+        score: shared ?? new ScoreKeeper(level, this.#difficulty),
         shotsTotal: shots,
         shotsLeft: shots,
-        ammo: this.#mode.ammoFor(level, diff),
+        ammo: this.#mode.ammoFor(level, diff, i),
         selectedAmmo: 'stone',
         flag: this.#mode.players.length > 1 ? PLAYER_FLAGS[i] : null,
       }
@@ -161,6 +168,16 @@ export class GameSession extends EventBus {
   get selectedAmmo() {
     return this.player.selectedAmmo
   }
+  /** Renommée de chaque joueur (copie). */
+  get renown() {
+    return [...this.#renown]
+  }
+
+  /** Joueur dont le dernier tir est en cours d'effet. */
+  get shooter() {
+    return this.#shooter
+  }
+
   get targetsLeft() {
     return this.world.filter((e) => e.kind === 'target' && e.alive).length
   }
@@ -202,6 +219,7 @@ export class GameSession extends EventBus {
         shotsLeft: p.shotsLeft,
         active: p.index === this.#active,
         defenders: this.world.filter((e) => e.kind === 'target' && e.alive && e.team === p.index + 1).length,
+        renown: this.#renown[p.index] ?? 0,
       })),
       powersEnabled: this.#mode.powersEnabled,
       targetsLeft: this.targetsLeft,
@@ -293,6 +311,7 @@ export class GameSession extends EventBus {
     shot.mods.fireFactor = this.#mode.effects.fireFactor ?? 1
     if (shot.windOverride !== null) this.world.wind = shot.windOverride
     if (player.shotsLeft !== null) player.shotsLeft--
+    this.#shooter = this.#active
     this.score.startShot(type)
     this.#setState(STATE.FLYING)
     this.#feedback({ sound: 'creak', x: this.catapult.x, intensity: 0.6 })
@@ -451,18 +470,22 @@ export class GameSession extends EventBus {
   }
 
   /** Fin de partie : résultat signé (histoire), scores, annonce. */
-  #finish({ won, winner }) {
+  #finish({ won, winner, reason = null }) {
     if (this.#state === STATE.ENDED) return
     const p = this.player
     // Seul le mode histoire produit un résultat authentifié (enregistrable).
-    const result = this.#mode.recordsResult
-      ? this.score.finalize({ won, shotsLeft: p.shotsLeft, shotsUsed: p.shotsTotal - p.shotsLeft })
-      : null
-    const scores = this.players.map((pl) => pl.score.finalScore({ won, shotsLeft: pl.shotsLeft ?? 0 }))
+    // Score commun (campagne à deux) : les tirs des deux joueurs comptent ensemble.
+    const team = this.#mode.sharedScore ? this.players : [p]
+    const shotsLeft = team.reduce((sum, pl) => sum + (pl.shotsLeft ?? 0), 0)
+    const shotsUsed = team.reduce((sum, pl) => sum + (pl.shotsTotal - pl.shotsLeft), 0)
+    const result = this.#mode.recordsResult ? this.score.finalize({ won, shotsLeft, shotsUsed }) : null
+    const scores = this.#mode.sharedScore
+      ? this.players.map(() => (result ? result.score : p.score.finalScore({ won, shotsLeft })))
+      : this.players.map((pl) => pl.score.finalScore({ won, shotsLeft: pl.shotsLeft ?? 0 }))
     const happy = this.players.length > 1 || won
     this.#setState(STATE.ENDED)
     this.#feedback({ sound: happy ? 'victory' : 'defeat', x: 1000, caption: happy ? 'victory' : 'defeat', haptic: happy ? 'victory' : 'defeat' })
-    this.emit('end', { won, result, winner, scores, mode: this.#mode.id })
+    this.emit('end', { won, result, winner, scores, reason, renown: [...this.#renown], mode: this.#mode.id })
   }
 
   #updateCamera(dt) {
@@ -491,8 +514,14 @@ export class GameSession extends EventBus {
   #bindWorldEvents() {
     const ev = this.#events
     ev.on('entity:destroyed', ({ entity, cause }) => {
-      const gained = this.score.registerDestroyed(entity, cause)
+      // Les points vont à l'auteur du tir, même si la chute finit pendant le tour suivant.
+      const shooter = this.players[this.#shooter] ?? this.player
+      const gained = shooter.score.registerDestroyed(entity, cause)
       if (entity.kind === 'target') {
+        const own = this.#mode.teamOf(entity)
+        // Au face-à-face, abattre un défenseur de son propre camp ne rapporte rien.
+        if (!own || own !== this.#shooter + 1) this.#renown[this.#shooter] += renownOf(entity)
+        if (this.#mode.coupDeGrace && this.targetsLeft === 0) this.#renown[this.#shooter] += COUP_DE_GRACE
         if (gained) this.particles.text(entity.x, entity.y - 40, `+${gained}`)
         if (this.options.blood) {
           const vx = entity.body.velocity.x

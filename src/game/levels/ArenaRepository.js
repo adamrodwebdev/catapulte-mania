@@ -1,68 +1,78 @@
 import { StructureBuilder } from './StructureBuilder.js'
 import { WORLD } from '../physics/constants.js'
 import { deepFreeze } from '../../core/utils/Guard.js'
+import { BP } from './blueprints.js'
 
 /**
  * Arènes du face-à-face : chaque joueur a sa catapulte et son château.
  *
  * Chaque arène décrit UN château (côté gauche, joueur 1) ; le château du
  * joueur 2 en est le reflet exact (x → largeur du monde − x). Les deux camps
- * sont donc strictement équitables.
+ * sont donc strictement équitables. Chaque château abrite un roi.
  */
 export const CATAPULT_X = Object.freeze({ left: 170, right: WORLD.WIDTH - 170 })
 
+/*
+ * Six arènes, chacune avec un ROI dans le château : l'abattre donne la victoire
+ * (voir VersusMode). Le roi est logé à l'arrière (côté de sa propre catapulte),
+ * protégé par des tours de garde tournées vers l'adversaire.
+ */
 const ARENA_SPECS = [
-  // 1. Les deux tours : bois, à découvert.
+  // 1. Les palissades : donjon de bois et tour de garde.
   {
-    shots: 6, wind: 0.2, theme: 1, ammo: {},
+    shots: 7, wind: 0.25, theme: 1, ammo: { fire: 2 },
     build(b) {
-      const t = b.tower(620, { floors: 3, roof: 'straw' })
-      b.target(t[0])
-      b.target(t[2])
-      b.target(b.room(790, b.ground, { mat: 'wood', w: 100, h: 90 }))
+      BP.keep(b, { x: 680, floors: 4, m: 'wood', s: 'wood', w: 130, roof: 'straw', king: true })
+      const g = b.tower(930, { floors: 3, mats: ['straw', 'wood', 'wood'], slab: 'wood', w: 110, roof: 'straw' })
+      b.target(g[0])
+      b.target(g[2])
     },
   },
-  // 2. Forts de pierre : un chevalier bien abrité.
+  // 2. Les forts de pierre : un chevalier en garde, un baril sous la tour avancée.
   {
-    shots: 6, wind: 0.35, theme: 2, ammo: { boulder: 2 },
+    shots: 7, wind: 0.35, theme: 2, ammo: { boulder: 2, bomb: 1 },
     build(b) {
-      const t = b.tower(620, { floors: 3, mats: ['stone', 'stone', 'wood'], t: 24, roof: 'wood' })
-      b.target(t[0], 'knight')
-      b.target(t[2])
-      b.target(b.room(800, b.ground, { mat: 'stone', slab: 'wood', w: 110, t: 24 }))
+      BP.keep(b, { x: 660, floors: 4, m: 'stone', top: 'wood', split: 2, s: 'stone', w: 130, roof: 'wood', king: true, knights: 1 })
+      const g = b.tower(920, { floors: 3, mats: ['stone', 'wood', 'wood'], slab: 'stone', w: 120, t: 24, roof: 'straw' })
+      b.barrel(g[0], -26)
+      b.target(g[0], 'soldier', 26)
+      b.target(g[2], 'knight')
     },
   },
-  // 3. Poudrières : un baril sous chaque tour. Visez juste.
+  // 3. Les poudrières : une forteresse et ses deux tours, des barils au cœur.
   {
-    shots: 6, wind: 0.4, theme: 2, ammo: { boulder: 1, fire: 2 },
+    shots: 8, wind: 0.4, theme: 3, ammo: { boulder: 2, bomb: 2, fire: 1 },
     build(b) {
-      const t = b.tower(640, { floors: 4, mats: ['wood', 'stone', 'stone', 'wood'], slab: 'stone', w: 130, t: 24, h: 95, roof: 'wood' })
-      b.barrel(t[0], -24)
-      b.target(t[0], 'soldier', 26)
-      b.target(t[1])
-      b.target(t[3])
+      BP.fortress(b, { x: 900, floors: 5, side: 3, m: 'brick', top: 'wood', split: 2, s: 'stone', king: true, barrel: true })
     },
   },
-  // 4. Citadelles de fer : sur une colline, planchers de fer.
+  // 4. Les citadelles de nuit : un donjon de fer sur son socle, une tour de brique devant.
   {
-    shots: 7, wind: 0.5, theme: 3, ammo: { boulder: 2, bomb: 2 },
+    shots: 8, wind: 0.5, theme: 4, ammo: { boulder: 2, bomb: 2 },
     build(b) {
-      const top = b.base(660, { w: 260, h: 80, mat: 'stone', rows: 2 })
-      const t = b.tower(640, { floors: 3, mat: 'stone', slab: 'iron', t: 26, floorY: top, roof: 'wood' })
-      b.target(t[0], 'knight')
-      b.target(t[1])
-      b.target(t[2], 'king')
+      const top = b.base(700, { w: 260, h: 80, mat: 'stone', rows: 2 })
+      const k = b.tower(700, { floors: 3, mat: 'stone', slab: 'iron', t: 26, floorY: top, roof: 'wood' })
+      b.target(k[0], 'knight')
+      b.target(k[1])
+      b.target(k[2], 'king')
+      const g = b.tower(970, { floors: 3, mat: 'brick', slab: 'stone', w: 120, t: 24, roof: 'straw' })
+      b.target(g[0])
+      b.target(g[2], 'knight')
     },
   },
-  // 5. La nuit des pilotis : tout repose sur des pieds de verre.
+  // 5. Les pilotis des marais : le château du roi sur des pieds de verre.
   {
-    shots: 6, wind: 0.6, theme: 4, ammo: { boulder: 1, bomb: 1, split: 1 },
+    shots: 8, wind: 0.45, theme: 5, ammo: { boulder: 1, bomb: 2, split: 1 },
     build(b) {
-      const deck = b.stilts(660, { legs: 3, mat: 'glass', deck: 'stone', w: 200, h: 120, legW: 20, t: 24 })
-      const t = b.tower(660, { floors: 2, mat: 'stone', w: 140, t: 24, floorY: deck.floorY, roof: 'wood' })
-      b.target(t[0], 'knight', -30)
-      b.target(t[0], 'soldier', 30)
-      b.target(t[1])
+      BP.stiltCastle(b, { x: 720, legs: 3, legMat: 'glass', deck: 'stone', h: 120, floors: 3, m: 'brick', s: 'stone', twin: false })
+      BP.keep(b, { x: 990, floors: 2, m: 'wood', s: 'wood', w: 110, roof: 'straw' })
+    },
+  },
+  // 6. Les trônes : citadelles de marbre, barils et chevaliers.
+  {
+    shots: 9, wind: 0.55, theme: 10, ammo: { boulder: 3, bomb: 3, fire: 1 },
+    build(b) {
+      BP.fortress(b, { x: 900, floors: 5, side: 3, m: 'marble', top: 'brick', split: 2, s: 'marble', h: 88, king: true, barrel: true })
     },
   },
 ]

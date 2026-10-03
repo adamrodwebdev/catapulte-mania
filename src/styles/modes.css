@@ -934,3 +934,82 @@
   font-style: italic;
   line-height: 1.4;
 }
+
+/* ---------- Deux joueurs (v3.4) ---------- */
+.coop-chapters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+}
+.btn--chip {
+  min-width: var(--hud-size);
+  min-height: var(--hud-size);
+  padding: 0 var(--space-3);
+}
+.btn--chip-on {
+  background: var(--action);
+  color: var(--action-text);
+  border-color: var(--action);
+}
+.level-pick__item {
+  height: auto;
+  min-height: var(--hud-size);
+  align-content: center;
+  gap: 2px;
+  padding: 2px 0;
+}
+.level-pick__item--locked {
+  opacity: 0.45;
+}
+.intro-players__meta {
+  display: block;
+  margin-top: var(--space-1);
+  font-weight: 700;
+  color: var(--accent-text);
+}
+.end__reason {
+  margin: 0 0 var(--space-3);
+  font-weight: 600;
+  color: var(--accent-text);
+}
+.tourney {
+  width: 100%;
+  margin: 0 0 var(--space-3);
+  border-collapse: collapse;
+  font-size: var(--fs-0);
+}
+.tourney th,
+.tourney td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+.tourney thead th {
+  font-weight: 700;
+}
+.tourney tbody th {
+  text-align: left;
+  font-weight: 600;
+}
+.tourney__win {
+  font-weight: 700;
+  color: var(--accent-text);
+}
+.tourney__row--pending {
+  opacity: 0.5;
+}
+.mvp-badge {
+  padding: 0 var(--space-2);
+  font-size: var(--fs-0);
+  font-weight: 700;
+  color: #120e1c;
+  background: var(--c-gold);
+  border-radius: 999px;
+}
+.coop-profiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}

@@ -20,6 +20,10 @@ export class GameMode {
   powersEnabled = true
   /** Tirs et munitions illimités ? */
   unlimited = false
+  /** Bonus de renommée pour qui abat le dernier défenseur (modes à deux). */
+  coupDeGrace = false
+  /** Un seul score pour l'équipe (campagne à deux) ? */
+  sharedScore = false
 
   /**
    * @param {{ players?: string[], effects?: object, completedLevels?: number }} [opts]
