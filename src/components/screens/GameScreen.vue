@@ -17,6 +17,7 @@ import AchievementList from '../ui/AchievementList.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import CoachBubble from '../game/CoachBubble.vue'
 import StoryPanel from '../ui/StoryPanel.vue'
+import PixelPortrait from '../ui/PixelPortrait.vue'
 import { StoryRepository } from '../../game/story/StoryRepository.js'
 import { TutorialCoach } from '../../game/tutorial/Tutorial.js'
 import ToggleSwitch from '../ui/ToggleSwitch.vue'
@@ -279,6 +280,9 @@ function nextLevel() {
 
 /* ---------- Chronique ---------- */
 
+/** Réplique d'un personnage avant le niveau (campagne, si le récit est affiché). */
+const interlude = computed(() => (mode.value === 'story' && state.settings.story !== false ? StoryRepository.line(state.levelId) : null))
+
 function storyDone() {
   storyBeat.value = null
   if (phase.value === 'story') phase.value = 'intro'
@@ -471,6 +475,13 @@ const canvasLabel = computed(() =>
       <p class="modal__eyebrow">{{ matchSubtitle }}</p>
       <h2 id="intro-title" class="modal__title">{{ matchTitle }}</h2>
       <template v-if="mode === 'story'">
+        <figure v-if="interlude" class="interlude">
+          <PixelPortrait :id="interlude.speaker" height="5.5rem" decorative class="interlude__portrait" />
+          <figcaption class="interlude__text">
+            <span class="interlude__name">{{ t(`characters.${interlude.speaker}.name`) }}</span>
+            <q>{{ t(interlude.key) }}</q>
+          </figcaption>
+        </figure>
         <p>{{ t('intro.goal') }} {{ t('intro.shots', { count: hud?.shotsTotal ?? level.shots }) }}</p>
         <p class="intro-stars">
           <span><StarRow :count="3" :size="16" />{{ t('intro.star3', { count: level.par }) }}</span>

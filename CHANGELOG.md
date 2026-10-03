@@ -2,6 +2,24 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [3.3.0] – 2026-10-03
+### Ajouté
+- **Personnages en pixel art** : Ysolde, Maître Gontran, le duc Mordrac et le
+  roi Aubert, convertis depuis les illustrations fournies. Aucune image dans le
+  jeu : chaque portrait est une palette (52 couleurs au plus) et une suite de
+  pixels compressée, redessinée dans un canevas (16 Ko compressés au total,
+  chargés seulement quand un personnage apparaît). Scripts de conversion et
+  d'encodage dans scripts/portraits/, maîtres retouchables dans art/portraits/.
+- **Une réplique avant chaque niveau** (100 répliques, en FR, EN et ID), dite
+  par le personnage le plus concerné, dans la fenêtre d'introduction.
+- Maître Gontran guide les tutoriels et accueille le joueur à l'atelier.
+### Modifié
+- **La Chronique réécrite** autour des personnages : le roi Aubert est captif
+  de Mordrac, Ysolde mène la reconquête, Gontran et son apprenti (le joueur)
+  manient la catapulte. Les épisodes sont mis en scène : celui qui parle est au
+  premier plan, les autres dans l'ombre.
+- L'emplacement prévu pour des illustrations (public/story/) est retiré.
+
 ## [3.2.1] – 2026-10-02
 ### Modifié
 - Campagne : toute munition découverte reste disponible jusqu'à la fin (au

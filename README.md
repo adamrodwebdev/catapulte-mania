@@ -8,7 +8,7 @@ Réglez l'angle et la puissance, calculez la trajectoire, et faites tomber les f
 - 6 pouvoirs spéciaux à débloquer (un seul par tour, chaque utilisation coûte des points)
 - **Mode libre** : rejouer les niveaux terminés sans limite de tirs ni de munitions
 - **Deux joueurs** sur le même appareil : duel, chacun sa partie ou face-à-face
-- **Une histoire** : la Chronique, racontée entre les chapitres, du prologue à l'épilogue
+- **Une histoire** : la Chronique, avec quatre personnages en pixel art, une réplique avant chaque niveau et un épisode à chaque chapitre
 - **Tutoriels guidés** : chaque nouvelle munition et chaque nouveau pouvoir s'apprennent dans un niveau dédié
 - **Bande son médiévale** composée en direct, qui s'intensifie aux moments forts
 - **300 succès** : trois défis par niveau, tirés de 18 défis différents (sur le fil, carton, chirurgien, éboulement…)
@@ -96,7 +96,18 @@ On peut l'envoyer par e-mail, le mettre sur une clé USB ou l'héberger sur n'im
 | 25 | Mitraille (munition) |
 | 31 | Séisme (pouvoir) |
 
-**La Chronique :** un récit accompagne la campagne. Un prologue avant le premier niveau, un épisode à l'ouverture de chaque chapitre, un épilogue après la victoire finale. Les épisodes déjà lus se relisent depuis la carte des niveaux. L'histoire peut être masquée dans les Réglages.
+**La Chronique :** un récit accompagne la campagne. Le duc Mordrac a pris la capitale et enfermé le vieux roi Aubert dans sa tour ; la princesse Ysolde lève une armée, avec Maître Gontran, l'ingénieur royal, et vous, son apprenti, aux commandes de la catapulte.
+
+| Personnage | Rôle |
+|---|---|
+| Princesse Ysolde | Héritière du royaume, elle mène la reconquête |
+| Maître Gontran | Ingénieur royal : il vous guide dans les tutoriels et tient l'atelier |
+| Le duc Mordrac | L'usurpateur, qui vous nargue avant chaque forteresse de fin de chapitre |
+| Le roi Aubert | Le roi captif, qui écrit à sa fille dans les derniers chapitres |
+
+Chaque niveau s'ouvre sur une réplique d'un personnage ; chaque chapitre, sur un épisode de quelques pages mis en scène ; l'épilogue suit la victoire finale. Les épisodes déjà lus se relisent depuis la carte des niveaux, et l'histoire peut être masquée dans les Réglages.
+
+**Des personnages sans images :** les quatre personnages sont du pixel art redessiné par le code, à partir d'une palette et d'une suite de pixels compressée. Ils pèsent 16 Ko en tout, contre 14 Mo pour les illustrations d'origine, ne coûtent aucun téléchargement d'image et restent nets à toutes les tailles.
 
 **La musique** est jouée note à note par des instruments médiévaux synthétiques (vielle, luth, flûte, tambourin, chalemie). Calme dans les menus, elle prend le tambour quand on vise, s'accélère quand le projectile vole et explose en contre-chant lors des effondrements, des explosions et face à la dernière cible. Son volume est réglable à part ; pour les personnes malentendantes, un sous-titre « ♪ La musique s'emballe » signale ces moments.
 
@@ -289,7 +300,7 @@ src/
 │   ├── modes/              GameMode → StoryMode, FreeMode, DuelMode, HotSeatMode, VersusMode
 │   ├── progression/        UpgradeCatalog (atelier), GoldRules (barème de l'or), Achievements (les 18 défis)
 │   ├── tutorial/           TutorialCoach : les tutoriels guidés, étape par étape
-│   ├── story/              StoryRepository : la Chronique (récit et illustrations)
+│   ├── story/              StoryRepository (la Chronique), Portraits (personnages pixel art dessinés par le code)
 │   ├── Catapult.js         Visée et lancement
 │   ├── TrajectoryPredictor Calcul de la trajectoire prévue (aide à la visée)
 │   ├── physics/            Monde physique (Matter.js)
@@ -380,6 +391,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v3.1.0 | 300 succès, étoiles au nombre de tirs, atelier plus exigeant (poix, poudre fine, étoiles requises), le bois brûle, victoire immédiate par le feu ou un pouvoir |
 | v3.2.0 | Tutoriels guidés pour chaque outil, feu grégeois dès le niveau 9, 18 défis variés et or des défis (tout l'atelier devient accessible), bande son adaptative, la Chronique (récit entre les chapitres) |
 | v3.2.1 | Les munitions découvertes restent disponibles pendant toute la campagne |
+| v3.3.0 | Les personnages de la Chronique en pixel art (sans images), une réplique avant chaque niveau, histoire réécrite |
 
 Pour revenir à une version précise avec Git : `git checkout v0.4.0` (puis `git checkout main` pour revenir à la dernière).
 
@@ -391,7 +403,8 @@ Pour revenir à une version précise avec Git : `git checkout v0.4.0` (puis `git
 - **Modifier un niveau** : `src/game/levels/levelSpecs.js` (chaque niveau est décrit en quelques lignes), puis lancer `npm run check:levels` pour vérifier qu'il reste gagnable.
 - **Remplacer les graphismes par des images** : déposer les images et les déclarer dans `src/game/assets/assets.config.js`. Le jeu bascule automatiquement de l'élément dessiné à l'image.
 - **Changer les couleurs de l'interface** : `src/styles/tokens.css`.
-- **Illustrer la Chronique** : déposer les images dans `public/story/` (WebP de 1280 × 720 conseillé) et indiquer leur nom sur la page voulue dans `src/game/story/StoryRepository.js`. Les textes sont dans les fichiers de traduction, rubrique `story`.
+- **Modifier l'histoire** : les textes sont dans les fichiers de traduction (rubriques `story` et `characters`) ; qui parle, et qui est sur scène, dans `src/game/story/StoryRepository.js`.
+- **Retoucher ou ajouter un personnage** : les « maîtres » pixel art sont dans `art/portraits/` (PNG d'environ 100 × 120 pixels, 52 couleurs au plus), modifiables dans n'importe quel éditeur de pixel art. Lancer ensuite `python3 scripts/portraits/encode.py` pour régénérer les données du jeu. Pour partir d'une grande illustration sur fond en damier : `python3 scripts/portraits/convert.py image.png identifiant` (voir l'aide en tête du script).
 
 ---
 

@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useApp } from '../../app/AppContext.js'
 import AppIcon from '../ui/AppIcon.vue'
+import PixelPortrait from '../ui/PixelPortrait.vue'
 
 /**
  * Bulle du tutoriel guidé : consigne de l'étape en cours, progression et
@@ -36,6 +37,7 @@ const text = computed(() => {
 
 <template>
   <aside class="coach" role="status" aria-live="polite" :aria-label="title">
+    <PixelPortrait id="gontran" height="4.5rem" decorative class="coach__portrait" />
     <p class="coach__head">
       <AppIcon name="help" :size="18" />
       <span class="coach__title">{{ title }}</span>

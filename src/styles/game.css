@@ -835,3 +835,17 @@
     font-size: var(--fs-0);
   }
 }
+
+/* Maître Gontran accompagne les tutoriels. */
+.coach {
+  padding-left: calc(var(--space-4) + 3.6rem);
+}
+.coach__portrait {
+  position: absolute;
+  left: var(--space-2);
+  bottom: var(--space-2);
+}
+@media (max-height: 520px) {
+  .coach { padding-left: calc(var(--space-3) + 3rem); }
+  .coach__portrait { height: 3.5rem !important; }
+}

@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import PixelPortrait from '../ui/PixelPortrait.vue'
 import { useApp } from '../../app/AppContext.js'
 import { UpgradeCatalog } from '../../game/progression/UpgradeCatalog.js'
 import { StoreService } from '../../services/StoreService.js'
@@ -63,6 +64,13 @@ const storeEnabled = StoreService.enabled
         <AppIcon name="coin" :size="20" />{{ profile.gold.toLocaleString(state.locale) }}
       </p>
     </ScreenHeader>
+    <figure class="interlude workshop__host">
+      <PixelPortrait id="gontran" height="6rem" decorative />
+      <figcaption class="interlude__text">
+        <span class="interlude__name">{{ t('characters.gontran.name') }}</span>
+        <q>{{ t('workshop.gontran') }}</q>
+      </figcaption>
+    </figure>
     <p class="screen__intro">{{ t('workshop.intro') }} {{ t('workshop.earn') }}</p>
     <p class="visually-hidden" role="status" aria-live="polite">{{ message }}</p>
     <p v-if="message" class="notice" aria-hidden="true">{{ message }}</p>

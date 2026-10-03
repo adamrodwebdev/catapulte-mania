@@ -24,3 +24,25 @@ test('épisodes relisibles : seulement ceux déjà découverts', () => {
   assert.equal(StoryRepository.unlocked(10).length, 2)
   assert.equal(StoryRepository.unlocked(100).length, 11)
 })
+
+test('une réplique traduite avant chacun des 100 niveaux, par un personnage connu', () => {
+  for (let id = 1; id <= 100; id++) {
+    const { speaker, key } = StoryRepository.line(id)
+    for (const [lang, dict] of Object.entries(DICTIONARIES)) {
+      assert.ok(dict.characters[speaker].name, `${lang} ${speaker}`)
+      assert.ok(dict.story.lines[key.split('.').pop()]?.length > 15, `${lang} ${key}`)
+    }
+  }
+})
+
+test('portraits pixel art : décodés sans image, aux bonnes dimensions', async () => {
+  const { decodePortrait, CHARACTERS } = await import('../src/game/story/Portraits.js')
+  for (const id of Object.keys(CHARACTERS)) {
+    const p = decodePortrait(id)
+    assert.equal(p.pixels.length, p.w * p.h * 4)
+    let opaque = 0
+    for (let i = 3; i < p.pixels.length; i += 4) if (p.pixels[i]) opaque++
+    assert.ok(opaque > p.w * p.h * 0.3 && opaque < p.w * p.h, `${id} : ${opaque} pixels opaques`)
+  }
+  assert.throws(() => decodePortrait('bowser'))
+})
