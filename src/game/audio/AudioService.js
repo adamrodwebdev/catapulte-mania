@@ -20,6 +20,8 @@ export class AudioService {
   #last = new Map()
   #volume = 0.7
   #muted = false
+  /** Coupure temporaire pendant une publicité (indépendante du réglage du joueur). */
+  #adMuted = false
   /** Bus de la musique (volume séparé des effets sonores). */
   #musicBus = null
   #musicVolume = 0.5
@@ -50,9 +52,15 @@ export class AudioService {
     return this.#muted
   }
 
+  set adMuted(m) {
+    this.#adMuted = Boolean(m)
+    this.#applyGain()
+  }
+
   #applyGain() {
-    if (this.#master) this.#master.gain.value = this.#muted ? 0 : this.#volume * 0.8
-    if (this.#musicBus) this.#musicBus.gain.setTargetAtTime(this.#muted ? 0 : this.#musicVolume * 0.75, this.#ctx.currentTime, 0.1)
+    const silent = this.#muted || this.#adMuted
+    if (this.#master) this.#master.gain.value = silent ? 0 : this.#volume * 0.8
+    if (this.#musicBus) this.#musicBus.gain.setTargetAtTime(silent ? 0 : this.#musicVolume * 0.75, this.#ctx.currentTime, 0.1)
   }
 
   /**
@@ -107,7 +115,7 @@ export class AudioService {
    * @param {{ pan?: number, intensity?: number }} [opts] pan ∈ [-1, 1]
    */
   play(id, { pan = 0, intensity = 1 } = {}) {
-    if (!this.#ctx || this.#muted || this.#volume === 0 || !SOUND_IDS.includes(id)) return
+    if (!this.#ctx || this.#muted || this.#adMuted || this.#volume === 0 || !SOUND_IDS.includes(id)) return
     const now = this.#ctx.currentTime
     const last = this.#last.get(id) ?? -1
     if (now - last < 0.05) return

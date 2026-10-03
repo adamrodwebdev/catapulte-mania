@@ -7,7 +7,7 @@ export const GAME = deepFreeze({
   LEVEL_COUNT: 100,
   LEVELS_PER_CHAPTER: 10,
   SAVE_SLOTS: 3,
-  SAVE_VERSION: 5,
+  SAVE_VERSION: 6,
   LANGUAGES: ['fr', 'en', 'id'],
   DEFAULT_LANGUAGE: 'fr',
   DIFFICULTIES: ['easy', 'normal', 'hard'],
@@ -34,4 +34,10 @@ export const DIFFICULTY = deepFreeze({
 /** Est-on dans la build de démonstration ? (constante remplacée au build par Vite) */
 export const IS_DEMO = typeof __DEMO__ !== 'undefined' && __DEMO__ === true
 export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'
+/**
+ * Plateforme visée par ce build (v3.5) : 'web' (notre site, sans publicité),
+ * 'crazygames' ou 'poki' (portails, avec leur SDK). Constante remplacée au build.
+ */
+export const TARGET = typeof __TARGET__ !== 'undefined' && ['web', 'crazygames', 'poki'].includes(__TARGET__) ? __TARGET__ : 'web'
+export const IS_PORTAL = TARGET !== 'web' && !IS_DEMO
 export const PLAYABLE_LEVELS = IS_DEMO ? GAME.DEMO_LEVEL_COUNT : GAME.LEVEL_COUNT

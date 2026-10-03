@@ -18,7 +18,7 @@ import MultiplayerScreen from './components/screens/MultiplayerScreen.vue'
  */
 const GameScreen = defineAsyncComponent(() => import('./components/screens/GameScreen.vue'))
 
-const { state } = useApp()
+const { state, t } = useApp()
 const SCREENS = {
   home: HomeScreen,
   profiles: ProfilesScreen,
@@ -37,4 +37,6 @@ const current = computed(() => SCREENS[state.screen] || HomeScreen)
     <component :is="current" :key="state.screen" />
   </Transition>
   <div class="visually-hidden" role="status" aria-live="polite" aria-atomic="true">{{ state.announcement }}</div>
+  <!-- Portails : pendant une publicité, le jeu est masqué et ne reçoit plus aucune commande. -->
+  <div v-if="state.adPlaying" class="ad-curtain" role="status" aria-live="polite">{{ t('ads.playing') }}</div>
 </template>

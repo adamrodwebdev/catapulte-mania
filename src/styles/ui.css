@@ -374,3 +374,28 @@ kbd {
 .screen-leave-to {
   opacity: 0;
 }
+
+/* Vidéo récompensée (portails) : un bouton doré, clairement facultatif. */
+.btn--reward {
+  background: linear-gradient(180deg, #e2b33c, #b8861d);
+  border-color: #6b4c0e;
+  color: #241703;
+}
+
+.btn--reward:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+/* Rideau pendant une publicité : masque le jeu et bloque toute commande. */
+.ad-curtain {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(10 8 6 / 0.92);
+  color: #f3ead7;
+  font-size: 1.1rem;
+  text-align: center;
+}

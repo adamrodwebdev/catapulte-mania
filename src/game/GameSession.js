@@ -20,12 +20,15 @@ import { StoryMode } from './modes/modes.js'
 import { CATAPULT_X } from './levels/ArenaRepository.js'
 import { NO_EFFECTS } from './progression/UpgradeCatalog.js'
 import { renownOf, COUP_DE_GRACE } from './modes/Renown.js'
+import { RewardTicket } from '../services/ads/RewardTicket.js'
 
 /** États d'une partie. */
 export const STATE = Object.freeze({
   SETTLING: 'settling',
   AIMING: 'aiming',
   FLYING: 'flying',
+  /** Défaite en suspens : un dernier tir est proposé contre une vidéo (portails). */
+  OFFER: 'offer',
   ENDED: 'ended',
 })
 
@@ -50,6 +53,7 @@ const PLAYER_FLAGS = Object.freeze(['#a3322b', '#3d7a3a'])
  *  - `feedback`  : { sound, x, intensity, caption, haptic } pour l'audio, les sous-titres et les vibrations
  *  - `announce`  : { key, params } message pour les lecteurs d'écran
  *  - `turn`      : { player, name } c'est au tour d'un autre joueur
+ *  - `offer`     : { kind: 'extra-shot' } défaite en suspens, un dernier tir peut être offert
  *  - `end`       : { won, result, winner, scores } fin de partie
  *                  (result : résultat authentifié, seulement en mode histoire)
  */
@@ -73,6 +77,9 @@ export class GameSession extends EventBus {
   #windRng
   #baseWind = 0
   #slowMo = 0
+  /** Dernier tir offert : déjà utilisé ? verdict de défaite en attente. */
+  #continued = false
+  #pendingVerdict = null
   #events = new EventBus()
   #time = 0
   options = { trajectoryAid: false, reducedMotion: false, blood: true }
@@ -86,7 +93,7 @@ export class GameSession extends EventBus {
    * @param {object} opts options d'affichage et de difficulté
    * @param {import('./modes/GameMode.js').GameMode} [mode] règles (histoire par défaut)
    */
-  constructor(level, { difficulty, completedLevels, trajectoryAid = false, reducedMotion = false, screenShake = true, blood = true, startPower = 100, effects = NO_EFFECTS }, mode = null) {
+  constructor(level, { difficulty, completedLevels, trajectoryAid = false, reducedMotion = false, screenShake = true, blood = true, startPower = 100, effects = NO_EFFECTS, continueOffer = false }, mode = null) {
     super()
     this.#level = level
     this.#difficulty = Guard.oneOf(difficulty, GAME.DIFFICULTIES, 'difficulty')
@@ -97,6 +104,8 @@ export class GameSession extends EventBus {
     const diff = DIFFICULTY[this.#difficulty]
     this.#windRng = new SeededRandom(level.seed)
     this.options = { trajectoryAid, reducedMotion, blood, startPower, trail: fx.trail || 'smoke' }
+    /** Proposer un dernier tir contre une vidéo (campagne solo, portails). */
+    this.continueOffer = Guard.boolean(continueOffer, 'continueOffer')
     const versus = this.#mode.id === 'versus'
 
     // Un état par joueur : catapulte (et sa visée), score, tirs, munitions.
@@ -456,6 +465,13 @@ export class GameSession extends EventBus {
     this.#turn++
     this.#restT = 0
     const verdict = this.#mode.evaluate(this)
+    if (verdict && !verdict.won && this.continueOffer && !this.#continued && this.#mode.id === 'story') {
+      this.#pendingVerdict = verdict
+      this.#setState(STATE.OFFER)
+      this.emit('offer', { kind: 'extra-shot' })
+      this.emit('hud', this.hud)
+      return
+    }
     if (verdict) return this.#finish(verdict)
     const next = this.#mode.nextPlayer(this.#active, this)
     const changed = next !== this.#active
@@ -467,6 +483,36 @@ export class GameSession extends EventBus {
     this.#setState(STATE.AIMING)
     if (changed) this.emit('turn', { player: next, name: this.player.name })
     this.emit('announce', { key: 'a11y.turn', params: { targets: this.targetsLeft, shots: this.player.shotsLeft ?? '∞', wind: Math.round(this.world.wind * 10) } })
+  }
+
+  /**
+   * Accepte le dernier tir offert : exige le ticket d'une vidéo vue en entier.
+   * Une seule fois par partie. Le tir compte comme les autres (étoiles, score).
+   * @param {RewardTicket} ticket
+   * @returns {boolean}
+   */
+  acceptOffer(ticket) {
+    if (this.#state !== STATE.OFFER || !RewardTicket.redeem(ticket, 'extra-shot')) return false
+    this.#continued = true
+    this.#pendingVerdict = null
+    const p = this.player
+    p.shotsTotal += 1
+    p.shotsLeft = (p.shotsLeft ?? 0) + 1
+    this.#powerUsedThisTurn = false
+    this.#pendingPower = null
+    this.#applyStartPower()
+    this.#setState(STATE.AIMING)
+    this.emit('announce', { key: 'a11y.turn', params: { targets: this.targetsLeft, shots: p.shotsLeft, wind: Math.round(this.world.wind * 10) } })
+    this.emit('hud', this.hud)
+    return true
+  }
+
+  /** Refuse le dernier tir : la défaite est prononcée. */
+  declineOffer() {
+    if (this.#state !== STATE.OFFER) return
+    const verdict = this.#pendingVerdict
+    this.#pendingVerdict = null
+    this.#finish(verdict)
   }
 
   /** Fin de partie : résultat signé (histoire), scores, annonce. */

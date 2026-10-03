@@ -52,7 +52,7 @@ export class GameController extends EventBus {
     return c
   }
 
-  constructor(canvas, level, { difficulty, completedLevels, settings, reducedMotion, audio, haptics, effects, mode }, registry) {
+  constructor(canvas, level, { difficulty, completedLevels, settings, reducedMotion, audio, haptics, effects, mode, continueOffer = false }, registry) {
     super()
     this.#canvas = canvas
     this.#audio = audio
@@ -67,12 +67,14 @@ export class GameController extends EventBus {
       blood: settings.blood,
       startPower: settings.startPower,
       effects,
+      continueOffer,
     }, mode)
     this.session.camera.setFocus(level.focus.left, level.focus.right, level.focus.top)
     this.session.on('hud', (h) => this.emit('hud', h))
     this.session.on('announce', (a) => this.emit('announce', a))
     this.session.on('end', (e) => this.emit('end', e))
     this.session.on('turn', (e) => this.emit('turn', e))
+    this.session.on('offer', (e) => this.emit('offer', e))
     this.session.on('feedback', (f) => this.#feedback(f))
   }
 

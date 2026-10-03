@@ -2,6 +2,31 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [3.5.0] – 2026-10-03
+### Ajouté
+- **Versions pour les portails** : `npm run build:crazygames` et
+  `npm run build:poki`. Chaque version embarque uniquement le SDK de son portail ;
+  la version de notre site n'en contient aucune trace et reste sans publicité.
+- **Service de publicité** orienté objet (`AdService`, une sous-classe par
+  portail, `NoAdService` pour notre site) et règles de fréquence (`AdPolicy`) :
+  publicités seulement entre deux niveaux, pas avant deux niveaux joués, au
+  plus une toutes les 3 minutes ; son coupé et jeu masqué pendant la vidéo.
+- **Vidéos récompensées, toujours facultatives** : un dernier tir quand les
+  munitions sont épuisées (une fois par partie, campagne solo), ou l'or d'une
+  victoire doublé.
+- **Tickets de récompense** (anti-triche) : une récompense n'est accordée que
+  contre un ticket émis après une vidéo vue en entier, à usage unique.
+- **Sauvegarde synchronisée** sur CrazyGames (module `data`), avec reprise des
+  profils déjà présents sur l'appareil.
+### Modifié
+- **Langues chargées à la demande** : seul le dictionnaire du joueur est
+  téléchargé (−62 Ko au premier chargement) ; les autres le sont s'il change
+  de langue. La démo en fichier unique les contient toujours toutes.
+- Sauvegarde **v6** : l'or gagné grâce aux vidéos est compté à part et plafonné
+  (jamais plus que l'or gagnable en jouant). Migration automatique.
+- CSP par plateforme : stricte sur notre site, ouverte en HTTPS aux régies
+  publicitaires sur les portails (toujours sans `eval` ni plugin).
+
 ## [3.4.0] – 2026-10-03
 ### Ajouté
 - **Campagne à deux** : les 100 niveaux de l'histoire en coopération. Les

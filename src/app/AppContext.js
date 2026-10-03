@@ -10,7 +10,9 @@ import { MusicDirector } from '../game/audio/MusicDirector.js'
 import { LevelRepository } from '../game/levels/LevelRepository.js'
 import { starsFor } from '../game/score/ScoreRules.js'
 import { PowerRegistry } from '../game/powers/PowerRegistry.js'
-import { DICTIONARIES } from '../i18n/index.js'
+import { loadDictionary } from '../i18n/loader.js'
+import { NoAdService } from '../services/ads/AdService.js'
+import { CloudStorageBackend } from '../services/CloudStorageBackend.js'
 import { GAME, PLAYABLE_LEVELS } from '../config/gameConfig.js'
 import { ValidationError } from '../core/utils/Guard.js'
 
@@ -40,8 +42,19 @@ export const SCREENS = Object.freeze(['home', 'profiles', 'levels', 'game', 'set
  * état réactif minimal à l'interface. Les objets métier restent hors de la
  * réactivité Vue (markRaw) : Vue n'observe que des copies d'affichage.
  */
-export function createAppContext() {
-  const storage = new StorageService()
+/**
+ * @param {{ ads?: import('../services/ads/AdService.js').AdService }} [opts]
+ *   ads : service de publicité du build (aucune pub sur notre site)
+ */
+export async function createAppContext({ ads = new NoAdService() } = {}) {
+  // Portail avec sauvegarde synchronisée : le stockage du portail remplace le localStorage.
+  let cloud = null
+  try {
+    cloud = ads.cloudStorage ? new CloudStorageBackend(ads.cloudStorage, globalThis.localStorage ?? null) : null
+  } catch {
+    cloud = null
+  }
+  const storage = cloud ? new StorageService(cloud) : new StorageService()
   const settings = new SettingsService(storage)
   const urlLang = new URLSearchParams(globalThis.location?.search || '').get('lang')
   const locale =
@@ -50,7 +63,11 @@ export function createAppContext() {
       : settings.hasStoredLanguage
         ? settings.get('language')
         : I18nService.detect('', globalThis.navigator?.languages || [], GAME.LANGUAGES, GAME.DEFAULT_LANGUAGE)
-  const i18n = new I18nService(DICTIONARIES, locale, 'en')
+  // Seule la langue du joueur est téléchargée avant l'affichage (v3.5).
+  const i18n = new I18nService({ [locale]: await loadDictionary(locale) }, locale, 'en', {
+    available: GAME.LANGUAGES,
+    loader: loadDictionary,
+  })
   const saves = new SaveManager(storage, new SaveSigner(storage), checkRecord)
   const audio = new AudioService()
   const haptics = new HapticService()
@@ -75,22 +92,63 @@ export function createAppContext() {
     captions: [],
     systemDark: false,
     systemReducedMotion: false,
+    /** Une publicité est à l'écran (son coupé, commandes bloquées). */
+    adPlaying: false,
+    /** Les vidéos récompensées sont-elles proposables sur cette plateforme ? */
+    rewardedAvailable: ads.rewardedAvailable,
   })
 
   /** @type {import('../domain/SaveSlot.js').SaveSlot | null} */
   let activeSlot = null
 
-  const services = markRaw({ storage, settings, i18n, saves, audio, haptics, music })
+  const services = markRaw({ storage, settings, i18n, saves, audio, haptics, music, ads })
+
+  /* ----- Publicités (portails) : son coupé et commandes bloquées pendant la vidéo ----- */
+  ads.on('pause', () => {
+    state.adPlaying = true
+    audio.adMuted = true
+  })
+  ads.on('resume', () => {
+    state.adPlaying = false
+    audio.adMuted = false
+  })
+
+  /**
+   * Double l'or de la dernière victoire contre une vidéo récompensée.
+   * @returns {Promise<number>} or ajouté (0 si vidéo interrompue ou refusée)
+   */
+  async function doubleGold(result) {
+    if (!activeSlot || !activeSlot.canDoubleGold(result)) return 0
+    const ticket = await ads.rewarded('double-gold')
+    if (!ticket) return 0
+    const bonus = activeSlot.claimDoubleGold(result, ticket)
+    if (bonus > 0) {
+      try {
+        await saves.save(activeSlot)
+      } catch {
+        /* l'or reste acquis pour la session */
+      }
+      state.profile = profileView(activeSlot)
+    }
+    return bonus
+  }
 
   /* ----- Langue ----- */
   const t = (key, params) => {
     void state.locale // dépendance réactive : retraduit quand la langue change
     return i18n.t(key, params)
   }
-  function setLocale(lang) {
-    i18n.setLocale(lang)
-    settings.set('language', lang)
+  /** Change de langue (téléchargée au besoin). Hors-ligne et non en cache : on garde l'actuelle. */
+  async function setLocale(lang) {
+    try {
+      await i18n.use(lang)
+      settings.set('language', lang)
+    } catch (err) {
+      console.warn('[i18n]', err)
+    }
   }
+  // La langue de secours n'est pas préchargée : un test garantit que chaque
+  // dictionnaire contient toutes les clés.
   i18n.on('change', (lang) => (state.locale = lang))
   settings.on('change', ({ key, value }) => {
     state.settings[key] = value
@@ -357,6 +415,7 @@ export function createAppContext() {
     workshop,
     startMatch,
     recordCoop,
+    doubleGold,
     multiplayerLevels,
     announce,
     caption,

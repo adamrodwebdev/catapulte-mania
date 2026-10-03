@@ -276,6 +276,8 @@ Pour tester sur un téléphone connecté au même Wi-Fi : utilisez l'adresse « 
 |---|---|
 | `npm run build` | Version complète optimisée dans le dossier `dist/` |
 | `npm run build:demo` | Démo en un seul fichier dans `dist-demo/index.html` |
+| `npm run build:crazygames` | Version pour le portail CrazyGames (avec ses publicités) dans `dist-crazygames/` |
+| `npm run build:poki` | Version pour le portail Poki (avec ses publicités) dans `dist-poki/` |
 | `npm run preview` | Affiche la version `dist/` en local pour vérifier avant publication |
 
 **Avant de publier**, ouvrez le fichier `.env` et remplacez l'adresse `VITE_SITE_URL` par celle de votre site. Elle sert au référencement (Google, partages sur les réseaux sociaux).
@@ -287,6 +289,24 @@ Pour tester sur un téléphone connecté au même Wi-Fi : utilisez l'adresse « 
 3. Netlify lit la configuration tout seul et publie le site. À chaque nouveau commit sur GitHub, le site se met à jour.
 
 Tout autre hébergeur de fichiers statiques convient (GitHub Pages, Cloudflare Pages, OVH…) : il suffit d'envoyer le contenu du dossier `dist/`.
+
+### Publier sur un portail de jeux (CrazyGames, Poki)
+
+Notre site reste **sans publicité**. Les portails, eux, apportent des joueurs et partagent les revenus publicitaires. Chaque portail a sa propre version du jeu :
+
+1. Lancez `npm run build:crazygames` (ou `npm run build:poki`).
+2. Compressez le **contenu** du dossier `dist-crazygames/` (ou `dist-poki/`) en un fichier `.zip`.
+3. Envoyez ce zip depuis l'espace développeur du portail, puis testez-le avec leur outil d'aperçu.
+
+Ce que contient une version portail :
+
+- **Vidéos récompensées, toujours au choix du joueur** : un dernier tir quand les munitions sont épuisées (une fois par partie, campagne solo), ou l'or d'une victoire doublé.
+- **Publicités entre deux niveaux** seulement, jamais pendant une visée : pas avant deux niveaux joués, puis au plus une toutes les 3 minutes (Poki décide lui-même de sa fréquence).
+- **Son coupé et jeu masqué** pendant chaque publicité.
+- **Sauvegarde synchronisée** sur CrazyGames : la progression suit le joueur connecté d'un appareil à l'autre. Les profils déjà présents sur l'appareil sont repris au premier lancement.
+- Pas de mode hors-ligne : le portail sert le jeu lui-même.
+
+Si le SDK du portail ne se charge pas (bloqueur de publicités, réseau), le jeu fonctionne normalement, simplement sans vidéo.
 
 ---
 
@@ -347,7 +367,8 @@ build/                      Sécurité (CSP) et service worker générés au bui
 - **Or et améliorations vérifiés** : au chargement, le solde doit être exactement égal à l'or gagné moins l'or dépensé, et l'or gagné ne peut pas dépasser ce que les niveaux joués permettent. Une amélioration inconnue ou au-delà de son maximum est refusée.
 - **Score scellé** : le score ne peut changer qu'en réaction au moteur physique ; il n'est pas accessible depuis la console du navigateur.
 - **Objets gelés** : configuration, niveaux et règles sont figés (`Object.freeze`) et ne peuvent pas être modifiés pendant la partie.
-- **Content-Security-Policy stricte** : aucun script tiers, aucun `eval`, aucune connexion réseau sortante.
+- **Content-Security-Policy stricte** sur notre site : aucun script tiers, aucun `eval`, aucune connexion réseau sortante. Les versions portail autorisent en plus les régies publicitaires (en HTTPS uniquement), toujours sans `eval` ni plugin.
+- **Récompenses publicitaires infalsifiables** : un tir supplémentaire ou de l'or doublé n'est accordé que sur présentation d'un « ticket » émis par le service de publicité après une vidéo vue en entier. Chaque ticket ne sert qu'une fois, pour une seule récompense. L'or gagné grâce aux vidéos est comptabilisé à part dans la sauvegarde et plafonné : il ne peut jamais dépasser l'or gagnable en jouant.
 - **En-têtes HTTP de sécurité** (fichier `public/_headers`) : protection contre l'intégration dans une autre page, le reniflage de type, etc.
 - **Aucune utilisation de `innerHTML`** avec des données du joueur (le nom du profil est toujours affiché comme du texte).
 
@@ -403,6 +424,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v3.2.1 | Les munitions découvertes restent disponibles pendant toute la campagne |
 | v3.3.0 | Les personnages de la Chronique en pixel art (sans images), une réplique avant chaque niveau, histoire réécrite |
 | v3.4.0 | Campagne à deux en coopération, nouvelles conditions de victoire (renommée, tournoi, régicide), tout en Difficile à deux, 6 arènes avec un roi |
+| v3.5.0 | Versions pour les portails CrazyGames et Poki (vidéos récompensées facultatives, publicités entre les niveaux, sauvegarde synchronisée), langues chargées à la demande |
 
 Pour revenir à une version précise avec Git : `git checkout v0.4.0` (puis `git checkout main` pour revenir à la dernière).
 

@@ -1,6 +1,6 @@
 <script setup>
 import { useApp } from '../../app/AppContext.js'
-import { LANGUAGE_NAMES } from '../../i18n/index.js'
+import { LANGUAGE_NAMES } from '../../i18n/loader.js'
 import { GAME } from '../../config/gameConfig.js'
 
 defineProps({ id: { type: String, default: 'lang-picker' } })

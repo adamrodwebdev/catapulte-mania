@@ -1,8 +1,10 @@
 /**
  * Configuration Vite.
  *
- * - `npm run build`       → version complète (dist/)
- * - `npm run build:demo`  → démo autonome en UN SEUL fichier HTML (dist-demo/index.html)
+ * - `npm run build`             → version complète pour notre site, sans publicité (dist/)
+ * - `npm run build:demo`        → démo autonome en UN SEUL fichier HTML (dist-demo/index.html)
+ * - `npm run build:crazygames`  → version CrazyGames, avec son SDK (dist-crazygames/)
+ * - `npm run build:poki`        → version Poki, avec son SDK (dist-poki/)
  *
  * Sécurité : une Content-Security-Policy stricte est injectée uniquement au build
  * (le serveur de dev de Vite a besoin de styles injectés à la volée).
@@ -16,14 +18,15 @@ import { buildServiceWorker, PUBLIC_PRECACHE } from './build/sw.js'
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
 const LANGS = ['fr', 'en', 'id']
+const PORTALS = ['crazygames', 'poki']
 
 /** Injecte la CSP dans index.html au moment du build. */
-function cspPlugin() {
+function cspPlugin(target) {
   return {
     name: 'ctc-csp',
     apply: 'build',
     transformIndexHtml(html) {
-      return html.replace('<!--CSP-->', `<meta http-equiv="Content-Security-Policy" content="${buildCsp()}">`)
+      return html.replace('<!--CSP-->', `<meta http-equiv="Content-Security-Policy" content="${buildCsp({ target })}">`)
     },
   }
 }
@@ -139,17 +142,26 @@ function escapeRe(s) {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_')
   const isDemo = mode === 'demo'
+  /** Plateforme visée : notre site ('web'), ou un portail (mode du même nom). */
+  const target = PORTALS.includes(mode) ? mode : 'web'
   const siteUrl = env.VITE_SITE_URL || 'https://catapulte-mania.netlify.app'
 
   return {
     base: './',
-    plugins: [vue(), siteUrlPlugin(siteUrl), cspPlugin(), ...(isDemo ? [singleFilePlugin()] : [seoFilesPlugin(siteUrl), serviceWorkerPlugin()])],
+    plugins: [
+      vue(),
+      siteUrlPlugin(siteUrl),
+      cspPlugin(target),
+      // Portails : ni service worker ni fichiers SEO (ils servent et référencent le jeu eux-mêmes).
+      ...(isDemo ? [singleFilePlugin()] : target === 'web' ? [seoFilesPlugin(siteUrl), serviceWorkerPlugin()] : []),
+    ],
     define: {
       __DEMO__: JSON.stringify(isDemo),
+      __TARGET__: JSON.stringify(target),
       __APP_VERSION__: JSON.stringify(pkg.version),
     },
     build: {
-      outDir: isDemo ? 'dist-demo' : 'dist',
+      outDir: isDemo ? 'dist-demo' : target === 'web' ? 'dist' : `dist-${target}`,
       target: 'es2020',
       sourcemap: false,
       cssCodeSplit: !isDemo,

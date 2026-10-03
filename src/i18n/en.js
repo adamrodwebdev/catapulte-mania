@@ -183,6 +183,18 @@ export default {
       'ammo:split': 'New ammo: grapeshot. Tap the screen mid-flight to split it.',
     },
   },
+  ads: {
+    playing: 'Ad playing… The game resumes right after.',
+    offerTitle: 'Out of ammunition!',
+    offerText: { one: '{count} defender is still standing. One last shot to finish the job?', other: '{count} defenders are still standing. One last shot to finish the job?' },
+    extraShot: 'Watch a video: +1 shot',
+    extraShotGranted: 'One more shot! Take aim.',
+    giveUp: 'Accept defeat',
+    doubleGold: 'Watch a video: double your gold',
+    goldDoubled: 'Gold doubled: +{gold} gold coins.',
+    loading: 'Loading video…',
+    unavailable: 'Video unavailable right now.',
+  },
   end: {
     gold: '+{gold} gold',
     winner: '{name} wins!',

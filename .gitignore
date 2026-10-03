@@ -10,3 +10,5 @@ coverage/
 *.local
 .scratch/
 .netlify/
+dist-crazygames/
+dist-poki/

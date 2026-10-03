@@ -4,6 +4,7 @@ import { LevelResult } from './LevelResult.js'
 import { UpgradeCatalog } from '../game/progression/UpgradeCatalog.js'
 import { GOLD, goldFor, maxGoldFor, legacyMaxGoldFor } from '../game/progression/GoldRules.js'
 import { countAchievements } from '../game/progression/Achievements.js'
+import { RewardTicket } from '../services/ads/RewardTicket.js'
 
 /** Nom de profil : lettres (toutes langues), chiffres, espaces, tirets. */
 export const PROFILE_NAME = /^[\p{L}\p{N}][\p{L}\p{N} _'-]{0,15}$/u
@@ -21,7 +22,7 @@ const COOP_RECORD = Schema.object({
   attempts: Schema.int({ min: 1, max: 1e6 }),
 })
 
-/** Schéma de la sauvegarde (version 5). Toute clé inconnue est refusée. */
+/** Schéma de la sauvegarde (version 6). Toute clé inconnue est refusée. */
 export const saveSchema = Schema.object({
   version: Schema.enum([GAME.SAVE_VERSION]),
   name: Schema.string({ minLength: 1, maxLength: 16, pattern: PROFILE_NAME }),
@@ -61,6 +62,8 @@ export const saveSchema = Schema.object({
   }),
   // v5 : campagne à deux (progression séparée, sans or).
   coop: Schema.record(LEVEL_KEY, COOP_RECORD, { maxKeys: GAME.LEVEL_COUNT }),
+  // v6 : or gagné grâce aux vidéos récompensées (portails), plafonné séparément.
+  bonusGold: GOLD_INT,
 })
 
 /**
@@ -71,6 +74,7 @@ export const saveSchema = Schema.object({
  *            (et contrôlé selon l'ancien barème).
  * v3 → v4 : succès renouvelés (masques remis à zéro, or conservé).
  * v4 → v5 : ajout de la campagne à deux, vide.
+ * v5 → v6 : or des vidéos récompensées, à zéro.
  * @param {any} raw
  */
 export function migrateSave(raw) {
@@ -94,6 +98,7 @@ export function migrateSave(raw) {
     save = { ...save, version: 4, levels, legacyGold: Number.isInteger(save.goldEarned) ? save.goldEarned : 0 }
   }
   if (save && typeof save === 'object' && save.version === 4) save = { ...save, version: 5, coop: {} }
+  if (save && typeof save === 'object' && save.version === 5) save = { ...save, version: 6, bonusGold: 0 }
   return save
 }
 
@@ -105,6 +110,8 @@ export function migrateSave(raw) {
 export class SaveSlot {
   #index
   #data
+  /** Or doublable par une vidéo : résultat authentique → or gagné (usage unique). */
+  #doublable = new WeakMap()
 
   /**
    * @param {number} index numéro d'emplacement (0..2)
@@ -131,6 +138,7 @@ export class SaveSlot {
       upgrades: {},
       cosmetics: { owned: UpgradeCatalog.defaults(), skin: 'oak', trail: 'smoke' },
       coop: {},
+      bonusGold: 0,
     })
     return new SaveSlot(index, data)
   }
@@ -195,7 +203,9 @@ export class SaveSlot {
     }
     if (data.goldEarned - spent !== data.gold) throw new ValidationError('save.gold', 'balance mismatch')
     if (data.legacyGold > legacyMaxGoldFor(data.levels)) throw new ValidationError('save.legacyGold', 'more gold than possible')
-    if (data.goldEarned > data.legacyGold + maxGoldFor(data.levels)) throw new ValidationError('save.goldEarned', 'more gold than possible')
+    // L'or des vidéos ne peut jamais dépasser l'or gagnable en jouant (au plus « doublé »).
+    if (data.bonusGold > maxGoldFor(data.levels)) throw new ValidationError('save.bonusGold', 'more bonus than possible')
+    if (data.goldEarned > data.legacyGold + maxGoldFor(data.levels) + data.bonusGold) throw new ValidationError('save.goldEarned', 'more gold than possible')
   }
 
   get index() {
@@ -335,6 +345,7 @@ export class SaveSlot {
     const gold = goldFor(result, { firstClear, newStars, newAchievements: countAchievements(newAchievements), perfect })
     this.#data.gold = Math.min(GOLD.MAX_BALANCE, this.#data.gold + gold)
     this.#data.goldEarned = Math.min(GOLD.MAX_BALANCE, this.#data.goldEarned + gold)
+    if (gold > 0) this.#doublable.set(result, gold)
     if (firstClear) {
       this.#data.levels[result.levelId] = { stars: result.stars, best: result.score, attempts: 1, shots: Math.max(1, result.shotsUsed), ach: result.achievements }
       return { newBest: true, firstClear: true, gold, newAchievements }
@@ -347,6 +358,30 @@ export class SaveSlot {
     prev.shots = prev.shots > 0 ? Math.min(prev.shots, shots) : shots
     prev.ach |= result.achievements
     return { newBest, firstClear: false, gold, newAchievements }
+  }
+
+  /**
+   * Double l'or d'une victoire qui vient d'être enregistrée, contre une vidéo.
+   * Exige le résultat authentique ET le ticket de la vidéo ; une seule fois par
+   * victoire ; plafonné pour que la sauvegarde reste vérifiable.
+   * @returns {number} or ajouté (0 si refusé)
+   */
+  claimDoubleGold(result, ticket) {
+    const gold = this.#doublable.get(result)
+    if (!gold || !RewardTicket.redeem(ticket, 'double-gold')) return 0
+    this.#doublable.delete(result)
+    const room = Math.max(0, maxGoldFor(this.#data.levels) - this.#data.bonusGold)
+    const bonus = Math.min(gold, room, GOLD.MAX_BALANCE - this.#data.goldEarned)
+    if (bonus <= 0) return 0
+    this.#data.gold += bonus
+    this.#data.goldEarned += bonus
+    this.#data.bonusGold += bonus
+    return bonus
+  }
+
+  /** L'or de cette victoire peut-il encore être doublé ? */
+  canDoubleGold(result) {
+    return this.#doublable.has(result)
   }
 
   /** Copie sérialisable (validée à nouveau avant écriture). */

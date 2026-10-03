@@ -183,6 +183,18 @@ export default {
       'ammo:split': 'Amunisi baru: peluru sebar. Ketuk layar saat melayang untuk memecahnya.',
     },
   },
+  ads: {
+    playing: 'Iklan sedang diputar… Permainan berlanjut sesudahnya.',
+    offerTitle: 'Amunisi habis!',
+    offerText: { other: 'Masih ada {count} pembela. Satu tembakan terakhir untuk menuntaskannya?' },
+    extraShot: 'Tonton video: +1 tembakan',
+    extraShotGranted: 'Satu tembakan lagi! Bidik sekarang.',
+    giveUp: 'Terima kekalahan',
+    doubleGold: 'Tonton video: gandakan emas',
+    goldDoubled: 'Emas digandakan: +{gold} keping emas.',
+    loading: 'Memuat video…',
+    unavailable: 'Video belum tersedia saat ini.',
+  },
   end: {
     gold: '+{gold} emas',
     winner: '{name} menang!',

@@ -35,6 +35,12 @@ const phase = ref('loading') // loading | story | intro | playing | paused | end
 const storyBeat = shallowRef(null)
 const showPowers = ref(false)
 const end = ref(null)
+/** Dernier résultat authentique (hors réactivité : Vue l'envelopperait dans un Proxy). */
+let lastResult = null
+/** Dernier tir offert contre une vidéo : 'idle' | 'loading' | 'failed'. */
+const offer = ref('idle')
+/** Or doublé : 'idle' | 'loading' | 'done' | 'failed'. */
+const doubling = ref('idle')
 /** Mode de la partie : histoire, libre, duel, chacun sa partie, face-à-face, campagne à deux. */
 const mode = computed(() => state.match.mode || 'story')
 const isMulti = computed(() => ['duel', 'hotseat', 'versus', 'coop'].includes(mode.value))
@@ -147,6 +153,8 @@ async function startLevel() {
       haptics: app.services.haptics,
       effects,
       mode: rules,
+      // Portails : un dernier tir contre une vidéo, en campagne solo uniquement.
+      continueOffer: state.rewardedAvailable && mode.value === 'story',
     }),
   )
   controller.on('turn', ({ name }) => showTurn(name))
@@ -163,6 +171,11 @@ async function startLevel() {
     app.services.music.duck(p)
   })
   controller.on('end', onEnd)
+  controller.on('offer', () => {
+    offer.value = 'idle'
+    showPowers.value = false
+    phase.value = 'offer'
+  })
   hud.value = controller.session.hud
   stopCoach()
   if (mode.value === 'story' && level.value.tutorial && !rec?.completed && state.settings.tutorials !== false) startCoach(level.value.tutorial)
@@ -281,18 +294,54 @@ function quit() {
   app.go(isMulti.value ? 'multiplayer' : 'levels')
 }
 /** Rejouer : en « chacun sa partie », la revanche repart d'un tournoi neuf. */
-function restart() {
+async function restart() {
   if (mode.value === 'hotseat' && phase.value === 'ended' && end.value?.kind === 'tourney') tourney = null
+  if (phase.value === 'ended') await app.services.ads.interstitial()
   startLevel()
 }
 /** Chacun sa partie : au joueur suivant, ou à la manche suivante. */
 function nextRound() {
   startLevel()
 }
-function nextLevel() {
+async function nextLevel() {
   state.levelId = Math.min(state.levelId + 1, GAME.LEVEL_COUNT)
+  // Portails : une publicité éventuelle, uniquement entre deux niveaux (règles AdPolicy).
+  await app.services.ads.interstitial()
   startLevel()
 }
+
+/* ---------- Vidéos récompensées (portails) ---------- */
+
+/** Dernier tir : la vidéo doit être vue en entier, sinon la défaite reste proposée. */
+async function acceptOffer() {
+  if (offer.value === 'loading' || !controller) return
+  offer.value = 'loading'
+  const ticket = await app.services.ads.rewarded('extra-shot')
+  if (ticket && controller?.session.acceptOffer(ticket)) {
+    offer.value = 'idle'
+    phase.value = 'playing'
+    app.announce(t('ads.extraShotGranted'))
+  } else offer.value = 'failed'
+}
+function declineOffer() {
+  controller?.session.declineOffer()
+}
+async function doubleGold() {
+  if (doubling.value !== 'idle' || !lastResult) return
+  doubling.value = 'loading'
+  const bonus = await app.doubleGold(lastResult)
+  if (bonus > 0) {
+    end.value = { ...end.value, gold: end.value.gold + bonus }
+    doubling.value = 'done'
+    app.announce(t('ads.goldDoubled', { gold: bonus }))
+  } else doubling.value = 'failed'
+}
+
+/* Événements de partie pour les portails (statistiques, fréquence des pubs). */
+watch(phase, (now, before) => {
+  if (now === 'playing') app.services.ads.gameplayStart()
+  else if (before === 'playing') app.services.ads.gameplayStop()
+})
 
 /* ---------- Chronique ---------- */
 
@@ -390,6 +439,8 @@ async function onCoopEnd({ won, result, renown }) {
 }
 
 async function onStoryEnd({ won, result }) {
+  lastResult = result
+  doubling.value = 'idle'
   const maskBefore = state.profile?.levels[result.levelId]?.ach ?? 0
   const outcome = await app.recordResult(result)
   const rec = state.profile?.levels[result.levelId]
@@ -577,6 +628,19 @@ const canvasLabel = computed(() =>
       </div>
     </ModalPanel>
 
+    <!-- Plus de tirs : un dernier tir contre une vidéo (portails, campagne solo) -->
+    <ModalPanel v-if="phase === 'offer'" labelledby="offer-title" tone="defeat" :closable="false">
+      <h2 id="offer-title" class="modal__title">{{ t('ads.offerTitle') }}</h2>
+      <p>{{ t('ads.offerText', { count: hud?.targetsLeft ?? 0 }) }}</p>
+      <p v-if="offer === 'failed'" class="notice notice--warning" role="alert">{{ t('ads.unavailable') }}</p>
+      <div class="modal__actions">
+        <button type="button" class="btn btn--primary btn--large btn--reward" data-autofocus :disabled="offer !== 'idle'" @click="acceptOffer">
+          <AppIcon name="play" />{{ offer === 'loading' ? t('ads.loading') : t('ads.extraShot') }}
+        </button>
+        <button type="button" class="btn btn--ghost" @click="declineOffer">{{ t('ads.giveUp') }}</button>
+      </div>
+    </ModalPanel>
+
     <!-- Pause -->
     <ModalPanel v-if="phase === 'paused'" labelledby="pause-title" @close="resume">
       <h2 id="pause-title" class="modal__title">{{ t('game.paused') }}</h2>
@@ -605,6 +669,9 @@ const canvasLabel = computed(() =>
         <p v-if="end.newBest" class="end__badge">{{ t('end.newBest') }}</p>
         <AchievementList :level="level" :mask="end.achMask" :fresh="end.achFresh" compact />
         <p v-if="end.gold" class="end__gold"><AppIcon name="coin" />{{ t('end.gold', { gold: end.gold }) }}</p>
+        <button v-if="end.gold && state.rewardedAvailable && doubling !== 'done'" type="button" class="btn btn--reward" :disabled="doubling === 'loading' || doubling === 'failed'" @click="doubleGold">
+          <AppIcon name="play" />{{ doubling === 'failed' ? t('ads.unavailable') : t('ads.doubleGold') }}
+        </button>
         <p v-if="end.unlockedPower" class="end__power">
           <AppIcon name="flame" />{{ t('powers.unlocked', { name: t(`powers.${end.unlockedPower}`) }) }}
         </p>

@@ -183,6 +183,18 @@ export default {
       'ammo:split': 'Nouvelle munition : la mitraille. Touchez l’écran en vol pour la diviser.',
     },
   },
+  ads: {
+    playing: 'Publicité en cours… Le jeu reprend juste après.',
+    offerTitle: 'Plus de munitions !',
+    offerText: { one: 'Il reste {count} défenseur. Un dernier tir pour finir le travail ?', other: 'Il reste {count} défenseurs. Un dernier tir pour finir le travail ?' },
+    extraShot: 'Regarder une vidéo : +1 tir',
+    extraShotGranted: 'Un tir de plus ! À vous de viser.',
+    giveUp: 'Accepter la défaite',
+    doubleGold: "Regarder une vidéo : doubler l'or",
+    goldDoubled: "Or doublé : +{gold} pièces d'or.",
+    loading: 'Chargement de la vidéo…',
+    unavailable: 'Vidéo indisponible pour le moment.',
+  },
   end: {
     gold: '+{gold} pièces d’or',
     winner: '{name} l’emporte !',

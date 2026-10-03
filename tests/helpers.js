@@ -13,4 +13,7 @@ export class MemoryStorage {
   get length() {
     return this.#map.size
   }
+  key(i) {
+    return [...this.#map.keys()][i] ?? null
+  }
 }

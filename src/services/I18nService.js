@@ -12,6 +12,9 @@ const INTL_LOCALES = Object.freeze({ fr: 'fr-FR', en: 'en-GB', id: 'id-ID' })
  * - Pluriels via Intl.PluralRules : une entrée peut être `{ one: '…', other: '…' }`.
  * - Repli : langue courante → langue de secours → clé brute (jamais d'écran vide).
  *
+ * - Chargement à la demande (v3.5) : avec un `loader`, seuls les dictionnaires
+ *   utiles sont téléchargés ; `use(locale)` charge puis active une langue.
+ *
  * Les textes sont toujours insérés comme texte (jamais comme HTML) : pas de risque XSS.
  * Événement émis : `change` avec le code de langue.
  */
@@ -21,17 +24,59 @@ export class I18nService extends EventBus {
   #fallback
   #plural = new Map()
   #numberFormat = new Map()
+  #available
+  #loader
+  #pending = new Map()
 
   /**
-   * @param {Record<string, object>} dictionaries ex. { fr: {...}, en: {...} }
-   * @param {string} locale langue initiale
-   * @param {string} fallback langue de secours
+   * @param {Record<string, object>} dictionaries dictionnaires déjà chargés (ex. { fr: {...} })
+   * @param {string} locale langue initiale (doit être chargée)
+   * @param {string} fallback langue de secours (peut être chargée plus tard)
+   * @param {{ available?: readonly string[], loader?: (locale: string) => Promise<object> }} [opts]
    */
-  constructor(dictionaries, locale, fallback = 'en') {
+  constructor(dictionaries, locale, fallback = 'en', { available, loader } = {}) {
     super()
-    this.#dictionaries = dictionaries
-    this.#fallback = Guard.oneOf(fallback, Object.keys(dictionaries), 'fallback')
-    this.#locale = Guard.oneOf(locale, Object.keys(dictionaries), 'locale')
+    this.#dictionaries = { ...dictionaries }
+    this.#available = Object.freeze([...(available ?? Object.keys(dictionaries))])
+    this.#loader = typeof loader === 'function' ? loader : null
+    this.#fallback = Guard.oneOf(fallback, this.#available, 'fallback')
+    Guard.oneOf(locale, Object.keys(this.#dictionaries), 'locale')
+    this.#locale = Guard.oneOf(locale, this.#available, 'locale')
+  }
+
+  /** La langue est-elle déjà téléchargée ? */
+  isLoaded(locale) {
+    return Object.hasOwn(this.#dictionaries, locale)
+  }
+
+  /**
+   * Télécharge un dictionnaire (une seule fois, même si on le demande plusieurs fois).
+   * @param {string} locale
+   * @returns {Promise<void>}
+   */
+  load(locale) {
+    try {
+      Guard.oneOf(locale, this.#available, 'locale')
+    } catch (err) {
+      return Promise.reject(err)
+    }
+    if (this.isLoaded(locale)) return Promise.resolve()
+    if (!this.#loader) return Promise.reject(new Error(`no loader for "${locale}"`))
+    if (!this.#pending.has(locale)) {
+      const p = Promise.resolve(this.#loader(locale)).then((dict) => {
+        if (!dict || typeof dict !== 'object' || Array.isArray(dict)) throw new TypeError(`invalid dictionary "${locale}"`)
+        this.#dictionaries[locale] = dict
+      })
+      p.catch(() => this.#pending.delete(locale)) // nouvel essai possible (réseau coupé)
+      this.#pending.set(locale, p)
+    }
+    return this.#pending.get(locale)
+  }
+
+  /** Charge (si besoin) puis active une langue. */
+  async use(locale) {
+    await this.load(locale)
+    this.setLocale(locale)
   }
 
   get locale() {
@@ -39,7 +84,7 @@ export class I18nService extends EventBus {
   }
 
   get available() {
-    return Object.keys(this.#dictionaries)
+    return this.#available
   }
 
   /** Code BCP 47 complet (ex. « fr-FR ») pour les API Intl. */
@@ -49,6 +94,7 @@ export class I18nService extends EventBus {
 
   setLocale(locale) {
     Guard.oneOf(locale, this.available, 'locale')
+    if (!this.isLoaded(locale)) throw new Error(`locale "${locale}" not loaded`)
     if (locale === this.#locale) return
     this.#locale = locale
     this.emit('change', locale)
@@ -76,6 +122,7 @@ export class I18nService extends EventBus {
   }
 
   #lookup(locale, key) {
+    if (!this.isLoaded(locale)) return undefined
     let node = this.#dictionaries[locale]
     for (const part of key.split('.')) {
       if (node === null || typeof node !== 'object' || !Object.hasOwn(node, part)) return undefined

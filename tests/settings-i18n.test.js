@@ -51,3 +51,24 @@ test('détection de la langue : URL puis navigateur', () => {
   assert.equal(I18nService.detect('', ['ms-MY'], av, 'fr'), 'id')
   assert.equal(I18nService.detect('', ['de-DE'], av, 'fr'), 'fr')
 })
+
+test('I18nService : langues chargées à la demande (v3.5)', async () => {
+  let calls = 0
+  const loader = async (lang) => {
+    calls++
+    return { en: { hi: 'Hello' }, id: { hi: 'Halo' } }[lang]
+  }
+  const i18n = new I18nService({ fr: { hi: 'Salut' } }, 'fr', 'en', { available: ['fr', 'en', 'id'], loader })
+  assert.deepEqual([...i18n.available], ['fr', 'en', 'id'])
+  assert.equal(i18n.t('hi'), 'Salut')
+  assert.equal(i18n.t('absent'), 'absent') // secours pas encore chargé : clé brute, sans erreur
+  assert.throws(() => i18n.setLocale('id'), /not loaded/)
+  await Promise.all([i18n.use('id'), i18n.load('id')])
+  assert.equal(calls, 1) // un seul téléchargement
+  assert.equal(i18n.locale, 'id')
+  assert.equal(i18n.t('hi'), 'Halo')
+  await assert.rejects(() => i18n.load('de'))
+  const broken = new I18nService({ fr: {} }, 'fr', 'en', { available: ['fr', 'en'], loader: async () => null })
+  await assert.rejects(() => broken.use('en'), /invalid dictionary/)
+  assert.equal(broken.locale, 'fr')
+})
