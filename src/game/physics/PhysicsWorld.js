@@ -1,4 +1,5 @@
 import Matter from 'matter-js'
+import { WindField, WIND_PROFILES, windageOf } from './WindField.js'
 import { WORLD, CATEGORY } from './constants.js'
 import { Guard } from '../../core/utils/Guard.js'
 import { Projectile } from '../entities/Projectile.js'
@@ -36,7 +37,6 @@ export class PhysicsWorld {
   #time = 0
   #pendingExplosions = []
   #events
-  #wind = 0
   #fireTick = 0
   #rng
   /** Vrai dès le premier tir : avant, la structure se met en place sans conséquence. */
@@ -48,11 +48,14 @@ export class PhysicsWorld {
 
   /**
    * @param {import('../../core/utils/EventBus.js').EventBus} events
-   * @param {{ wind?: number, seed?: number }} [opts] wind ∈ [-1, 1] ; graine du hasard (feu, éclats)
+   * @param {{ wind?: number, seed?: number, windProfile?: object }} [opts] wind ∈ [-1, 1] ;
+   *   graine du hasard (feu, éclats, rafales) ; profil de vent de la difficulté
    */
-  constructor(events, { wind = 0, seed = 1 } = {}) {
+  constructor(events, { wind = 0, seed = 1, windProfile = WIND_PROFILES.normal } = {}) {
     this.#events = events
     this.#rng = new SeededRandom(seed)
+    /** Champ de vent (base du tour, altitude, rafales). */
+    this.windField = new WindField(windProfile, seed)
     this.engine = Engine.create({ enableSleeping: true, positionIterations: 8, velocityIterations: 6 })
     this.engine.gravity.y = WORLD.GRAVITY
     this.engine.gravity.scale = WORLD.GRAVITY_SCALE
@@ -81,12 +84,13 @@ export class PhysicsWorld {
     return this.#time
   }
 
+  /** Vent de base du tour, ∈ [-1, 1]. */
   get wind() {
-    return this.#wind
+    return this.windField.base
   }
 
   set wind(v) {
-    this.#wind = Guard.number(v, 'wind', { min: -1, max: 1 })
+    this.windField.base = v
   }
 
   /** @returns {IterableIterator<import('../entities/Entity.js').Entity>} */
@@ -312,11 +316,17 @@ export class PhysicsWorld {
     return shards
   }
 
+  /**
+   * Le vent pousse les projectiles en vol. En Difficile, sa force dépend de
+   * l'altitude, des rafales et de la prise au vent du projectile (WindField).
+   */
   #applyWind() {
-    if (this.#wind === 0) return
-    const ax = this.#wind * WORLD.WIND_RATIO * WORLD.GRAVITY * WORLD.GRAVITY_SCALE
+    const field = this.windField
+    if (field.base === 0) return
     for (const e of this.#entities.values()) {
-      if (e.kind === 'projectile' && !e.hasImpacted) e.body.force.x += e.body.mass * ax
+      if (e.kind !== 'projectile' || e.hasImpacted) continue
+      e.windage ??= windageOf(e)
+      e.body.force.x += e.body.mass * field.accel(e.x, e.y, this.#time, e.windage)
     }
   }
 
@@ -427,14 +437,25 @@ export class PhysicsWorld {
     for (const e of this.queryRadius(x, y, radius)) Sleeping.set(e.body, false)
   }
 
+  /**
+   * Propagation du feu. En Difficile, le vent l'attise : sous le vent, le feu
+   * va plus loin et prend plus facilement ; contre le vent, il peine.
+   */
   #spreadFire() {
     const burning = this.filter((e) => e.burning > 0 && e.alive && e.kind !== 'projectile')
+    const wind = this.windField.profile.fire ? this.windField.base : 0
     for (const src of burning) {
-      const reach = Math.max(src.width, src.height) / 2 + 26
+      const reach = Math.max(src.width, src.height) / 2 + 26 + Math.abs(wind) * 45
       for (const near of this.queryRadius(src.x, src.y, reach + 30)) {
-        if (near !== src && near.flammable && near.burning === 0 && this.#rng.chance(near.catchChance ?? 0.3)) {
-          if (near.ignite(5500)) this.#events.emit('fire:start', { entity: near })
+        if (near === src || !near.flammable || near.burning !== 0) continue
+        let chance = near.catchChance ?? 0.3
+        if (wind !== 0) {
+          const downwind = Math.sign(near.x - src.x) === Math.sign(wind)
+          chance = downwind ? Math.min(0.95, chance * (1 + Math.abs(wind) * 1.4)) : chance * (1 - Math.abs(wind) * 0.6)
+          // Contre le vent, la portée habituelle seulement.
+          if (!downwind && Math.hypot(near.x - src.x, near.y - src.y) > Math.max(src.width, src.height) / 2 + 56) continue
         }
+        if (this.#rng.chance(chance) && near.ignite(5500)) this.#events.emit('fire:start', { entity: near })
       }
     }
   }

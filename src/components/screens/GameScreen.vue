@@ -525,10 +525,13 @@ function onKey(e) {
 
 /* ---------- Accessibilité ---------- */
 
+/** Vent lu aux lecteurs d'écran : vitesse réelle, sens, et rafales en Difficile. */
 function windText(w) {
-  const kmh = Math.round(Math.abs(w) * 30)
+  const h = hud.value
+  const kmh = h?.windKmh ?? Math.round(Math.abs(w) * 30)
   if (!kmh) return t('game.windCalm')
-  return `${kmh} km/h ${w < 0 ? t('a11y.windLeft') : t('a11y.windRight')}`
+  const base = `${kmh} km/h ${w < 0 ? t('a11y.windLeft') : t('a11y.windRight')}`
+  return h?.windDynamic ? `${base}, ${t('a11y.windGusty')}` : base
 }
 
 function formatAnnouncement({ key, params = {} }) {

@@ -9,7 +9,7 @@ import { clamp } from '../../core/utils/math.js'
  */
 export const SOUND_IDS = Object.freeze([
   'launch', 'creak', 'wood', 'straw', 'stone', 'iron', 'glass', 'hit', 'down', 'explosion',
-  'fire', 'victory', 'defeat', 'power', 'click', 'split', 'star',
+  'fire', 'victory', 'defeat', 'power', 'click', 'split', 'star', 'gust',
 ])
 
 export class AudioService {
@@ -142,6 +142,7 @@ export class AudioService {
   #noiseHit(out, t, { type = 'bandpass', freq = 800, q = 1, attack = 0.005, decay = 0.2, peak = 0.5, sweepTo = null }) {
     const src = this.#ctx.createBufferSource()
     src.buffer = this.#noise
+    src.loop = true // sons longs (rafale) : le bruit d'une seconde tourne en boucle
     const f = this.#ctx.createBiquadFilter()
     f.type = type
     f.frequency.setValueAtTime(freq, t)
@@ -197,6 +198,10 @@ export class AudioService {
         break
       case 'down':
         this.#tone(out, t, { type: 'triangle', freq: 520, to: 140, attack: 0.01, decay: 0.45, peak: 0.25 })
+        break
+      case 'gust':
+        // Souffle qui monte puis retombe (bruit filtré, balayage lent).
+        this.#noiseHit(out, t, { type: 'bandpass', freq: 380, sweepTo: 950, q: 0.7, attack: 0.45, decay: 1.3, peak: 0.22 * k })
         break
       case 'explosion':
         this.#noiseHit(out, t, { type: 'lowpass', freq: 900, sweepTo: 80, attack: 0.01, decay: 1.1, peak: 0.9 })

@@ -26,7 +26,9 @@ async function loadGame() {
   const { LevelRepository } = await import('../src/game/levels/LevelRepository.js')
   const { TrajectoryPredictor } = await import('../src/game/TrajectoryPredictor.js')
   const { AIM } = await import('../src/game/Catapult.js')
-  return { GameSession, LevelRepository, TrajectoryPredictor, AIM }
+  const { windageOf } = await import('../src/game/physics/WindField.js')
+  const { PROJECTILE_TYPES } = await import('../src/game/entities/catalog.js')
+  return { GameSession, LevelRepository, TrajectoryPredictor, AIM, windageOf, PROJECTILE_TYPES }
 }
 
 /** Joue une partie en appliquant une liste de tirs ; s'arrête au tour suivant. */
@@ -48,15 +50,23 @@ function replay(G, level, difficulty, shots) {
   return { session: s, ended }
 }
 
-/** Puissance qui fait passer la trajectoire par (tx, ty) pour un angle donné. */
-function solvePower(G, session, angle, tx, ty) {
+/**
+ * Puissance qui fait passer la trajectoire par (tx, ty) pour un angle donné.
+ * En Difficile, la visée tient compte de l'altitude, de la prise au vent du
+ * projectile et de la rafale du moment (comme l'aide à la trajectoire) ; les
+ * rafales pendant le vol, elles, se découvrent au tir, comme pour un joueur.
+ */
+function solvePower(G, session, angle, tx, ty, ammo = 'stone') {
   const c = session.catapult
+  const field = session.world.windField
+  const windage = G.windageOf({ type: ammo, radius: G.PROJECTILE_TYPES[ammo].radius })
   let lo = 0
   let hi = 1
   for (let i = 0; i < 18; i++) {
     const mid = (lo + hi) / 2
     c.setAim(angle, mid)
-    const pts = G.TrajectoryPredictor.predict(c.launchPoint, c.velocity, { wind: session.wind, maxPoints: 400, every: 1 })
+    const windAccel = field.dynamic ? field.frozen(c.launchPoint.x, session.world.time, windage) : null
+    const pts = G.TrajectoryPredictor.predict(c.launchPoint, c.velocity, { wind: session.wind, windAccel, maxPoints: 400, every: 1 })
     const at = pts.find((p) => p.x >= tx)
     const y = at ? at.y : Infinity
     if (y > ty) lo = mid
@@ -79,9 +89,11 @@ function candidates(G, session) {
   const ammoTypes = session.ammo.filter((a) => a.count === null || a.count > 0).map((a) => a.type)
   for (const t of points) {
     for (const angle of ANGLES) {
-      const power = solvePower(G, session, angle, t.x, t.y)
-      if (power <= 0.001 || power >= 0.999) continue
-      for (const ammo of ammoTypes) out.push({ angle, power: Math.round(power * 1000) / 1000, ammo })
+      for (const ammo of ammoTypes) {
+        const power = solvePower(G, session, angle, t.x, t.y, session.world.windField.dynamic ? ammo : 'stone')
+        if (power <= 0.001 || power >= 0.999) continue
+        out.push({ angle, power: Math.round(power * 1000) / 1000, ammo })
+      }
     }
   }
   return out

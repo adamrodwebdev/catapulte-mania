@@ -849,3 +849,46 @@
   .coach { padding-left: calc(var(--space-3) + 3rem); }
   .coach__portrait { height: 3.5rem !important; }
 }
+
+/* Vent (v3.6) : la couleur suit la force ; « rafale » clignote doucement. */
+.hud-stat--wind-strong .hud-stat__value {
+  color: var(--accent-text);
+}
+
+.hud-stat--wind-storm .hud-stat__value {
+  color: var(--danger);
+}
+
+.hud-stat--wind .hud-stat__value {
+  position: relative;
+}
+
+.wind-gust {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  translate: -50% 2px;
+  padding: 0 0.35em;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  animation: gust-pulse calc(0.9s * var(--speed)) ease-in-out infinite alternate;
+}
+
+[data-motion='reduced'] .wind-gust {
+  animation: none;
+}
+
+@keyframes gust-pulse {
+  from {
+    opacity: 0.65;
+  }
+  to {
+    opacity: 1;
+  }
+}

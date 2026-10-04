@@ -126,7 +126,9 @@ export class GameController extends EventBus {
       if (!this.#paused) this.session.update(dt)
       this.#renderer.render(this.#sceneWithAim())
       this.#hudTimer += dt
-      if (this.#hudTimer > 180 && this.session.state === STATE.FLYING) {
+      // En vol (et en visée quand le vent souffle en rafales), le HUD suit en continu.
+      const live = this.session.state === STATE.FLYING || (this.session.state === STATE.AIMING && this.session.world.windField.dynamic)
+      if (this.#hudTimer > 180 && live) {
         this.#hudTimer = 0
         this.emit('hud', this.session.hud)
       }

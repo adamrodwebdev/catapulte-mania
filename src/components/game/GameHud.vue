@@ -18,8 +18,11 @@ const props = defineProps({
 const emit = defineEmits(['pause', 'powers'])
 const { t, state } = useApp()
 
-const windAbs = computed(() => Math.abs(props.hud.wind))
-const windKmh = computed(() => Math.round(windAbs.value * 30))
+/** Vent ressenti à la catapulte (rafale comprise en Difficile), en km/h réels. */
+const windNow = computed(() => props.hud.windNow ?? props.hud.wind)
+const windKmh = computed(() => props.hud.windKmh ?? Math.round(Math.abs(windNow.value) * 30))
+/** Rafale en cours (Difficile) : affichée au-delà d'un seuil. */
+const gusting = computed(() => props.hud.windDynamic && props.hud.gust > 0.35 && windKmh.value > 0)
 const hasPowers = computed(() => props.hud.powersEnabled !== false && props.hud.powers.some((p) => p.unlocked))
 const duo = computed(() => props.hud.players.length > 1)
 const infinite = computed(() => props.hud.shotsTotal === null)
@@ -68,15 +71,16 @@ const infinite = computed(() => props.hud.shotsTotal === null)
           </template>
         </dd>
       </div>
-      <div class="hud-stat hud-stat--wind">
-        <dt>{{ t('game.wind') }}</dt>
+      <div :class="['hud-stat hud-stat--wind', `hud-stat--wind-${hud.windLevel || 'calm'}`, { 'hud-stat--gust': gusting }]">
+        <dt>{{ hud.windDynamic && windKmh > 0 ? t('game.windGusty') : t('game.wind') }}</dt>
         <dd class="hud-stat__value">
           <template v-if="windKmh === 0">{{ t('game.windCalm') }}</template>
           <template v-else>
-            <AppIcon name="arrow" :size="18" :class="['wind-arrow', { 'wind-arrow--left': hud.wind < 0 }]" />
+            <AppIcon name="arrow" :size="18" :class="['wind-arrow', { 'wind-arrow--left': windNow < 0 }]" />
             {{ windKmh }} km/h
-            <span class="visually-hidden">{{ hud.wind < 0 ? t('a11y.windLeft') : t('a11y.windRight') }}</span>
+            <span class="visually-hidden">{{ windNow < 0 ? t('a11y.windLeft') : t('a11y.windRight') }}, {{ t(`game.windLevels.${hud.windLevel || 'breeze'}`) }}</span>
           </template>
+          <span v-if="gusting" class="wind-gust" aria-hidden="true">{{ t('game.gust') }}</span>
         </dd>
       </div>
     </dl>

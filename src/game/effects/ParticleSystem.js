@@ -134,11 +134,16 @@ export class ParticleSystem {
     this.#items.length = 0
   }
 
+  /** Vent du moment (−1..1 et au-delà en Difficile) : pousse fumée et flammes. */
+  wind = 0
+
   update(dtMs) {
     const k = dtMs / 16.67
+    const drift = this.wind * 0.9
     for (const p of this.#items) {
       p.life += dtMs
       p.x += p.vx * k
+      if (p.kind === 'smoke' || p.kind === 'flame') p.x += drift * k * Math.min(1, p.life / 300)
       p.y += p.vy * k
       if (p.kind === 'chunk' || p.kind === 'spark' || p.kind === 'drop') p.vy += 0.28 * k
       // Les gouttes s'arrêtent au sol au lieu de le traverser.

@@ -20,7 +20,9 @@ export const GAME = deepFreeze({
 /**
  * Réglages par difficulté.
  * - shotDelta    : tirs en plus / en moins par rapport au niveau de base
- * - windFactor   : intensité du vent
+ * - windFactor   : vent tiré au sort (part du vent max du niveau). En Difficile,
+ *                  sa puissance vient surtout du profil de vent (WindField : ×2,4,
+ *                  altitude, rafales), d'où un facteur plus modéré qu'avant la v3.6.
  * - targetHp     : multiplicateur de résistance des soldats
  * - scoreFactor  : multiplicateur de score final
  * - ammoFactor   : part des munitions spéciales du niveau (arrondi inférieur)
@@ -28,7 +30,7 @@ export const GAME = deepFreeze({
 export const DIFFICULTY = deepFreeze({
   easy: { shotDelta: 2, windFactor: 0.4, targetHp: 0.75, scoreFactor: 0.75, ammoFactor: 1 },
   normal: { shotDelta: 0, windFactor: 1, targetHp: 1, scoreFactor: 1, ammoFactor: 1 },
-  hard: { shotDelta: -1, windFactor: 1.5, targetHp: 1.35, scoreFactor: 1.5, ammoFactor: 0.5 },
+  hard: { shotDelta: -1, windFactor: 1.2, targetHp: 1.35, scoreFactor: 1.5, ammoFactor: 0.5 },
 })
 
 /** Est-on dans la build de démonstration ? (constante remplacée au build par Vite) */

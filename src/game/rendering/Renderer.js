@@ -1,9 +1,10 @@
 import { WORLD } from '../physics/constants.js'
+import { WindLayer } from './WindLayer.js'
 
 /**
  * Rendu Canvas 2D de la scène.
  * Ordre de dessin : ciel → lointain (parallaxe) → sol → structures → cibles →
- * projectiles → catapulte → particules → aide à la trajectoire.
+ * projectiles → vent → catapulte → particules → aide à la trajectoire.
  * Toute la partie graphique passe par l'AssetRegistry.
  */
 export class Renderer {
@@ -11,6 +12,7 @@ export class Renderer {
   #ctx
   #canvas
   #assets
+  #wind = new WindLayer()
   dpr = 1
 
   /**
@@ -51,7 +53,7 @@ export class Renderer {
     const assets = this.#assets
 
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
-    assets.draw(ctx, 'scene.sky', { w: camera.viewW, h: camera.viewH, extra: { theme, viewW: camera.viewW, viewH: camera.viewH, time, animate } })
+    assets.draw(ctx, 'scene.sky', { w: camera.viewW, h: camera.viewH, extra: { theme, viewW: camera.viewW, viewH: camera.viewH, time, animate, wind: scene.wind?.field.base ?? 0 } })
 
     camera.apply(ctx, this.dpr, 0.45)
     assets.draw(ctx, 'scene.far', { w: WORLD.WIDTH, h: 400, pixel, extra: { theme, castle: !scene.versus } })
@@ -72,6 +74,9 @@ export class Renderer {
       })
       ctx.restore()
     }
+
+    // Vent : traînées, manche à air, fanion du château.
+    if (scene.wind) this.#wind.draw(ctx, scene.wind, pixel)
 
     // Catapultes (une en solo, deux en face-à-face ; celle de droite est dessinée en miroir).
     for (const c of scene.catapults || []) {

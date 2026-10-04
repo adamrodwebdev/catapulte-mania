@@ -5,6 +5,7 @@ import { SeededRandom } from '../core/utils/SeededRandom.js'
 import { clamp } from '../core/utils/math.js'
 import { DIFFICULTY, GAME } from '../config/gameConfig.js'
 import { PhysicsWorld } from './physics/PhysicsWorld.js'
+import { WIND_PROFILES, windageOf } from './physics/WindField.js'
 import { WORLD } from './physics/constants.js'
 import { Block } from './entities/Block.js'
 import { Target } from './entities/Target.js'
@@ -79,6 +80,9 @@ export class GameSession extends EventBus {
   #slowMo = 0
   /** Dernier tir offert : déjà utilisé ? verdict de défaite en attente. */
   #continued = false
+  /** Suivi des rafales (sous-titres, son). */
+  #lastGustAt = -Infinity
+  #lastGustLevel = 0
   #pendingVerdict = null
   #events = new EventBus()
   #time = 0
@@ -127,7 +131,7 @@ export class GameSession extends EventBus {
       }
     })
 
-    this.world = new PhysicsWorld(this.#events, { seed: level.seed })
+    this.world = new PhysicsWorld(this.#events, { seed: level.seed, windProfile: WIND_PROFILES[this.#difficulty] })
     this.particles = new ParticleSystem()
     this.particles.density = reducedMotion ? 0.35 : 1
     this.camera = new Camera()
@@ -234,6 +238,7 @@ export class GameSession extends EventBus {
       targetsLeft: this.targetsLeft,
       targetsTotal: this.#level.targets.length,
       wind: Math.round(this.world.wind * 100) / 100,
+      ...this.#windView(),
       angle: Math.round(this.catapult.angle),
       power: Math.round(this.catapult.power * 100),
       ammo: this.ammo,
@@ -246,9 +251,13 @@ export class GameSession extends EventBus {
   /** Points de l'aide à la trajectoire (ou null si désactivée / hors visée). */
   get trajectory() {
     if (!this.options.trajectoryAid || this.#state !== STATE.AIMING) return null
-    const wind = this.#pendingPower === 'calm' ? 0 : this.world.wind
-    return TrajectoryPredictor.predict(this.catapult.launchPoint, this.catapult.velocity, {
-      wind,
+    const calm = this.#pendingPower === 'calm'
+    const field = this.world.windField
+    const start = this.catapult.launchPoint
+    const windage = windageOf({ type: this.player.selectedAmmo, radius: PROJECTILE_TYPES[this.player.selectedAmmo].radius })
+    return TrajectoryPredictor.predict(start, this.catapult.velocity, {
+      wind: calm ? 0 : this.world.wind,
+      windAccel: calm || !field.dynamic ? null : field.frozen(start.x, this.world.time, windage),
       obstacles: this.world.filter((e) => e.kind !== 'projectile'),
     })
   }
@@ -366,9 +375,12 @@ export class GameSession extends EventBus {
     this.#slowMo = Math.max(0, this.#slowMo - dt)
     if (this.#state !== STATE.ENDED || this.#stateT < 4000) this.world.step(dt, timeScale)
     this.catapult.update(dt)
+    // La fumée et les flammes dérivent avec le vent du moment.
+    this.particles.wind = this.world.windField.sample(this.catapult.x, this.world.time).value
     this.particles.update(dt * timeScale)
     this.#visualEffects()
     this.#updateCamera(dt)
+    if (this.#state === STATE.AIMING || this.#state === STATE.FLYING) this.#watchGusts()
 
     if (this.#state === STATE.SETTLING && this.#stateT >= SETTLE_MS) {
       this.#setState(STATE.AIMING)
@@ -420,7 +432,25 @@ export class GameSession extends EventBus {
       animate: !this.options.reducedMotion,
       catapults,
       versus: this.#mode.id === 'versus',
+      wind: {
+        field: this.world.windField,
+        time: this.world.time,
+        animate: !this.options.reducedMotion,
+        catapults: catapults.map((c) => ({ x: c.x, y: c.y, dir: c.dir })),
+        top: this.#mode.id === 'versus' ? null : this.#castleTop(),
+      },
     }
+  }
+
+  /** Sommet du château (bloc debout le plus haut) : on y plante le fanion. */
+  #castleTop() {
+    let best = null
+    for (const e of this.world.entities()) {
+      if (e.kind !== 'block' || !e.alive || e.x < 900) continue
+      const top = e.y - e.height / 2
+      if (!best || top < best.y) best = { x: e.x, y: top }
+    }
+    return best
   }
 
   /** Abandon / sortie : libère la mémoire. */
@@ -450,12 +480,39 @@ export class GameSession extends EventBus {
     for (const pl of this.players) pl.catapult.setAim(pl.catapult.angle, clamp(p / 100, 0, 1))
   }
 
+  /**
+   * Vent ressenti à la catapulte, pour le HUD : force du moment (rafale
+   * comprise), rafale en cours (−1 à 1), et vent « dynamique » (Difficile).
+   */
+  #windView() {
+    const field = this.world.windField
+    const live = field.dynamic && field.base !== 0
+    const { value, gust } = live ? field.sample(this.catapult.x, this.world.time) : { value: this.world.wind, gust: 0 }
+    // Vitesse affichée : force réelle (le Difficile souffle ×2,4 plus fort).
+    const kmh = Math.round(Math.abs(value) * 30 * field.profile.ratio)
+    const level = kmh === 0 ? 'calm' : kmh < 20 ? 'breeze' : kmh < 45 ? 'strong' : 'storm'
+    return { windNow: Math.round(value * 100) / 100, windKmh: kmh, windLevel: level, gust: Math.round(gust * 100) / 100, windDynamic: field.dynamic }
+  }
+
+  /** Difficile : une rafale forcit à la catapulte → son, sous-titre (malentendants). */
+  #watchGusts() {
+    const field = this.world.windField
+    if (!field.dynamic || field.base === 0) return
+    const g = field.gustAt(this.catapult.x, this.world.time)
+    if (g > 0.55 && this.#lastGustLevel <= 0.55 && this.#time - this.#lastGustAt > 3000) {
+      this.#lastGustAt = this.#time
+      this.#feedback({ sound: 'gust', x: this.catapult.x + 300 * Math.sign(field.base), intensity: 0.5 + Math.abs(field.base) * 0.6, caption: 'gust' })
+    }
+    this.#lastGustLevel = g
+  }
+
   #rollWind() {
     const max = this.#level.wind * DIFFICULTY[this.#difficulty].windFactor
     if (max <= 0) {
       this.#baseWind = 0
     } else {
-      const mag = max * this.#windRng.range(0.35, 1)
+      // Difficile : le vent n'est jamais une simple brise.
+      const mag = max * this.#windRng.range(this.world.windField.dynamic ? 0.6 : 0.35, 1)
       this.#baseWind = clamp((this.#windRng.chance(0.5) ? -1 : 1) * mag, -1, 1)
     }
     this.world.wind = Math.round(this.#baseWind * 100) / 100

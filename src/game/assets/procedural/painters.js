@@ -554,7 +554,7 @@ function catapult(ctx, s) {
 
 /** Ciel (repère écran) : dégradé, astre, nuages qui dérivent. */
 function sky(ctx, s) {
-  const { theme = 1, viewW, viewH, time = 0, animate = true } = s.extra
+  const { theme = 1, viewW, viewH, time = 0, animate = true, wind = 0 } = s.extra
   const th = THEMES[theme]
   const g = ctx.createLinearGradient(0, 0, 0, viewH)
   g.addColorStop(0, th.skyTop)
@@ -590,9 +590,10 @@ function sky(ctx, s) {
   const r = new SeededRandom(11 + theme)
   ctx.fillStyle = th.night ? 'rgba(200,210,255,0.08)' : th.weather === 'rain' ? 'rgba(90,98,115,0.6)' : 'rgba(255,255,255,0.55)'
   for (let i = 0; i < 6; i++) {
-    const speed = r.range(0.004, 0.012)
+    // Les nuages suivent le vent : sens et vitesse (brise lente par temps calme).
+    const speed = r.range(0.004, 0.012) * (wind === 0 ? 1 : Math.sign(wind) * (0.6 + 4 * Math.abs(wind)))
     const span = viewW + 300
-    const cx = ((r.range(0, span) + (animate ? time * speed : 0)) % span) - 150
+    const cx = ((((r.range(0, span) + (animate ? time * speed : 0)) % span) + span) % span) - 150
     const cy = r.range(viewH * 0.06, viewH * 0.4)
     const cw = r.range(60, 140) * (viewH / 600)
     for (let k = 0; k < 4; k++) {

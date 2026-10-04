@@ -66,7 +66,7 @@ On peut l'envoyer par e-mail, le mettre sur une clé USB ou l'héberger sur n'im
 **Astuce :** certains châteaux ont un point faible (un pied en verre, un étage en paille, une poudrière…). Trouvez-le et tout s'écroule.
 
 **Le but :** éliminer tous les personnages (soldats, chevaliers, rois) avant d'avoir épuisé ses tirs.
-**Le vent** (indiqué en haut à droite) dévie les projectiles.
+**Le vent** (indiqué en haut à droite) dévie les projectiles. On le voit aussi dans le décor : traînées d'air dans le ciel, manche à air près de la catapulte, fanion au sommet du château, nuages et fumée qui dérivent. **En Difficile**, il devient un adversaire : bien plus fort, plus fort encore en altitude (un tir en cloche dérive bien plus qu'un tir tendu), il souffle **en rafales** (les traînées plus claires qui approchent annoncent la prochaine, un badge « Rafale » et un sous-titre la signalent) et pousse le feu dans son sens. Les projectiles lourds lui résistent : le boulet dévie deux fois moins que la pierre, la mitraille bien plus.
 **La physique :** les personnages tombent **au moindre choc** (un bloc qui bouge, un projectile, un débris, une chute). Ce sont les **châteaux** qui les protègent, et ils sont solides : une simple pierre ne renverse pas un mur de pierre. Il faut choisir le bon projectile (le rocher pour enfoncer, les explosifs pour la pierre, le marbre et le fer) ou améliorer sa catapulte à l'atelier. Frappez un mur porteur de face et assez fort : il cède et ce qu'il soutenait s'effondre. Rien ne reste jamais suspendu dans le vide.
 **Le feu :** le feu grégeois enflamme ce qu'il touche. La paille flambe en deux secondes et propage le feu partout ; le bois brûle plus longtemps, finit par céder, mais propage beaucoup moins. Une cible qui prend feu succombe.
 
@@ -425,6 +425,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v3.3.0 | Les personnages de la Chronique en pixel art (sans images), une réplique avant chaque niveau, histoire réécrite |
 | v3.4.0 | Campagne à deux en coopération, nouvelles conditions de victoire (renommée, tournoi, régicide), tout en Difficile à deux, 6 arènes avec un roi |
 | v3.5.0 | Versions pour les portails CrazyGames et Poki (vidéos récompensées facultatives, publicités entre les niveaux, sauvegarde synchronisée), langues chargées à la demande |
+| v3.6.0 | Vent repensé en Difficile (altitude, rafales, prise au vent selon le projectile, feu attisé) et représentation visuelle du vent (traînées, manche à air, fanion, HUD, sous-titres) |
 
 Pour revenir à une version précise avec Git : `git checkout v0.4.0` (puis `git checkout main` pour revenir à la dernière).
 

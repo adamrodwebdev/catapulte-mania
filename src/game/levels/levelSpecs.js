@@ -410,7 +410,7 @@ export const LEVEL_SPECS = [
 
   // 30. Le roi : il se cache au sommet du donjon, gardé par deux tours.
   {
-    shots: 7, wind: 0.65, ammo: { boulder: 4, bomb: 2, split: 1, fire: 1 },
+    shots: 7, wind: 0.5, ammo: { boulder: 4, bomb: 2, split: 1, fire: 1 },
     build(b) {
       const l = b.tower(1320, { floors: 4, mat: 'stone', slab: 'iron', t: 26, roof: 'wood' })
       const k = b.tower(1580, { floors: 6, mats: ['iron', 'stone', 'stone', 'stone', 'wood'], slab: 'stone', w: 150, t: 26, h: 92, roof: 'wood' })

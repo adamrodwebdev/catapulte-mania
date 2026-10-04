@@ -2,6 +2,36 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [3.6.0] – 2026-10-04
+### Modifié
+- **Le vent devient un vrai enjeu en Difficile** (Facile et Normal inchangés) :
+  - 2,4 fois plus fort, et jamais une simple brise : un tir tendu dévie
+    désormais de 30 à 50 px par vent moyen (contre 15), un tir en cloche de
+    plusieurs centaines ;
+  - **plus fort en altitude** (×1,6 à 800 px) : tendu ou en cloche devient un
+    vrai choix ;
+  - **rafales** : des fronts qui traversent le terrain dans le sens du vent ;
+    le même tir ne tombe pas au même endroit selon l'instant ;
+  - **prise au vent selon le projectile** (surface / masse) : le boulet résiste
+    (×0,4), la mitraille s'envole (×1,5) ;
+  - **le vent attise le feu** et le pousse dans son sens.
+- **Aide à la trajectoire** : tient compte de l'altitude, du projectile choisi
+  et de la rafale du moment (la courbe ondule avec le vent) ; les rafales à
+  venir restent à anticiper.
+- Le contrôleur de niveaux vise comme l'aide : les 100 niveaux restent
+  réussissables en Difficile. Quatre niveaux rééquilibrés pour cela :
+  30, 65 et 96 (vent modéré), 85 (vent modéré, un rocher et une bombe de plus).
+### Ajouté
+- **Représentation visuelle du vent** : traînées d'air (nombre = force, vitesse
+  = force locale, plus rapides en altitude, plus claires dans une rafale qui
+  approche), manche à air près de la catapulte, fanion au sommet du château,
+  nuages, fumée et flammes qui suivent le vent. Mouvement réduit : traînées
+  immobiles avec pointe de direction.
+- HUD : vitesse réelle en km/h, couleur selon la force (brise, vent fort,
+  tempête), badge « Rafale ».
+- Accessibilité : son et sous-titre « Rafale de vent » (malentendants), vent
+  lu aux lecteurs d'écran avec sa force et ses rafales ; aide mise à jour.
+
 ## [3.5.0] – 2026-10-03
 ### Ajouté
 - **Versions pour les portails** : `npm run build:crazygames` et

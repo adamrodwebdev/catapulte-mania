@@ -68,7 +68,7 @@ export const LEVEL_SPECS_2 = [
   // 64. Le refuge sur pilotis de pierre.
   { shots: 4, wind: 0.5, ammo: { boulder: 2, bomb: 1 }, build: (b) => BP.stiltCastle(b, { legs: 4, legMat: 'glass', deck: 'iron', m: 'stone', s: 'iron', floors: 3 }) },
   // 65. L'escalier de la montagne.
-  { shots: 7, wind: 0.55, ammo: { boulder: 3, bomb: 3 }, build: (b) => BP.stairs(b, { count: 5, start: 3, m: 'stone', top: 'sandstone', s: 'iron' }) },
+  { shots: 7, wind: 0.45, ammo: { boulder: 3, bomb: 3 }, build: (b) => BP.stairs(b, { count: 5, start: 3, m: 'stone', top: 'sandstone', s: 'iron' }) },
   // 66. La crypte du monastère.
   { shots: 5, wind: 0.55, ammo: { boulder: 2, bomb: 2, fire: 1 }, build: (b) => BP.crypt(b, { vault: 'iron', hall: 'wood', floors: 3 }) },
   // 67. Les deux pics.
@@ -112,7 +112,7 @@ export const LEVEL_SPECS_2 = [
   // 84. La crypte du chevalier noir.
   { shots: 5, wind: 0.7, ammo: { boulder: 2, bomb: 3 }, build: (b) => BP.crypt(b, { vault: 'iron', hall: 'brick', floors: 4, barrels: 3, sideMat: 'iron' }) },
   // 85. Les dominos de fer.
-  { shots: 5, wind: 0.7, ammo: { boulder: 3, bomb: 1 }, build: (b) => BP.dominoes(b, { count: 5, floors: 5, m: 'brick', s: 'iron', h: 92 }) },
+  { shots: 5, wind: 0.55, ammo: { boulder: 4, bomb: 2 }, build: (b) => BP.dominoes(b, { count: 5, floors: 5, m: 'brick', s: 'iron', h: 92 }) },
   // 86. Le manoir foudroyé, sur pilotis de verre.
   { shots: 4, wind: 0.7, ammo: { boulder: 2, bomb: 1, split: 1 }, build: (b) => BP.stiltCastle(b, { legs: 4, legMat: 'glass', deck: 'iron', m: 'iron', s: 'iron', floors: 3 }) },
   // 87. Le grand rempart.
@@ -136,7 +136,7 @@ export const LEVEL_SPECS_2 = [
   // 95. Le belvédère du roi, sur pilotis de verre.
   { shots: 4, wind: 0.7, ammo: { boulder: 2, bomb: 1 }, build: (b) => BP.stiltCastle(b, { legs: 3, legMat: 'glass', deck: 'marble', m: 'marble', s: 'marble', floors: 3, twin: false }) },
   // 96. L'escalier d'honneur.
-  { shots: 7, wind: 0.75, ammo: { boulder: 3, bomb: 4, split: 1 }, build: (b) => BP.stairs(b, { count: 5, start: 3, m: 'marble', top: 'iron', s: 'marble' }) },
+  { shots: 7, wind: 0.25, ammo: { boulder: 3, bomb: 4, split: 1 }, build: (b) => BP.stairs(b, { count: 5, start: 3, m: 'marble', top: 'iron', s: 'marble' }) },
   // 97. Le pont du sacre.
   { shots: 5, wind: 0.75, ammo: { boulder: 2, bomb: 3, fire: 1 }, build: (b) => BP.drawbridge(b, { floors: 5, gap: 420, m: 'marble', s: 'iron', hall: 'brick' }) },
   // 98. La poudrière de la couronne.
