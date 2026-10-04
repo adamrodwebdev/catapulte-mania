@@ -28,7 +28,7 @@ export const LEVEL_SPECS_2 = [
   // 46. Le rempart de briques.
   { shots: 5, wind: 0.4, ammo: { boulder: 2, bomb: 1 }, build: (b) => BP.rampart(b, { rooms: 4, m: 'brick', s: 'wood' }) },
   // 47. Les dominos du marais.
-  { shots: 4, wind: 0.4, ammo: { boulder: 2 }, build: (b) => BP.dominoes(b, { count: 5, floors: 3, m: 'brick', s: 'wood' }) },
+  { shots: 5, wind: 0.3, ammo: { boulder: 2, bomb: 2 }, build: (b) => BP.dominoes(b, { count: 5, floors: 3, m: 'brick', s: 'wood' }) },
   // 48. Le manoir sur l'eau : deux tours sur des pieds de verre.
   { shots: 4, wind: 0.45, ammo: { boulder: 2, bomb: 1 }, build: (b) => BP.stiltCastle(b, { legs: 3, legMat: 'glass', deck: 'stone', m: 'brick', s: 'stone', floors: 3 }) },
   // 49. Le grand moulin : huit étages de brique et de bois.
@@ -68,7 +68,7 @@ export const LEVEL_SPECS_2 = [
   // 64. Le refuge sur pilotis de pierre.
   { shots: 4, wind: 0.5, ammo: { boulder: 2, bomb: 1 }, build: (b) => BP.stiltCastle(b, { legs: 4, legMat: 'glass', deck: 'iron', m: 'stone', s: 'iron', floors: 3 }) },
   // 65. L'escalier de la montagne.
-  { shots: 7, wind: 0.45, ammo: { boulder: 3, bomb: 3 }, build: (b) => BP.stairs(b, { count: 5, start: 3, m: 'stone', top: 'sandstone', s: 'iron' }) },
+  { shots: 7, wind: 0.45, ammo: { boulder: 3, bomb: 3 }, build: (b) => BP.stairs(b, { count: 5, start: 3, m: 'stone', top: 'sandstone', s: 'iron', powder: true }) },
   // 66. La crypte du monastère.
   { shots: 5, wind: 0.55, ammo: { boulder: 2, bomb: 2, fire: 1 }, build: (b) => BP.crypt(b, { vault: 'iron', hall: 'wood', floors: 3 }) },
   // 67. Les deux pics.
@@ -118,7 +118,7 @@ export const LEVEL_SPECS_2 = [
   // 87. Le grand rempart.
   { shots: 6, wind: 0.75, ammo: { boulder: 3, bomb: 2, split: 2 }, build: (b) => BP.rampart(b, { rooms: 5, w: 120, m: 'iron', s: 'brick', gallery: 'wood' }) },
   // 88. L'escalier de fer.
-  { shots: 7, wind: 0.75, ammo: { boulder: 3, bomb: 4 }, build: (b) => BP.stairs(b, { count: 5, start: 2, m: 'brick', top: 'iron', s: 'stone' }) },
+  { shots: 7, wind: 0.75, ammo: { boulder: 3, bomb: 4 }, build: (b) => BP.stairs(b, { count: 5, start: 2, m: 'brick', top: 'iron', s: 'stone', powder: true }) },
   // 89. La poudrière dans la tempête.
   { shots: 4, wind: 0.8, ammo: { boulder: 2, bomb: 1 }, build: (b) => BP.magazine(b, { floors: 6, m: 'iron', s: 'stone', barrels: 2, w: 150 }) },
   // 90. Le donjon de l'orage.
@@ -136,7 +136,7 @@ export const LEVEL_SPECS_2 = [
   // 95. Le belvédère du roi, sur pilotis de verre.
   { shots: 4, wind: 0.7, ammo: { boulder: 2, bomb: 1 }, build: (b) => BP.stiltCastle(b, { legs: 3, legMat: 'glass', deck: 'marble', m: 'marble', s: 'marble', floors: 3, twin: false }) },
   // 96. L'escalier d'honneur.
-  { shots: 7, wind: 0.25, ammo: { boulder: 3, bomb: 4, split: 1 }, build: (b) => BP.stairs(b, { count: 5, start: 3, m: 'marble', top: 'iron', s: 'marble' }) },
+  { shots: 8, wind: 0.25, ammo: { boulder: 4, bomb: 6, split: 1 }, build: (b) => BP.stairs(b, { count: 5, start: 3, m: 'marble', top: 'iron', s: 'marble', powder: true }) },
   // 97. Le pont du sacre.
   { shots: 5, wind: 0.75, ammo: { boulder: 2, bomb: 3, fire: 1 }, build: (b) => BP.drawbridge(b, { floors: 5, gap: 420, m: 'marble', s: 'iron', hall: 'brick' }) },
   // 98. La poudrière de la couronne.
@@ -144,5 +144,5 @@ export const LEVEL_SPECS_2 = [
   // 99. L'aqueduc impérial.
   { shots: 6, wind: 0.85, ammo: { boulder: 3, bomb: 3, split: 2 }, build: (b) => BP.aqueduct(b, { pillar: 'marble', deck: 'stone', room: 'marble', vault: 'iron', piers: 4, span: 190, height: 260 }) },
   // 100. Le Trône : la citadelle finale.
-  { shots: 7, wind: 0.9, ammo: { boulder: 4, bomb: 4, fire: 2, split: 2 }, build: (b) => BP.fortress(b, { floors: 8, side: 5, m: 'marble', top: 'iron', split: 4, s: 'marble', h: 86, barrel: true }) },
+  { shots: 7, wind: 0.9, ammo: { boulder: 4, bomb: 6, fire: 2, split: 2 }, build: (b) => BP.fortress(b, { floors: 8, side: 5, m: 'marble', top: 'iron', split: 4, s: 'marble', h: 86, barrel: true }) },
 ]

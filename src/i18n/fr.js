@@ -530,7 +530,7 @@ export default {
   },
   help: {
     trebuchetTitle: 'Le trébuchet',
-    trebuchet: 'Débloqué après le niveau 13, il se choisit avant chaque niveau (sauf au face-à-face). Il se joue uniquement au clic : le premier libère le contrepoids, le second lâche la fronde. Lâchez tôt pour un tir en cloche, tard pour un tir tendu. Il tire de plus loin que la catapulte mais frappe plus fort, et la caméra suit le tir. Un tic sonore monte avec l’angle du tir ; l’option « Balancier lent » ralentit le bras.',
+    trebuchet: 'Débloqué après le niveau 13, il se choisit avant chaque niveau (sauf au face-à-face). Il se joue uniquement au clic : le premier libère le contrepoids, le second lâche la fronde. Lâchez tôt pour un tir en cloche, tard pour un tir tendu. Il tire de plus loin que la catapulte mais frappe plus fort (pierres plus lourdes), et la caméra suit le tir. Un tic sonore monte avec l’angle du tir ; l’option « Balancier lent » ralentit le bras.',
     modesTitle: 'Modes de jeu',
     modes: 'Campagne : les 100 niveaux, avec étoiles et or. Mode libre : rejouez un niveau terminé sans limite. Deux joueurs, sur le même appareil : la campagne à deux en coopération, le duel (renommée), le tournoi en trois manches et le face-à-face (régicide).',
     workshopTitle: 'Atelier',

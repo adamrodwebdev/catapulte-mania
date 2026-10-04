@@ -38,6 +38,12 @@ export const TREBUCHET_X = -520
 /** Le trébuchet se débloque après ce niveau (niveau suivant = tutoriel). */
 export const TREBUCHET_UNLOCK = 13
 
+/**
+ * Le trébuchet lance des pierres plus lourdes que la catapulte (×1,5) : ses
+ * tirs plongeants enfoncent les planchers jusqu'aux étages bas.
+ */
+export const TREBUCHET_MASS = 1.5
+
 /** Ralenti du balancier (normal / « Balancier lent »). */
 export const SWING_SCALE = Object.freeze({ normal: 0.35, slow: 0.18 })
 

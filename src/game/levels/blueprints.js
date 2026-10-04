@@ -82,12 +82,15 @@ export const BP = {
   },
 
   /** Forteresse en escalier : chaque tour cache la suivante. */
-  stairs(b, { x0 = 1280, step = 160, count = 5, start = 2, m = 'stone', top = 'wood', s = 'stone', t = 24, h = 92, king = true }) {
+  stairs(b, { x0 = 1280, step = 160, count = 5, start = 2, m = 'stone', top = 'wood', s = 'stone', t = 24, h = 92, king = true, powder = false }) {
     for (let i = 0; i < count; i++) {
       const floors = start + i
       const r = b.tower(x0 + i * step, { floors, mats: mix(m, top, 2)(floors), slab: s, w: 110, t, h, roof: i === count - 1 ? 'stone' : 'straw' })
       b.target(r[floors - 1], king && i === count - 1 ? 'king' : i % 2 ? 'knight' : 'soldier')
       if (floors >= 5) b.target(r[1])
+      // Poudrière au pied des grandes tours (v3.7) : un point faible accessible
+      // aussi aux tirs plongeants du trébuchet.
+      if (powder && floors >= 5) b.barrel(r[0])
     }
   },
 

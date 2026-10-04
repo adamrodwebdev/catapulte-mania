@@ -530,7 +530,7 @@ export default {
   },
   help: {
     trebuchetTitle: 'The trebuchet',
-    trebuchet: 'Unlocked after level 13, you choose it before each level (except head-to-head). It is played only by clicking: the first click drops the counterweight, the second releases the sling. Release early for a high lob, late for a flat shot. It fires from further back than the catapult but hits harder, and the camera follows the shot. A tick sound rises with the shot angle; the “Slow swing” option slows the arm down.',
+    trebuchet: 'Unlocked after level 13, you choose it before each level (except head-to-head). It is played only by clicking: the first click drops the counterweight, the second releases the sling. Release early for a high lob, late for a flat shot. It fires from further back than the catapult but hits harder (heavier stones), and the camera follows the shot. A tick sound rises with the shot angle; the “Slow swing” option slows the arm down.',
     modesTitle: 'Game modes',
     modes: 'Campaign: all 100 levels, with stars and gold. Free play: replay a cleared level without limits. Two players on the same device: the cooperative two-player campaign, the duel (renown), the three-round tournament and the face-off (regicide).',
     workshopTitle: 'Workshop',

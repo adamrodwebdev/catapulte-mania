@@ -184,3 +184,18 @@ test("trébuchet : un clic pendant la remise en batterie n'est jamais perdu", ()
   assert.equal(s.state, 'aiming')
   assert.equal(s.trigger(0), 'armed')
 })
+
+test('trébuchet : projectiles plus lourds que ceux de la catapulte', () => {
+  const s = session()
+  untilAiming(s)
+  s.trigger(0)
+  for (let i = 0; i < 40; i++) s.update(16)
+  s.trigger(0)
+  const p = s.world.filter((e) => e.kind === 'projectile')[0]
+  const c = new GameSession(LevelRepository.get(20), { difficulty: 'normal', completedLevels: 30, reducedMotion: true })
+  untilAiming(c)
+  c.fire()
+  for (let i = 0; i < 30; i++) c.update(16)
+  const q = c.world.filter((e) => e.kind === 'projectile')[0]
+  assert.ok(Math.abs(p.body.mass / q.body.mass - 1.5) < 1e-6)
+})

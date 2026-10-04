@@ -2,6 +2,19 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [3.7.1] – 2026-10-04
+### Modifié
+- **Tous les niveaux sont désormais gagnables au trébuchet**, en Difficile
+  (vérifié par le joueur automatique, comme à la catapulte) :
+  - le trébuchet lance des **pierres plus lourdes** (×1,5) : ses tirs plongeants
+    enfoncent les planchers jusqu'aux étages bas ;
+  - **poudrières** ajoutées au pied des grandes tours des niveaux 36, 65, 88 et
+    96 : un point faible accessible aussi aux tirs en cloche ;
+  - niveau 47 : un tir de plus, vent plus doux et deux bombes ; niveau 96 : un
+    tir, un rocher et deux bombes de plus (marbre et fer, il restait le plus
+    dur) ; niveau 100 : deux bombes de plus (la tempête finale est conservée).
+- Les mêmes niveaux restent gagnables à la catapulte (vérifié).
+
 ## [3.7.0] – 2026-10-04
 ### Ajouté
 - **Le trébuchet**, un second engin de siège qui se joue **uniquement au clic** :

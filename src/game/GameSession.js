@@ -12,7 +12,7 @@ import { Target } from './entities/Target.js'
 import { Barrel } from './entities/Barrel.js'
 import { Projectile, PROJECTILE_TYPES } from './entities/Projectile.js'
 import { Catapult, AIM } from './Catapult.js'
-import { Trebuchet, TREBUCHET_X } from './Trebuchet.js'
+import { Trebuchet, TREBUCHET_X, TREBUCHET_MASS } from './Trebuchet.js'
 import { TrajectoryPredictor } from './TrajectoryPredictor.js'
 import { ParticleSystem } from './effects/ParticleSystem.js'
 import { Camera } from './rendering/Camera.js'
@@ -395,6 +395,8 @@ export class GameSession extends EventBus {
     this.#pendingPower = null
     // Amélioration « Boulets lestés » : se cumule avec la Force du Titan.
     shot.mods.massFactor = (shot.mods.massFactor ?? 1) * (this.#mode.effects.massFactor ?? 1)
+    // Trébuchet : projectiles plus lourds (voir TREBUCHET_MASS).
+    if (this.#engine === 'trebuchet') shot.mods.massFactor *= TREBUCHET_MASS
     shot.mods.blastFactor = this.#mode.effects.blastFactor ?? 1
     shot.mods.fireFactor = this.#mode.effects.fireFactor ?? 1
     if (shot.windOverride !== null) this.world.wind = shot.windOverride

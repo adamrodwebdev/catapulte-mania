@@ -514,6 +514,8 @@ export const LEVEL_SPECS = [
       b.target(t0[0], 'knight')
       b.target(t1[1])
       b.barrel(t2[0])
+      // v3.7 : poudrière aussi sous la dernière tour (point faible pour le trébuchet).
+      b.barrel(t3[0])
       b.target(t2[2], 'knight')
       b.target(t2[4])
       b.target(t3[1])

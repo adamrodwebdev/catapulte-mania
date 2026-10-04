@@ -64,7 +64,7 @@ On peut l'envoyer par e-mail, le mettre sur une clé USB ou l'héberger sur n'im
 | Pause | Bouton ⏸ en haut à gauche | P ou Échap |
 | **Trébuchet** : lancer le balancier, puis lâcher | Toucher la scène (ou le bouton « Armer », puis « Lâcher ! ») | Espace ou Entrée, deux fois |
 
-**Le trébuchet (v3.7) :** débloqué après le niveau 13 (le niveau 14 l'enseigne), il se choisit ensuite avant chaque niveau, à la place de la catapulte (sauf au face-à-face). Il ne se vise pas : **il se joue uniquement au clic**. Le premier clic libère le contrepoids, le bras se met à tourner ; le second lâche la fronde. Lâcher tôt donne un tir en cloche (trop tôt : le projectile part en arrière), lâcher tard un tir tendu (trop tard : dans le sol). Il tire de plus loin que la catapulte, mais frappe plus fort, et la caméra suit le projectile jusqu'au château puis reste sur l'effondrement. La physique est réelle : le bras obéit à son contrepoids, le projectile est une masse au bout d'une corde, et il part avec la vitesse qu'il avait au moment du lâcher.
+**Le trébuchet (v3.7) :** débloqué après le niveau 13 (le niveau 14 l'enseigne), il se choisit ensuite avant chaque niveau, à la place de la catapulte (sauf au face-à-face). Il ne se vise pas : **il se joue uniquement au clic**. Le premier clic libère le contrepoids, le bras se met à tourner ; le second lâche la fronde. Lâcher tôt donne un tir en cloche (trop tôt : le projectile part en arrière), lâcher tard un tir tendu (trop tard : dans le sol). Il tire de plus loin que la catapulte, mais frappe plus fort (ses pierres sont une fois et demie plus lourdes), et la caméra suit le projectile jusqu'au château puis reste sur l'effondrement. La physique est réelle : le bras obéit à son contrepoids, le projectile est une masse au bout d'une corde, et il part avec la vitesse qu'il avait au moment du lâcher.
 
 **Astuce :** certains châteaux ont un point faible (un pied en verre, un étage en paille, une poudrière…). Trouvez-le et tout s'écroule.
 
@@ -431,6 +431,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v3.3.0 | Les personnages de la Chronique en pixel art (sans images), une réplique avant chaque niveau, histoire réécrite |
 | v3.4.0 | Campagne à deux en coopération, nouvelles conditions de victoire (renommée, tournoi, régicide), tout en Difficile à deux, 6 arènes avec un roi |
 | v3.5.0 | Versions pour les portails CrazyGames et Poki (vidéos récompensées facultatives, publicités entre les niveaux, sauvegarde synchronisée), langues chargées à la demande |
+| v3.7.1 | Les 100 niveaux gagnables au trébuchet en Difficile : pierres plus lourdes au trébuchet, poudrières aux niveaux 36, 65, 88 et 96, niveaux 47, 96 et 100 rééquilibrés |
 | v3.7.0 | Nouvel engin : le trébuchet, joué uniquement au clic (balancier puis lâcher), château plus loin, caméra qui suit le tir ; niveau d'apprentissage, choix de l'engin avant chaque niveau, balancier lent et repère sonore pour l'accessibilité |
 | v3.6.0 | Vent repensé en Difficile (altitude, rafales, prise au vent selon le projectile, feu attisé) et représentation visuelle du vent (traînées, manche à air, fanion, HUD, sous-titres) |
 

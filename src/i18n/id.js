@@ -530,7 +530,7 @@ export default {
   },
   help: {
     trebuchetTitle: 'Trebuset',
-    trebuchet: 'Terbuka setelah level 13 dan dipilih sebelum setiap level (kecuali mode berhadapan). Hanya dimainkan dengan klik: klik pertama menjatuhkan pemberat, klik kedua melepas ambin. Lepas awal untuk tembakan melengkung, lambat untuk tembakan datar. Menembak dari lebih jauh daripada katapel tetapi menghantam lebih keras, dan kamera mengikuti tembakan. Bunyi detak naik seiring sudut tembakan; opsi “Ayunan lambat” memperlambat lengan.',
+    trebuchet: 'Terbuka setelah level 13 dan dipilih sebelum setiap level (kecuali mode berhadapan). Hanya dimainkan dengan klik: klik pertama menjatuhkan pemberat, klik kedua melepas ambin. Lepas awal untuk tembakan melengkung, lambat untuk tembakan datar. Menembak dari lebih jauh daripada katapel tetapi menghantam lebih keras (batu lebih berat), dan kamera mengikuti tembakan. Bunyi detak naik seiring sudut tembakan; opsi “Ayunan lambat” memperlambat lengan.',
     modesTitle: 'Mode permainan',
     modes: 'Kampanye: 100 level, dengan bintang dan emas. Main bebas: ulangi level yang sudah selesai tanpa batas. Dua pemain di perangkat yang sama: kampanye berdua secara kooperatif, duel (kemasyhuran), turnamen tiga babak, dan berhadapan (pembunuhan raja).',
     workshopTitle: 'Bengkel',
