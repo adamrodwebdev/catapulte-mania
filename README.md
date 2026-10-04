@@ -1,4 +1,4 @@
-# 🏰 Crush the Castle
+# 🏰 Catapulte Mania
 
 **Jeu de catapulte médiéval, 100 % dans le navigateur.**
 Réglez l'angle et la puissance, calculez la trajectoire, et faites tomber les forteresses pour atteindre les soldats cachés à l'intérieur.
@@ -204,7 +204,7 @@ Tout se règle dans **Réglages** (et une partie directement depuis la pause) :
 
 - **Aide à la visée** : affiche la trajectoire prévue du projectile en pointillés.
 - **Puissance au début du tour** : 100 % par défaut (ou 75 %, 50 %, ou « Garder » la dernière visée).
-- **Balancier lent** (trébuchet) : le bras tourne deux fois plus lentement, l'instant du lâcher est plus facile à choisir. Un **tic sonore** de plus en plus aigu suit l'angle du tir pendant le balancier : on peut lâcher à l'oreille. Avec l'aide à la visée, la trajectoire du tir « si je lâchais maintenant » s'affiche en direct.
+- **Balancier lent** (trébuchet) : la fenêtre de tir dure plus longtemps, l'instant du lâcher est plus facile à choisir. **Balancier infini** (sauf en Difficile) : sans second clic, le bras revient et recommence. Un **tic sonore** de plus en plus aigu suit l'angle du tir pendant le balancier : on peut lâcher à l'oreille. Avec l'aide à la visée, la trajectoire du tir « si je lâchais maintenant » s'affiche en direct.
 - **Tutoriels guidés** et **récit** (la Chronique) : activables ou non.
 - **Musique** : volume séparé des effets sonores (0 % pour la couper). Ses moments intenses sont aussi sous-titrés.
 - **Sous-titres des sons** (malentendants) : chaque bruit important est écrit à l'écran avec sa direction, par exemple `◀ [Bois brisé]`.
@@ -252,7 +252,7 @@ Sur la page GitHub du projet, bouton vert **Code** → **Download ZIP**, puis d�
 
 ```bash
 git clone <adresse-du-dépôt>
-cd crush-the-castle
+cd catapulte-mania
 ```
 
 ---
@@ -431,6 +431,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v3.3.0 | Les personnages de la Chronique en pixel art (sans images), une réplique avant chaque niveau, histoire réécrite |
 | v3.4.0 | Campagne à deux en coopération, nouvelles conditions de victoire (renommée, tournoi, régicide), tout en Difficile à deux, 6 arènes avec un roi |
 | v3.5.0 | Versions pour les portails CrazyGames et Poki (vidéos récompensées facultatives, publicités entre les niveaux, sauvegarde synchronisée), langues chargées à la demande |
+| v3.8.0 | Nouveau nom : Catapulte Mania ; générique du studio Solo Levelling ; trébuchet rééquilibré (fenêtre de tir plus longue) et balancier infini ; sang désactivé par défaut sur les portails ; page de confidentialité ; visuels des fiches |
 | v3.7.1 | Les 100 niveaux gagnables au trébuchet en Difficile : pierres plus lourdes au trébuchet, poudrières aux niveaux 36, 65, 88 et 96, niveaux 47, 96 et 100 rééquilibrés |
 | v3.7.0 | Nouvel engin : le trébuchet, joué uniquement au clic (balancier puis lâcher), château plus loin, caméra qui suit le tir ; niveau d'apprentissage, choix de l'engin avant chaque niveau, balancier lent et repère sonore pour l'accessibilité |
 | v3.6.0 | Vent repensé en Difficile (altitude, rafales, prise au vent selon le projectile, feu attisé) et représentation visuelle du vent (traînées, manche à air, fanion, HUD, sous-titres) |

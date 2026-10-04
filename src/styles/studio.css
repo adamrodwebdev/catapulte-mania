@@ -1,0 +1,179 @@
+/* Générique du studio (voir StudioIntro.vue). */
+.studio {
+  --ink: #1a1430;
+  --dusk: #3b2a5c;
+  --ember: #f2b33d;
+  --dawn: #f6c98a;
+  --vellum: #f3ead8;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.6rem;
+  padding: 1rem;
+  background: var(--ink);
+  color: var(--vellum);
+  cursor: pointer;
+  overflow: hidden;
+  transition: opacity 0.35s ease;
+}
+
+.studio--leaving {
+  opacity: 0;
+}
+
+/* L'aube : un halo qui se lève derrière le sommet de l'escalier. */
+.studio__dawn {
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(closest-side at 50% 58%, rgb(246 201 138 / 0.55), rgb(59 42 92 / 0.6) 55%, transparent 80%);
+  opacity: 0;
+  transform: translateY(12%) scale(0.85);
+  animation: studio-dawn 1.1s 1.15s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+
+.studio__mark {
+  position: relative;
+  width: min(52vw, 17rem);
+  height: auto;
+  overflow: visible;
+}
+
+.studio__ground {
+  stroke: rgb(243 234 216 / 0.35);
+  stroke-width: 1;
+  stroke-dasharray: 140;
+  stroke-dashoffset: 140;
+  animation: studio-draw 0.4s 0.1s ease-out forwards;
+}
+
+.studio__step {
+  fill: var(--vellum);
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  transform: scaleY(0);
+  animation: studio-rise 0.32s calc(0.18s + var(--i) * 0.11s) cubic-bezier(0.3, 1.4, 0.5, 1) forwards;
+}
+
+/* L'étincelle saute de marche en marche, puis éclate au sommet. */
+.studio__spark {
+  transform: translate(52px, 80px);
+  opacity: 0;
+  animation: studio-climb 0.95s 0.42s cubic-bezier(0.45, 0, 0.55, 1) forwards;
+}
+
+.studio__spark-core {
+  fill: var(--ember);
+  filter: drop-shadow(0 0 3px var(--ember)) drop-shadow(0 0 8px rgb(242 179 61 / 0.7));
+}
+
+.studio__ring {
+  fill: none;
+  stroke: var(--ember);
+  stroke-width: 1.5;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: studio-burst 0.7s 1.33s ease-out forwards;
+}
+
+.studio__name {
+  position: relative;
+  margin: 0.4rem 0 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.7rem, 6.5vw, 3.2rem);
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.studio__letter {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(0.35em);
+  filter: blur(6px);
+  animation: studio-letter 0.45s calc(1.4s + var(--i) * 0.035s) cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.studio__presents {
+  position: relative;
+  margin: 0;
+  font-size: clamp(0.85rem, 2.4vw, 1rem);
+  letter-spacing: 0.08em;
+  color: var(--dawn);
+  opacity: 0;
+  animation: studio-fade 0.5s 1.95s ease forwards;
+}
+
+@keyframes studio-dawn {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes studio-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes studio-rise {
+  to {
+    transform: scaleY(1);
+  }
+}
+@keyframes studio-climb {
+  0% { opacity: 0; transform: translate(52px, 80px); }
+  8% { opacity: 1; transform: translate(52px, 80px); }
+  20% { transform: translate(64px, 62px); }
+  28% { transform: translate(76px, 66px); }
+  40% { transform: translate(88px, 48px); }
+  48% { transform: translate(100px, 52px); }
+  60% { transform: translate(112px, 34px); }
+  68% { transform: translate(124px, 38px); }
+  80% { transform: translate(136px, 18px); }
+  90% { opacity: 1; transform: translate(148px, 24px) scale(1); }
+  100% { opacity: 1; transform: translate(148px, 24px) scale(1.25); }
+}
+@keyframes studio-burst {
+  0% { opacity: 0.95; transform: scale(1); }
+  100% { opacity: 0; transform: scale(7); }
+}
+@keyframes studio-letter {
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+@keyframes studio-fade {
+  to {
+    opacity: 1;
+  }
+}
+
+/* Mouvement réduit : l'image finale, fixe. */
+.studio--still *,
+.studio--still .studio__dawn {
+  animation: none !important;
+}
+.studio--still .studio__step,
+.studio--still .studio__letter {
+  transform: none;
+  opacity: 1;
+  filter: none;
+}
+.studio--still .studio__spark {
+  opacity: 1;
+  transform: translate(148px, 24px);
+}
+.studio--still .studio__ground {
+  stroke-dashoffset: 0;
+}
+.studio--still .studio__dawn,
+.studio--still .studio__presents {
+  opacity: 1;
+  transform: none;
+}

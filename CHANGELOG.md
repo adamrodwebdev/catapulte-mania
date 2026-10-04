@@ -2,6 +2,26 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [3.8.0] – 2026-10-04
+### Modifié
+- **Le jeu s'appelle désormais Catapulte Mania** (titre en jeu, page, partage,
+  application installable). Les sauvegardes existantes sont conservées.
+- **Trébuchet rééquilibré** : le ralenti du balancier devient variable. La
+  montée du bras passe vite (≈ 1,2 s), puis le mouvement ralentit nettement dans
+  la fenêtre de tir : ≈ 1,1 s pour choisir l'instant (contre ≈ 0,6 s avant).
+  « Balancier lent » allonge la fenêtre à ≈ 1,6 s sans faire attendre la montée.
+- Sur les portails (public familial), **le sang est désactivé par défaut**.
+### Ajouté
+- **Balancier infini** (réglage, sauf en Difficile et donc à deux) : sans second
+  clic, le bras revient en position et recommence, à l'identique.
+- **Générique du studio Solo Levelling** au lancement (2,6 s, une fois par
+  session, passable d'un clic ou d'une touche, fixe en mouvement réduit,
+  entièrement en CSS et SVG).
+- **Page « Confidentialité et mentions »** dans le jeu, et `privacy.html` pour
+  les fiches des portails.
+- **Visuels des fiches** générés depuis le jeu (`docs/store/`) : couvertures
+  paysage, portrait et carrée, image de partage, captures.
+
 ## [3.7.1] – 2026-10-04
 ### Modifié
 - **Tous les niveaux sont désormais gagnables au trébuchet**, en Difficile

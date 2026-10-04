@@ -1,8 +1,8 @@
 /** English texts. */
 export default {
   app: {
-    title: 'Crush the Castle',
-    metaTitle: 'Crush the Castle – Free medieval catapult game',
+    title: 'Catapulte Mania',
+    metaTitle: 'Catapulte Mania – Free medieval catapult game',
     metaDescription:
       'Aim, work out the trajectory and bring the fortresses down! 100 levels, castles of wood, stone, ice and marble, powder kegs and special powers. Free, on phone, tablet and desktop.',
     tagline: 'Work out the trajectory. Bring the fortress down.',
@@ -132,6 +132,7 @@ export default {
       arm: 'First click: drop the counterweight',
       release: 'Second click: release the sling!',
       wait: 'The shot is away…',
+      rewind: 'The arm is coming back… get ready',
       angle: 'Angle',
       speed: 'Speed',
       armBtn: 'Arm',
@@ -509,7 +510,9 @@ export default {
     trajectoryAid: 'Trajectory aid',
     trajectoryAidDesc: 'Shows the curve the projectile will follow.',
     slowSwing: 'Slow swing',
-    slowSwingDesc: 'The trebuchet arm swings twice as slowly, making the release easier to time.',
+    slowSwingDesc: 'The trebuchet’s release window lasts longer, making the release easier to time.',
+    infiniteSwing: 'Endless swing',
+    infiniteSwingDesc: 'Without a second click, the trebuchet arm comes back and swings again: take your time to choose your shot. Except on Hard.',
     captions: 'Sound captions',
     captionsDesc: 'Describes every important sound on screen, with its direction.',
     announcements: 'Spoken announcements',
@@ -553,6 +556,27 @@ export default {
     score: 'Every destruction earns points, more so as part of a chain reaction. Unused shots are worth 1,000 points. Stars depend on how many shots you use: 3 stars for a single shot (two for the big castles).',
     achTitle: 'Achievements',
     ach: 'Each level offers three achievements (win without special shots, blow up every barrel, take the king first…). They add up from one game to the next and earn gold.',
+  },
+  privacy: {
+    link: 'Privacy',
+    title: 'Privacy and legal',
+    dataTitle: 'No personal data',
+    data: 'The game asks for no real name, no email address and no account. It has no server: nothing you do is sent to the publisher.',
+    storageTitle: 'What stays on your device',
+    storage: 'Your profiles (nickname, progress, gold), settings and records are saved in your browser’s local storage, on this device only. Clearing the site’s data erases them.',
+    adsTitle: 'Ads and cookies',
+    ads: 'On this site, the game shows no ads and sets no tracking cookies.',
+    portalTitle: 'On this games portal',
+    portal: 'The portal hosting the game may show ads and save your progress to your account. That data is covered by its own privacy policy, available on its website.',
+    rightsTitle: 'Your rights',
+    rights: 'You can delete your profiles at any time from the profiles screen, or by clearing the site’s data in your browser. No other data is kept.',
+    publisherTitle: 'Publisher',
+    publisher: 'Catapulte Mania is published by the {name} studio. Version {version}.',
+    contact: 'Contact:',
+  },
+  studio: {
+    label: 'Solo Levelling presents Catapulte Mania',
+    presents: 'presents',
   },
   captions: {
     swing: 'The counterweight drops',

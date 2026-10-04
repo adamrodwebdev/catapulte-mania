@@ -16,7 +16,7 @@
  */
 export function buildServiceWorker(files, version) {
   const list = JSON.stringify(['./', ...files.filter((f) => typeof f === 'string' && !f.endsWith('.map'))])
-  return `/* Crush the Castle – service worker ${version} (généré au build) */
+  return `/* Catapulte Mania – service worker ${version} (généré au build) */
 const CACHE = 'ctc-${version}'
 const PRECACHE = ${list}
 

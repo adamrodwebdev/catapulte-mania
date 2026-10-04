@@ -1,8 +1,8 @@
 /** Textes français (langue de référence). */
 export default {
   app: {
-    title: 'Crush the Castle',
-    metaTitle: 'Crush the Castle – Jeu de catapulte médiéval gratuit',
+    title: 'Catapulte Mania',
+    metaTitle: 'Catapulte Mania – Jeu de catapulte médiéval gratuit',
     metaDescription:
       'Visez, calculez la trajectoire et faites tomber les forteresses ! 100 niveaux, des châteaux de bois, de pierre, de glace et de marbre, des barils explosifs et des pouvoirs spéciaux. Gratuit, sur mobile, tablette et ordinateur.',
     tagline: 'Calculez la trajectoire. Faites tomber la forteresse.',
@@ -132,6 +132,7 @@ export default {
       arm: '1er clic : libérez le contrepoids',
       release: '2e clic : lâchez la fronde !',
       wait: 'Le tir est parti…',
+      rewind: 'Le bras revient… préparez-vous',
       angle: 'Angle',
       speed: 'Vitesse',
       armBtn: 'Armer',
@@ -509,7 +510,9 @@ export default {
     trajectoryAid: 'Aide à la trajectoire',
     trajectoryAidDesc: 'Affiche la courbe que suivra le projectile.',
     slowSwing: 'Balancier lent',
-    slowSwingDesc: 'Le bras du trébuchet tourne deux fois plus lentement : l’instant du lâcher est plus facile à choisir.',
+    slowSwingDesc: 'La fenêtre de tir du trébuchet dure plus longtemps : l’instant du lâcher est plus facile à choisir.',
+    infiniteSwing: 'Balancier infini',
+    infiniteSwingDesc: 'Sans second clic, le bras du trébuchet revient et recommence : prenez le temps de choisir votre tir. Sauf en Difficile.',
     captions: 'Sous-titres des sons',
     captionsDesc: 'Décrit à l’écran chaque son important, avec sa direction.',
     announcements: 'Annonces vocales',
@@ -553,6 +556,27 @@ export default {
     score: 'Chaque destruction rapporte des points, d’autant plus si elle fait partie d’une réaction en chaîne. Les tirs non utilisés valent 1 000 points. Les étoiles dépendent du nombre de tirs : 3 étoiles en un seul tir (deux pour les grands châteaux).',
     achTitle: 'Succès',
     ach: 'Chaque niveau propose trois succès (gagner sans boulet spécial, faire sauter tous les barils, abattre le roi en premier…). Ils se cumulent d’une partie à l’autre et rapportent de l’or.',
+  },
+  privacy: {
+    link: 'Confidentialité',
+    title: 'Confidentialité et mentions',
+    dataTitle: 'Aucune donnée personnelle',
+    data: 'Le jeu ne demande ni nom réel, ni adresse e-mail, ni compte. Il n’a pas de serveur : rien de ce que vous faites n’est envoyé à l’éditeur.',
+    storageTitle: 'Ce qui reste sur votre appareil',
+    storage: 'Vos profils (pseudonyme, progression, or), vos réglages et vos records sont enregistrés dans le stockage local de votre navigateur, sur cet appareil uniquement. Vider les données du site les efface.',
+    adsTitle: 'Publicité et cookies',
+    ads: 'Sur ce site, le jeu n’affiche aucune publicité et ne dépose aucun cookie de suivi.',
+    portalTitle: 'Sur ce portail de jeux',
+    portal: 'Le portail qui héberge le jeu peut afficher des publicités et enregistrer votre progression dans votre compte. Ces données relèvent de sa propre politique de confidentialité, consultable sur son site.',
+    rightsTitle: 'Vos droits',
+    rights: 'Vous pouvez effacer vos profils à tout moment depuis l’écran des profils, ou en vidant les données du site dans votre navigateur. Aucune autre donnée n’est conservée.',
+    publisherTitle: 'Éditeur',
+    publisher: 'Catapulte Mania est édité par le studio {name}. Version {version}.',
+    contact: 'Contact :',
+  },
+  studio: {
+    label: 'Solo Levelling présente Catapulte Mania',
+    presents: 'présente',
   },
   captions: {
     swing: 'Le contrepoids tombe',

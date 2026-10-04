@@ -70,6 +70,7 @@ export class GameController extends EventBus {
       continueOffer,
       engine,
       slowSwing: settings.slowSwing === true,
+      infiniteSwing: settings.infiniteSwing === true,
     }, mode)
     const focus = this.session.focus
     this.session.camera.setFocus(focus.left, focus.right, focus.top)
@@ -97,7 +98,13 @@ export class GameController extends EventBus {
     this.session.camera.shakeEnabled = settings.screenShake && !reducedMotion
     this.session.options.blood = settings.blood
     this.session.options.startPower = settings.startPower
-    if (this.session.engine === 'trebuchet') for (const p of this.session.players) p.catapult.setSlow(settings.slowSwing === true)
+    if (this.session.engine === 'trebuchet') {
+      this.session.infiniteSwing = settings.infiniteSwing === true && this.session.difficulty !== 'hard'
+      for (const p of this.session.players) {
+        p.catapult.setSlow(settings.slowSwing === true)
+        p.catapult.setInfinite(this.session.infiniteSwing)
+      }
+    }
     this.session.camera.follow = !reducedMotion
     this.session.particles.density = reducedMotion ? 0.35 : 1
   }

@@ -603,3 +603,18 @@
     font-size: var(--fs-1);
   }
 }
+
+/* Lien discret du pied de page (confidentialité). */
+.home__link {
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: var(--fs-0);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  text-shadow: 0 1px 4px rgb(0 0 0 / 0.7);
+  cursor: pointer;
+  min-height: var(--hud-size);
+}

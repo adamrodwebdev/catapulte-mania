@@ -89,12 +89,53 @@ test('trébuchet : le lâcher tient compte du temps écoulé depuis la dernière
   assert.ok(ang(sb) < ang(sa))
 })
 
-test('balancier lent : le bras tourne moins vite (accessibilité), mais le tir est le même au même instant', () => {
-  const t = new Trebuchet(TREBUCHET_X, { slow: true })
-  assert.equal(t.timeScale, SWING_SCALE.slow)
-  t.arm(() => {})
-  t.update(1000)
-  assert.ok(Math.abs(t.simTime - 1000 * SWING_SCALE.slow) < 10)
+test('ralenti variable : montée rapide, fenêtre de tir lente ; balancier lent = fenêtre plus longue', () => {
+  const real = (slow) => {
+    const t = new Trebuchet(TREBUCHET_X, { slow })
+    t.arm(() => {})
+    let ms = 0
+    let windowStart = null
+    while (t.simTime < 880 && ms < 20000) {
+      t.update(4)
+      ms += 4
+      if (windowStart === null && t.simTime >= 640) windowStart = ms
+    }
+    return { windup: windowStart, window: ms - windowStart }
+  }
+  const n = real(false)
+  const s = real(true)
+  assert.ok(n.windup < 1300, `montée ${n.windup} ms`)
+  assert.ok(n.window > 950 && n.window < 1300, `fenêtre normale ${n.window} ms`)
+  assert.ok(s.window > n.window * 1.35, `fenêtre lente ${s.window} ms`)
+  assert.ok(Math.abs(s.windup - n.windup) < 120, 'la montée ne ralentit pas')
+  assert.equal(SWING_SCALE.slow.windup, SWING_SCALE.normal.windup)
+})
+
+test('balancier infini : sans second clic, le bras revient et recommence, à l’identique', () => {
+  const t = new Trebuchet(TREBUCHET_X, { infinite: true })
+  let shot = null
+  t.arm((s) => (shot = s))
+  let rewound = false
+  for (let i = 0; i < 2000; i++) {
+    t.update(16)
+    if (t.rewinding) rewound = true
+    if (rewound && t.armed && t.simTime > 100) break
+  }
+  assert.equal(shot, null, 'jamais de lâcher automatique')
+  assert.ok(rewound)
+  // Le même instant de lâcher donne le même tir qu'au premier passage.
+  t.releaseAt(700)
+  const ref = Trebuchet.preview(t.simTime)
+  assert.ok(Math.abs(shot.velocity.x - ref.velocity.x) < 1e-9 && Math.abs(shot.velocity.y - ref.velocity.y) < 1e-9)
+})
+
+test('balancier infini : refusé en Difficile (et donc à deux)', () => {
+  const easy = session({ infiniteSwing: true })
+  assert.equal(easy.infiniteSwing, true)
+  assert.equal(easy.catapult.infinite, true)
+  const hard = session({ infiniteSwing: true, difficulty: 'hard' })
+  assert.equal(hard.infiniteSwing, false)
+  assert.equal(hard.catapult.infinite, false)
 })
 
 test('partie au trébuchet : 1er appui = balancier (tir engagé), 2e = lâcher', () => {

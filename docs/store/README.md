@@ -1,0 +1,15 @@
+# Visuels pour les fiches des portails
+
+Générés automatiquement depuis le jeu (aucun montage) :
+
+| Fichier | Usage |
+|---|---|
+| `cover-1920x1080.png` | Couverture paysage (CrazyGames, Poki, itch.io) |
+| `cover-800x1200.png` | Couverture portrait |
+| `cover-800x800.png` | Couverture carrée |
+| `og-image.png` | Image de partage (réseaux sociaux), copiée dans `public/` |
+| `screenshot-1.png` à `screenshot-4.png` | Captures de jeu 1280 × 720, sans interface |
+| `screenshot-hud-*.png` | Captures 1280 × 720 avec l'interface |
+
+Vérifiez les formats exacts demandés par chaque portail au moment de la soumission : ils changent parfois.
+La page de confidentialité à indiquer dans les fiches est `privacy.html` (à la racine du site).

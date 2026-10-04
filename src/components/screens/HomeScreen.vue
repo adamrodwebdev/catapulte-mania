@@ -32,7 +32,7 @@ function open(screen) {
     <SiegeLandscape class="home__scene" />
     <div class="home__content">
       <header class="home__heading">
-        <h1 class="home__title">Crush the&nbsp;Castle</h1>
+        <h1 class="home__title">Catapulte&nbsp;Mania</h1>
         <p class="home__tagline">{{ t('app.tagline') }}</p>
         <p v-if="IS_DEMO" class="home__demo">{{ t('demo.banner', { count: PLAYABLE_LEVELS }) }}</p>
       </header>
@@ -78,6 +78,7 @@ function open(screen) {
 
     <footer class="home__footer">
       <LanguagePicker id="home-lang" />
+      <button type="button" class="home__link" @click="app.go('privacy')">{{ t('privacy.link') }}</button>
       <span class="home__version">{{ t('app.version', { version: APP_VERSION }) }}</span>
     </footer>
   </main>

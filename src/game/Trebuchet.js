@@ -1,5 +1,5 @@
 import { WORLD } from './physics/constants.js'
-import { Guard } from '../core/utils/Guard.js'
+import { Guard, deepFreeze } from '../core/utils/Guard.js'
 import { clamp } from '../core/utils/math.js'
 
 /**
@@ -16,9 +16,14 @@ import { clamp } from '../core/utils/math.js'
  * un tir tendu (voire dans le sol). La simulation est à pas fixe : un même
  * instant de lâcher donne toujours le même tir.
  *
- * Le balancier est joué au ralenti (`timeScale`) : un trébuchet est un engin
- * lourd, et la fenêtre de tir reste ainsi jouable au doigt. L'option
- * d'accessibilité « Balancier lent » ralentit encore le mouvement.
+ * Le balancier est joué au ralenti, et ce ralenti est VARIABLE (v3.8) : la
+ * montée du bras, sans intérêt pour le tir, passe vite ; dès que la fronde
+ * entre dans la fenêtre de tir, le mouvement ralentit nettement (environ une
+ * seconde pour choisir l'instant). L'option « Balancier lent » allonge encore
+ * la fenêtre sans faire attendre la montée.
+ *
+ * Balancier infini (option, sauf en Difficile) : sans second clic, le bras
+ * revient en position et le balancier recommence, à l'identique.
  *
  * Repère local : origine au pied de l'engin, au sol, x vers l'avant (sens du tir).
  */
@@ -44,8 +49,20 @@ export const TREBUCHET_UNLOCK = 13
  */
 export const TREBUCHET_MASS = 1.5
 
-/** Ralenti du balancier (normal / « Balancier lent »). */
-export const SWING_SCALE = Object.freeze({ normal: 0.35, slow: 0.18 })
+/**
+ * Ralenti du balancier : `windup` pendant la montée du bras, `window` dans la
+ * fenêtre de tir (normal / « Balancier lent »). La fenêtre utile (≈ 640 à
+ * 880 ms simulées) dure ainsi ≈ 1,1 s en normal, ≈ 1,6 s en lent.
+ */
+export const SWING_SCALE = deepFreeze({
+  normal: { windup: 0.6, window: 0.22 },
+  slow: { windup: 0.6, window: 0.15 },
+})
+/** Début (ms simulées) du passage au ralenti de la fenêtre de tir, et durée de la transition. */
+const WINDOW_START = 540
+const WINDOW_EASE = 80
+/** Retour du bras en position avant un nouveau balancier (balancier infini), ms réelles. */
+const REWIND_MS = 650
 
 const STEP = 1000 / 120
 /** Gravité Matter (px/ms²) : 1 × 0,001. */
@@ -70,12 +87,17 @@ export class Trebuchet {
   dir = 1
   /** Multiplicateur de vitesse (amélioration « Bras renforcé » : contrepoids plus lourd). */
   speedFactor = 1
-  /** Ralenti du balancier (voir SWING_SCALE). */
-  timeScale = SWING_SCALE.normal
+  /** Profil de ralenti (voir SWING_SCALE). */
+  #profile = SWING_SCALE.normal
+  /** Balancier infini : sans lâcher, le balancier recommence (option, jamais en Difficile). */
+  infinite = false
   /** Rayon du projectile chargé (il glisse dans l'auge, posé au sol). */
   loadRadius = 14
 
-  /** 'idle' (armé, prêt) | 'swing' (bras en mouvement) | 'released' (fronde vide) | 'reset' (remise en batterie) */
+  /**
+   * 'idle' (armé, prêt) | 'swing' (bras en mouvement) | 'rewind' (balancier infini :
+   * retour en position) | 'released' (fronde vide) | 'reset' (remise en batterie)
+   */
   #phase = 'idle'
   #theta = REST
   #omega = 0
@@ -92,19 +114,40 @@ export class Trebuchet {
 
   /**
    * @param {number} [x] position au sol
-   * @param {{ dir?: 1 | -1, speedFactor?: number, slow?: boolean }} [opts]
+   * @param {{ dir?: 1 | -1, speedFactor?: number, slow?: boolean, infinite?: boolean }} [opts]
    */
-  constructor(x = TREBUCHET_X, { dir = 1, speedFactor = 1, slow = false } = {}) {
+  constructor(x = TREBUCHET_X, { dir = 1, speedFactor = 1, slow = false, infinite = false } = {}) {
     this.x = Guard.number(x, 'trebuchet x', { min: -1500, max: WORLD.WIDTH + 1500 })
     this.dir = dir === -1 ? -1 : 1
     this.speedFactor = Guard.number(speedFactor, 'speedFactor', { min: 0.5, max: 1.6 })
     this.setSlow(slow)
+    this.setInfinite(infinite)
     this.#loadSling()
   }
 
   /** Option d'accessibilité « Balancier lent ». */
   setSlow(slow) {
-    this.timeScale = slow === true ? SWING_SCALE.slow : SWING_SCALE.normal
+    this.#profile = slow === true ? SWING_SCALE.slow : SWING_SCALE.normal
+  }
+
+  /** Option « Balancier infini » (la partie la refuse en Difficile). */
+  setInfinite(on) {
+    this.infinite = on === true
+  }
+
+  /**
+   * Ralenti du moment (ms simulées par ms réelle) : rapide pendant la montée
+   * du bras, lent dans la fenêtre de tir, avec une transition douce.
+   */
+  get timeScale() {
+    const { windup, window } = this.#profile
+    const k = clamp((this.#simTime - WINDOW_START) / WINDOW_EASE, 0, 1)
+    return windup + (window - windup) * k
+  }
+
+  /** Ralenti le plus fort du profil (pour borner un pas de simulation). */
+  get minTimeScale() {
+    return this.#profile.window
   }
 
   setLoadRadius(r) {
@@ -123,7 +166,12 @@ export class Trebuchet {
   }
   /** Occupé : le tour ne peut pas se terminer tant que le projectile n'est pas parti. */
   get busy() {
-    return this.#phase === 'swing'
+    return this.#phase === 'swing' || this.#phase === 'rewind'
+  }
+
+  /** Balancier infini : bras qui revient en position avant de repartir. */
+  get rewinding() {
+    return this.#phase === 'rewind'
   }
   /** Prêt pour un nouveau tir. */
   get ready() {
@@ -189,7 +237,7 @@ export class Trebuchet {
    * la fin de l'animation pour tirer à nouveau.
    */
   reload() {
-    if (this.#phase === 'swing') return
+    if (this.#phase === 'swing' || this.#phase === 'rewind') return
     this.#phase = 'idle'
     this.#theta = REST
     this.#omega = 0
@@ -227,7 +275,7 @@ export class Trebuchet {
    */
   release(leadMs = 0) {
     if (this.#phase !== 'swing') return false
-    const lead = clamp(Number.isFinite(leadMs) ? leadMs : 0, 0, 50) * this.timeScale
+    const lead = this.#realToSim(clamp(Number.isFinite(leadMs) ? leadMs : 0, 0, 50))
     this.#advance(lead)
     this.#debt += lead
     this.#letGo()
@@ -241,7 +289,9 @@ export class Trebuchet {
   releaseAt(simMs) {
     if (this.#phase !== 'swing') return false
     Guard.number(simMs, 'release time', { min: 0, max: 5000 })
-    if (simMs > this.#simTime) this.#advance(simMs - this.#simTime)
+    // Pas à pas jusqu'à l'instant voulu (sans erreur d'arrondi : même résultat
+    // que le jeu image par image).
+    while (this.#phase === 'swing' && this.#simTime + 1e-6 < simMs) this.#tick()
     if (this.#phase === 'swing') this.#letGo()
     return true
   }
@@ -264,7 +314,7 @@ export class Trebuchet {
   update(dtMs) {
     const dt = Math.max(0, dtMs)
     if (this.#phase === 'swing' || this.#phase === 'released') {
-      let sim = dt * this.timeScale
+      let sim = this.#realToSim(dt)
       const pay = Math.min(this.#debt, sim)
       this.#debt -= pay
       sim -= pay
@@ -273,6 +323,21 @@ export class Trebuchet {
       if (this.#phase === 'released') {
         this.#resetT += dt
         if (this.#resetT > 1600) this.#startReset()
+      }
+    } else if (this.#phase === 'rewind') {
+      // Balancier infini : le bras revient en position, la fronde se recharge, et c'est reparti.
+      this.#resetT += dt
+      const t = Math.min(1, this.#resetT / REWIND_MS)
+      const ease = t * t * (3 - 2 * t)
+      this.#theta = this.#resetFrom + (REST - this.#resetFrom) * ease
+      this.#loadSling()
+      if (t >= 1) {
+        this.#phase = 'swing'
+        this.#simTime = 0
+        this.#acc = 0
+        this.#omega = 0
+        this.#theta = REST
+        this.#loadSling()
       }
     } else if (this.#phase === 'reset') {
       this.#resetT += dt
@@ -299,13 +364,50 @@ export class Trebuchet {
     this.#pp = { ...this.#p }
   }
 
+  /**
+   * Convertit une durée réelle en durée simulée, en suivant le ralenti
+   * variable (intégré par petits morceaux : la transition reste douce).
+   */
+  #realToSim(realMs) {
+    if (this.#phase !== 'swing') return realMs * this.#profile.windup
+    let left = realMs
+    let sim = 0
+    let t = this.#simTime + this.#acc
+    while (left > 0) {
+      const chunk = Math.min(left, 4)
+      const { windup, window } = this.#profile
+      const k = clamp((t - WINDOW_START) / WINDOW_EASE, 0, 1)
+      const d = chunk * (windup + (window - windup) * k)
+      sim += d
+      t += d
+      left -= chunk
+    }
+    return sim
+  }
+
   #advance(simMs) {
     this.#acc += simMs
     while (this.#acc >= STEP) {
       this.#acc -= STEP
-      this.#step()
-      if (this.#phase === 'swing' && this.#theta >= AUTO_RELEASE) this.#letGo()
+      this.#tick()
+      if (this.#phase === 'rewind') return
     }
+  }
+
+  /** Un pas de simulation, avec le lâcher automatique (ou le retour du balancier infini). */
+  #tick() {
+    this.#step()
+    if (this.#phase !== 'swing' || this.#theta < AUTO_RELEASE) return
+    if (this.infinite) {
+      // Balancier infini : pas de lâcher automatique, le bras revient et recommence.
+      this.#phase = 'rewind'
+      this.#resetT = 0
+      this.#resetFrom = this.#theta
+      this.#acc = 0
+      this.#debt = 0
+      return
+    }
+    this.#letGo()
   }
 
   #step() {

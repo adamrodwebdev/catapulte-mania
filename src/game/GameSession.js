@@ -105,7 +105,7 @@ export class GameSession extends EventBus {
    * @param {object} opts options d'affichage et de difficulté
    * @param {import('./modes/GameMode.js').GameMode} [mode] règles (histoire par défaut)
    */
-  constructor(level, { difficulty, completedLevels, trajectoryAid = false, reducedMotion = false, screenShake = true, blood = true, startPower = 100, effects = NO_EFFECTS, continueOffer = false, engine = 'catapult', slowSwing = false }, mode = null) {
+  constructor(level, { difficulty, completedLevels, trajectoryAid = false, reducedMotion = false, screenShake = true, blood = true, startPower = 100, effects = NO_EFFECTS, continueOffer = false, engine = 'catapult', slowSwing = false, infiniteSwing = false }, mode = null) {
     super()
     this.#level = level
     this.#difficulty = Guard.oneOf(difficulty, GAME.DIFFICULTIES, 'difficulty')
@@ -122,6 +122,9 @@ export class GameSession extends EventBus {
     // Le trébuchet tire depuis l'arrière : impossible au face-à-face (deux camps, deux châteaux).
     this.#engine = versus ? 'catapult' : Guard.oneOf(engine, ENGINES, 'engine')
     Guard.boolean(slowSwing, 'slowSwing')
+    Guard.boolean(infiniteSwing, 'infiniteSwing')
+    /** Balancier infini : option du joueur, jamais en Difficile (ni donc à deux). */
+    this.infiniteSwing = infiniteSwing && this.#difficulty !== 'hard'
 
     // Un état par joueur : catapulte (et sa visée), score, tirs, munitions.
     // Campagne à deux : un seul score commun aux deux joueurs.
@@ -135,7 +138,7 @@ export class GameSession extends EventBus {
         // `catapult` désigne l'engin du joueur, catapulte ou trébuchet.
         catapult:
           this.#engine === 'trebuchet'
-            ? new Trebuchet(TREBUCHET_X, { speedFactor: fx.speedFactor, slow: slowSwing })
+            ? new Trebuchet(TREBUCHET_X, { speedFactor: fx.speedFactor, slow: slowSwing, infinite: this.infiniteSwing })
             : new Catapult(right ? CATAPULT_X.right : CATAPULT_X.left, { dir: right ? -1 : 1, speedFactor: fx.speedFactor }),
         score: shared ?? new ScoreKeeper(level, this.#difficulty),
         shotsTotal: shots,
@@ -205,6 +208,11 @@ export class GameSession extends EventBus {
   get selectedAmmo() {
     return this.player.selectedAmmo
   }
+  /** Difficulté de la partie. */
+  get difficulty() {
+    return this.#difficulty
+  }
+
   /** Engin de la partie : 'catapult' ou 'trebuchet'. */
   get engine() {
     return this.#engine
@@ -213,6 +221,11 @@ export class GameSession extends EventBus {
   /** Trébuchet : balancier lancé, en attente du lâcher. */
   get armed() {
     return this.#engine === 'trebuchet' && this.catapult.armed
+  }
+
+  /** Balancier infini : le bras revient en position (le tir reste engagé). */
+  get rewinding() {
+    return this.#engine === 'trebuchet' && this.catapult.rewinding
   }
 
   /** Renommée de chaque joueur (copie). */
@@ -277,6 +290,8 @@ export class GameSession extends EventBus {
       power: Math.round(this.catapult.power * 100),
       engine: this.#engine,
       armed: this.armed,
+      rewinding: this.rewinding,
+      infiniteSwing: this.infiniteSwing,
       ammo: this.ammo,
       powers: this.powers,
       canActivate: this.#activeProjectiles().some((p) => p.canActivate),

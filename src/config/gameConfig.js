@@ -33,6 +33,15 @@ export const DIFFICULTY = deepFreeze({
   hard: { shotDelta: -1, windFactor: 1.2, targetHp: 1.35, scoreFactor: 1.5, ammoFactor: 0.5 },
 })
 
+/**
+ * Éditeur du jeu (page « Confidentialité et mentions »). Le contact est
+ * facultatif : laissé vide, la ligne n'est pas affichée.
+ */
+export const LEGAL = deepFreeze({
+  publisher: 'Solo Levelling',
+  contact: '',
+})
+
 /** Est-on dans la build de démonstration ? (constante remplacée au build par Vite) */
 export const IS_DEMO = typeof __DEMO__ !== 'undefined' && __DEMO__ === true
 export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'

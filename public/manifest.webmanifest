@@ -1,7 +1,7 @@
 {
-  "name": "Crush the Castle",
-  "short_name": "Crush Castle",
-  "description": "Jeu de catapulte médiéval : 40 niveaux, pouvoirs spéciaux, multilingue.",
+  "name": "Catapulte Mania",
+  "short_name": "Catapulte Mania",
+  "description": "Jeu de catapulte et de trébuchet médiéval : 100 niveaux, pouvoirs spéciaux, multilingue.",
   "lang": "fr",
   "start_url": "./",
   "scope": "./",

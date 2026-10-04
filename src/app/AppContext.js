@@ -35,7 +35,7 @@ function checkRecord(levelId, rec) {
 }
 
 /** Écrans de l'application (navigation interne, une seule URL pour le SEO). */
-export const SCREENS = Object.freeze(['home', 'profiles', 'levels', 'game', 'settings', 'help', 'workshop', 'multiplayer'])
+export const SCREENS = Object.freeze(['home', 'profiles', 'levels', 'game', 'settings', 'help', 'workshop', 'multiplayer', 'privacy'])
 
 /**
  * Contexte applicatif : instancie les services (une seule fois) et expose un

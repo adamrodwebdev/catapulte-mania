@@ -13,7 +13,7 @@ const props = defineProps({
 const { t } = useApp()
 
 const armed = computed(() => props.hud.armed)
-const step = computed(() => (armed.value ? 'release' : props.hud.state === 'aiming' ? 'arm' : 'wait'))
+const step = computed(() => (armed.value ? 'release' : props.hud.rewinding ? 'rewind' : props.hud.state === 'aiming' ? 'arm' : 'wait'))
 /** Aiguille du cadran : 0° à droite (tir tendu), 90° en haut (tir vertical). */
 const needle = computed(() => {
   const a = Math.max(-20, Math.min(110, props.hud.angle))

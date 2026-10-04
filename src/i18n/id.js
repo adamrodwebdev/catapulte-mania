@@ -1,8 +1,8 @@
 /** Teks bahasa Indonesia. */
 export default {
   app: {
-    title: 'Crush the Castle',
-    metaTitle: 'Crush the Castle – Game ketapel abad pertengahan gratis',
+    title: 'Catapulte Mania',
+    metaTitle: 'Catapulte Mania – Game ketapel abad pertengahan gratis',
     metaDescription:
       'Bidik, hitung lintasan, dan runtuhkan benteng! 100 level, kastil dari kayu, batu, es, dan marmer, tong mesiu, dan kekuatan khusus. Gratis, di ponsel, tablet, dan komputer.',
     tagline: 'Hitung lintasannya. Runtuhkan bentengnya.',
@@ -132,6 +132,7 @@ export default {
       arm: 'Klik pertama: jatuhkan pemberat',
       release: 'Klik kedua: lepaskan ambin!',
       wait: 'Tembakan meluncur…',
+      rewind: 'Lengan kembali… bersiaplah',
       angle: 'Sudut',
       speed: 'Kecepatan',
       armBtn: 'Siagakan',
@@ -509,7 +510,9 @@ export default {
     trajectoryAid: 'Bantuan lintasan',
     trajectoryAidDesc: 'Menampilkan kurva yang akan dilalui proyektil.',
     slowSwing: 'Ayunan lambat',
-    slowSwingDesc: 'Lengan trebuset berayun dua kali lebih lambat sehingga saat melepas lebih mudah dipilih.',
+    slowSwingDesc: 'Jendela tembak trebuset berlangsung lebih lama sehingga saat melepas lebih mudah dipilih.',
+    infiniteSwing: 'Ayunan tanpa henti',
+    infiniteSwingDesc: 'Tanpa klik kedua, lengan trebuset kembali dan berayun lagi: luangkan waktu memilih tembakan. Kecuali di Sulit.',
     captions: 'Teks suara',
     captionsDesc: 'Menjelaskan setiap suara penting di layar, beserta arahnya.',
     announcements: 'Pengumuman suara',
@@ -553,6 +556,27 @@ export default {
     score: 'Setiap kehancuran memberi poin, lebih banyak lagi dalam reaksi berantai. Tembakan yang tidak terpakai bernilai 1.000 poin. Bintang bergantung pada jumlah tembakan: 3 bintang untuk satu tembakan (dua untuk kastel besar).',
     achTitle: 'Pencapaian',
     ach: 'Setiap level punya tiga pencapaian (menang tanpa peluru khusus, meledakkan semua tong, menjatuhkan raja lebih dulu…). Pencapaian terkumpul dari satu permainan ke permainan berikutnya dan memberi emas.',
+  },
+  privacy: {
+    link: 'Privasi',
+    title: 'Privasi dan informasi hukum',
+    dataTitle: 'Tanpa data pribadi',
+    data: 'Game ini tidak meminta nama asli, alamat email, atau akun. Game ini tidak punya server: tidak ada yang Anda lakukan dikirim ke penerbit.',
+    storageTitle: 'Yang tersimpan di perangkat Anda',
+    storage: 'Profil (nama samaran, kemajuan, emas), pengaturan, dan rekor disimpan di penyimpanan lokal peramban, hanya di perangkat ini. Menghapus data situs akan menghapusnya.',
+    adsTitle: 'Iklan dan cookie',
+    ads: 'Di situs ini, game tidak menampilkan iklan dan tidak memasang cookie pelacak.',
+    portalTitle: 'Di portal game ini',
+    portal: 'Portal yang menampung game dapat menampilkan iklan dan menyimpan kemajuan di akun Anda. Data tersebut diatur oleh kebijakan privasi portal itu sendiri, yang dapat dibaca di situsnya.',
+    rightsTitle: 'Hak Anda',
+    rights: 'Anda dapat menghapus profil kapan saja dari layar profil, atau dengan menghapus data situs di peramban. Tidak ada data lain yang disimpan.',
+    publisherTitle: 'Penerbit',
+    publisher: 'Catapulte Mania diterbitkan oleh studio {name}. Versi {version}.',
+    contact: 'Kontak:',
+  },
+  studio: {
+    label: 'Solo Levelling mempersembahkan Catapulte Mania',
+    presents: 'mempersembahkan',
   },
   captions: {
     swing: 'Pemberat jatuh',

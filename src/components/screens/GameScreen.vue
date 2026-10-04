@@ -275,7 +275,7 @@ onBeforeUnmount(() => {
   destroyController()
 })
 watch(
-  () => [state.settings.trajectoryAid, state.settings.screenShake, state.settings.blood, state.settings.motion, state.systemReducedMotion],
+  () => [state.settings.trajectoryAid, state.settings.screenShake, state.settings.blood, state.settings.motion, state.systemReducedMotion, state.settings.slowSwing, state.settings.infiniteSwing],
   () => {
     controller?.applySettings({ ...state.settings }, app.reducedMotion())
     if (coach && controller) controller.session.options.trajectoryAid = true

@@ -1,5 +1,5 @@
 import { Schema } from '../core/utils/Guard.js'
-import { GAME } from '../config/gameConfig.js'
+import { GAME, IS_PORTAL } from '../config/gameConfig.js'
 import { EventBus } from '../core/utils/EventBus.js'
 
 /** Définition de chaque réglage : validateur + valeur par défaut. */
@@ -20,11 +20,14 @@ const DEFINITIONS = Object.freeze({
   engine: { validate: Schema.enum(['catapult', 'trebuchet']), fallback: 'catapult' },
   // Accessibilité : balancier du trébuchet encore plus lent (lâcher plus facile).
   slowSwing: { validate: Schema.boolean(), fallback: false },
+  // Balancier infini du trébuchet (sauf en Difficile) : tout le temps de choisir son tir.
+  infiniteSwing: { validate: Schema.boolean(), fallback: false },
   captions: { validate: Schema.boolean(), fallback: true },
   announcements: { validate: Schema.boolean(), fallback: true },
   haptics: { validate: Schema.boolean(), fallback: true },
   screenShake: { validate: Schema.boolean(), fallback: true },
-  blood: { validate: Schema.boolean(), fallback: true },
+  // Portails (public familial) : sang désactivé par défaut, remplacé par de la poussière.
+  blood: { validate: Schema.boolean(), fallback: !IS_PORTAL },
   volume: { validate: Schema.number({ min: 0, max: 1 }), fallback: 0.7 },
   // Volume de la musique (0 = coupée), séparé des effets sonores.
   music: { validate: Schema.number({ min: 0, max: 1 }), fallback: 0.5 },

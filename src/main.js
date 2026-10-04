@@ -14,6 +14,7 @@ import './styles/ui.css'
 import './styles/screens.css'
 import './styles/game.css'
 import './styles/modes.css'
+import './styles/studio.css'
 
 // Portails : le SDK s'initialise d'abord (sauvegarde synchronisée). Notre site : rien à charger.
 createAdService()
@@ -23,7 +24,7 @@ createAdService()
     provideApp(app, ctx)
     // En production, aucune erreur interne n'est affichée à l'utilisateur ni exposée.
     app.config.errorHandler = (err) => {
-      console.error('[Crush the Castle]', err)
+      console.error('[Catapulte Mania]', err)
     }
     app.mount('#app')
     ctx.services.ads.loadingFinished()
