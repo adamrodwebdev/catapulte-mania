@@ -10,6 +10,8 @@ import { MusicDirector } from '../game/audio/MusicDirector.js'
 import { LevelRepository } from '../game/levels/LevelRepository.js'
 import { starsFor } from '../game/score/ScoreRules.js'
 import { PowerRegistry } from '../game/powers/PowerRegistry.js'
+import { DailyChallenge, dayKey } from '../game/daily/DailyChallenge.js'
+import { ReplayCode } from '../game/replay/ReplayCode.js'
 import { loadDictionary } from '../i18n/loader.js'
 import { NoAdService } from '../services/ads/AdService.js'
 import { CloudStorageBackend } from '../services/CloudStorageBackend.js'
@@ -87,7 +89,13 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
      * Partie à lancer : mode ('story' | 'free' | 'duel' | 'hotseat' | 'versus'),
      * niveau ou arène, noms des joueurs (modes à deux).
      */
-    match: { mode: 'story', levelId: 1, levels: null, arenaId: 1, duelId: 1, players: [] },
+    match: { mode: 'story', levelId: 1, levels: null, arenaId: 1, duelId: 1, players: [], daily: null, challenge: null },
+    /** Défi reçu par un lien « Bats mon tir » (décodé et validé), en attente sur l'accueil. */
+    incomingChallenge: null,
+    /** Lien de défi reçu mais illisible ou altéré. */
+    badChallenge: false,
+    /** Écran à ouvrir une fois un profil choisi (ex. 'daily'). */
+    afterProfile: null,
     announcement: '',
     captions: [],
     systemDark: false,
@@ -229,6 +237,23 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
       gold: slot.gold,
       upgrades: slot.upgrades,
       cosmetics: slot.cosmetics,
+      daily: dailyView(slot),
+    }
+  }
+
+  /** Défi du jour vu par un profil : série en cours, record du jour, derniers jours. */
+  function dailyView(slot) {
+    const today = dayKey()
+    const d = slot.daily
+    return {
+      today,
+      challenge: DailyChallenge.forDay(today),
+      streak: slot.dailyStreak(today),
+      bestStreak: d.bestStreak,
+      todayBest: d.days[today] ?? null,
+      history: Object.entries(d.days)
+        .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+        .map(([day, score]) => ({ day, score })),
     }
   }
 
@@ -285,6 +310,7 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     }
     const after = activeSlot.completedCount
     const unlocked = after > before ? PowerRegistry.unlockedAt(after) : null
+    if (after > before) ads.reportProgress((after / GAME.LEVEL_COUNT) * 100)
     state.profile = profileView(activeSlot)
     await refreshSlots()
     return { ...outcome, unlockedPower: unlocked ? unlocked.id : null, saved }
@@ -306,6 +332,109 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     state.profile = profileView(activeSlot)
     return { ...outcome, saved }
   }
+
+  /**
+   * Enregistre une partie du défi du jour (résultat authentifié, défi du jour même).
+   * @returns {Promise<{ newBest: boolean, streak: number, extended: boolean, saved: boolean }>}
+   */
+  async function recordDaily(result, day) {
+    if (!activeSlot) return { newBest: false, streak: 0, extended: false, saved: false }
+    const outcome = activeSlot.recordDaily(result, day)
+    let saved
+    try {
+      saved = await saves.save(activeSlot)
+    } catch {
+      saved = false
+    }
+    if (outcome.newBest || outcome.extended) ads.happytime()
+    state.profile = profileView(activeSlot)
+    return { ...outcome, saved }
+  }
+
+  /** Lance le défi du jour (un profil est nécessaire pour la série). */
+  async function startDaily() {
+    if (!activeSlot) {
+      const last = saves.lastSlot
+      if (!(Number.isInteger(last) && (await openProfile(last)))) {
+        state.afterProfile = 'daily'
+        go('profiles')
+        return
+      }
+    }
+    const c = DailyChallenge.today()
+    state.match = { mode: 'daily', levelId: c.levelId, levels: null, arenaId: 1, duelId: 1, players: [], daily: c, challenge: null }
+    state.levelId = c.levelId
+    go('game')
+  }
+
+  /** Après le choix d'un profil : écran demandé avant (défi du jour) ou la carte des niveaux. */
+  function afterProfileChosen() {
+    const next = state.afterProfile
+    state.afterProfile = null
+    if (next === 'daily') return startDaily()
+    go('levels')
+  }
+
+  /** Lance un défi reçu par lien (aucun profil nécessaire, rien n'est enregistré). */
+  function startChallenge(run = state.incomingChallenge) {
+    if (!run) return
+    state.incomingChallenge = null
+    state.match = { mode: 'challenge', levelId: run.levelId, levels: null, arenaId: 1, duelId: 1, players: [], daily: null, challenge: run }
+    state.levelId = run.levelId
+    go('game')
+  }
+
+  /**
+   * Partage une partie (« Bats mon tir ») : lien du portail si possible, sinon
+   * l'adresse de notre site ; partage natif sur mobile, sinon copie.
+   * @returns {Promise<{ url: string, method: 'shared' | 'copied' | 'manual' }>}
+   */
+  async function shareRun(run, text) {
+    const code = ReplayCode.encode(run)
+    let url = await ads.inviteLink({ defi: code })
+    if (!url) {
+      const base = globalThis.location ? `${location.origin}${location.pathname}` : ''
+      url = `${base}#defi=${code}`
+    }
+    try {
+      if (globalThis.navigator?.share) {
+        await navigator.share({ title: 'Catapulte Mania', text, url })
+        return { url, method: 'shared' }
+      }
+    } catch (e) {
+      if (e?.name === 'AbortError') return { url, method: 'manual' }
+    }
+    try {
+      await navigator.clipboard.writeText(`${text} ${url}`)
+      return { url, method: 'copied' }
+    } catch {
+      return { url, method: 'manual' }
+    }
+  }
+
+  /** Au démarrage : un défi reçu par lien (portail ou #defi= sur notre site) ? */
+  function readIncomingChallenge() {
+    let code = null
+    try {
+      code = ads.inviteParam('defi')
+      if (!code && globalThis.location?.hash.startsWith('#defi=')) code = location.hash.slice(6)
+    } catch {
+      code = null
+    }
+    if (!code) return
+    try {
+      state.incomingChallenge = ReplayCode.decode(code)
+    } catch {
+      state.badChallenge = true
+    }
+    // Le lien a servi : on le retire de l'adresse (un rechargement ne le rejoue pas).
+    try {
+      if (location.hash) history.replaceState(history.state, '', location.pathname + location.search)
+    } catch {
+      /* sans conséquence */
+    }
+  }
+  readIncomingChallenge()
 
   /* ----- Atelier (or et améliorations) ----- */
 
@@ -334,7 +463,7 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
    */
   function startMatch(match) {
     const levels = Array.isArray(match.levels) && match.levels.length === 3 && match.levels.every((id) => Number.isInteger(id) && id >= 1 && id <= GAME.LEVEL_COUNT) ? [...match.levels] : null
-    state.match = { mode: match.mode, levelId: match.levelId ?? state.levelId, levels, arenaId: match.arenaId ?? 1, duelId: match.duelId ?? 1, players: [...(match.players || [])] }
+    state.match = { mode: match.mode, levelId: match.levelId ?? state.levelId, levels, arenaId: match.arenaId ?? 1, duelId: match.duelId ?? 1, players: [...(match.players || [])], daily: null, challenge: null }
     if (match.levelId) state.levelId = match.levelId
     go('game')
   }
@@ -415,6 +544,11 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     workshop,
     startMatch,
     recordCoop,
+    recordDaily,
+    startDaily,
+    startChallenge,
+    afterProfileChosen,
+    shareRun,
     doubleGold,
     multiplayerLevels,
     announce,

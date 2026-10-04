@@ -41,7 +41,7 @@ async function submit(index) {
   try {
     await app.createProfile(index, name, form.difficulty)
     creating.value = null
-    app.go('levels')
+    app.afterProfileChosen()
   } catch {
     form.error = t('profiles.nameError')
   } finally {
@@ -52,7 +52,7 @@ async function submit(index) {
 async function openSlot(index) {
   app.services.audio.unlock()
   try {
-    if (await app.openProfile(index)) app.go('levels')
+    if (await app.openProfile(index)) app.afterProfileChosen()
   } catch {
     await app.refreshSlots()
   }

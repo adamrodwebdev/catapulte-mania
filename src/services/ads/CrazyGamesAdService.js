@@ -42,6 +42,31 @@ export class CrazyGamesAdService extends AdService {
   loadingFinished() {
     this.#sdk?.game?.loadingStop?.()
   }
+
+  /** Lien d'invitation CrazyGames (module `game`). */
+  async inviteLink(params) {
+    try {
+      const link = this.#sdk?.game?.inviteLink?.(params)
+      return typeof link === 'string' && /^https:\/\//.test(link) ? link : null
+    } catch {
+      return null
+    }
+  }
+  inviteParam(key) {
+    try {
+      const v = this.#sdk?.game?.getInviteParam?.(key)
+      return typeof v === 'string' ? v : null
+    } catch {
+      return null
+    }
+  }
+  happytime() {
+    this.#sdk?.game?.happytime?.()
+  }
+  reportProgress(percent) {
+    const p = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)))
+    this.#sdk?.game?.reportGameCompletedPercentage?.(p)
+  }
   gameplayStart() {
     this.#sdk?.game?.gameplayStart?.()
   }

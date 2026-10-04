@@ -4,6 +4,7 @@ import { GameSession, STATE } from './GameSession.js'
 import { AssetRegistry } from './assets/AssetRegistry.js'
 import { Renderer } from './rendering/Renderer.js'
 import { WORLD } from './physics/constants.js'
+import { ReplayPlayer } from './replay/ReplayPlayer.js'
 
 const TAP_MAX_PX = 12
 const TAP_MAX_MS = 320
@@ -40,6 +41,8 @@ export class GameController extends EventBus {
   #drag = null
   #hudTimer = 0
   #handlers = {}
+  /** Relecture d'une partie (« Bats mon tir ») : le joueur regarde, les commandes sont coupées. */
+  #replayer = null
 
   /**
    * @param {HTMLCanvasElement} canvas
@@ -52,7 +55,7 @@ export class GameController extends EventBus {
     return c
   }
 
-  constructor(canvas, level, { difficulty, completedLevels, settings, reducedMotion, audio, haptics, effects, mode, continueOffer = false, engine = 'catapult' }, registry) {
+  constructor(canvas, level, { difficulty, completedLevels, settings, reducedMotion, audio, haptics, effects, mode, continueOffer = false, engine = 'catapult', replay = null }, registry) {
     super()
     this.#canvas = canvas
     this.#audio = audio
@@ -71,7 +74,9 @@ export class GameController extends EventBus {
       engine,
       slowSwing: settings.slowSwing === true,
       infiniteSwing: settings.infiniteSwing === true,
+      replay: Array.isArray(replay),
     }, mode)
+    if (Array.isArray(replay)) this.#replayer = new ReplayPlayer(this.session, replay)
     const focus = this.session.focus
     this.session.camera.setFocus(focus.left, focus.right, focus.top)
     this.session.on('hud', (h) => this.emit('hud', h))
@@ -134,7 +139,10 @@ export class GameController extends EventBus {
       this.#raf = requestAnimationFrame(frame)
       const dt = now - this.#last
       this.#last = now
-      if (!this.#paused) this.session.update(dt)
+      if (!this.#paused) {
+        if (this.#replayer && !this.#replayer.done) this.#replayer.advance(dt)
+        else this.session.update(dt)
+      }
       this.#renderer.render(this.#sceneWithAim())
       this.#hudTimer += dt
       // En vol (et en visée quand le vent souffle en rafales), le HUD suit en continu.
@@ -173,8 +181,13 @@ export class GameController extends EventBus {
    * fronde correspond à l'instant exact du clic, pas à l'image suivante.
    * @returns {'fired' | 'armed' | 'released' | 'split' | false}
    */
+  /** Une relecture est-elle en cours ? */
+  get replaying() {
+    return this.#replayer !== null && !this.#replayer.done
+  }
+
   trigger() {
-    if (this.#paused) return false
+    if (this.#paused || this.#replayer) return false
     this.#audio.unlock()
     const ammo = this.session.selectedAmmo
     const r = this.session.trigger(performance.now() - this.#last)
@@ -188,7 +201,7 @@ export class GameController extends EventBus {
     const cv = this.#canvas
     const down = (e) => {
       this.#audio.unlock()
-      if (this.#paused) return
+      if (this.#paused || this.#replayer) return
       // Trébuchet : tout se joue au clic, dès l'appui (1er : balancier, 2e : lâcher).
       if (this.session.engine === 'trebuchet') {
         if (e.button === 0 || e.pointerType !== 'mouse') this.trigger()

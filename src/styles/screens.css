@@ -618,3 +618,12 @@
   cursor: pointer;
   min-height: var(--hud-size);
 }
+
+.home__notice {
+  position: absolute;
+  z-index: 3;
+  top: var(--space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(30rem, calc(100% - 2 * var(--space-4)));
+}

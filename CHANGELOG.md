@@ -2,6 +2,31 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [3.9.0] – 2026-10-04
+### Ajouté
+- **Défi du jour** : chaque jour, le même défi pour tous (un niveau et un engin
+  tirés au sort à partir de la date, sans serveur). Difficulté Normale, sans
+  pouvoirs ni améliorations. **Série** de jours réussis d'affilée (rompue après
+  un jour manqué, insensible à une horloge reculée), record du jour, meilleure
+  série. Accès depuis l'accueil.
+- **« Bats mon tir »** : après une victoire, un lien à envoyer à un ami.
+  - Le lien contient **les gestes**, pas le score : niveau, engin, munitions,
+    angles et puissances, ou instants du lâcher, datés au pas de simulation près.
+  - Le jeu les **rejoue dans le moteur** pour calculer le score à battre : un
+    lien truqué ne peut pas afficher un faux score.
+  - On peut regarder le tir de l'ami avant de jouer, puis renvoyer le défi.
+  - Sur les portails, le lien d'invitation du portail est utilisé (CrazyGames
+    `inviteLink`, Poki `shareableURL`) ; sur notre site, une adresse `#defi=`.
+  - Partage natif sur mobile, sinon copie du lien.
+- **Portails** : célébration du portail sur un record ou une série
+  (CrazyGames `happytime`), progression de la campagne remontée au portail.
+### Sécurité
+- Le code d'un défi est une donnée non fiable : taille bornée, décodage sans
+  `eval`, schéma strict champ par champ, pouvoirs et scores refusés, niveau et
+  engin vérifiés contre le défi du jour quand le lien en porte la date.
+### Modifié
+- Sauvegarde **v7** (série et records du défi du jour). Migration automatique.
+
 ## [3.8.0] – 2026-10-04
 ### Modifié
 - **Le jeu s'appelle désormais Catapulte Mania** (titre en jeu, page, partage,

@@ -43,6 +43,27 @@ export class AdService extends EventBus {
   /** Le joueur quitte la partie (fin, pause, menu). */
   gameplayStop() {}
 
+  /**
+   * Lien de partage du portail portant des paramètres (v3.9, « Bats mon tir »),
+   * ou null : le jeu utilise alors l'adresse de notre site.
+   * @param {Record<string, string>} params
+   * @returns {Promise<string | null>}
+   */
+  async inviteLink(params) { // eslint-disable-line no-unused-vars
+    return null
+  }
+
+  /** Paramètre reçu par un lien de partage ouvert sur le portail, ou null. */
+  inviteParam(key) { // eslint-disable-line no-unused-vars
+    return null
+  }
+
+  /** Moment fort (record, série) : célébration propre au portail. */
+  happytime() {}
+
+  /** Progression globale du joueur, de 0 à 100 (statistiques du portail). */
+  reportProgress(percent) {} // eslint-disable-line no-unused-vars
+
   /** Stockage synchronisé de la plateforme (interface de localStorage) ou null. */
   get cloudStorage() {
     return null

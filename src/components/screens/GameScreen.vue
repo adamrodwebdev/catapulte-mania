@@ -52,6 +52,16 @@ const isCoop = computed(() => mode.value === 'coop')
 const isCampaign = computed(() => mode.value === 'story' || isCoop.value)
 const isVersus = computed(() => mode.value === 'versus')
 const isDuel = computed(() => mode.value === 'duel')
+/** Défi du jour, et défi reçu par un lien « Bats mon tir ». */
+const isDaily = computed(() => mode.value === 'daily')
+const isChallenge = computed(() => mode.value === 'challenge')
+const isDefi = computed(() => isDaily.value || isChallenge.value)
+/** Défi par lien : score à battre (recalculé en rejouant le tir de l'ami) et étape ('play' ou 'watch' = relecture). */
+const challengeTarget = ref(null)
+const challengeStage = ref('play')
+/** Journal de la dernière partie (pour la partager) et état du partage. */
+let lastLog = null
+const share = ref({ state: 'idle', url: '' })
 const level = computed(() =>
   isVersus.value ? ArenaRepository.get(state.match.arenaId) : isDuel.value ? DuelRepository.get(state.match.duelId) : LevelRepository.get(state.levelId),
 )
@@ -83,8 +93,13 @@ const trebuchetLesson = computed(() => {
   return !state.profile?.levels[state.levelId]?.completed && state.settings.tutorials !== false
 })
 /** Le trébuchet est débloqué après le niveau 13 (jamais au face-à-face : il tire depuis l'arrière). */
-const engineChoice = computed(() => !isVersus.value && !trebuchetLesson.value && completedForEngine.value >= TREBUCHET_UNLOCK)
-const engine = computed(() => (trebuchetLesson.value || (engineChoice.value && state.settings.engine === 'trebuchet') ? 'trebuchet' : 'catapult'))
+const engineChoice = computed(() => !isVersus.value && !isDefi.value && !trebuchetLesson.value && completedForEngine.value >= TREBUCHET_UNLOCK)
+const engine = computed(() => {
+  // Défis : engin imposé, le même pour tous.
+  if (isDaily.value) return state.match.daily?.engine ?? 'catapult'
+  if (isChallenge.value) return state.match.challenge?.engine ?? 'catapult'
+  return trebuchetLesson.value || (engineChoice.value && state.settings.engine === 'trebuchet') ? 'trebuchet' : 'catapult'
+})
 const isTrebuchet = computed(() => hud.value?.engine === 'trebuchet')
 /** Changement d'engin depuis l'introduction : la partie est reconstruite, l'introduction reste affichée. */
 function chooseEngine(value) {
@@ -156,6 +171,11 @@ async function startLevel({ rebuild = false } = {}) {
     state.levelId = tourney.levelId
   }
   const rec = isCoop.value ? profile?.coop?.levels[state.levelId] : profile?.levels[state.levelId]
+  // Défis : le défi du jour exige un profil (la série), le défi par lien un code validé.
+  if ((isDaily.value && (!profile || !state.match.daily)) || (isChallenge.value && !state.match.challenge)) {
+    app.go('home', { replace: true })
+    return
+  }
   // Contrôles d'accès : la campagne (seul ou à deux) suit la progression, le mode libre exige un niveau terminé.
   if ((isCampaign.value && !rec?.unlocked) || (mode.value === 'free' && !rec?.completed)) {
     app.go(profile ? (isCoop.value ? 'multiplayer' : 'levels') : 'profiles', { replace: true })
@@ -165,8 +185,13 @@ async function startLevel({ rebuild = false } = {}) {
   // Pouvoirs : ceux débloqués par le profil, en solo comme à deux.
   const completedLevels = Math.max(profile?.completed ?? 0, isCoop.value ? (profile?.coop?.completed ?? 0) : 0)
   const effects = app.activeSlot?.effects
+  share.value = { state: 'idle', url: '' }
+  // Défi par lien : le score à battre est calculé une fois, en rejouant le tir de l'ami.
+  if (isChallenge.value && challengeTarget.value === null) challengeTarget.value = await computeTarget(state.match.challenge)
   const rules =
-    mode.value === 'story' || mode.value === 'free'
+    isDefi.value
+      ? createMode(mode.value, { completedLevels })
+      : mode.value === 'story' || mode.value === 'free'
       ? createMode(mode.value, { effects, completedLevels })
       : mode.value === 'hotseat'
         ? createMode('hotseat', { players: [players[tourney.player]], completedLevels })
@@ -176,7 +201,8 @@ async function startLevel({ rebuild = false } = {}) {
   controller = markRaw(
     await GameController.create(canvas.value, level.value, {
       // À deux, tout se joue en Difficile : deux humains, des châteaux à leur mesure.
-      difficulty: isMulti.value ? 'hard' : profile.difficulty,
+      // Défis : Normal pour tout le monde.
+      difficulty: isMulti.value ? 'hard' : isDefi.value ? 'normal' : profile.difficulty,
       completedLevels,
       settings: { ...state.settings },
       reducedMotion: app.reducedMotion(),
@@ -187,6 +213,7 @@ async function startLevel({ rebuild = false } = {}) {
       // Portails : un dernier tir contre une vidéo, en campagne solo uniquement.
       continueOffer: state.rewardedAvailable && mode.value === 'story',
       engine: engine.value,
+      replay: isChallenge.value && challengeStage.value === 'watch' ? state.match.challenge.actions : null,
     }),
   )
   controller.on('turn', ({ name }) => showTurn(name))
@@ -225,6 +252,49 @@ async function startLevel({ rebuild = false } = {}) {
   phase.value = beat ? 'story' : 'intro'
   await nextTick()
   observeHud()
+}
+
+/** Score obtenu par le tir partagé, recalculé par le moteur (jamais lu dans le lien). */
+async function computeTarget(run) {
+  const [{ GameSession }, { ReplayPlayer }] = await Promise.all([import('../../game/GameSession.js'), import('../../game/replay/ReplayPlayer.js')])
+  const session = new GameSession(LevelRepository.get(run.levelId), { difficulty: 'normal', completedLevels: 0, reducedMotion: true, engine: run.engine, replay: true }, createMode('challenge', {}))
+  let ended = null
+  session.on('end', (e) => (ended = e))
+  new ReplayPlayer(session, run.actions).runToEnd()
+  const score = ended ? ended.scores[0] : session.score.current
+  session.destroy()
+  return score
+}
+
+/** Défi par lien : regarder le tir de l'ami, puis revenir à l'introduction. */
+async function watchChallenge() {
+  challengeStage.value = 'watch'
+  await startLevel({ rebuild: true })
+  play()
+}
+async function stopWatching() {
+  challengeStage.value = 'play'
+  await startLevel()
+}
+
+/** Partager sa partie (défi du jour ou défi relevé). */
+async function shareRun() {
+  if (!lastLog || share.value.state === 'busy') return
+  share.value = { state: 'busy', url: '' }
+  const run = {
+    day: isDaily.value ? state.match.daily.key : (state.match.challenge?.day ?? ''),
+    levelId: state.levelId,
+    engine: engine.value,
+    name: state.profile?.name ?? '',
+    log: lastLog,
+  }
+  try {
+    const res = await app.shareRun(run, t('daily.shareText', { score: (end.value?.score ?? 0).toLocaleString(state.locale) }))
+    share.value = { state: res.method, url: res.url }
+    if (res.method === 'copied') app.announce(t('daily.copied'))
+  } catch {
+    share.value = { state: 'failed', url: '' }
+  }
 }
 
 function destroyController() {
@@ -328,7 +398,7 @@ function quit() {
   destroyController()
   tourney = null
   refreshTourney()
-  app.go(isMulti.value ? 'multiplayer' : 'levels')
+  app.go(isMulti.value ? 'multiplayer' : isDefi.value ? 'home' : 'levels')
 }
 /** Rejouer : en « chacun sa partie », la revanche repart d'un tournoi neuf. */
 async function restart() {
@@ -412,6 +482,14 @@ watch(() => [hud.value?.state, hud.value?.targetsLeft], () => phase.value === 'p
 /** Fin de partie : présentation propre à chaque mode. */
 async function onEnd(e) {
   app.services.music.stop(1.5)
+  lastLog = controller?.session.log ?? null
+  if (isChallenge.value && challengeStage.value === 'watch') {
+    // Fin de la relecture : retour à l'introduction, le défi peut commencer.
+    setTimeout(() => stopWatching(), 1500)
+    return
+  }
+  if (isDaily.value) return onDailyEnd(e)
+  if (isChallenge.value) return onChallengeEnd(e)
   if (mode.value === 'story') return onStoryEnd(e)
   if (isCoop.value) return onCoopEnd(e)
   const session = controller?.session
@@ -475,6 +553,37 @@ async function onCoopEnd({ won, result, renown }) {
   }, won ? 1400 : 900)
 }
 
+/** Fin du défi du jour : série, record du jour, partage. */
+async function onDailyEnd({ won, result, scores }) {
+  const outcome = result ? await app.recordDaily(result, state.match.daily.key) : { saved: true }
+  const score = result?.score ?? scores?.[0] ?? 0
+  setTimeout(() => {
+    end.value = {
+      kind: 'daily',
+      won,
+      score,
+      newBest: won && outcome.newBest,
+      streak: outcome.streak ?? state.profile?.daily?.streak ?? 0,
+      extended: Boolean(outcome.extended),
+      todayBest: state.profile?.daily?.todayBest ?? null,
+      saved: outcome.saved !== false,
+    }
+    phase.value = 'ended'
+    app.announce(won ? `${t('end.victory')} ${t('end.score')} ${score}. ${t('daily.streak', { count: end.value.streak })}` : t('end.defeat'))
+  }, won ? 1400 : 900)
+}
+
+/** Fin d'un défi par lien : a-t-on battu le score de l'ami ? */
+function onChallengeEnd({ won, scores }) {
+  const score = scores?.[0] ?? 0
+  const target = challengeTarget.value ?? 0
+  setTimeout(() => {
+    end.value = { kind: 'challenge', won, score, target, beaten: won && score > target, name: state.match.challenge?.name || '' }
+    phase.value = 'ended'
+    app.announce(end.value.beaten ? t('daily.beaten') : t('daily.notBeaten', { score: target }))
+  }, won ? 1400 : 900)
+}
+
 async function onStoryEnd({ won, result }) {
   lastResult = result
   doubling.value = 'idle'
@@ -506,9 +615,17 @@ async function onStoryEnd({ won, result }) {
 
 /** Titre de l'introduction et du bandeau : niveau, ou arène en face-à-face. */
 const matchTitle = computed(() =>
-  isVersus.value ? t(`mp.arenas.${state.match.arenaId}`) : isDuel.value ? t(`mp.duels.${state.match.duelId}`) : t('game.level', { n: state.levelId }),
+  isDaily.value
+    ? t('daily.title')
+    : isChallenge.value
+      ? state.match.challenge?.name
+        ? t('daily.challengeFrom', { name: state.match.challenge.name })
+        : t('daily.challengeTitle')
+      : isVersus.value ? t(`mp.arenas.${state.match.arenaId}`) : isDuel.value ? t(`mp.duels.${state.match.duelId}`) : t('game.level', { n: state.levelId }),
 )
 const matchSubtitle = computed(() => {
+  if (isDaily.value) return `${formatDay(state.match.daily.key)} · ${t('game.level', { n: state.levelId })}`
+  if (isChallenge.value) return t('game.level', { n: state.levelId })
   if (isCoop.value) return `${t('mp.formats.coop.name')} · ${t('levels.chapter', { n: level.value.chapter })} · ${t(`levels.chapters.${level.value.chapter}`)}`
   if (mode.value === 'hotseat' && tourneyView.value) return `${t('mp.formats.hotseat.name')} · ${t('mp.roundOf', { n: Math.min(tourneyView.value.round + 1, 3) })}`
   if (isMulti.value) return t(`mp.formats.${mode.value}.name`)
@@ -516,12 +633,26 @@ const matchSubtitle = computed(() => {
   return `${t('levels.chapter', { n: level.value.chapter })} · ${t(`levels.chapters.${level.value.chapter}`)}`
 })
 
+/** Date lisible d'un défi du jour (langue du joueur). */
+function formatDay(key) {
+  const [y, m, d] = key.split('-').map(Number)
+  try {
+    return new Date(y, m - 1, d).toLocaleDateString(state.locale, { weekday: 'long', day: 'numeric', month: 'long' })
+  } catch {
+    return key
+  }
+}
+
 /* ---------- Clavier ---------- */
 
 function onKey(e) {
   if (e.target instanceof HTMLElement && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) && e.target.type !== 'range') return
   if (phase.value === 'paused' && (e.key === 'p' || e.key === 'P')) return resume()
   if (phase.value !== 'playing' || showPowers.value) return
+  if (controller?.replaying) {
+    if (e.code === 'Escape') stopWatching()
+    return
+  }
   const fast = e.shiftKey ? 5 : 1
   switch (e.code) {
     case 'ArrowLeft':
@@ -595,7 +726,12 @@ const canvasLabel = computed(() =>
 
       <PowersMenu v-if="showPowers && phase === 'playing'" :powers="hud.powers" :coach="coachAnchor" @use="usePower" @close="showPowers = false" />
 
-      <div v-show="phase === 'playing'" class="hud-bottom">
+      <div v-if="isChallenge && challengeStage === 'watch' && phase === 'playing'" class="replay-banner" role="status">
+        <AppIcon name="play" :size="18" />
+        <span>{{ state.match.challenge?.name ? t('daily.watchingName', { name: state.match.challenge.name }) : t('daily.watching') }}</span>
+        <button type="button" class="btn btn--small" @click="stopWatching">{{ t('daily.skip') }}</button>
+      </div>
+      <div v-show="phase === 'playing' && !(isChallenge && challengeStage === 'watch')" class="hud-bottom">
         <TrebuchetPanel v-if="isTrebuchet" :hud="hud" />
         <AimPanel v-else :angle="hud.angle" :power="hud.power" :disabled="!aiming" :coach="coachAnchor" @aim="aim" @nudge="nudge" />
         <AmmoBar :ammo="hud.ammo" :disabled="!aiming" :coach="coachAnchor" @select="selectAmmo" />
@@ -643,6 +779,14 @@ const canvasLabel = computed(() =>
           <AchievementList :level="level" :mask="state.profile?.levels[state.levelId]?.ach ?? 0" compact />
         </template>
       </template>
+      <template v-else-if="isDefi">
+        <p>{{ t(isDaily ? 'daily.rules' : 'daily.challengeRules', { engine: t(`game.engines.${engine}`) }) }}</p>
+        <p v-if="isDaily" class="daily-line">
+          <AppIcon name="flame" :size="18" />{{ t('daily.streak', { count: state.profile?.daily?.streak ?? 0 }) }}
+          <span v-if="state.profile?.daily?.todayBest !== null && state.profile?.daily?.todayBest !== undefined"> · {{ t('daily.todayBest', { score: state.profile.daily.todayBest.toLocaleString(state.locale) }) }}</span>
+        </p>
+        <p v-if="isChallenge" class="end__big">{{ t('daily.toBeat', { score: (challengeTarget ?? 0).toLocaleString(state.locale) }) }}</p>
+      </template>
       <p v-else-if="mode === 'free'">{{ t('levels.freeHint') }}</p>
       <template v-else>
         <p>{{ t(`mp.formats.${mode}.desc`) }}</p>
@@ -674,7 +818,8 @@ const canvasLabel = computed(() =>
         </li>
       </ul>
       <div class="modal__actions">
-        <button type="button" class="btn btn--primary btn--large" data-autofocus @click="play">{{ t('intro.go') }}</button>
+        <button type="button" class="btn btn--primary btn--large" data-autofocus @click="play">{{ isChallenge ? t('daily.yourTurn') : t('intro.go') }}</button>
+        <button v-if="isChallenge" type="button" class="btn" @click="watchChallenge"><AppIcon name="play" />{{ t('daily.watch') }}</button>
         <button type="button" class="btn btn--ghost" @click="quit">{{ t('menu.back') }}</button>
       </div>
     </ModalPanel>
@@ -740,6 +885,50 @@ const canvasLabel = computed(() =>
           <AppIcon name="refresh" />{{ t('end.retry') }}
         </button>
         <button type="button" class="btn btn--ghost" @click="quit"><AppIcon name="map" />{{ t('end.levels') }}</button>
+      </div>
+    </ModalPanel>
+
+    <!-- Fin : défi du jour -->
+    <ModalPanel v-if="phase === 'ended' && end?.kind === 'daily'" labelledby="end-title" :tone="end.won ? 'victory' : 'defeat'" :closable="false">
+      <p class="modal__eyebrow">{{ t('daily.title') }}</p>
+      <h2 id="end-title" class="modal__title">{{ end.won ? t('end.victory') : t('end.defeat') }}</h2>
+      <template v-if="end.won">
+        <p class="end__big">{{ t('end.points', { score: end.score.toLocaleString(state.locale) }) }}</p>
+        <p v-if="end.newBest" class="end__badge">{{ t('daily.newBest') }}</p>
+        <p class="daily-line"><AppIcon name="flame" :size="20" />{{ t('daily.streak', { count: end.streak }) }}<template v-if="end.extended"> · {{ t('daily.extended') }}</template></p>
+      </template>
+      <p v-else>{{ t('daily.lost') }}</p>
+      <p class="notice">{{ t('daily.comeBack') }}</p>
+      <div v-if="end.won" class="share">
+        <button type="button" class="btn btn--primary" :disabled="share.state === 'busy'" @click="shareRun"><AppIcon name="users" />{{ t('daily.share') }}</button>
+        <p v-if="share.state === 'copied'" class="share__done" role="status">{{ t('daily.copied') }}</p>
+        <p v-else-if="share.state === 'shared'" class="share__done" role="status">{{ t('daily.shared') }}</p>
+        <label v-else-if="share.state === 'manual'" class="share__manual">{{ t('daily.copyManual') }}<input class="input" type="text" readonly :value="share.url" @focus="$event.target.select()"></label>
+      </div>
+      <p v-if="!end.saved" class="notice notice--warning" role="alert">{{ t('end.saveError') }}</p>
+      <div class="modal__actions">
+        <button type="button" :class="['btn', { 'btn--primary btn--large': !end.won }]" :data-autofocus="!end.won ? '' : undefined" @click="restart"><AppIcon name="refresh" />{{ t('end.retry') }}</button>
+        <button type="button" class="btn btn--ghost" @click="quit"><AppIcon name="map" />{{ t('daily.menu') }}</button>
+      </div>
+    </ModalPanel>
+
+    <!-- Fin : défi reçu par lien -->
+    <ModalPanel v-if="phase === 'ended' && end?.kind === 'challenge'" labelledby="end-title" :tone="end.beaten ? 'victory' : 'defeat'" :closable="false">
+      <p class="modal__eyebrow">{{ t('daily.challengeTitle') }}</p>
+      <h2 id="end-title" class="modal__title">{{ end.beaten ? t('daily.beaten') : t('daily.notBeatenTitle') }}</h2>
+      <dl class="end__scores">
+        <div><dt>{{ t('daily.you') }}</dt><dd>{{ end.score.toLocaleString(state.locale) }}</dd></div>
+        <div><dt>{{ end.name || t('daily.friend') }}</dt><dd>{{ end.target.toLocaleString(state.locale) }}</dd></div>
+      </dl>
+      <div v-if="end.won" class="share">
+        <button type="button" class="btn btn--primary" :disabled="share.state === 'busy'" @click="shareRun"><AppIcon name="users" />{{ t('daily.shareBack') }}</button>
+        <p v-if="share.state === 'copied'" class="share__done" role="status">{{ t('daily.copied') }}</p>
+        <p v-else-if="share.state === 'shared'" class="share__done" role="status">{{ t('daily.shared') }}</p>
+        <label v-else-if="share.state === 'manual'" class="share__manual">{{ t('daily.copyManual') }}<input class="input" type="text" readonly :value="share.url" @focus="$event.target.select()"></label>
+      </div>
+      <div class="modal__actions">
+        <button type="button" :class="['btn', { 'btn--primary btn--large': !end.won }]" :data-autofocus="!end.won ? '' : undefined" @click="restart"><AppIcon name="refresh" />{{ t('end.retry') }}</button>
+        <button type="button" class="btn btn--ghost" @click="quit"><AppIcon name="map" />{{ t('daily.menu') }}</button>
       </div>
     </ModalPanel>
 

@@ -5,6 +5,7 @@ import { UpgradeCatalog } from '../game/progression/UpgradeCatalog.js'
 import { GOLD, goldFor, maxGoldFor, legacyMaxGoldFor } from '../game/progression/GoldRules.js'
 import { countAchievements } from '../game/progression/Achievements.js'
 import { RewardTicket } from '../services/ads/RewardTicket.js'
+import { DAY_KEY, dayNumber, DailyChallenge } from '../game/daily/DailyChallenge.js'
 
 /** Nom de profil : lettres (toutes langues), chiffres, espaces, tirets. */
 export const PROFILE_NAME = /^[\p{L}\p{N}][\p{L}\p{N} _'-]{0,15}$/u
@@ -22,7 +23,18 @@ const COOP_RECORD = Schema.object({
   attempts: Schema.int({ min: 1, max: 1e6 }),
 })
 
-/** Schéma de la sauvegarde (version 6). Toute clé inconnue est refusée. */
+/** Défi du jour : jours gardés en mémoire (les plus récents). */
+export const DAILY_HISTORY = 14
+const DAILY = Schema.object({
+  // Dernier jour réussi (AAAA-MM-JJ), '' si aucun.
+  last: Schema.string({ minLength: 0, maxLength: 10, pattern: /^(?:|\d{4}-\d{2}-\d{2})$/ }),
+  streak: Schema.int({ min: 0, max: 100000 }),
+  bestStreak: Schema.int({ min: 0, max: 100000 }),
+  // Meilleur score de chaque jour réussi récemment.
+  days: Schema.record(DAY_KEY, Schema.int({ min: 0, max: GAME.MAX_LEVEL_SCORE }), { maxKeys: DAILY_HISTORY }),
+})
+
+/** Schéma de la sauvegarde (version 7). Toute clé inconnue est refusée. */
 export const saveSchema = Schema.object({
   version: Schema.enum([GAME.SAVE_VERSION]),
   name: Schema.string({ minLength: 1, maxLength: 16, pattern: PROFILE_NAME }),
@@ -64,6 +76,8 @@ export const saveSchema = Schema.object({
   coop: Schema.record(LEVEL_KEY, COOP_RECORD, { maxKeys: GAME.LEVEL_COUNT }),
   // v6 : or gagné grâce aux vidéos récompensées (portails), plafonné séparément.
   bonusGold: GOLD_INT,
+  // v7 : défi du jour (série, records récents).
+  daily: DAILY,
 })
 
 /**
@@ -75,6 +89,7 @@ export const saveSchema = Schema.object({
  * v3 → v4 : succès renouvelés (masques remis à zéro, or conservé).
  * v4 → v5 : ajout de la campagne à deux, vide.
  * v5 → v6 : or des vidéos récompensées, à zéro.
+ * v6 → v7 : défi du jour, vide.
  * @param {any} raw
  */
 export function migrateSave(raw) {
@@ -99,6 +114,7 @@ export function migrateSave(raw) {
   }
   if (save && typeof save === 'object' && save.version === 4) save = { ...save, version: 5, coop: {} }
   if (save && typeof save === 'object' && save.version === 5) save = { ...save, version: 6, bonusGold: 0 }
+  if (save && typeof save === 'object' && save.version === 6) save = { ...save, version: 7, daily: { last: '', streak: 0, bestStreak: 0, days: {} } }
   return save
 }
 
@@ -139,6 +155,7 @@ export class SaveSlot {
       cosmetics: { owned: UpgradeCatalog.defaults(), skin: 'oak', trail: 'smoke' },
       coop: {},
       bonusGold: 0,
+      daily: { last: '', streak: 0, bestStreak: 0, days: {} },
     })
     return new SaveSlot(index, data)
   }
@@ -175,6 +192,11 @@ export class SaveSlot {
     })
     if (data.updatedAt < data.createdAt) throw new ValidationError('save.updatedAt', 'before creation')
     SaveSlot.#checkEconomy(data)
+    // Défi du jour : série cohérente.
+    const daily = data.daily
+    if (daily.streak > daily.bestStreak) throw new ValidationError('save.daily.streak', 'streak above best')
+    if ((daily.streak > 0) !== Boolean(daily.last)) throw new ValidationError('save.daily.last', 'inconsistent streak')
+    if (daily.last && !DAY_KEY.test(daily.last)) throw new ValidationError('save.daily.last', 'invalid day')
     return new SaveSlot(index, data)
   }
 
@@ -431,6 +453,55 @@ export class SaveSlot {
     prev.stars = Math.max(prev.stars, result.stars)
     prev.shots = Math.min(prev.shots, shots)
     return { newBest, firstClear: false }
+  }
+
+  /* ---------- Défi du jour ---------- */
+
+  /** Série, meilleure série et records récents (copie). */
+  get daily() {
+    return structuredClone(this.#data.daily)
+  }
+
+  /**
+   * Série en cours au jour `today` : elle est rompue si le dernier défi
+   * réussi date d'avant-hier ou plus.
+   */
+  dailyStreak(today) {
+    const { last, streak } = this.#data.daily
+    if (!last) return 0
+    const gap = dayNumber(today) - dayNumber(last)
+    return gap <= 1 ? streak : 0
+  }
+
+  /**
+   * Enregistre une partie du défi du jour (résultat authentifié uniquement,
+   * et seulement pour le défi du jour `today`). Pas d'or : la récompense est
+   * la série et le record.
+   * @returns {{ newBest: boolean, streak: number, extended: boolean }}
+   */
+  recordDaily(result, today) {
+    if (!LevelResult.isAuthentic(result)) throw new ValidationError('result', 'not issued by the game engine')
+    const challenge = DailyChallenge.forDay(today)
+    if (result.levelId !== challenge.levelId || result.difficulty !== challenge.difficulty) throw new ValidationError('result', 'not today\'s challenge')
+    const d = this.#data.daily
+    if (!result.won) return { newBest: false, streak: this.dailyStreak(today), extended: false }
+    const prev = d.days[today]
+    const newBest = prev === undefined || result.score > prev
+    if (newBest) d.days[today] = result.score
+    // Ne garder que les jours les plus récents.
+    const keys = Object.keys(d.days).sort()
+    while (keys.length > DAILY_HISTORY) delete d.days[keys.shift()]
+    let extended = false
+    if (d.last !== today) {
+      const gap = d.last ? dayNumber(today) - dayNumber(d.last) : Infinity
+      if (gap < 0) return { newBest, streak: d.streak, extended: false } // horloge reculée : on ne touche pas à la série
+      d.streak = gap === 1 ? d.streak + 1 : 1
+      d.last = today
+      d.bestStreak = Math.max(d.bestStreak, d.streak)
+      extended = true
+    }
+    this.#data.updatedAt = Math.max(this.#data.updatedAt, Date.now())
+    return { newBest, streak: d.streak, extended }
   }
 
   toJSON() {

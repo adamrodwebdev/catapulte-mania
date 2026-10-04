@@ -35,6 +35,24 @@ export class PokiAdService extends AdService {
   loadingFinished() {
     this.#sdk?.gameLoadingFinished?.()
   }
+
+  /** Lien partageable Poki (`shareableURL`), relu avec `getURLParam`. */
+  async inviteLink(params) {
+    try {
+      const link = await this.#sdk?.shareableURL?.(params)
+      return typeof link === 'string' && /^https:\/\//.test(link) ? link : null
+    } catch {
+      return null
+    }
+  }
+  inviteParam(key) {
+    try {
+      const v = this.#sdk?.getURLParam?.(key)
+      return typeof v === 'string' && v ? v : null
+    } catch {
+      return null
+    }
+  }
   gameplayStart() {
     this.#sdk?.gameplayStart?.()
   }

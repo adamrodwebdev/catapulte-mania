@@ -4,6 +4,8 @@ import { useApp } from '../../app/AppContext.js'
 import AppIcon from '../ui/AppIcon.vue'
 import LanguagePicker from '../ui/LanguagePicker.vue'
 import SiegeLandscape from '../ui/SiegeLandscape.vue'
+import ModalPanel from '../ui/ModalPanel.vue'
+import { DailyChallenge } from '../../game/daily/DailyChallenge.js'
 import { IS_DEMO, PLAYABLE_LEVELS, APP_VERSION } from '../../config/gameConfig.js'
 
 const app = useApp()
@@ -19,6 +21,18 @@ const lastProfile = computed(() => {
 async function continueGame() {
   app.services.audio.unlock()
   if (await app.openProfile(lastProfile.value.index)) app.go('levels')
+}
+
+/** Défi du jour : niveau et engin du jour, série du dernier profil. */
+const today = DailyChallenge.today()
+const dailyStreak = computed(() => state.profile?.daily?.streak ?? 0)
+function daily() {
+  app.services.audio.unlock()
+  app.startDaily()
+}
+function acceptChallenge() {
+  app.services.audio.unlock()
+  app.startChallenge()
 }
 
 function open(screen) {
@@ -54,6 +68,15 @@ function open(screen) {
               <span class="banner__text">{{ t('menu.play') }}</span>
             </button>
           </li>
+          <li v-if="!IS_DEMO">
+            <button type="button" class="banner__item" @click="daily">
+              <AppIcon name="flame" />
+              <span class="banner__text">
+                {{ t('daily.title') }}
+                <small>{{ dailyStreak ? t('daily.streak', { count: dailyStreak }) : t('daily.menuHint', { n: today.levelId, engine: t(`game.engines.${today.engine}`) }) }}</small>
+              </span>
+            </button>
+          </li>
           <li>
             <button type="button" class="banner__item" @click="open('multiplayer')">
               <AppIcon name="users" />
@@ -75,6 +98,16 @@ function open(screen) {
         </ul>
       </nav>
     </div>
+
+    <ModalPanel v-if="state.incomingChallenge" labelledby="incoming-title" class="incoming" @close="state.incomingChallenge = null">
+      <h2 id="incoming-title" class="modal__title">{{ state.incomingChallenge.name ? t('daily.challengeFrom', { name: state.incomingChallenge.name }) : t('daily.challengeTitle') }}</h2>
+      <p>{{ t('daily.incoming', { n: state.incomingChallenge.levelId, engine: t(`game.engines.${state.incomingChallenge.engine}`) }) }}</p>
+      <div class="modal__actions">
+        <button type="button" class="btn btn--primary btn--large" data-autofocus @click="acceptChallenge">{{ t('daily.accept') }}</button>
+        <button type="button" class="btn btn--ghost" @click="state.incomingChallenge = null">{{ t('daily.later') }}</button>
+      </div>
+    </ModalPanel>
+    <p v-if="state.badChallenge" class="notice notice--warning home__notice" role="alert">{{ t('daily.badLink') }}</p>
 
     <footer class="home__footer">
       <LanguagePicker id="home-lang" />

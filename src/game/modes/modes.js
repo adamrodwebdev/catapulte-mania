@@ -201,6 +201,30 @@ export class VersusMode extends GameMode {
   }
 }
 
+/**
+ * Défi du jour (v3.9) : un niveau, mêmes règles pour tous. Difficulté Normale,
+ * sans pouvoirs ni améliorations, munitions prévues par le niveau. Le
+ * résultat est authentifié (série, record du jour), sans or ni étoiles.
+ */
+export class DailyMode extends GameMode {
+  id = 'daily'
+  recordsResult = true
+  powersEnabled = false
+
+  constructor(opts = {}) {
+    super({ ...opts, effects: NO_EFFECTS })
+  }
+}
+
+/**
+ * Défi lancé par un lien « Bats mon tir » : mêmes règles que le défi du jour,
+ * rien n'est enregistré ; on compare son score à celui de l'ami.
+ */
+export class ChallengeMode extends DailyMode {
+  id = 'challenge'
+  recordsResult = false
+}
+
 /** Fabrique d'un mode à partir de son identifiant. */
 export function createMode(id, opts) {
   switch (id) {
@@ -216,6 +240,10 @@ export function createMode(id, opts) {
       return new VersusMode(opts)
     case 'coop':
       return new CoopMode(opts)
+    case 'daily':
+      return new DailyMode(opts)
+    case 'challenge':
+      return new ChallengeMode(opts)
     default:
       throw new TypeError(`unknown mode ${id}`)
   }

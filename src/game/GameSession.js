@@ -92,6 +92,18 @@ export class GameSession extends EventBus {
   #engine = 'catapult'
   /** Trébuchet : munition dans la fronde pendant le balancier. */
   #loadedAmmo = null
+  /**
+   * Journal des gestes du joueur (v3.9, « Bats mon tir ») : uniquement des
+   * commandes (munition, angle, puissance, instant du lâcher…) datées en pas
+   * de simulation, jamais des résultats. Rejoué, il redonne la même partie.
+   */
+  #log = []
+  #aimStep = 0
+  #fireStep = 0
+  #spawnStep = 0
+  /** Relecture : le lancement attend le pas enregistré (voir ReplayPlayer). */
+  #replay = false
+  #pendingLaunch = null
   /** Repère sonore du balancier : dernière tranche de 15° annoncée. */
   #tickBand = null
   options = { trajectoryAid: false, reducedMotion: false, blood: true }
@@ -105,7 +117,7 @@ export class GameSession extends EventBus {
    * @param {object} opts options d'affichage et de difficulté
    * @param {import('./modes/GameMode.js').GameMode} [mode] règles (histoire par défaut)
    */
-  constructor(level, { difficulty, completedLevels, trajectoryAid = false, reducedMotion = false, screenShake = true, blood = true, startPower = 100, effects = NO_EFFECTS, continueOffer = false, engine = 'catapult', slowSwing = false, infiniteSwing = false }, mode = null) {
+  constructor(level, { difficulty, completedLevels, trajectoryAid = false, reducedMotion = false, screenShake = true, blood = true, startPower = 100, effects = NO_EFFECTS, continueOffer = false, engine = 'catapult', slowSwing = false, infiniteSwing = false, replay = false }, mode = null) {
     super()
     this.#level = level
     this.#difficulty = Guard.oneOf(difficulty, GAME.DIFFICULTIES, 'difficulty')
@@ -123,6 +135,7 @@ export class GameSession extends EventBus {
     this.#engine = versus ? 'catapult' : Guard.oneOf(engine, ENGINES, 'engine')
     Guard.boolean(slowSwing, 'slowSwing')
     Guard.boolean(infiniteSwing, 'infiniteSwing')
+    this.#replay = Guard.boolean(replay, 'replay')
     /** Balancier infini : option du joueur, jamais en Difficile (ni donc à deux). */
     this.infiniteSwing = infiniteSwing && this.#difficulty !== 'hard'
 
@@ -208,6 +221,34 @@ export class GameSession extends EventBus {
   get selectedAmmo() {
     return this.player.selectedAmmo
   }
+  /** Pas de simulation écoulés depuis le début de la partie. */
+  get steps() {
+    return Math.round(this.world.time / WORLD.STEP_MS)
+  }
+
+  /** Pas de simulation au début de la visée en cours. */
+  get aimStep() {
+    return this.#aimStep
+  }
+
+  /** Pas du dernier tir et du dernier lancement (relecture). */
+  get fireStep() {
+    return this.#fireStep
+  }
+  get spawnStep() {
+    return this.#spawnStep
+  }
+
+  /** Un lancement attend son pas (relecture). */
+  get launchPending() {
+    return this.#pendingLaunch !== null
+  }
+
+  /** Journal des gestes (copie). */
+  get log() {
+    return structuredClone(this.#log)
+  }
+
   /** Difficulté de la partie. */
   get difficulty() {
     return this.#difficulty
@@ -356,6 +397,7 @@ export class GameSession extends EventBus {
     const power = PowerRegistry.get(id)
     if (this.#state !== STATE.AIMING || this.#powerUsedThisTurn || !this.#unlockedPowers.has(id)) return false
     this.#powerUsedThisTurn = true
+    this.#log.push({ k: 'p', d: this.steps - this.#aimStep, id })
     this.score.spend(this.#mode.powerCost(power))
     if (power.immediate) {
       this.world.arm()
@@ -368,6 +410,28 @@ export class GameSession extends EventBus {
     }
     this.emit('announce', { key: 'a11y.powerUsed', params: { power: id, cost: this.#mode.powerCost(power) } })
     this.emit('hud', this.hud)
+    return true
+  }
+
+  /**
+   * Relecture : lance le projectile du tir en cours, comme lors de la partie
+   * enregistrée. Catapulte : depuis sa visée ; trébuchet : le tir est
+   * recalculé à partir de l'instant du lâcher (`release`, ms de balancier).
+   * @param {{ release?: number }} [rec]
+   */
+  replayLaunch(rec = {}) {
+    const pending = this.#pendingLaunch
+    if (!this.#replay || !pending) return false
+    if (this.#engine === 'trebuchet') {
+      const release = Guard.number(rec.release, 'release', { min: 0, max: 5000 })
+      const c = this.catapult
+      const shot = Trebuchet.preview(release, { x: c.x, dir: c.dir, speedFactor: c.speedFactor, loadRadius: PROJECTILE_TYPES[pending.type].radius })
+      if (!shot) return false
+      c.forceRelease()
+      pending.launch(shot.point, shot.velocity)
+    } else {
+      pending.launch(this.catapult.launchPoint, this.catapult.velocity)
+    }
     return true
   }
 
@@ -417,11 +481,19 @@ export class GameSession extends EventBus {
     if (shot.windOverride !== null) this.world.wind = shot.windOverride
     if (player.shotsLeft !== null) player.shotsLeft--
     this.#shooter = this.#active
+    const treb = this.#engine === 'trebuchet'
+    const entry = treb ? { k: 't', d: this.steps - this.#aimStep, a: type } : { k: 'f', d: this.steps - this.#aimStep, a: type, ang: this.catapult.angle, pow: this.catapult.power }
+    this.#log.push(entry)
+    this.#fireStep = this.steps
     this.score.startShot(type)
     this.#setState(STATE.FLYING)
     this.#feedback({ sound: 'creak', x: this.catapult.x, intensity: 0.6 })
     const launch = (start, v) => {
       this.#loadedAmmo = null
+      this.#pendingLaunch = null
+      entry.l = this.steps - this.#fireStep
+      if (treb) entry.r = this.catapult.simTime
+      this.#spawnStep = this.steps
       const spreads = shot.count === 3 ? [-2.5, 0, 2.5] : [0]
       spreads.forEach((deg, i) => {
         const p = new Projectile(type, start.x - i * 4, start.y + i * 3, shot.mods)
@@ -433,19 +505,21 @@ export class GameSession extends EventBus {
           y: (v.x * Math.sin(a) + v.y * Math.cos(a)) * factor,
         })
       })
-      this.#feedback({ sound: 'launch', x: this.catapult.x, caption: 'launch', haptic: 'launch' })
+      this.#feedback({ sound: 'launch', x: this.catapult.x, caption: treb ? 'launchTreb' : 'launch', haptic: 'launch' })
       this.emit('hud', this.hud)
     }
     if (this.#engine === 'trebuchet') {
       // Le contrepoids tombe : le tir est engagé, il partira au lâcher (2e clic).
       this.catapult.setLoadRadius(PROJECTILE_TYPES[type].radius)
       this.#loadedAmmo = type
-      this.catapult.arm(({ point, velocity }) => launch(point, velocity))
+      this.catapult.arm(({ point, velocity }) => (this.#replay ? null : launch(point, velocity)))
       this.#feedback({ sound: 'creak', x: this.catapult.x, intensity: 1, caption: 'swing' })
       this.emit('announce', { key: 'a11y.swing' })
     } else {
-      this.catapult.fire(() => launch(this.catapult.launchPoint, this.catapult.velocity))
+      this.catapult.fire(() => (this.#replay ? null : launch(this.catapult.launchPoint, this.catapult.velocity)))
     }
+    // Relecture : le lancement attend le pas enregistré (ReplayPlayer → replayLaunch).
+    if (this.#replay) this.#pendingLaunch = { launch, type }
     if (type !== 'stone' && player.ammo[type] === 0) player.selectedAmmo = 'stone'
     this.emit('hud', this.hud)
     return true
@@ -455,6 +529,7 @@ export class GameSession extends EventBus {
   activate() {
     const p = this.#activeProjectiles().find((x) => x.canActivate)
     if (!p) return false
+    this.#log.push({ k: 'x', d: this.steps - this.#spawnStep })
     this.world.splitProjectile(p)
     this.#feedback({ sound: 'split', x: p.x, caption: 'split' })
     this.emit('hud', this.hud)
@@ -495,9 +570,9 @@ export class GameSession extends EventBus {
       // Au dernier tir, on laisse aussi le feu finir son œuvre (jusqu'à 20 s).
       const burning = this.world.filter((e) => e.alive && e.burning > 0 && e.kind !== 'projectile')
       const waitFire = burning.some((e) => e.kind === 'target') || (this.player.shotsLeft === 0 && burning.length > 0 && this.#stateT < FIRE_WAIT_MS)
-      this.#restT = this.world.isAtRest() && !this.catapult.busy && !waitFire ? this.#restT + dt : 0
+      this.#restT = this.world.isAtRest() && !this.catapult.busy && !this.#pendingLaunch && !waitFire ? this.#restT + dt : 0
       const allDown = this.targetsLeft === 0
-      if (this.#restT >= REST_CONFIRM_MS || (this.#stateT > MAX_TURN_MS && !waitFire) || this.#stateT > FIRE_WAIT_MS || (allDown && this.#stateT > 3500)) this.#endTurn()
+      if (!this.#pendingLaunch && (this.#restT >= REST_CONFIRM_MS || (this.#stateT > MAX_TURN_MS && !waitFire) || this.#stateT > FIRE_WAIT_MS || (allDown && this.#stateT > 3500))) this.#endTurn()
     }
   }
 
@@ -574,6 +649,7 @@ export class GameSession extends EventBus {
   #setState(s) {
     this.#state = s
     this.#stateT = 0
+    if (s === STATE.AIMING) this.#aimStep = this.steps
     this.emit('hud', this.hud)
   }
 

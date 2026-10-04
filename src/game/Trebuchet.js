@@ -244,6 +244,14 @@ export class Trebuchet {
     this.#loadSling()
   }
 
+  /** Relecture : la fronde est vidée sans lancer (le tir est recalculé par la partie). */
+  forceRelease() {
+    if (this.#phase !== 'swing' && this.#phase !== 'rewind') return
+    this.#onRelease = null
+    this.#phase = 'released'
+    this.#resetT = 0
+  }
+
   /** Sans objet : le trébuchet ne se règle pas, il se joue au moment du lâcher. */
   setAim() {}
 
