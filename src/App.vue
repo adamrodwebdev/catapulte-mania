@@ -10,6 +10,7 @@ import WorkshopScreen from './components/screens/WorkshopScreen.vue'
 import MultiplayerScreen from './components/screens/MultiplayerScreen.vue'
 import StudioIntro from './components/ui/StudioIntro.vue'
 import PrivacyScreen from './components/screens/PrivacyScreen.vue'
+import ModesScreen from './components/screens/ModesScreen.vue'
 
 /**
  * Composant racine : affiche l'écran courant et la région d'annonces
@@ -19,6 +20,8 @@ import PrivacyScreen from './components/screens/PrivacyScreen.vue'
  * la page d'accueil reste légère et s'affiche instantanément.
  */
 const GameScreen = defineAsyncComponent(() => import('./components/screens/GameScreen.vue'))
+/** L'atelier de châteaux (éditeur) est lui aussi chargé à la demande. */
+const EditorScreen = defineAsyncComponent(() => import('./components/screens/EditorScreen.vue'))
 
 const { state, t } = useApp()
 const SCREENS = {
@@ -31,6 +34,8 @@ const SCREENS = {
   workshop: WorkshopScreen,
   multiplayer: MultiplayerScreen,
   privacy: PrivacyScreen,
+  modes: ModesScreen,
+  editor: EditorScreen,
 }
 const current = computed(() => SCREENS[state.screen] || HomeScreen)
 

@@ -3,13 +3,10 @@ import { CATAPULT_GEOMETRY } from './assets/procedural/painters.js'
 import { clamp, toRad } from '../core/utils/math.js'
 import { Guard } from '../core/utils/Guard.js'
 
-/** Bornes de visée. */
-export const AIM = Object.freeze({
-  MIN_ANGLE: 5,
-  MAX_ANGLE: 80,
-  MIN_SPEED: 8,
-  MAX_SPEED: 27,
-})
+import { AIM } from './aim.js'
+
+/** Bornes de visée (voir aim.js). */
+export { AIM }
 
 const REST_ANGLE = Math.PI - 0.25
 const RELEASE_ANGLE = 2 * Math.PI - 1.1

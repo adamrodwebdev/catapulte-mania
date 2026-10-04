@@ -21,6 +21,10 @@ import PixelPortrait from '../ui/PixelPortrait.vue'
 import { StoryRepository } from '../../game/story/StoryRepository.js'
 import { TutorialCoach } from '../../game/tutorial/Tutorial.js'
 import { HotSeatMatch } from '../../game/modes/HotSeatMatch.js'
+import { EndlessRun } from '../../domain/EndlessRun.js'
+import { CastleCode, buildCustomLevel } from '../../game/editor/CastleDesign.js'
+import { eventFor } from '../../game/events/Season.js'
+import { dayKey } from '../../game/daily/DailyChallenge.js'
 import ToggleSwitch from '../ui/ToggleSwitch.vue'
 import SegmentedControl from '../ui/SegmentedControl.vue'
 import TrebuchetPanel from '../game/TrebuchetPanel.vue'
@@ -56,6 +60,16 @@ const isDuel = computed(() => mode.value === 'duel')
 const isDaily = computed(() => mode.value === 'daily')
 const isChallenge = computed(() => mode.value === 'challenge')
 const isDefi = computed(() => isDaily.value || isChallenge.value)
+/** Siège sans fin : la partie en cours (objet non réactif) et sa copie d'affichage. */
+const isEndless = computed(() => mode.value === 'endless')
+/** Château de l'atelier (le sien en essai, ou celui d'un ami). */
+const isCustom = computed(() => mode.value === 'custom')
+const customLevel = shallowRef(null)
+let endlessRun = null
+const endlessView = shallowRef(null)
+function refreshEndless() {
+  endlessView.value = endlessRun ? { wave: endlessRun.wave, score: endlessRun.score, shots: endlessRun.shots } : null
+}
 /** Défi par lien : score à battre (recalculé en rejouant le tir de l'ami) et étape ('play' ou 'watch' = relecture). */
 const challengeTarget = ref(null)
 const challengeStage = ref('play')
@@ -63,7 +77,9 @@ const challengeStage = ref('play')
 let lastLog = null
 const share = ref({ state: 'idle', url: '' })
 const level = computed(() =>
-  isVersus.value ? ArenaRepository.get(state.match.arenaId) : isDuel.value ? DuelRepository.get(state.match.duelId) : LevelRepository.get(state.levelId),
+  isCustom.value && customLevel.value
+    ? customLevel.value
+    : isVersus.value ? ArenaRepository.get(state.match.arenaId) : isDuel.value ? DuelRepository.get(state.match.duelId) : LevelRepository.get(state.levelId),
 )
 const novelties = computed(() => (isCampaign.value ? LevelRepository.novelties(state.levelId) : []))
 /** Chacun sa partie : le tournoi en trois manches (objet non réactif) et sa copie d'affichage. */
@@ -171,6 +187,25 @@ async function startLevel({ rebuild = false } = {}) {
     state.levelId = tourney.levelId
   }
   const rec = isCoop.value ? profile?.coop?.levels[state.levelId] : profile?.levels[state.levelId]
+  // Siège sans fin : un siège neuf au premier château (ou après une défaite).
+  if (isEndless.value) {
+    if (!profile || !profile.endless?.unlocked) {
+      app.go('home', { replace: true })
+      return
+    }
+    if (!endlessRun || endlessRun.over) endlessRun = markRaw(EndlessRun.start())
+    state.levelId = endlessRun.levelFor()
+    refreshEndless()
+  }
+  // Atelier : le château est relu et validé à chaque partie.
+  if (isCustom.value) {
+    try {
+      customLevel.value = markRaw(buildCustomLevel(CastleCode.decode(state.match.custom?.code)))
+    } catch {
+      app.go('home', { replace: true })
+      return
+    }
+  }
   // Défis : le défi du jour exige un profil (la série), le défi par lien un code validé.
   if ((isDaily.value && (!profile || !state.match.daily)) || (isChallenge.value && !state.match.challenge)) {
     app.go('home', { replace: true })
@@ -189,8 +224,10 @@ async function startLevel({ rebuild = false } = {}) {
   // Défi par lien : le score à battre est calculé une fois, en rejouant le tir de l'ami.
   if (isChallenge.value && challengeTarget.value === null) challengeTarget.value = await computeTarget(state.match.challenge)
   const rules =
-    isDefi.value
+    isDefi.value || isCustom.value
       ? createMode(mode.value, { completedLevels })
+      : isEndless.value
+        ? createMode('endless', { effects, completedLevels, shots: endlessRun.shots })
       : mode.value === 'story' || mode.value === 'free'
       ? createMode(mode.value, { effects, completedLevels })
       : mode.value === 'hotseat'
@@ -202,7 +239,7 @@ async function startLevel({ rebuild = false } = {}) {
     await GameController.create(canvas.value, level.value, {
       // À deux, tout se joue en Difficile : deux humains, des châteaux à leur mesure.
       // Défis : Normal pour tout le monde.
-      difficulty: isMulti.value ? 'hard' : isDefi.value ? 'normal' : profile.difficulty,
+      difficulty: isMulti.value ? 'hard' : isDefi.value || isCustom.value || !profile ? 'normal' : profile.difficulty,
       completedLevels,
       settings: { ...state.settings },
       reducedMotion: app.reducedMotion(),
@@ -214,6 +251,7 @@ async function startLevel({ rebuild = false } = {}) {
       continueOffer: state.rewardedAvailable && mode.value === 'story',
       engine: engine.value,
       replay: isChallenge.value && challengeStage.value === 'watch' ? state.match.challenge.actions : null,
+      season: eventFor(dayKey()),
     }),
   )
   controller.on('turn', ({ name }) => showTurn(name))
@@ -394,14 +432,38 @@ function usePower(id) {
     coachNotify('power', id)
   }
 }
+/* Vidéos récompensées en partie (portails, campagne solo) : toujours facultatives. */
+const rewardBusy = ref(false)
+async function askHint() {
+  if (rewardBusy.value || !controller) return
+  rewardBusy.value = true
+  const ticket = await app.services.ads.rewarded('hint')
+  rewardBusy.value = false
+  if (ticket && controller?.session.grantHint(ticket)) app.announce(t('ads.hintGranted'))
+}
+async function usePowerFree(id) {
+  if (rewardBusy.value || !controller) return
+  rewardBusy.value = true
+  const ticket = await app.services.ads.rewarded('free-power')
+  rewardBusy.value = false
+  if (ticket && controller?.session.usePowerFree(id, ticket)) {
+    showPowers.value = false
+    coachNotify('power', id)
+  }
+}
+
 function quit() {
   destroyController()
   tourney = null
   refreshTourney()
-  app.go(isMulti.value ? 'multiplayer' : isDefi.value ? 'home' : 'levels')
+  endlessRun = null
+  if (isCustom.value) return app.go(state.match.custom?.fromEditor ? 'editor' : 'home')
+  app.go(isMulti.value ? 'multiplayer' : isDefi.value ? 'home' : isEndless.value ? 'modes' : 'levels')
 }
 /** Rejouer : en « chacun sa partie », la revanche repart d'un tournoi neuf. */
 async function restart() {
+  // Siège sans fin : recommencer, c'est repartir du premier château.
+  if (isEndless.value) endlessRun = null
   if (mode.value === 'hotseat' && phase.value === 'ended' && end.value?.kind === 'tourney') tourney = null
   if (phase.value === 'ended') await app.services.ads.interstitial()
   startLevel()
@@ -489,6 +551,8 @@ async function onEnd(e) {
     return
   }
   if (isDaily.value) return onDailyEnd(e)
+  if (isEndless.value) return onEndlessEnd(e)
+  if (isCustom.value) return onCustomEnd(e)
   if (isChallenge.value) return onChallengeEnd(e)
   if (mode.value === 'story') return onStoryEnd(e)
   if (isCoop.value) return onCoopEnd(e)
@@ -563,6 +627,7 @@ async function onDailyEnd({ won, result, scores }) {
       won,
       score,
       newBest: won && outcome.newBest,
+      reward: outcome.reward ?? null,
       streak: outcome.streak ?? state.profile?.daily?.streak ?? 0,
       extended: Boolean(outcome.extended),
       todayBest: state.profile?.daily?.todayBest ?? null,
@@ -570,6 +635,43 @@ async function onDailyEnd({ won, result, scores }) {
     }
     phase.value = 'ended'
     app.announce(won ? `${t('end.victory')} ${t('end.score')} ${score}. ${t('daily.streak', { count: end.value.streak })}` : t('end.defeat'))
+  }, won ? 1400 : 900)
+}
+
+/** Fin d'un château du siège sans fin : château suivant, ou fin du siège. */
+async function onEndlessEnd({ result }) {
+  const left = controller?.session.player.shotsLeft ?? 0
+  const step = endlessRun.record(result, Math.max(0, left))
+  refreshEndless()
+  let outcome = null
+  if (step === 'over') outcome = await app.recordEndless(endlessRun)
+  setTimeout(() => {
+    end.value =
+      step === 'next'
+        ? { kind: 'endlessNext', ...endlessRun.last, wave: endlessRun.wave, shots: endlessRun.shots, total: endlessRun.score }
+        : { kind: 'endlessOver', cleared: endlessRun.cleared, total: endlessRun.score, newBest: outcome?.newBest, newWave: outcome?.newWave, best: state.profile?.endless?.best ?? 0, saved: outcome?.saved !== false }
+    phase.value = 'ended'
+    app.announce(step === 'next' ? t('endless.castleDown', { n: endlessRun.cleared }) : t('endless.over', { count: endlessRun.cleared }))
+  }, step === 'next' ? 1400 : 900)
+}
+async function nextCastle() {
+  await app.services.ads.interstitial()
+  startLevel()
+}
+function newSiege() {
+  endlessRun = null
+  startLevel()
+}
+
+/** Fin d'une partie dans un château de l'atelier. */
+function onCustomEnd({ won, scores }) {
+  const fromEditor = state.match.custom?.fromEditor
+  // Prendre son propre château prouve qu'il est faisable : on peut alors le partager.
+  if (won && fromEditor) state.editorVerified = state.match.custom.code
+  setTimeout(() => {
+    end.value = { kind: 'custom', won, score: scores?.[0] ?? 0, fromEditor }
+    phase.value = 'ended'
+    app.announce(won ? t('editor.taken') : t('end.defeat'))
   }, won ? 1400 : 900)
 }
 
@@ -615,7 +717,11 @@ async function onStoryEnd({ won, result }) {
 
 /** Titre de l'introduction et du bandeau : niveau, ou arène en face-à-face. */
 const matchTitle = computed(() =>
-  isDaily.value
+  isCustom.value
+    ? state.match.custom?.name || t('editor.untitled')
+    : isEndless.value
+    ? t('endless.castle', { n: endlessView.value?.wave ?? 1 })
+    : isDaily.value
     ? t('daily.title')
     : isChallenge.value
       ? state.match.challenge?.name
@@ -624,6 +730,8 @@ const matchTitle = computed(() =>
       : isVersus.value ? t(`mp.arenas.${state.match.arenaId}`) : isDuel.value ? t(`mp.duels.${state.match.duelId}`) : t('game.level', { n: state.levelId }),
 )
 const matchSubtitle = computed(() => {
+  if (isCustom.value) return state.match.custom?.fromEditor ? t('editor.testing') : t('editor.title')
+  if (isEndless.value) return `${t('endless.title')} · ${t('end.points', { score: (endlessView.value?.score ?? 0).toLocaleString(state.locale) })}`
   if (isDaily.value) return `${formatDay(state.match.daily.key)} · ${t('game.level', { n: state.levelId })}`
   if (isChallenge.value) return t('game.level', { n: state.levelId })
   if (isCoop.value) return `${t('mp.formats.coop.name')} · ${t('levels.chapter', { n: level.value.chapter })} · ${t(`levels.chapters.${level.value.chapter}`)}`
@@ -724,7 +832,16 @@ const canvasLabel = computed(() =>
       <GameHud :hud="hud" :title="matchTitle" :subtitle="matchSubtitle" :coach="coachAnchor" @pause="pause" @powers="showPowers = !showPowers" />
       <p v-if="turnBanner" class="turn-banner" aria-hidden="true">{{ turnBanner }}</p>
 
-      <PowersMenu v-if="showPowers && phase === 'playing'" :powers="hud.powers" :coach="coachAnchor" @use="usePower" @close="showPowers = false" />
+      <PowersMenu
+        v-if="showPowers && phase === 'playing'"
+        :powers="hud.powers"
+        :coach="coachAnchor"
+        :free-offer="state.rewardedAvailable && Boolean(hud.rewards?.freePower)"
+        :free-busy="rewardBusy"
+        @use="usePower"
+        @use-free="usePowerFree"
+        @close="showPowers = false"
+      />
 
       <div v-if="isChallenge && challengeStage === 'watch' && phase === 'playing'" class="replay-banner" role="status">
         <AppIcon name="play" :size="18" />
@@ -732,6 +849,15 @@ const canvasLabel = computed(() =>
         <button type="button" class="btn btn--small" @click="stopWatching">{{ t('daily.skip') }}</button>
       </div>
       <div v-show="phase === 'playing' && !(isChallenge && challengeStage === 'watch')" class="hud-bottom">
+        <button
+          v-if="state.rewardedAvailable && hud.rewards?.hint && aiming && !state.settings.trajectoryAid && !coachStep"
+          type="button"
+          class="btn btn--reward btn--small hint-btn"
+          :disabled="rewardBusy"
+          @click="askHint"
+        >
+          <AppIcon name="play" :size="16" />{{ t('ads.hint') }}
+        </button>
         <TrebuchetPanel v-if="isTrebuchet" :hud="hud" />
         <AimPanel v-else :angle="hud.angle" :power="hud.power" :disabled="!aiming" :coach="coachAnchor" @aim="aim" @nudge="nudge" />
         <AmmoBar :ammo="hud.ammo" :disabled="!aiming" :coach="coachAnchor" @select="selectAmmo" />
@@ -778,6 +904,14 @@ const canvasLabel = computed(() =>
           <h3 class="intro-ach__title"><AppIcon name="trophy" :size="18" />{{ t('ach.title') }}</h3>
           <AchievementList :level="level" :mask="state.profile?.levels[state.levelId]?.ach ?? 0" compact />
         </template>
+      </template>
+      <template v-else-if="isCustom">
+        <p>{{ state.match.custom?.fromEditor ? t('editor.testHint') : t('editor.friendHint') }}</p>
+        <p>{{ t('intro.shots', { count: hud?.shotsTotal ?? level.shots }) }}</p>
+      </template>
+      <template v-else-if="isEndless">
+        <p v-if="(endlessView?.wave ?? 1) === 1">{{ t('endless.rules') }}</p>
+        <p class="end__big">{{ t('endless.shots', { count: endlessView?.shots ?? 0 }) }}</p>
       </template>
       <template v-else-if="isDefi">
         <p>{{ t(isDaily ? 'daily.rules' : 'daily.challengeRules', { engine: t(`game.engines.${engine}`) }) }}</p>
@@ -888,6 +1022,47 @@ const canvasLabel = computed(() =>
       </div>
     </ModalPanel>
 
+    <!-- Atelier : fin de partie -->
+    <ModalPanel v-if="phase === 'ended' && end?.kind === 'custom'" labelledby="end-title" :tone="end.won ? 'victory' : 'defeat'" :closable="false">
+      <p class="modal__eyebrow">{{ t('editor.title') }}</p>
+      <h2 id="end-title" class="modal__title">{{ end.won ? t('editor.taken') : t('end.defeat') }}</h2>
+      <p v-if="end.won" class="end__big">{{ t('end.points', { score: end.score.toLocaleString(state.locale) }) }}</p>
+      <p v-if="end.won && end.fromEditor" class="notice">{{ t('editor.verified') }}</p>
+      <div class="modal__actions">
+        <button v-if="end.fromEditor" type="button" class="btn btn--primary btn--large" data-autofocus @click="quit"><AppIcon name="hammer" />{{ t('editor.back') }}</button>
+        <button type="button" :class="['btn', { 'btn--primary btn--large': !end.fromEditor }]" :data-autofocus="end.fromEditor ? undefined : ''" @click="restart"><AppIcon name="refresh" />{{ t('end.retry') }}</button>
+        <button v-if="!end.fromEditor" type="button" class="btn" @click="app.go('editor')"><AppIcon name="hammer" />{{ t('editor.buildMine') }}</button>
+        <button v-if="!end.fromEditor" type="button" class="btn btn--ghost" @click="quit"><AppIcon name="map" />{{ t('daily.menu') }}</button>
+      </div>
+    </ModalPanel>
+
+    <!-- Siège sans fin : château abattu -->
+    <ModalPanel v-if="phase === 'ended' && end?.kind === 'endlessNext'" labelledby="end-title" tone="victory" :closable="false">
+      <p class="modal__eyebrow">{{ t('endless.title') }}</p>
+      <h2 id="end-title" class="modal__title">{{ t('endless.castleDown', { n: end.wave - 1 }) }}</h2>
+      <p class="end__big">{{ t('end.points', { score: end.score.toLocaleString(state.locale) }) }}</p>
+      <p>{{ t('endless.bonus', { count: end.bonus }) }} · {{ t('endless.shots', { count: end.shots }) }}</p>
+      <p class="notice">{{ t('endless.total', { score: end.total.toLocaleString(state.locale) }) }}</p>
+      <div class="modal__actions">
+        <button type="button" class="btn btn--primary btn--large" data-autofocus @click="nextCastle">{{ t('endless.next', { n: end.wave }) }}</button>
+        <button type="button" class="btn btn--ghost" @click="quit"><AppIcon name="map" />{{ t('endless.stop') }}</button>
+      </div>
+    </ModalPanel>
+
+    <!-- Siège sans fin : fin du siège -->
+    <ModalPanel v-if="phase === 'ended' && end?.kind === 'endlessOver'" labelledby="end-title" tone="defeat" :closable="false">
+      <p class="modal__eyebrow">{{ t('endless.title') }}</p>
+      <h2 id="end-title" class="modal__title">{{ t('endless.over', { count: end.cleared }) }}</h2>
+      <p class="end__big">{{ t('end.points', { score: end.total.toLocaleString(state.locale) }) }}</p>
+      <p v-if="end.newBest || end.newWave" class="end__badge">{{ t('endless.record') }}</p>
+      <p v-else class="notice">{{ t('endless.best', { score: end.best.toLocaleString(state.locale) }) }}</p>
+      <p v-if="!end.saved" class="notice notice--warning" role="alert">{{ t('end.saveError') }}</p>
+      <div class="modal__actions">
+        <button type="button" class="btn btn--primary btn--large" data-autofocus @click="newSiege"><AppIcon name="refresh" />{{ t('endless.again') }}</button>
+        <button type="button" class="btn btn--ghost" @click="quit"><AppIcon name="map" />{{ t('daily.menu') }}</button>
+      </div>
+    </ModalPanel>
+
     <!-- Fin : défi du jour -->
     <ModalPanel v-if="phase === 'ended' && end?.kind === 'daily'" labelledby="end-title" :tone="end.won ? 'victory' : 'defeat'" :closable="false">
       <p class="modal__eyebrow">{{ t('daily.title') }}</p>
@@ -896,6 +1071,7 @@ const canvasLabel = computed(() =>
         <p class="end__big">{{ t('end.points', { score: end.score.toLocaleString(state.locale) }) }}</p>
         <p v-if="end.newBest" class="end__badge">{{ t('daily.newBest') }}</p>
         <p class="daily-line"><AppIcon name="flame" :size="20" />{{ t('daily.streak', { count: end.streak }) }}<template v-if="end.extended"> · {{ t('daily.extended') }}</template></p>
+        <p v-if="end.reward" class="end__badge">{{ t('season.reward', { name: t(`workshop.names.${end.reward}`) }) }}</p>
       </template>
       <p v-else>{{ t('daily.lost') }}</p>
       <p class="notice">{{ t('daily.comeBack') }}</p>

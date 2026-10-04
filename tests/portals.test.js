@@ -152,7 +152,7 @@ test('sauvegarde v5 migrée en v6 (or des vidéos à zéro)', () => {
   const { bonusGold, ...rest } = v6
   assert.equal(bonusGold, 0)
   const slot = SaveSlot.fromJSON(0, { ...rest, version: 5 })
-  assert.equal(slot.toJSON().version, 7)
+  assert.equal(slot.toJSON().version, 8)
   assert.equal(slot.toJSON().bonusGold, 0)
 })
 

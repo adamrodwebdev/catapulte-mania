@@ -5,7 +5,8 @@ import AppIcon from '../ui/AppIcon.vue'
 import LanguagePicker from '../ui/LanguagePicker.vue'
 import SiegeLandscape from '../ui/SiegeLandscape.vue'
 import ModalPanel from '../ui/ModalPanel.vue'
-import { DailyChallenge } from '../../game/daily/DailyChallenge.js'
+import { DailyChallenge, dayKey } from '../../game/daily/DailyChallenge.js'
+import { eventFor } from '../../game/events/Season.js'
 import { IS_DEMO, PLAYABLE_LEVELS, APP_VERSION } from '../../config/gameConfig.js'
 
 const app = useApp()
@@ -25,6 +26,8 @@ async function continueGame() {
 
 /** Défi du jour : niveau et engin du jour, série du dernier profil. */
 const today = DailyChallenge.today()
+/** Événement saisonnier en cours (bandeau d'accueil). */
+const season = eventFor(dayKey())
 const dailyStreak = computed(() => state.profile?.daily?.streak ?? 0)
 function daily() {
   app.services.audio.unlock()
@@ -48,6 +51,7 @@ function open(screen) {
       <header class="home__heading">
         <h1 class="home__title">Catapulte&nbsp;Mania</h1>
         <p class="home__tagline">{{ t('app.tagline') }}</p>
+        <p v-if="season && !IS_DEMO" class="home__event">{{ t(`season.${season}`) }}</p>
         <p v-if="IS_DEMO" class="home__demo">{{ t('demo.banner', { count: PLAYABLE_LEVELS }) }}</p>
       </header>
 
@@ -78,9 +82,12 @@ function open(screen) {
             </button>
           </li>
           <li>
-            <button type="button" class="banner__item" @click="open('multiplayer')">
+            <button type="button" class="banner__item" @click="open('modes')">
               <AppIcon name="users" />
-              <span class="banner__text">{{ t('menu.twoPlayers') }}</span>
+              <span class="banner__text">
+                {{ t('modes.title') }}
+                <small>{{ t('modes.hint') }}</small>
+              </span>
             </button>
           </li>
           <li>
@@ -105,6 +112,14 @@ function open(screen) {
       <div class="modal__actions">
         <button type="button" class="btn btn--primary btn--large" data-autofocus @click="acceptChallenge">{{ t('daily.accept') }}</button>
         <button type="button" class="btn btn--ghost" @click="state.incomingChallenge = null">{{ t('daily.later') }}</button>
+      </div>
+    </ModalPanel>
+    <ModalPanel v-if="state.incomingCastle" labelledby="castle-title" class="incoming" @close="state.incomingCastle = null">
+      <h2 id="castle-title" class="modal__title">{{ state.incomingCastle.name ? t('editor.incomingNamed', { name: state.incomingCastle.name }) : t('editor.incoming') }}</h2>
+      <p>{{ t('editor.incomingText') }}</p>
+      <div class="modal__actions">
+        <button type="button" class="btn btn--primary btn--large" data-autofocus @click="app.startCustom(state.incomingCastle.code)">{{ t('editor.attack') }}</button>
+        <button type="button" class="btn btn--ghost" @click="state.incomingCastle = null">{{ t('daily.later') }}</button>
       </div>
     </ModalPanel>
     <p v-if="state.badChallenge" class="notice notice--warning home__notice" role="alert">{{ t('daily.badLink') }}</p>

@@ -60,6 +60,16 @@ export class Renderer {
 
     camera.apply(ctx, this.dpr)
     assets.draw(ctx, 'scene.ground', { w: WORLD.WIDTH, h: 200, pixel, extra: { theme } })
+    // Événements saisonniers : citrouilles d'automne, neige d'hiver.
+    if (scene.season === 'winter') assets.draw(ctx, 'deco.snow', { w: WORLD.WIDTH, h: 20, pixel })
+    if (scene.season === 'halloween') {
+      for (const x of [380, 1080, 1340, 1660, 2010, 2240]) {
+        ctx.save()
+        ctx.translate(x, WORLD.GROUND_Y + 2)
+        assets.draw(ctx, 'deco.pumpkin', { w: 54, h: 42, pixel, time })
+        ctx.restore()
+      }
+    }
 
     const order = { block: 0, barrel: 1, target: 2, projectile: 3 }
     const list = [...scene.entities].sort((a, b) => order[a.kind] - order[b.kind])

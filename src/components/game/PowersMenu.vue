@@ -7,8 +7,11 @@ defineProps({
   powers: { type: Array, required: true },
   /** Élément mis en valeur par le tutoriel (voir Tutorial.js). */
   coach: { type: String, default: '' },
+  /** Portails : un pouvoir peut être offert contre une vidéo (une fois par niveau). */
+  freeOffer: { type: Boolean, default: false },
+  freeBusy: { type: Boolean, default: false },
 })
-const emit = defineEmits(['use', 'close'])
+const emit = defineEmits(['use', 'use-free', 'close'])
 const { t } = useApp()
 const ICONS = { calm: 'wind', titan: 'fist', greekfire: 'flame', volley: 'volley', powder: 'bomb', quake: 'quake' }
 const panel = ref(null)
@@ -41,6 +44,9 @@ onMounted(() => panel.value?.querySelector('button:not([disabled])')?.focus())
             </span>
           </span>
           <span class="power-btn__cost">{{ p.armed ? t('game.armed') : t('game.cost', { cost: p.cost }) }}</span>
+        </button>
+        <button v-if="freeOffer && p.available" type="button" class="btn btn--reward btn--small power-free" :disabled="freeBusy" @click="emit('use-free', p.id)">
+          <AppIcon name="play" :size="16" />{{ t('ads.freePower') }}
         </button>
       </li>
     </ul>

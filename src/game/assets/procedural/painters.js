@@ -684,6 +684,53 @@ function trebuchet(ctx, s) {
   }
 }
 
+/* ---------- Décor de saison (v4.0) ---------- */
+
+/** Citrouille sculptée, posée au sol (origine au pied), lueur de bougie. */
+function pumpkin(ctx, s) {
+  const w = s.w
+  const h = s.h
+  const px = s.pixel ?? 1
+  for (const [dx, sc] of [[-w * 0.22, 0.8], [w * 0.22, 0.8], [0, 1]]) {
+    ctx.beginPath()
+    ctx.ellipse(dx, -h / 2, (w / 2.6) * sc, h / 2, 0, 0, TAU)
+    ctx.fillStyle = sc === 1 ? '#e8731c' : '#cf5f12'
+    ctx.fill()
+    outline(ctx, s, 1.6)
+  }
+  ctx.fillStyle = '#4f6b3a'
+  ctx.fillRect(-2.5, -h - 6, 5, 8)
+  // Visage éclairé de l'intérieur.
+  const flick = 0.75 + 0.25 * Math.sin((s.time ?? 0) / 120)
+  ctx.fillStyle = `rgba(255, 214, 102, ${flick})`
+  ctx.beginPath()
+  ctx.moveTo(-w * 0.2, -h * 0.62)
+  ctx.lineTo(-w * 0.1, -h * 0.75)
+  ctx.lineTo(-w * 0.02, -h * 0.62)
+  ctx.moveTo(w * 0.02, -h * 0.62)
+  ctx.lineTo(w * 0.1, -h * 0.75)
+  ctx.lineTo(w * 0.2, -h * 0.62)
+  ctx.fill()
+  ctx.beginPath()
+  ctx.moveTo(-w * 0.24, -h * 0.4)
+  ctx.quadraticCurveTo(0, -h * 0.18, w * 0.24, -h * 0.4)
+  ctx.quadraticCurveTo(0, -h * 0.3, -w * 0.24, -h * 0.4)
+  ctx.fill()
+  ctx.lineWidth = 1 * px
+}
+
+/** Neige au sol (repère monde). */
+function snowcap(ctx) {
+  const y = WORLD.GROUND_Y
+  ctx.fillStyle = '#f4f8fc'
+  ctx.beginPath()
+  ctx.moveTo(-1500, y + 6)
+  for (let x = -1500; x <= WORLD.WIDTH + 1500; x += 60) ctx.lineTo(x + 30, y - 6 - ((x / 60) % 3) * 2)
+  ctx.lineTo(WORLD.WIDTH + 1500, y + 6)
+  ctx.closePath()
+  ctx.fill()
+}
+
 /* ---------- Décor ---------- */
 
 /** Ciel (repère écran) : dégradé, astre, nuages qui dérivent. */
@@ -893,6 +940,8 @@ export const PAINTERS = Object.freeze({
   ...projectiles,
   catapult,
   trebuchet,
+  'deco.pumpkin': pumpkin,
+  'deco.snow': snowcap,
   'scene.sky': sky,
   'scene.far': far,
   'scene.ground': ground,

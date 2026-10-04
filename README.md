@@ -64,6 +64,11 @@ On peut l'envoyer par e-mail, le mettre sur une clé USB ou l'héberger sur n'im
 | Pause | Bouton ⏸ en haut à gauche | P ou Échap |
 | **Trébuchet** : lancer le balancier, puis lâcher | Toucher la scène (ou le bouton « Armer », puis « Lâcher ! ») | Espace ou Entrée, deux fois |
 
+**Autres modes (v4.0) :**
+- **Siège sans fin** : des châteaux qui s'enchaînent, de plus en plus durs ; chaque château abattu rapporte des tirs, le siège s'arrête quand un château résiste.
+- **Atelier de châteaux** : construisez votre château pièce par pièce, prenez-le vous-même, puis envoyez le lien à vos amis.
+- **Événements de saison** : Nuit des citrouilles en automne, Siège d'hiver en décembre, avec un décor et une récompense pour le défi du jour.
+
 **Le défi du jour (v3.9) :** chaque jour, le même niveau et le même engin pour tout le monde, en Normal, sans pouvoirs ni améliorations. Réussissez-le plusieurs jours de suite pour faire grandir votre série. Après une victoire, **« Défier un ami »** crée un lien : votre ami voit votre tir rejoué, puis tente de faire mieux. Le lien ne contient que vos gestes : le score est recalculé par le jeu, impossible à truquer.
 
 **Le trébuchet (v3.7) :** débloqué après le niveau 13 (le niveau 14 l'enseigne), il se choisit ensuite avant chaque niveau, à la place de la catapulte (sauf au face-à-face). Il ne se vise pas : **il se joue uniquement au clic**. Le premier clic libère le contrepoids, le bras se met à tourner ; le second lâche la fronde. Lâcher tôt donne un tir en cloche (trop tôt : le projectile part en arrière), lâcher tard un tir tendu (trop tard : dans le sol). Il tire de plus loin que la catapulte, mais frappe plus fort (ses pierres sont une fois et demie plus lourdes), et la caméra suit le projectile jusqu'au château puis reste sur l'effondrement. La physique est réelle : le bras obéit à son contrepoids, le projectile est une masse au bout d'une corde, et il part avec la vitesse qu'il avait au moment du lâcher.
@@ -298,6 +303,8 @@ Tout autre hébergeur de fichiers statiques convient (GitHub Pages, Cloudflare P
 
 ### Publier sur un portail de jeux (CrazyGames, Poki)
 
+Le guide complet (portails, Microsoft Store, Google Play, App Store) est dans [`docs/BOUTIQUES.md`](docs/BOUTIQUES.md).
+
 Notre site reste **sans publicité**. Les portails, eux, apportent des joueurs et partagent les revenus publicitaires. Chaque portail a sa propre version du jeu :
 
 1. Lancez `npm run build:crazygames` (ou `npm run build:poki`).
@@ -433,6 +440,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v3.3.0 | Les personnages de la Chronique en pixel art (sans images), une réplique avant chaque niveau, histoire réécrite |
 | v3.4.0 | Campagne à deux en coopération, nouvelles conditions de victoire (renommée, tournoi, régicide), tout en Difficile à deux, 6 arènes avec un roi |
 | v3.5.0 | Versions pour les portails CrazyGames et Poki (vidéos récompensées facultatives, publicités entre les niveaux, sauvegarde synchronisée), langues chargées à la demande |
+| v4.0.0 | Siège sans fin, atelier de châteaux (éditeur et partage), vidéos récompensées facultatives (indice, pouvoir offert), événements saisonniers, préparation des boutiques |
 | v3.9.0 | Défi du jour (même défi pour tous, série de jours) et liens « Bats mon tir » rejoués par le moteur ; célébrations et progression sur les portails |
 | v3.8.0 | Nouveau nom : Catapulte Mania ; générique du studio Solo Levelling ; trébuchet rééquilibré (fenêtre de tir plus longue) et balancier infini ; sang désactivé par défaut sur les portails ; page de confidentialité ; visuels des fiches |
 | v3.7.1 | Les 100 niveaux gagnables au trébuchet en Difficile : pierres plus lourdes au trébuchet, poudrières aux niveaux 36, 65, 88 et 96, niveaux 47, 96 et 100 rééquilibrés |

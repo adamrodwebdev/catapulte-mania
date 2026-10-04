@@ -46,11 +46,13 @@ export class Upgrade {
 }
 
 export class Cosmetic {
-  /** @param {{ id: string, slot: 'skin' | 'trail', cost: number }} def */
-  constructor({ id, slot, cost }) {
+  /** @param {{ id: string, slot: 'skin' | 'trail', cost: number, event?: string | null }} def */
+  constructor({ id, slot, cost, event = null }) {
     this.id = Guard.string(id, 'cosmetic id', { pattern: /^[a-z]+$/ })
     this.slot = Guard.oneOf(slot, ['skin', 'trail'], 'cosmetic slot')
     this.cost = Guard.int(cost, 'cost', { min: 0, max: 100000 })
+    /** Cosmétique d'événement (v4.0) : ne s'achète pas, il se gagne pendant l'événement. */
+    this.event = event === null ? null : Guard.oneOf(event, ['halloween', 'winter'], 'cosmetic event')
     Object.freeze(this)
   }
 }
@@ -87,6 +89,9 @@ const COSMETICS = Object.freeze([
   new Cosmetic({ id: 'smoke', slot: 'trail', cost: 0 }),
   new Cosmetic({ id: 'embers', slot: 'trail', cost: 200 }),
   new Cosmetic({ id: 'stars', slot: 'trail', cost: 320 }),
+  // Événements saisonniers (v4.0) : offerts, jamais vendus.
+  new Cosmetic({ id: 'pumpkin', slot: 'trail', cost: 0, event: 'halloween' }),
+  new Cosmetic({ id: 'snow', slot: 'trail', cost: 0, event: 'winter' }),
 ])
 
 /** Effets neutres (aucune amélioration). */
@@ -113,7 +118,7 @@ export class UpgradeCatalog {
 
   /** Cosmétiques possédés d'office. */
   static defaults() {
-    return COSMETICS.filter((c) => c.cost === 0).map((c) => c.id)
+    return COSMETICS.filter((c) => c.cost === 0 && !c.event).map((c) => c.id)
   }
 
   /**

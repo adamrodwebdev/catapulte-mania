@@ -94,6 +94,12 @@ export class ParticleSystem {
       this.#spawn({ kind: 'flame', x, y, vx: 0, vy: -0.2, life: 0, max: 300, size: 7, color: '#ffb347' })
     } else if (style === 'embers') {
       this.#spawn({ kind: 'spark', x, y, vx: r.range(-0.4, 0.4), vy: r.range(-0.6, 0), life: 0, max: 420, size: r.range(2, 3.5), color: r.pick(['#ff8c3a', '#ffd36b', '#ff5a2a']) })
+    } else if (style === 'pumpkin') {
+      // Événement d'automne : étincelles orangées et petites ombres de chauves-souris.
+      this.#spawn({ kind: 'spark', x, y, vx: r.range(-0.5, 0.5), vy: r.range(-0.7, 0), life: 0, max: 460, size: r.range(2.5, 4), color: r.pick(['#ff7a1a', '#ffb347', '#3a2140']) })
+    } else if (style === 'snow') {
+      // Événement d'hiver : flocons qui tombent doucement.
+      this.#spawn({ kind: 'flame', x: x + r.range(-5, 5), y: y + r.range(-5, 5), vx: r.range(-0.2, 0.2), vy: r.range(0.1, 0.4), life: 0, max: 700, size: r.range(2, 3.5), color: r.pick(['#ffffff', '#e6f3ff', '#cfe6ff']) })
     } else if (style === 'stars') {
       this.#spawn({ kind: 'flame', x: x + r.range(-4, 4), y: y + r.range(-4, 4), vx: 0, vy: 0, life: 0, max: 520, size: r.range(2, 4), color: r.pick(['#fff1c4', '#d4a537', '#ffffff']) })
     } else {

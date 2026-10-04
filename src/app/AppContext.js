@@ -12,6 +12,7 @@ import { starsFor } from '../game/score/ScoreRules.js'
 import { PowerRegistry } from '../game/powers/PowerRegistry.js'
 import { DailyChallenge, dayKey } from '../game/daily/DailyChallenge.js'
 import { ReplayCode } from '../game/replay/ReplayCode.js'
+import { ENDLESS } from '../domain/EndlessRun.js'
 import { loadDictionary } from '../i18n/loader.js'
 import { NoAdService } from '../services/ads/AdService.js'
 import { CloudStorageBackend } from '../services/CloudStorageBackend.js'
@@ -37,7 +38,7 @@ function checkRecord(levelId, rec) {
 }
 
 /** Écrans de l'application (navigation interne, une seule URL pour le SEO). */
-export const SCREENS = Object.freeze(['home', 'profiles', 'levels', 'game', 'settings', 'help', 'workshop', 'multiplayer', 'privacy'])
+export const SCREENS = Object.freeze(['home', 'profiles', 'levels', 'game', 'settings', 'help', 'workshop', 'multiplayer', 'privacy', 'modes', 'editor'])
 
 /**
  * Contexte applicatif : instancie les services (une seule fois) et expose un
@@ -94,6 +95,10 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     incomingChallenge: null,
     /** Lien de défi reçu mais illisible ou altéré. */
     badChallenge: false,
+    /** Château reçu par lien (atelier d'un ami), en attente sur l'accueil : { code, name }. */
+    incomingCastle: null,
+    /** Code du château de l'atelier que le joueur a lui-même pris (condition pour le partager). */
+    editorVerified: null,
     /** Écran à ouvrir une fois un profil choisi (ex. 'daily'). */
     afterProfile: null,
     announcement: '',
@@ -238,6 +243,7 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
       upgrades: slot.upgrades,
       cosmetics: slot.cosmetics,
       daily: dailyView(slot),
+      endless: { ...slot.endless, unlocked: slot.completedCount >= ENDLESS.UNLOCK },
     }
   }
 
@@ -338,17 +344,19 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
    * @returns {Promise<{ newBest: boolean, streak: number, extended: boolean, saved: boolean }>}
    */
   async function recordDaily(result, day) {
-    if (!activeSlot) return { newBest: false, streak: 0, extended: false, saved: false }
+    if (!activeSlot) return { newBest: false, streak: 0, extended: false, saved: false, reward: null }
     const outcome = activeSlot.recordDaily(result, day)
+    // Événement saisonnier : une victoire au défi du jour offre sa récompense.
+    const reward = result.won ? activeSlot.grantEventReward(day) : null
     let saved
     try {
       saved = await saves.save(activeSlot)
     } catch {
       saved = false
     }
-    if (outcome.newBest || outcome.extended) ads.happytime()
+    if (outcome.newBest || outcome.extended || reward) ads.happytime()
     state.profile = profileView(activeSlot)
-    return { ...outcome, saved }
+    return { ...outcome, saved, reward }
   }
 
   /** Lance le défi du jour (un profil est nécessaire pour la série). */
@@ -372,7 +380,44 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     const next = state.afterProfile
     state.afterProfile = null
     if (next === 'daily') return startDaily()
+    if (next === 'endless') return startEndless()
     go('levels')
+  }
+
+  /** Lance un siège sans fin (profil requis, premier chapitre terminé). */
+  async function startEndless() {
+    if (!activeSlot) {
+      const last = saves.lastSlot
+      if (!(Number.isInteger(last) && (await openProfile(last)))) {
+        state.afterProfile = 'endless'
+        go('profiles')
+        return
+      }
+    }
+    if (activeSlot.completedCount < ENDLESS.UNLOCK) {
+      go('modes')
+      return
+    }
+    state.match = { mode: 'endless', levelId: 1, levels: null, arenaId: 1, duelId: 1, players: [], daily: null, challenge: null }
+    go('game')
+  }
+
+  /**
+   * Enregistre un siège terminé (partie authentique).
+   * @returns {Promise<{ newBest: boolean, newWave: boolean, saved: boolean }>}
+   */
+  async function recordEndless(run) {
+    if (!activeSlot) return { newBest: false, newWave: false, saved: false }
+    const outcome = activeSlot.recordEndless(run)
+    let saved
+    try {
+      saved = await saves.save(activeSlot)
+    } catch {
+      saved = false
+    }
+    if (outcome.newBest || outcome.newWave) ads.happytime()
+    state.profile = profileView(activeSlot)
+    return { ...outcome, saved }
   }
 
   /** Lance un défi reçu par lien (aucun profil nécessaire, rien n'est enregistré). */
@@ -411,6 +456,63 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
       return { url, method: 'manual' }
     }
   }
+
+  /** Joue un château de l'atelier (le sien, pour le tester, ou celui d'un ami). */
+  async function startCustom(code, { fromEditor = false } = {}) {
+    // L'atelier n'est chargé qu'à la demande (accueil plus léger).
+    const { CastleCode } = await import('../game/editor/CastleDesign.js')
+    const design = CastleCode.decode(code)
+    state.incomingCastle = null
+    state.match = { mode: 'custom', levelId: 1, levels: null, arenaId: 1, duelId: 1, players: [], daily: null, challenge: null, custom: { code, fromEditor: fromEditor === true, name: design.name } }
+    go('game')
+  }
+
+  /** Partage un château de l'atelier (lien du portail, ou #chateau= sur notre site). */
+  async function shareCastle(code, text) {
+    const { CastleCode } = await import('../game/editor/CastleDesign.js')
+    CastleCode.decode(code)
+    let url = await ads.inviteLink({ chateau: code })
+    if (!url) url = `${globalThis.location ? `${location.origin}${location.pathname}` : ''}#chateau=${code}`
+    try {
+      if (globalThis.navigator?.share) {
+        await navigator.share({ title: 'Catapulte Mania', text, url })
+        return { url, method: 'shared' }
+      }
+    } catch (e) {
+      if (e?.name === 'AbortError') return { url, method: 'manual' }
+    }
+    try {
+      await navigator.clipboard.writeText(`${text} ${url}`)
+      return { url, method: 'copied' }
+    } catch {
+      return { url, method: 'manual' }
+    }
+  }
+
+  /** Au démarrage : un château partagé par lien ? */
+  async function readIncomingCastle() {
+    let code = null
+    try {
+      code = ads.inviteParam('chateau')
+      if (!code && globalThis.location?.hash.startsWith('#chateau=')) code = location.hash.slice(9)
+    } catch {
+      code = null
+    }
+    if (!code) return
+    try {
+      const { CastleCode } = await import('../game/editor/CastleDesign.js')
+      const design = CastleCode.decode(code)
+      state.incomingCastle = { code, name: design.name }
+    } catch {
+      state.badChallenge = true
+    }
+    try {
+      if (location.hash) history.replaceState(history.state, '', location.pathname + location.search)
+    } catch {
+      /* sans conséquence */
+    }
+  }
+  readIncomingCastle()
 
   /** Au démarrage : un défi reçu par lien (portail ou #defi= sur notre site) ? */
   function readIncomingChallenge() {
@@ -547,6 +649,10 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     recordDaily,
     startDaily,
     startChallenge,
+    startEndless,
+    recordEndless,
+    startCustom,
+    shareCastle,
     afterProfileChosen,
     shareRun,
     doubleGold,

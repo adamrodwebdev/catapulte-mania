@@ -104,6 +104,10 @@ export class GameSession extends EventBus {
   /** Relecture : le lancement attend le pas enregistré (voir ReplayPlayer). */
   #replay = false
   #pendingLaunch = null
+  /** Vidéos récompensées (v4.0) : indice de trajectoire et pouvoir offert, une fois par niveau chacun. */
+  #hint = false
+  #hintUsed = false
+  #freePowerUsed = false
   /** Repère sonore du balancier : dernière tranche de 15° annoncée. */
   #tickBand = null
   options = { trajectoryAid: false, reducedMotion: false, blood: true }
@@ -117,7 +121,7 @@ export class GameSession extends EventBus {
    * @param {object} opts options d'affichage et de difficulté
    * @param {import('./modes/GameMode.js').GameMode} [mode] règles (histoire par défaut)
    */
-  constructor(level, { difficulty, completedLevels, trajectoryAid = false, reducedMotion = false, screenShake = true, blood = true, startPower = 100, effects = NO_EFFECTS, continueOffer = false, engine = 'catapult', slowSwing = false, infiniteSwing = false, replay = false }, mode = null) {
+  constructor(level, { difficulty, completedLevels, trajectoryAid = false, reducedMotion = false, screenShake = true, blood = true, startPower = 100, effects = NO_EFFECTS, continueOffer = false, engine = 'catapult', slowSwing = false, infiniteSwing = false, replay = false, season = null }, mode = null) {
     super()
     this.#level = level
     this.#difficulty = Guard.oneOf(difficulty, GAME.DIFFICULTIES, 'difficulty')
@@ -136,6 +140,8 @@ export class GameSession extends EventBus {
     Guard.boolean(slowSwing, 'slowSwing')
     Guard.boolean(infiniteSwing, 'infiniteSwing')
     this.#replay = Guard.boolean(replay, 'replay')
+    /** Événement saisonnier (décor seulement). */
+    this.season = season === 'halloween' || season === 'winter' ? season : null
     /** Balancier infini : option du joueur, jamais en Difficile (ni donc à deux). */
     this.infiniteSwing = infiniteSwing && this.#difficulty !== 'hard'
 
@@ -336,13 +342,15 @@ export class GameSession extends EventBus {
       ammo: this.ammo,
       powers: this.powers,
       canActivate: this.#activeProjectiles().some((p) => p.canActivate),
+      rewards: this.rewardsLeft,
+      hint: this.#hint,
       turn: this.#turn,
     }
   }
 
   /** Points de l'aide à la trajectoire (ou null si désactivée / hors visée). */
   get trajectory() {
-    if (!this.options.trajectoryAid) return null
+    if (!this.options.trajectoryAid && !this.#hint) return null
     // Trébuchet : la courbe montre, en direct, le tir qu'on obtiendrait en lâchant maintenant.
     if (this.#engine === 'trebuchet' ? !this.armed : this.#state !== STATE.AIMING) return null
     const calm = this.#pendingPower === 'calm'
@@ -393,12 +401,12 @@ export class GameSession extends EventBus {
    * Active un pouvoir pour ce tour.
    * @returns {boolean} succès
    */
-  usePower(id) {
+  usePower(id, { free = false } = {}) {
     const power = PowerRegistry.get(id)
     if (this.#state !== STATE.AIMING || this.#powerUsedThisTurn || !this.#unlockedPowers.has(id)) return false
     this.#powerUsedThisTurn = true
     this.#log.push({ k: 'p', d: this.steps - this.#aimStep, id })
-    this.score.spend(this.#mode.powerCost(power))
+    if (!free) this.score.spend(this.#mode.powerCost(power))
     if (power.immediate) {
       this.world.arm()
       power.activate(this)
@@ -408,7 +416,7 @@ export class GameSession extends EventBus {
       this.#pendingPower = id
       this.#feedback({ sound: 'power', x: this.catapult.x, caption: 'power' })
     }
-    this.emit('announce', { key: 'a11y.powerUsed', params: { power: id, cost: this.#mode.powerCost(power) } })
+    this.emit('announce', { key: 'a11y.powerUsed', params: { power: id, cost: free ? 0 : this.#mode.powerCost(power) } })
     this.emit('hud', this.hud)
     return true
   }
@@ -449,6 +457,34 @@ export class GameSession extends EventBus {
     return this.#engine === 'trebuchet' ? 'armed' : 'fired'
   }
 
+  /** Les vidéos récompensées de la partie sont-elles encore proposables ? */
+  get rewardsLeft() {
+    return { hint: !this.#hintUsed && this.#mode.id === 'story', freePower: !this.#freePowerUsed && this.#mode.id === 'story' }
+  }
+
+  /**
+   * Indice (vidéo récompensée, campagne solo) : la trajectoire prévue s'affiche
+   * pour le prochain tir. Une fois par niveau, sur présentation d'un ticket.
+   */
+  grantHint(ticket) {
+    if (this.#hintUsed || this.#mode.id !== 'story' || this.#state !== STATE.AIMING || !RewardTicket.redeem(ticket, 'hint')) return false
+    this.#hintUsed = true
+    this.#hint = true
+    this.emit('hud', this.hud)
+    return true
+  }
+
+  /**
+   * Pouvoir offert (vidéo récompensée, campagne solo) : un pouvoir débloqué,
+   * sans coût en points. Une fois par niveau, sur présentation d'un ticket.
+   */
+  usePowerFree(id, ticket) {
+    if (this.#freePowerUsed || this.#mode.id !== 'story' || this.#state !== STATE.AIMING || this.#powerUsedThisTurn || !this.#unlockedPowers.has(id)) return false
+    if (!RewardTicket.redeem(ticket, 'free-power')) return false
+    this.#freePowerUsed = true
+    return this.usePower(id, { free: true })
+  }
+
   /**
    * Tire ! Au trébuchet : premier appel = libère le contrepoids (le tir est
    * engagé), second appel = lâche la fronde.
@@ -481,6 +517,8 @@ export class GameSession extends EventBus {
     if (shot.windOverride !== null) this.world.wind = shot.windOverride
     if (player.shotsLeft !== null) player.shotsLeft--
     this.#shooter = this.#active
+    // L'indice ne vaut que pour un tir.
+    this.#hint = false
     const treb = this.#engine === 'trebuchet'
     const entry = treb ? { k: 't', d: this.steps - this.#aimStep, a: type } : { k: 'f', d: this.steps - this.#aimStep, a: type, ang: this.catapult.angle, pow: this.catapult.power }
     this.#log.push(entry)
@@ -607,6 +645,7 @@ export class GameSession extends EventBus {
       particles: this.particles,
       trajectory: this.trajectory,
       theme: this.#level.chapter,
+      season: this.season,
       time: this.#time,
       animate: !this.options.reducedMotion,
       catapults,

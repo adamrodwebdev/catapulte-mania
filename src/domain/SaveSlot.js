@@ -6,6 +6,8 @@ import { GOLD, goldFor, maxGoldFor, legacyMaxGoldFor } from '../game/progression
 import { countAchievements } from '../game/progression/Achievements.js'
 import { RewardTicket } from '../services/ads/RewardTicket.js'
 import { DAY_KEY, dayNumber, DailyChallenge } from '../game/daily/DailyChallenge.js'
+import { EndlessRun } from './EndlessRun.js'
+import { eventFor, EVENTS } from '../game/events/Season.js'
 
 /** Nom de profil : lettres (toutes langues), chiffres, espaces, tirets. */
 export const PROFILE_NAME = /^[\p{L}\p{N}][\p{L}\p{N} _'-]{0,15}$/u
@@ -34,7 +36,7 @@ const DAILY = Schema.object({
   days: Schema.record(DAY_KEY, Schema.int({ min: 0, max: GAME.MAX_LEVEL_SCORE }), { maxKeys: DAILY_HISTORY }),
 })
 
-/** Schéma de la sauvegarde (version 7). Toute clé inconnue est refusée. */
+/** Schéma de la sauvegarde (version 8). Toute clé inconnue est refusée. */
 export const saveSchema = Schema.object({
   version: Schema.enum([GAME.SAVE_VERSION]),
   name: Schema.string({ minLength: 1, maxLength: 16, pattern: PROFILE_NAME }),
@@ -78,6 +80,8 @@ export const saveSchema = Schema.object({
   bonusGold: GOLD_INT,
   // v7 : défi du jour (série, records récents).
   daily: DAILY,
+  // v8 : siège sans fin (meilleur score, plus de châteaux abattus).
+  endless: Schema.object({ best: Schema.int({ min: 0, max: 1e9 }), bestWave: Schema.int({ min: 0, max: 10000 }), sieges: COUNTER }),
 })
 
 /**
@@ -90,6 +94,7 @@ export const saveSchema = Schema.object({
  * v4 → v5 : ajout de la campagne à deux, vide.
  * v5 → v6 : or des vidéos récompensées, à zéro.
  * v6 → v7 : défi du jour, vide.
+ * v7 → v8 : siège sans fin, vide.
  * @param {any} raw
  */
 export function migrateSave(raw) {
@@ -115,6 +120,7 @@ export function migrateSave(raw) {
   if (save && typeof save === 'object' && save.version === 4) save = { ...save, version: 5, coop: {} }
   if (save && typeof save === 'object' && save.version === 5) save = { ...save, version: 6, bonusGold: 0 }
   if (save && typeof save === 'object' && save.version === 6) save = { ...save, version: 7, daily: { last: '', streak: 0, bestStreak: 0, days: {} } }
+  if (save && typeof save === 'object' && save.version === 7) save = { ...save, version: 8, endless: { best: 0, bestWave: 0, sieges: 0 } }
   return save
 }
 
@@ -156,6 +162,7 @@ export class SaveSlot {
       coop: {},
       bonusGold: 0,
       daily: { last: '', streak: 0, bestStreak: 0, days: {} },
+      endless: { best: 0, bestWave: 0, sieges: 0 },
     })
     return new SaveSlot(index, data)
   }
@@ -197,6 +204,8 @@ export class SaveSlot {
     if (daily.streak > daily.bestStreak) throw new ValidationError('save.daily.streak', 'streak above best')
     if ((daily.streak > 0) !== Boolean(daily.last)) throw new ValidationError('save.daily.last', 'inconsistent streak')
     if (daily.last && !DAY_KEY.test(daily.last)) throw new ValidationError('save.daily.last', 'invalid day')
+    // Siège sans fin : un score ne peut pas dépasser ce que les châteaux abattus permettent.
+    if (data.endless.best > data.endless.bestWave * GAME.MAX_LEVEL_SCORE) throw new ValidationError('save.endless.best', 'impossible score')
     return new SaveSlot(index, data)
   }
 
@@ -286,10 +295,24 @@ export class SaveSlot {
   /** Achète une apparence. */
   buyCosmetic(id) {
     const c = UpgradeCatalog.cosmetic(id)
-    if (this.#data.cosmetics.owned.includes(id) || c.cost > this.#data.gold) return false
+    if (c.event || this.#data.cosmetics.owned.includes(id) || c.cost > this.#data.gold) return false
     this.#data.gold -= c.cost
     this.#data.cosmetics.owned.push(id)
     return true
+  }
+
+  /**
+   * Récompense d'événement (v4.0) : le cosmétique de l'événement en cours,
+   * offert pour une victoire au défi du jour pendant l'événement.
+   * @returns {string | null} cosmétique obtenu (null si déjà possédé ou hors événement)
+   */
+  grantEventReward(today) {
+    const event = eventFor(today)
+    if (!event) return null
+    const id = EVENTS[event].reward
+    if (this.#data.cosmetics.owned.includes(id)) return null
+    this.#data.cosmetics.owned.push(id)
+    return id
   }
 
   /** Équipe une apparence possédée. */
@@ -502,6 +525,28 @@ export class SaveSlot {
     }
     this.#data.updatedAt = Math.max(this.#data.updatedAt, Date.now())
     return { newBest, streak: d.streak, extended }
+  }
+
+  /* ---------- Siège sans fin ---------- */
+
+  get endless() {
+    return { ...this.#data.endless }
+  }
+
+  /**
+   * Enregistre un siège terminé (partie authentique uniquement).
+   * @returns {{ newBest: boolean, newWave: boolean }}
+   */
+  recordEndless(run) {
+    if (!EndlessRun.isAuthentic(run) || !run.over) throw new ValidationError('endless', 'not a finished siege from the game engine')
+    const e = this.#data.endless
+    const newBest = run.score > e.best
+    const newWave = run.cleared > e.bestWave
+    e.best = Math.max(e.best, run.score)
+    e.bestWave = Math.max(e.bestWave, run.cleared)
+    e.sieges += 1
+    this.#data.updatedAt = Math.max(this.#data.updatedAt, Date.now())
+    return { newBest, newWave }
   }
 
   toJSON() {

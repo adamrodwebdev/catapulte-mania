@@ -2,7 +2,7 @@ import { Schema, ValidationError } from '../../core/utils/Guard.js'
 import { GAME } from '../../config/gameConfig.js'
 import { PROFILE_NAME } from '../../domain/SaveSlot.js'
 import { DAY_KEY, DailyChallenge } from '../daily/DailyChallenge.js'
-import { AIM } from '../Catapult.js'
+import { AIM } from '../aim.js'
 
 /**
  * Code d'un défi « Bats mon tir » (v3.9) : le niveau, l'engin et le journal

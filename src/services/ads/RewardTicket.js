@@ -1,7 +1,7 @@
 import { Guard } from '../../core/utils/Guard.js'
 
 /** Récompenses qu'une publicité vidéo peut débloquer. */
-export const REWARDS = Object.freeze(['extra-shot', 'double-gold'])
+export const REWARDS = Object.freeze(['extra-shot', 'double-gold', 'hint', 'free-power'])
 
 /**
  * Ticket de récompense (anti-triche).

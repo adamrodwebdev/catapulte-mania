@@ -11,7 +11,7 @@ const TAP_MAX_MS = 320
 
 /** Le registre de visuels est partagé entre les niveaux (chargé une seule fois). */
 let sharedAssets = null
-async function assets() {
+export async function assets() {
   if (!sharedAssets) {
     sharedAssets = new AssetRegistry()
     await sharedAssets.preload()
@@ -55,7 +55,7 @@ export class GameController extends EventBus {
     return c
   }
 
-  constructor(canvas, level, { difficulty, completedLevels, settings, reducedMotion, audio, haptics, effects, mode, continueOffer = false, engine = 'catapult', replay = null }, registry) {
+  constructor(canvas, level, { difficulty, completedLevels, settings, reducedMotion, audio, haptics, effects, mode, continueOffer = false, engine = 'catapult', replay = null, season = null }, registry) {
     super()
     this.#canvas = canvas
     this.#audio = audio
@@ -75,6 +75,7 @@ export class GameController extends EventBus {
       slowSwing: settings.slowSwing === true,
       infiniteSwing: settings.infiniteSwing === true,
       replay: Array.isArray(replay),
+      season,
     }, mode)
     if (Array.isArray(replay)) this.#replayer = new ReplayPlayer(this.session, replay)
     const focus = this.session.focus

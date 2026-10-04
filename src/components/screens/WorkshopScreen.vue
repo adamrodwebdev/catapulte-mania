@@ -39,6 +39,7 @@ const cosmetics = computed(() =>
       .map((c) => ({
         id: c.id,
         cost: c.cost,
+        event: c.event,
         owned: profile.value?.cosmetics.owned.includes(c.id),
         equipped: profile.value?.cosmetics[slot] === c.id,
         affordable: c.cost <= (profile.value?.gold ?? 0),
@@ -109,6 +110,7 @@ const storeEnabled = StoreService.enabled
           <span class="look__name">{{ t(`workshop.names.${c.id}`) }}</span>
           <span v-if="c.equipped" class="look__state"><AppIcon name="check" :size="16" />{{ t('workshop.equipped') }}</span>
           <button v-else-if="c.owned" type="button" class="btn" @click="act('equip', c.id)">{{ t('workshop.equip') }}</button>
+          <span v-else-if="c.event" class="look__state look__state--event">{{ t(`workshop.event.${c.event}`) }}</span>
           <button v-else type="button" class="btn btn--primary" :disabled="!c.affordable" @click="act('cosmetic', c.id)">
             <AppIcon name="coin" :size="16" />{{ c.cost }}
           </button>

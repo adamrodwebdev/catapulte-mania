@@ -41,6 +41,9 @@ export const ASSET_MANIFEST = Object.freeze({
   'projectile.split': { type: 'procedural' },
   catapult: { type: 'procedural' },
   trebuchet: { type: 'procedural' },
+  // Décor de saison (événements)
+  'deco.pumpkin': { type: 'procedural' },
+  'deco.snow': { type: 'procedural' },
   // Décor (paramétré par le thème du chapitre)
   'scene.sky': { type: 'procedural' },
   'scene.far': { type: 'procedural' },

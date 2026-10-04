@@ -627,3 +627,16 @@
   transform: translateX(-50%);
   width: min(30rem, calc(100% - 2 * var(--space-4)));
 }
+
+/* Bandeau d'événement saisonnier (accueil). */
+.home__event {
+  display: inline-block;
+  max-width: 34rem;
+  margin-top: var(--space-3);
+  padding: var(--space-1) var(--space-3);
+  background: #3a2140;
+  color: #ffd9a8;
+  border: 2px solid #e8731c;
+  border-radius: var(--radius);
+  font-weight: 700;
+}

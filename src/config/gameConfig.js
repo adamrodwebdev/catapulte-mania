@@ -7,7 +7,7 @@ export const GAME = deepFreeze({
   LEVEL_COUNT: 100,
   LEVELS_PER_CHAPTER: 10,
   SAVE_SLOTS: 3,
-  SAVE_VERSION: 7,
+  SAVE_VERSION: 8,
   LANGUAGES: ['fr', 'en', 'id'],
   DEFAULT_LANGUAGE: 'fr',
   DIFFICULTIES: ['easy', 'normal', 'hard'],

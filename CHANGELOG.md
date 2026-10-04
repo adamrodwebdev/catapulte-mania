@@ -2,6 +2,36 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [4.0.0] – 2026-10-04
+### Ajouté
+- **Siège sans fin** : des châteaux qui s'enchaînent, de plus en plus durs
+  (de plus en plus loin dans la campagne). 6 tirs au départ, +3 par château
+  abattu (+4 du premier coup), les tirs restants passent au château suivant.
+  Records (score, châteaux) dans le profil. Débloqué après 10 niveaux.
+  Anti-triche : le siège n'avance qu'avec des résultats authentiques du moteur,
+  chacun une seule fois et pour le bon château.
+- **Atelier de châteaux** (éditeur) : étages, murs, poutres, socles, toits, en
+  9 matériaux, défenseurs et barils. Les pièces s'empilent ; défenseurs et
+  barils se placent dans l'étage visé. Annuler, tout effacer, brouillon
+  conservé, réglages (nom, décor, tirs, vent, munitions). Jouable au clavier.
+  **Pour partager son château, il faut l'avoir pris soi-même** ; le lien
+  (`#chateau=` ou lien du portail) est validé champ par champ puis reconstruit
+  par le même schéma que les 100 niveaux.
+- **Autres modes** : nouvel écran (siège sans fin, atelier, deux joueurs).
+- **Vidéos récompensées supplémentaires** (portails, campagne solo, toujours
+  facultatives, une fois par niveau) : indice de trajectoire pour un tir,
+  pouvoir offert sans coût en points. Jamais en défi (équité).
+- **Événements saisonniers** : la Nuit des citrouilles (15 octobre – 2 novembre)
+  et le Siège d'hiver (15 décembre – 6 janvier). Décor de saison en jeu,
+  bandeau d'accueil, et une traînée offerte (Citrouille, Flocons) pour une
+  victoire au défi du jour pendant l'événement. Cosmétiques jamais vendus.
+- **Préparation des boutiques** : manifeste complété (identifiant, captures),
+  guide `docs/BOUTIQUES.md` (portails, Microsoft Store, Google Play, App Store).
+### Modifié
+- Sauvegarde **v8** (siège sans fin). Migration automatique.
+- Niveau 85 : vent plus doux ; niveau 88 : un rocher et deux bombes de plus.
+  Vérifié : 100/100 en Difficile, à la catapulte comme au trébuchet.
+
 ## [3.9.0] – 2026-10-04
 ### Ajouté
 - **Défi du jour** : chaque jour, le même défi pour tous (un niveau et un engin

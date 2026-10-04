@@ -225,6 +225,31 @@ export class ChallengeMode extends DailyMode {
   recordsResult = false
 }
 
+/** Château de l'atelier (v4.0) : celui qu'on construit, ou celui d'un ami. Rien n'est enregistré. */
+export class CustomMode extends ChallengeMode {
+  id = 'custom'
+}
+
+/**
+ * Siège sans fin (v4.0) : un château de la campagne à la fois, avec les tirs
+ * qui restent au siège (voir EndlessRun). Munitions et pouvoirs de la
+ * campagne, améliorations du profil. Chaque château produit un résultat
+ * authentifié, que le siège additionne.
+ */
+export class EndlessMode extends StoryMode {
+  id = 'endless'
+
+  /** @param {{ shots: number } & object} opts tirs disponibles pour ce château */
+  constructor({ shots, ...opts } = {}) {
+    super(opts)
+    this.shots = Math.max(1, Math.min(12, Math.trunc(Number(shots) || 1)))
+  }
+
+  shotsFor() {
+    return this.shots
+  }
+}
+
 /** Fabrique d'un mode à partir de son identifiant. */
 export function createMode(id, opts) {
   switch (id) {
@@ -244,6 +269,10 @@ export function createMode(id, opts) {
       return new DailyMode(opts)
     case 'challenge':
       return new ChallengeMode(opts)
+    case 'endless':
+      return new EndlessMode(opts)
+    case 'custom':
+      return new CustomMode(opts)
     default:
       throw new TypeError(`unknown mode ${id}`)
   }

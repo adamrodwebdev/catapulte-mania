@@ -112,13 +112,13 @@ export const LEVEL_SPECS_2 = [
   // 84. La crypte du chevalier noir.
   { shots: 5, wind: 0.7, ammo: { boulder: 2, bomb: 3 }, build: (b) => BP.crypt(b, { vault: 'iron', hall: 'brick', floors: 4, barrels: 3, sideMat: 'iron' }) },
   // 85. Les dominos de fer.
-  { shots: 5, wind: 0.55, ammo: { boulder: 4, bomb: 2 }, build: (b) => BP.dominoes(b, { count: 5, floors: 5, m: 'brick', s: 'iron', h: 92 }) },
+  { shots: 5, wind: 0.4, ammo: { boulder: 4, bomb: 2 }, build: (b) => BP.dominoes(b, { count: 5, floors: 5, m: 'brick', s: 'iron', h: 92 }) },
   // 86. Le manoir foudroyé, sur pilotis de verre.
   { shots: 4, wind: 0.7, ammo: { boulder: 2, bomb: 1, split: 1 }, build: (b) => BP.stiltCastle(b, { legs: 4, legMat: 'glass', deck: 'iron', m: 'iron', s: 'iron', floors: 3 }) },
   // 87. Le grand rempart.
   { shots: 6, wind: 0.75, ammo: { boulder: 3, bomb: 2, split: 2 }, build: (b) => BP.rampart(b, { rooms: 5, w: 120, m: 'iron', s: 'brick', gallery: 'wood' }) },
   // 88. L'escalier de fer.
-  { shots: 7, wind: 0.75, ammo: { boulder: 3, bomb: 4 }, build: (b) => BP.stairs(b, { count: 5, start: 2, m: 'brick', top: 'iron', s: 'stone', powder: true }) },
+  { shots: 7, wind: 0.75, ammo: { boulder: 4, bomb: 6 }, build: (b) => BP.stairs(b, { count: 5, start: 2, m: 'brick', top: 'iron', s: 'stone', powder: true }) },
   // 89. La poudrière dans la tempête.
   { shots: 4, wind: 0.8, ammo: { boulder: 2, bomb: 1 }, build: (b) => BP.magazine(b, { floors: 6, m: 'iron', s: 'stone', barrels: 2, w: 150 }) },
   // 90. Le donjon de l'orage.

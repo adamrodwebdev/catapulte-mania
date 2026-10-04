@@ -62,7 +62,7 @@ function start() {
 
 <template>
   <main class="screen multiplayer">
-    <ScreenHeader :title="t('mp.title')" @back="app.go('home')" />
+    <ScreenHeader :title="t('mp.title')" @back="app.go('modes')" />
     <p class="screen__intro">{{ t('mp.intro') }}</p>
 
     <form class="mp" @submit.prevent="start">
