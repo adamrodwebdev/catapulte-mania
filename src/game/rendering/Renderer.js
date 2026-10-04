@@ -83,7 +83,13 @@ export class Renderer {
       ctx.save()
       ctx.translate(c.x, c.y)
       if (c.dir === -1) ctx.scale(-1, 1)
-      assets.draw(ctx, 'catapult', { w: 180, h: 140, pixel, time, extra: { armAngle: c.armAngle, load: c.load, loadRadius: c.loadRadius, registry: assets, skin: c.skin, flag: c.flag } })
+      if (c.kind === 'trebuchet') {
+        // Repère local de l'engin : la fronde est donnée en coordonnées monde.
+        const sling = c.rig.sling ? { x: (c.rig.sling.x - c.x) * c.dir, y: c.rig.sling.y - c.y } : null
+        assets.draw(ctx, 'trebuchet', { w: 260, h: 260, pixel, time, extra: { theta: c.rig.theta, sling, load: c.loaded ? c.load : null, loadRadius: c.loadRadius, registry: assets, skin: c.skin, flag: c.flag } })
+      } else {
+        assets.draw(ctx, 'catapult', { w: 180, h: 140, pixel, time, extra: { armAngle: c.armAngle, load: c.load, loadRadius: c.loadRadius, registry: assets, skin: c.skin, flag: c.flag } })
+      }
       ctx.restore()
     }
 

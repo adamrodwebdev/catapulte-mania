@@ -53,7 +53,7 @@ const BEATS = deepFreeze([
  */
 const LINE_SPEAKERS = Object.freeze([
   G, Y, G, Y, G, G, Y, G, G, M, // 1-10
-  G, Y, G, Y, G, G, G, Y, G, M, // 11-20
+  G, Y, G, G, G, G, G, Y, G, M, // 11-20 (14 : Gontran présente son trébuchet)
   G, G, Y, G, G, Y, G, Y, Y, M, // 21-30
   G, Y, G, G, Y, Y, G, G, Y, M, // 31-40
   G, G, Y, Y, G, Y, G, G, Y, M, // 41-50

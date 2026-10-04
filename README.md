@@ -62,6 +62,9 @@ On peut l'envoyer par e-mail, le mettre sur une clé USB ou l'héberger sur n'im
 | Choisir un projectile | Cliquer sur un projectile en bas | Touches 1 à 5 |
 | Diviser la mitraille en vol | Bouton « Diviser » | Espace |
 | Pause | Bouton ⏸ en haut à gauche | P ou Échap |
+| **Trébuchet** : lancer le balancier, puis lâcher | Toucher la scène (ou le bouton « Armer », puis « Lâcher ! ») | Espace ou Entrée, deux fois |
+
+**Le trébuchet (v3.7) :** débloqué après le niveau 13 (le niveau 14 l'enseigne), il se choisit ensuite avant chaque niveau, à la place de la catapulte (sauf au face-à-face). Il ne se vise pas : **il se joue uniquement au clic**. Le premier clic libère le contrepoids, le bras se met à tourner ; le second lâche la fronde. Lâcher tôt donne un tir en cloche (trop tôt : le projectile part en arrière), lâcher tard un tir tendu (trop tard : dans le sol). Il tire de plus loin que la catapulte, mais frappe plus fort, et la caméra suit le projectile jusqu'au château puis reste sur l'effondrement. La physique est réelle : le bras obéit à son contrepoids, le projectile est une masse au bout d'une corde, et il part avec la vitesse qu'il avait au moment du lâcher.
 
 **Astuce :** certains châteaux ont un point faible (un pied en verre, un étage en paille, une poudrière…). Trouvez-le et tout s'écroule.
 
@@ -201,6 +204,7 @@ Tout se règle dans **Réglages** (et une partie directement depuis la pause) :
 
 - **Aide à la visée** : affiche la trajectoire prévue du projectile en pointillés.
 - **Puissance au début du tour** : 100 % par défaut (ou 75 %, 50 %, ou « Garder » la dernière visée).
+- **Balancier lent** (trébuchet) : le bras tourne deux fois plus lentement, l'instant du lâcher est plus facile à choisir. Un **tic sonore** de plus en plus aigu suit l'angle du tir pendant le balancier : on peut lâcher à l'oreille. Avec l'aide à la visée, la trajectoire du tir « si je lâchais maintenant » s'affiche en direct.
 - **Tutoriels guidés** et **récit** (la Chronique) : activables ou non.
 - **Musique** : volume séparé des effets sonores (0 % pour la couper). Ses moments intenses sont aussi sous-titrés.
 - **Sous-titres des sons** (malentendants) : chaque bruit important est écrit à l'écran avec sa direction, par exemple `◀ [Bois brisé]`.
@@ -332,6 +336,7 @@ src/
 │   ├── tutorial/           TutorialCoach : les tutoriels guidés, étape par étape
 │   ├── story/              StoryRepository (la Chronique), Portraits (personnages pixel art dessinés par le code)
 │   ├── Catapult.js         Visée et lancement
+│   ├── Trebuchet.js        Trébuchet à contrepoids : balancier et fronde simulés, lâcher au clic
 │   ├── TrajectoryPredictor Calcul de la trajectoire prévue (aide à la visée)
 │   ├── physics/            Monde physique (Matter.js)
 │   ├── entities/           Entity → Block, Projectile, Target, Barrel
@@ -381,6 +386,7 @@ build/                      Sécurité (CSP) et service worker générés au bui
 ```bash
 npm test              # tests automatiques (validation, sauvegarde, physique, gameplay, traductions)
 npm run check:levels  # un joueur automatique vérifie que les 100 niveaux sont stables et gagnables en Difficile
+npm run check:levels -- --engine trebuchet   # même contrôle, joué au trébuchet
 npm run lint          # vérification du style de code
 ```
 
@@ -425,6 +431,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v3.3.0 | Les personnages de la Chronique en pixel art (sans images), une réplique avant chaque niveau, histoire réécrite |
 | v3.4.0 | Campagne à deux en coopération, nouvelles conditions de victoire (renommée, tournoi, régicide), tout en Difficile à deux, 6 arènes avec un roi |
 | v3.5.0 | Versions pour les portails CrazyGames et Poki (vidéos récompensées facultatives, publicités entre les niveaux, sauvegarde synchronisée), langues chargées à la demande |
+| v3.7.0 | Nouvel engin : le trébuchet, joué uniquement au clic (balancier puis lâcher), château plus loin, caméra qui suit le tir ; niveau d'apprentissage, choix de l'engin avant chaque niveau, balancier lent et repère sonore pour l'accessibilité |
 | v3.6.0 | Vent repensé en Difficile (altitude, rafales, prise au vent selon le projectile, feu attisé) et représentation visuelle du vent (traînées, manche à air, fanion, HUD, sous-titres) |
 
 Pour revenir à une version précise avec Git : `git checkout v0.4.0` (puis `git checkout main` pour revenir à la dernière).

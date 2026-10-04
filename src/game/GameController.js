@@ -52,7 +52,7 @@ export class GameController extends EventBus {
     return c
   }
 
-  constructor(canvas, level, { difficulty, completedLevels, settings, reducedMotion, audio, haptics, effects, mode, continueOffer = false }, registry) {
+  constructor(canvas, level, { difficulty, completedLevels, settings, reducedMotion, audio, haptics, effects, mode, continueOffer = false, engine = 'catapult' }, registry) {
     super()
     this.#canvas = canvas
     this.#audio = audio
@@ -68,8 +68,11 @@ export class GameController extends EventBus {
       startPower: settings.startPower,
       effects,
       continueOffer,
+      engine,
+      slowSwing: settings.slowSwing === true,
     }, mode)
-    this.session.camera.setFocus(level.focus.left, level.focus.right, level.focus.top)
+    const focus = this.session.focus
+    this.session.camera.setFocus(focus.left, focus.right, focus.top)
     this.session.on('hud', (h) => this.emit('hud', h))
     this.session.on('announce', (a) => this.emit('announce', a))
     this.session.on('end', (e) => this.emit('end', e))
@@ -94,6 +97,7 @@ export class GameController extends EventBus {
     this.session.camera.shakeEnabled = settings.screenShake && !reducedMotion
     this.session.options.blood = settings.blood
     this.session.options.startPower = settings.startPower
+    if (this.session.engine === 'trebuchet') for (const p of this.session.players) p.catapult.setSlow(settings.slowSwing === true)
     this.session.camera.follow = !reducedMotion
     this.session.particles.density = reducedMotion ? 0.35 : 1
   }
@@ -128,7 +132,7 @@ export class GameController extends EventBus {
       this.#hudTimer += dt
       // En vol (et en visée quand le vent souffle en rafales), le HUD suit en continu.
       const live = this.session.state === STATE.FLYING || (this.session.state === STATE.AIMING && this.session.world.windField.dynamic)
-      if (this.#hudTimer > 180 && live) {
+      if (this.#hudTimer > (this.session.armed ? 50 : 180) && live) {
         this.#hudTimer = 0
         this.emit('hud', this.session.hud)
       }
@@ -139,7 +143,7 @@ export class GameController extends EventBus {
 
   #sceneWithAim() {
     const scene = this.session.scene()
-    if (this.session.state === STATE.AIMING) {
+    if (this.session.state === STATE.AIMING && this.session.engine === 'catapult') {
       const c = this.session.catapult
       scene.aim = { ...c.launchPoint, angle: c.angle, power: c.power, dir: c.dir }
     }
@@ -156,6 +160,21 @@ export class GameController extends EventBus {
     this.session.camera.setInsets(insetTop, insetBottom)
   }
 
+  /**
+   * Commande « au clic » (bouton Tirer, Espace, clic sur la scène au trébuchet).
+   * Le temps écoulé depuis la dernière image est transmis : le lâcher de la
+   * fronde correspond à l'instant exact du clic, pas à l'image suivante.
+   * @returns {'fired' | 'armed' | 'released' | 'split' | false}
+   */
+  trigger() {
+    if (this.#paused) return false
+    this.#audio.unlock()
+    const ammo = this.session.selectedAmmo
+    const r = this.session.trigger(performance.now() - this.#last)
+    if (r) this.emit('trigger', { result: r, ammo })
+    return r
+  }
+
   /* ---------- Saisie ---------- */
 
   #bindInput() {
@@ -163,6 +182,11 @@ export class GameController extends EventBus {
     const down = (e) => {
       this.#audio.unlock()
       if (this.#paused) return
+      // Trébuchet : tout se joue au clic, dès l'appui (1er : balancier, 2e : lâcher).
+      if (this.session.engine === 'trebuchet') {
+        if (e.button === 0 || e.pointerType !== 'mouse') this.trigger()
+        return
+      }
       cv.setPointerCapture?.(e.pointerId)
       this.#drag = {
         id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), moved: false,

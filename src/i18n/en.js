@@ -126,6 +126,18 @@ export default {
     usedThisTurn: 'Already used this turn',
     unlocksAfter: 'Unlocked after {count} levels',
     aimHint: 'Drag backwards to aim, then fire.',
+    engine: 'Siege engine',
+    engines: { catapult: 'Catapult', trebuchet: 'Trebuchet' },
+    treb: {
+      arm: 'First click: drop the counterweight',
+      release: 'Second click: release the sling!',
+      wait: 'The shot is away…',
+      angle: 'Angle',
+      speed: 'Speed',
+      armBtn: 'Arm',
+      releaseBtn: 'Release!',
+      introHint: 'Trebuchet: one click starts the swing, a second releases the sling. Release early for a high lob, late for a flat shot. The castle is further away, but the trebuchet hits harder.',
+    },
     ammo: {
       stone: 'Stone',
       boulder: 'Boulder',
@@ -167,6 +179,7 @@ export default {
     star3: { one: 'in {count} shot', other: 'in {count} shots' },
     star2: { one: 'in {count} shot', other: 'in {count} shots or fewer' },
     novelty: {
+      'engine:trebuchet': 'The trebuchet: a new, more powerful engine that fires from further back. You can then choose your engine before each level.',
       'material:brick': 'Brick holds better than wood, less than stone.',
       'material:sandstone': 'Sandstone is heavy but crumbles faster than stone.',
       'material:ice': 'Ice is slippery: a whole floor can slide off with one push.',
@@ -254,6 +267,12 @@ export default {
   tutorial: {
     title: 'Tutorial: {name}',
     aimTitle: 'Tutorial: aim and fire',
+    engine: {
+      arm: 'The trebuchet is played by clicking. Tap the scene (or “Arm”, or Space): the counterweight drops and the arm starts to swing.',
+      release: 'The arm is swinging! Tap again to release the sling. The dotted line shows the shot right now: release when it lands on the castle.',
+      watch: 'The camera follows the projectile all the way to the castle…',
+      done: 'Release early: high lob. Release late: flat shot. Before each level, you can choose between catapult and trebuchet.',
+    },
     skip: 'Skip',
     close: 'Got it',
     aim: {
@@ -381,7 +400,7 @@ export default {
       l11: 'Here’s my boulder. Heavy, very heavy: save it for stone, a plain stone will do for wood.',
       l12: 'The lookout at the top of his tower can see the whole land. Bring him down.',
       l13: 'Powder barrels under a stone tower… One spark, and boom. Aim for the barrels.',
-      l14: 'A glass chapel. Glass breaks at the slightest knock, yet its defenders think they’re safe.',
+      l14: 'My trebuchet is ready! It fires from further back and hits harder. One click drops the counterweight, a second releases the sling: it is all in the timing.',
       l15: 'A knight in armour, deep inside the keep. Everything will have to fall on him.',
       l16: 'Out of fire pots? No matter: the Greek Fire power sets even a plain stone ablaze.',
       l17: 'A stone tower standing on a wooden bridge. Break the bridge, the tower follows: that’s the keystone.',
@@ -489,6 +508,8 @@ export default {
     storyDesc: 'Shows the Chronicle before the levels that open a chapter.',
     trajectoryAid: 'Trajectory aid',
     trajectoryAidDesc: 'Shows the curve the projectile will follow.',
+    slowSwing: 'Slow swing',
+    slowSwingDesc: 'The trebuchet arm swings twice as slowly, making the release easier to time.',
     captions: 'Sound captions',
     captionsDesc: 'Describes every important sound on screen, with its direction.',
     announcements: 'Spoken announcements',
@@ -508,6 +529,8 @@ export default {
     off: 'Off',
   },
   help: {
+    trebuchetTitle: 'The trebuchet',
+    trebuchet: 'Unlocked after level 13, you choose it before each level (except head-to-head). It is played only by clicking: the first click drops the counterweight, the second releases the sling. Release early for a high lob, late for a flat shot. It fires from further back than the catapult but hits harder, and the camera follows the shot. A tick sound rises with the shot angle; the “Slow swing” option slows the arm down.',
     modesTitle: 'Game modes',
     modes: 'Campaign: all 100 levels, with stars and gold. Free play: replay a cleared level without limits. Two players on the same device: the cooperative two-player campaign, the duel (renown), the three-round tournament and the face-off (regicide).',
     workshopTitle: 'Workshop',
@@ -532,6 +555,7 @@ export default {
     ach: 'Each level offers three achievements (win without special shots, blow up every barrel, take the king first…). They add up from one game to the next and earn gold.',
   },
   captions: {
+    swing: 'The counterweight drops',
     gust: 'Gust of wind',
     music: '♪ The music swells',
     launch: 'Catapult fires',
@@ -560,9 +584,11 @@ export default {
     center: 'in the centre',
   },
   a11y: {
+    swing: 'The arm is swinging. Press again to release. The ticks rise as the shot gets steeper.',
     playerTurn: '{name}’s turn.',
     canvas: 'Battlefield. Level {level}: {targets} target(s) left, {shots} shot(s), wind {wind}.',
     keyboardHelp: 'Arrow keys to aim, Space to fire.',
+    keyboardHelpTreb: 'Trebuchet: Space or click to start the swing, then again to release the sling.',
     levelStart: 'Level starts. {targets} target(s) to take out with {shots} shot(s).',
     turn: 'New turn. {targets} target(s) left, {shots} shot(s). Wind: {wind}.',
     targetDown: 'Target down. {left} left.',

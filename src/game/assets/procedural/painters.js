@@ -11,6 +11,7 @@
 import { materialPattern } from './textures.js'
 import { SeededRandom } from '../../../core/utils/SeededRandom.js'
 import { WORLD } from '../../physics/constants.js'
+import { TREBUCHET_GEOMETRY } from '../../Trebuchet.js'
 
 const INK = '#1e1a2b'
 const TAU = Math.PI * 2
@@ -550,6 +551,139 @@ function catapult(ctx, s) {
   }
 }
 
+/* ---------- Trébuchet ---------- */
+
+/**
+ * Trébuchet à contrepoids. Repère : origine au pied de l'engin, au sol, x vers l'avant.
+ * `extra.theta` : angle du grand bras (radians, repère écran) ;
+ * `extra.sling` : extrémité de la fronde (repère local) ou null si la fronde est vide ;
+ * `extra.load`  : clé du projectile dans la fronde (ou null).
+ */
+function trebuchet(ctx, s) {
+  const { theta = Math.PI * 0.8, sling = null, load = null, loadRadius = 14, registry = null, skin = 'oak', flag = null } = s.extra ?? {}
+  const look = CATAPULT_SKINS[skin] || CATAPULT_SKINS.oak
+  const wood = materialPattern(ctx, 'wood')
+  const px = s.pixel ?? 1
+  const { pivotY, armLong, armShort, sling: slingLen } = TREBUCHET_GEOMETRY
+  const piece = (draw, fill = wood) => {
+    ctx.beginPath()
+    draw()
+    ctx.fillStyle = fill
+    ctx.fill()
+    if (look.tint && fill === wood) {
+      ctx.fillStyle = look.tint
+      ctx.fill()
+    }
+    outline(ctx, s)
+  }
+  const beam = (x1, y1, x2, y2, w) => {
+    const a = Math.atan2(y2 - y1, x2 - x1)
+    const nx = (-Math.sin(a) * w) / 2
+    const ny = (Math.cos(a) * w) / 2
+    piece(() => {
+      ctx.moveTo(x1 + nx, y1 + ny)
+      ctx.lineTo(x2 + nx, y2 + ny)
+      ctx.lineTo(x2 - nx, y2 - ny)
+      ctx.lineTo(x1 - nx, y1 - ny)
+      ctx.closePath()
+    })
+  }
+  // Auge (le projectile y glisse avant de décoller) et socle.
+  piece(() => roundRect(ctx, -70, -10, 200, 10, 2), '#6b4a2b')
+  piece(() => roundRect(ctx, -120, -26, 240, 18, 3))
+  // Montants en A et jambes de force.
+  beam(-92, -20, -6, pivotY + 4, 14)
+  beam(92, -20, 6, pivotY + 4, 14)
+  beam(-60, -70, 60, -70, 10)
+  beam(-14, -20, -4, pivotY + 8, 12)
+  // Grand bras (côté fronde) et petit bras (côté contrepoids), d'une seule poutre effilée.
+  const c = Math.cos(theta)
+  const sn = Math.sin(theta)
+  const tip = { x: armLong * c, y: pivotY + armLong * sn }
+  const cw = { x: -armShort * c, y: pivotY - armShort * sn }
+  piece(() => {
+    const nx = -sn
+    const ny = c
+    ctx.moveTo(cw.x + nx * 9, cw.y + ny * 9)
+    ctx.lineTo(tip.x + nx * 4, tip.y + ny * 4)
+    ctx.lineTo(tip.x - nx * 4, tip.y - ny * 4)
+    ctx.lineTo(cw.x - nx * 9, cw.y - ny * 9)
+    ctx.closePath()
+  })
+  // Contrepoids : caisse cerclée de fer, suspendue (elle reste verticale).
+  ctx.strokeStyle = INK
+  ctx.lineWidth = 2.4 * px
+  ctx.beginPath()
+  ctx.moveTo(cw.x - 14, cw.y)
+  ctx.lineTo(cw.x - 22, cw.y + 22)
+  ctx.moveTo(cw.x + 14, cw.y)
+  ctx.lineTo(cw.x + 22, cw.y + 22)
+  ctx.stroke()
+  piece(() => roundRect(ctx, cw.x - 32, cw.y + 20, 64, 52, 5), '#6f6a63')
+  ctx.fillStyle = look.metal
+  ctx.fillRect(cw.x - 32, cw.y + 30, 64, 5)
+  ctx.fillRect(cw.x - 32, cw.y + 56, 64, 5)
+  // Fronde : deux cordes jusqu'à la poche (pleine), ou pendante (vide).
+  const end = sling ?? { x: tip.x + 6, y: tip.y + slingLen * 0.96 }
+  ctx.strokeStyle = '#4a3a28'
+  ctx.lineWidth = 2 * px
+  ctx.beginPath()
+  ctx.moveTo(tip.x, tip.y)
+  ctx.lineTo(end.x, end.y)
+  ctx.stroke()
+  if (sling && load && registry) {
+    ctx.save()
+    ctx.translate(end.x, end.y)
+    registry.draw(ctx, load, { w: loadRadius * 2, h: loadRadius * 2, pixel: px, time: s.time })
+    ctx.restore()
+  }
+  ctx.beginPath()
+  ctx.ellipse(end.x, end.y + (sling ? loadRadius * 0.55 : 0), loadRadius * 0.9, loadRadius * 0.45, 0, 0, TAU)
+  ctx.fillStyle = '#7a5a3a'
+  ctx.fill()
+  outline(ctx, s, 1.4)
+  // Axe et crochet de lâcher.
+  ctx.beginPath()
+  ctx.arc(0, pivotY, 8, 0, TAU)
+  ctx.fillStyle = look.metal
+  ctx.fill()
+  outline(ctx, s)
+  ctx.beginPath()
+  ctx.arc(tip.x, tip.y, 4, 0, TAU)
+  ctx.fillStyle = look.metal
+  ctx.fill()
+  // Fanion (apparence ou couleur du joueur).
+  const banner = flag || look.flag
+  if (banner) {
+    ctx.strokeStyle = INK
+    ctx.lineWidth = 2 * px
+    ctx.beginPath()
+    ctx.moveTo(-100, -26)
+    ctx.lineTo(-100, -96)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(-100, -96)
+    ctx.lineTo(-70, -88)
+    ctx.lineTo(-100, -78)
+    ctx.closePath()
+    ctx.fillStyle = banner
+    ctx.fill()
+    outline(ctx, s)
+  }
+  // Roues pleines du socle.
+  for (const x of [-84, 84]) {
+    ctx.beginPath()
+    ctx.arc(x, -10, 13, 0, TAU)
+    ctx.fillStyle = '#7a5230'
+    ctx.fill()
+    outline(ctx, s)
+    ctx.beginPath()
+    ctx.arc(x, -10, 3.5, 0, TAU)
+    ctx.fillStyle = look.metal
+    ctx.fill()
+  }
+}
+
 /* ---------- Décor ---------- */
 
 /** Ciel (repère écran) : dégradé, astre, nuages qui dérivent. */
@@ -758,6 +892,7 @@ export const PAINTERS = Object.freeze({
   barrel,
   ...projectiles,
   catapult,
+  trebuchet,
   'scene.sky': sky,
   'scene.far': far,
   'scene.ground': ground,

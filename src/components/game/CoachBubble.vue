@@ -21,13 +21,16 @@ const { t } = useApp()
 const kind = computed(() => props.tool.split(':')[0])
 const name = computed(() => props.tool.split(':')[1] || '')
 /** Nom affiché de l'outil (munition ou pouvoir). */
-const toolName = computed(() => (kind.value === 'ammo' ? t(`game.ammo.${name.value}`) : kind.value === 'power' ? t(`powers.${name.value}`) : ''))
+const toolName = computed(() =>
+  kind.value === 'ammo' ? t(`game.ammo.${name.value}`) : kind.value === 'power' ? t(`powers.${name.value}`) : kind.value === 'engine' ? t(`game.engines.${name.value}`) : '',
+)
 const title = computed(() => (kind.value === 'aim' ? t('tutorial.aimTitle') : t('tutorial.title', { name: toolName.value })))
 
 /** Texte de l'étape : générique (choisir, ouvrir, activer) ou propre à l'outil. */
 const text = computed(() => {
   const id = props.step.id
   if (kind.value === 'aim') return t(`tutorial.aim.${id}`)
+  if (kind.value === 'engine') return t(`tutorial.engine.${id}`)
   if (id === 'select' || id === 'open' || id === 'use') return t(`tutorial.step.${id}`, { name: toolName.value })
   if (id === 'watch') return t('tutorial.step.watch')
   const key = props.tool.replace(':', '_')
@@ -36,7 +39,7 @@ const text = computed(() => {
 </script>
 
 <template>
-  <aside class="coach" role="status" aria-live="polite" :aria-label="title">
+  <aside :class="['coach', { 'coach--center': kind === 'engine' }]" role="status" aria-live="polite" :aria-label="title">
     <PixelPortrait id="gontran" height="4.5rem" decorative class="coach__portrait" />
     <p class="coach__head">
       <AppIcon name="help" :size="18" />

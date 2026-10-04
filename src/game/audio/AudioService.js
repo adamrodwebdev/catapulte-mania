@@ -9,7 +9,7 @@ import { clamp } from '../../core/utils/math.js'
  */
 export const SOUND_IDS = Object.freeze([
   'launch', 'creak', 'wood', 'straw', 'stone', 'iron', 'glass', 'hit', 'down', 'explosion',
-  'fire', 'victory', 'defeat', 'power', 'click', 'split', 'star', 'gust',
+  'fire', 'victory', 'defeat', 'power', 'click', 'split', 'star', 'gust', 'swing', 'tick',
 ])
 
 export class AudioService {
@@ -227,6 +227,16 @@ export class AudioService {
         break
       case 'click':
         this.#tone(out, t, { type: 'square', freq: 660, decay: 0.03, peak: 0.05 })
+        break
+      case 'swing':
+        // Trébuchet : le contrepoids chute (souffle grave) et la corde grince.
+        this.#noiseHit(out, t, { type: 'lowpass', freq: 260, sweepTo: 700, q: 0.9, attack: 0.25, decay: 0.9, peak: 0.35 })
+        this.#tone(out, t + 0.05, { type: 'sawtooth', freq: 55, to: 85, attack: 0.08, decay: 0.5, peak: 0.07 })
+        break
+      case 'tick':
+        // Repère sonore du balancier : plus aigu à mesure que le tir se relève
+        // (l'intensité porte l'angle du tir, voir GameSession). Aide les malvoyants.
+        this.#tone(out, t, { type: 'triangle', freq: 220 + k * 520, decay: 0.06, peak: 0.12 })
         break
     }
   }

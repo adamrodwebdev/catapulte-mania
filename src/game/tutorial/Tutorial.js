@@ -12,6 +12,7 @@ import { deepFreeze, Guard } from '../../core/utils/Guard.js'
  *  - 'power:<id>'   : le pouvoir <id> est activé
  *  - 'fire' / 'fire:<t>' : un tir (de la munition <t>) part
  *  - 'turn'         : le tir est terminé, la main revient au joueur
+ *  - 'arm' / 'release' : trébuchet, balancier lancé / fronde lâchée
  *
  * `anchor` désigne l'élément de l'interface à mettre en valeur
  * (attribut `data-coach` du même nom).
@@ -22,11 +23,20 @@ const IMMEDIATE = new Set(['quake'])
 
 /**
  * Étapes d'un tutoriel.
- * @param {string} tool 'aim' | 'ammo:<type>' | 'power:<id>'
+ * @param {string} tool 'aim' | 'ammo:<type>' | 'power:<id>' | 'engine:trebuchet'
  * @returns {readonly { id: string, anchor: string | null, until: string }[]}
  */
 export function tutorialSteps(tool) {
-  Guard.string(tool, 'tutorial tool', { pattern: /^(?:aim|ammo:[a-z]+|power:[a-z]+)$/ })
+  Guard.string(tool, 'tutorial tool', { pattern: /^(?:aim|ammo:[a-z]+|power:[a-z]+|engine:trebuchet)$/ })
+  if (tool === 'engine:trebuchet') {
+    // Le trébuchet : 1er clic pour lancer le balancier, 2e clic pour lâcher.
+    return deepFreeze([
+      { id: 'arm', anchor: 'fire', until: 'arm' },
+      { id: 'release', anchor: 'fire', until: 'release' },
+      { id: 'watch', anchor: null, until: 'turn' },
+      { id: 'done', anchor: null, until: 'arm' },
+    ])
+  }
   if (tool === 'aim') {
     return deepFreeze([
       { id: 'aim', anchor: 'aim', until: 'aim' },

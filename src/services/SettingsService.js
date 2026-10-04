@@ -16,6 +16,10 @@ const DEFINITIONS = Object.freeze({
   story: { validate: Schema.boolean(), fallback: true },
   // Puissance réglée au début de chaque tour ('keep' : garder la dernière visée).
   startPower: { validate: Schema.enum(['keep', 100, 75, 50]), fallback: 100 },
+  // Engin préféré (v3.7) : le trébuchet n'est proposé qu'une fois débloqué.
+  engine: { validate: Schema.enum(['catapult', 'trebuchet']), fallback: 'catapult' },
+  // Accessibilité : balancier du trébuchet encore plus lent (lâcher plus facile).
+  slowSwing: { validate: Schema.boolean(), fallback: false },
   captions: { validate: Schema.boolean(), fallback: true },
   announcements: { validate: Schema.boolean(), fallback: true },
   haptics: { validate: Schema.boolean(), fallback: true },

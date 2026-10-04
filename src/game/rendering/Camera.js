@@ -71,9 +71,31 @@ export class Camera {
     if (immediate) Object.assign(this, this.#target)
   }
 
-  /** Suit un point (projectile) avec un zoom modéré. */
-  track(px, py) {
+  /**
+   * Cadre une portion du terrain, de `left` à `right` (sol calé en bas),
+   * sans zoomer au-delà de `maxScale`. Sert au trébuchet : gros plan sur le
+   * balancier, puis sur le château pendant l'effondrement.
+   */
+  frame(left, right, maxScale = 1.1) {
     if (!this.follow) return
+    const s = Math.min(this.viewW / Math.max(200, right - left), maxScale)
+    this.#target = { x: (left + right) / 2, y: this.#groundY(s), scale: s }
+  }
+
+  /** Suit un point (projectile) avec un zoom modéré. */
+  track(px, py, { keepGround = false } = {}) {
+    if (!this.follow) return
+    if (keepGround) {
+      // Trébuchet : on suit le projectile en gardant le sol en bas de l'écran ;
+      // plus il monte, plus on dézoome (jamais en deçà de la vue d'ensemble).
+      const fit = this.#fitScale()
+      const span = WORLD.GROUND_Y + 90 - py + 160
+      const s = clamp(Math.min(this.#usableH / Math.max(1, span), 0.9), fit, Math.max(fit, 0.9))
+      const halfW = this.viewW / s / 2
+      const x = clamp(px + halfW * 0.25, this.#focus.left - 100 + halfW, Math.max(this.#focus.left - 100 + halfW, this.#focus.right + 300 - halfW))
+      this.#target = { x, y: this.#groundY(s), scale: s }
+      return
+    }
     const s = Math.min(this.#fitScale() * 1.35, 1.2)
     const halfW = this.viewW / s / 2
     const x = clamp(px, this.#focus.left - 100 + halfW, this.#focus.right + 300 - halfW)

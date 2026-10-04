@@ -13,7 +13,10 @@
  * chaque cible restante sous plusieurs angles, simule chaque tir et garde
  * le meilleur. S'il réussit, un humain le peut aussi.
  *
- * Usage : node scripts/check-levels.mjs [--levels 1-10] [--difficulty hard]
+ * Avec `--engine trebuchet`, le joueur automatique joue au trébuchet : il
+ * choisit l'instant du lâcher (en ms de balancier), le château est plus loin.
+ *
+ * Usage : node scripts/check-levels.mjs [--levels 1-10] [--difficulty hard] [--engine trebuchet]
  */
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads'
 import { availableParallelism } from 'node:os'
@@ -28,12 +31,13 @@ async function loadGame() {
   const { AIM } = await import('../src/game/Catapult.js')
   const { windageOf } = await import('../src/game/physics/WindField.js')
   const { PROJECTILE_TYPES } = await import('../src/game/entities/catalog.js')
-  return { GameSession, LevelRepository, TrajectoryPredictor, AIM, windageOf, PROJECTILE_TYPES }
+  const { Trebuchet } = await import('../src/game/Trebuchet.js')
+  return { GameSession, LevelRepository, TrajectoryPredictor, AIM, windageOf, PROJECTILE_TYPES, Trebuchet }
 }
 
 /** Joue une partie en appliquant une liste de tirs ; s'arrête au tour suivant. */
-function replay(G, level, difficulty, shots) {
-  const s = new G.GameSession(level, { difficulty, completedLevels: 0, reducedMotion: true })
+function replay(G, level, difficulty, shots, engine = 'catapult') {
+  const s = new G.GameSession(level, { difficulty, completedLevels: 0, reducedMotion: true, engine })
   let ended = null
   s.on('end', (e) => (ended = e))
   const tick = () => s.update(1000 / 30)
@@ -42,8 +46,16 @@ function replay(G, level, difficulty, shots) {
   for (const shot of shots) {
     if (ended) break
     s.selectAmmo(shot.ammo)
-    s.aim(shot.angle, shot.power)
-    s.fire()
+    if (engine === 'trebuchet') {
+      // Balancier, puis lâcher à l'instant choisi (ms simulées depuis le 1er clic).
+      s.fire()
+      const step = (1000 / 30) * s.catapult.timeScale
+      while (s.armed && s.catapult.simTime + step < shot.release) tick()
+      if (s.armed) s.catapult.releaseAt(shot.release)
+    } else {
+      s.aim(shot.angle, shot.power)
+      s.fire()
+    }
     guard = 0
     while (s.state !== 'aiming' && !ended && guard++ < 600) tick()
   }
@@ -75,7 +87,7 @@ function solvePower(G, session, angle, tx, ty, ammo = 'stone') {
   return (lo + hi) / 2
 }
 
-function candidates(G, session) {
+function candidates(G, session, engine = 'catapult') {
   const out = []
   const targets = session.world.filter((e) => e.kind === 'target' && e.alive)
   // Points visés : chaque cible, les barils, et les blocs les plus proches des cibles (supports).
@@ -87,6 +99,7 @@ function candidates(G, session) {
     .map((x) => x.b)
   const points = [...targets, ...near]
   const ammoTypes = session.ammo.filter((a) => a.count === null || a.count > 0).map((a) => a.type)
+  if (engine === 'trebuchet') return trebuchetCandidates(G, session, points, ammoTypes)
   for (const t of points) {
     for (const angle of ANGLES) {
       for (const ammo of ammoTypes) {
@@ -99,7 +112,41 @@ function candidates(G, session) {
   return out
 }
 
-async function checkLevel(G, id, difficulty) {
+/** Instants de lâcher essayés au trébuchet (ms de balancier, pas de 2 ms). */
+const RELEASES = Array.from({ length: 151 }, (_, i) => 600 + i * 2)
+
+/**
+ * Trébuchet : pour chaque instant de lâcher, point d'impact prévu (aide à la
+ * trajectoire, vent du moment compris). Pour chaque point visé, on garde les
+ * trois lâchers qui tombent le plus près.
+ */
+function trebuchetCandidates(G, session, points, ammoTypes) {
+  const out = new Map()
+  const field = session.world.windField
+  const obstacles = session.world.filter((e) => e.kind !== 'projectile')
+  for (const ammo of ammoTypes) {
+    const radius = G.PROJECTILE_TYPES[ammo].radius
+    const windage = G.windageOf({ type: ammo, radius })
+    const hits = []
+    for (const release of RELEASES) {
+      const shot = G.Trebuchet.preview(release, { x: session.catapult.x, loadRadius: radius })
+      const windAccel = field.dynamic ? field.frozen(shot.point.x, session.world.time, windage) : null
+      const pts = G.TrajectoryPredictor.predict(shot.point, shot.velocity, { wind: session.wind, windAccel, obstacles, maxPoints: 600, every: 1 })
+      const hit = pts[pts.length - 1]
+      if (hit && hit.x > 300) hits.push({ release, hit })
+    }
+    for (const p of points) {
+      hits
+        .map((h) => ({ h, d: Math.abs(h.hit.x - p.x) + 0.5 * Math.abs(h.hit.y - p.y) }))
+        .sort((a, b) => a.d - b.d)
+        .slice(0, 3)
+        .forEach(({ h }) => out.set(`${ammo}:${h.release}`, { release: h.release, ammo }))
+    }
+  }
+  return [...out.values()]
+}
+
+async function checkLevel(G, id, difficulty, engine = 'catapult') {
   const level = G.LevelRepository.get(id)
   // 1. Stabilité
   const s0 = new G.GameSession(level, { difficulty: 'normal', completedLevels: 0, reducedMotion: true })
@@ -119,7 +166,7 @@ async function checkLevel(G, id, difficulty) {
   let solved = false
   let lastScore = 0
   for (let turn = 0; turn < 12; turn++) {
-    const { session, ended } = replay(G, level, difficulty, history)
+    const { session, ended } = replay(G, level, difficulty, history, engine)
     if (ended) {
       solved = ended.won
       lastScore = ended.result.score
@@ -127,8 +174,8 @@ async function checkLevel(G, id, difficulty) {
       break
     }
     let best = null
-    for (const cand of candidates(G, session)) {
-      const r = replay(G, level, difficulty, [...history, cand])
+    for (const cand of candidates(G, session, engine)) {
+      const r = replay(G, level, difficulty, [...history, cand], engine)
       const left = r.session.targetsLeft
       const value = (level.targets.length - left) * 100000 + r.session.score.current
       if (!best || value > best.value) best = { cand, value, won: r.ended?.won }
@@ -153,6 +200,7 @@ if (isMainThread) {
   const get = (k) => (args.includes(k) ? args[args.indexOf(k) + 1] : undefined)
   const ids = parseRange(get('--levels'), 100)
   const difficulty = get('--difficulty') || 'hard'
+  const engine = get('--engine') === 'trebuchet' ? 'trebuchet' : 'catapult'
   const workers = Math.max(1, Math.min(availableParallelism(), ids.length))
   const chunks = Array.from({ length: workers }, (_, w) => ids.filter((_, i) => i % workers === w))
   const t0 = Date.now()
@@ -161,7 +209,7 @@ if (isMainThread) {
       chunks.map(
         (chunk) =>
           new Promise((resolve, reject) => {
-            const w = new Worker(fileURLToPath(import.meta.url), { workerData: { ids: chunk, difficulty } })
+            const w = new Worker(fileURLToPath(import.meta.url), { workerData: { ids: chunk, difficulty, engine } })
             const out = []
             w.on('message', (m) => {
               out.push(m)
@@ -177,7 +225,7 @@ if (isMainThread) {
     .flat()
     .sort((a, b) => a.id - b.id)
   const bad = results.filter((r) => !r.stable || !r.solved)
-  console.log(`\n${results.length - bad.length}/${results.length} niveaux valides (difficulté ${difficulty}) en ${((Date.now() - t0) / 1000).toFixed(0)} s`)
+  console.log(`\n${results.length - bad.length}/${results.length} niveaux valides (difficulté ${difficulty}${engine === 'trebuchet' ? ', trébuchet' : ''}) en ${((Date.now() - t0) / 1000).toFixed(0)} s`)
   if (process.env.CHECK_REPORT) {
     const { writeFileSync } = await import('node:fs')
     writeFileSync(process.env.CHECK_REPORT, JSON.stringify(results, null, 2))
@@ -185,5 +233,5 @@ if (isMainThread) {
   process.exitCode = bad.length ? 1 : 0
 } else {
   const G = await loadGame()
-  for (const id of workerData.ids) parentPort.postMessage(await checkLevel(G, id, workerData.difficulty))
+  for (const id of workerData.ids) parentPort.postMessage(await checkLevel(G, id, workerData.difficulty, workerData.engine))
 }

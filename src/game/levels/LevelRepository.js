@@ -8,6 +8,7 @@ import { TARGET_TYPES, PROJECTILE_NAMES } from '../entities/catalog.js'
 import { referenceScore, maxScore } from '../score/ScoreRules.js'
 import { achievementsFor } from '../progression/Achievements.js'
 import { PowerRegistry } from '../powers/PowerRegistry.js'
+import { TREBUCHET_UNLOCK } from '../Trebuchet.js'
 
 const coord = Schema.number({ min: -500, max: 4000 })
 const size = Schema.number({ min: 6, max: 600 })
@@ -79,7 +80,9 @@ export class LevelRepository {
       const fresh = Object.keys(spec.ammo).filter((a) => !seen.has(a))
       fresh.forEach((a) => seen.add(a))
       const power = PowerRegistry.all().find((p) => p.unlockAfter === id - 1)
-      const tutorial = id === 1 ? 'aim' : fresh.length ? `ammo:${fresh[0]}` : power ? `power:${power.id}` : null
+      // Le trébuchet a son propre niveau d'apprentissage, juste après son déblocage.
+      const engine = id === TREBUCHET_UNLOCK + 1 ? 'engine:trebuchet' : null
+      const tutorial = id === 1 ? 'aim' : fresh.length ? `ammo:${fresh[0]}` : power ? `power:${power.id}` : engine
       return buildLevel(spec, id, Math.ceil(id / GAME.LEVELS_PER_CHAPTER), 0, { tutorial })
     })
   }
@@ -129,6 +132,7 @@ export class LevelRepository {
     level.targets.forEach((t) => now.add(`target:${t.type}`))
     if (level.barrels.length) now.add('barrel')
     LevelRepository.newAmmo(id).forEach((a) => now.add(`ammo:${a}`))
+    if (id === TREBUCHET_UNLOCK + 1) now.add('engine:trebuchet')
     return [...now].filter((k) => !seen.has(k))
   }
 }

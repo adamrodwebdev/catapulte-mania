@@ -4,9 +4,10 @@ import { clamp } from '../../core/utils/math.js'
 
 const TAU = Math.PI * 2
 /** Nombre maximal de traînées (vent fort). */
-const MAX_STREAKS = 64
-/** Zone couverte par les traînées (repère monde). */
-const SPAN = WORLD.WIDTH + 600
+const MAX_STREAKS = 80
+/** Zone couverte par les traînées (repère monde), trébuchet en retrait compris. */
+const SPAN = WORLD.WIDTH + 1400
+const SPAN_LEFT = -1100
 const TOP = WORLD.TOP + 120
 const BOTTOM = WORLD.GROUND_Y - 30
 
@@ -47,7 +48,7 @@ export class WindLayer {
     const { field, time, animate } = wind
     const t = animate ? time : 0
     const base = field.base
-    for (const c of wind.catapults) this.#windsock(ctx, field, c.x + 150 * c.dir, t, animate, pixel)
+    for (const c of wind.catapults) this.#windsock(ctx, field, c.x + (c.offset ?? 150) * c.dir, t, animate, pixel)
     if (wind.top) this.#pennant(ctx, field, wind.top, t, animate, pixel)
     if (Math.abs(base) < 0.05) return
     this.#drawStreaks(ctx, field, t, pixel)
@@ -65,7 +66,7 @@ export class WindLayer {
       const s = this.#streaks[i]
       // Vitesse de défilement : vent de base × altitude (les rafales jouent sur la longueur et l'éclat).
       const v = (0.12 + 0.55 * Math.abs(base) * field.shearAt(s.y)) * s.speed
-      const x = ((((s.x + dir * t * v) % SPAN) + SPAN) % SPAN) - 300
+      const x = ((((s.x + dir * t * v) % SPAN) + SPAN) % SPAN) + SPAN_LEFT
       const local = Math.abs(field.at(x, s.y, t))
       const gust = Math.max(0, field.gustAt(x, t)) * field.profile.gust
       const len = (40 + 110 * clamp(local, 0, 1.8)) * s.len

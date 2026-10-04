@@ -2,6 +2,41 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [3.7.0] – 2026-10-04
+### Ajouté
+- **Le trébuchet**, un second engin de siège qui se joue **uniquement au clic** :
+  - 1er clic : le contrepoids tombe, le bras se met à tourner ;
+  - 2e clic : la fronde lâche le projectile. Lâcher tôt = tir en cloche (trop
+    tôt : il part en arrière) ; lâcher tard = tir tendu (trop tard : dans le sol) ;
+  - **physique réelle** : bras mû par son contrepoids (pendule amorti), projectile
+    = masse au bout d'une corde (Verlet + contrainte), qui glisse dans l'auge puis
+    décolle ; il part avec la vitesse exacte qu'il avait au lâcher. Simulation à
+    pas fixe : un même instant de lâcher donne toujours le même tir ;
+  - le lâcher correspond à l'**instant exact du clic** (le temps écoulé depuis la
+    dernière image est compté), et non à l'image suivante ;
+  - en retrait de la catapulte : **le château est plus loin**, mais le trébuchet
+    frappe plus fort ; l'amélioration « Bras renforcé » alourdit son contrepoids ;
+  - **caméra qui suit le tir** en gardant le sol à l'écran (elle dézoome quand le
+    projectile monte), puis reste sur le château pendant l'effondrement ;
+  - dessiné par le code (châssis, bras effilé, caisse de contrepoids, fronde), sons
+    synthétisés (chute du contrepoids, grincement).
+- **Déblocage** après le niveau 13 ; **le niveau 14 devient son niveau
+  d'apprentissage** (tutoriel guidé, trébuchet imposé au premier passage, réplique
+  de Maître Gontran). Ensuite, **choix de l'engin dans l'introduction de chaque
+  niveau** (campagne, mode libre, et à deux sauf au face-à-face), mémorisé.
+- **Commandes du trébuchet** : cadran de l'angle et de la vitesse du moment,
+  bouton « Armer » puis « Lâcher ! », Espace ou Entrée au clavier.
+- **Accessibilité** : réglage « Balancier lent » (bras deux fois plus lent) ;
+  **tic sonore** de plus en plus aigu à chaque tranche de 15° de l'angle de tir
+  (lâcher à l'oreille) ; sous-titre « Le contrepoids tombe » ; annonces adaptées
+  aux lecteurs d'écran ; avec l'aide à la visée, la trajectoire du tir « si je
+  lâchais maintenant » s'affiche en direct pendant le balancier.
+- Contrôleur de niveaux : `--engine trebuchet` (le joueur automatique choisit
+  l'instant du lâcher).
+### Modifié
+- Monde étendu vers l'arrière (traînées de vent, limites de sortie) pour le trébuchet.
+- Aucun changement de sauvegarde : le déblocage se déduit de la progression.
+
 ## [3.6.0] – 2026-10-04
 ### Modifié
 - **Le vent devient un vrai enjeu en Difficile** (Facile et Normal inchangés) :

@@ -45,6 +45,8 @@ export class PhysicsWorld {
   #supportTick = 0
   #ground
   structure = new StructuralIntegrity()
+  /** Bord gauche du monde (plus loin quand le trébuchet tire depuis l'arrière). */
+  leftLimit = 0
 
   /**
    * @param {import('../../core/utils/EventBus.js').EventBus} events
@@ -470,7 +472,7 @@ export class PhysicsWorld {
   /** Retire les entités détruites, sorties du monde ou épuisées, et déclenche les barils. */
   #cleanup() {
     for (const e of [...this.#entities.values()]) {
-      const out = e.y > WORLD.BOTTOM + WORLD.KILL_MARGIN || e.x < -WORLD.KILL_MARGIN || e.x > WORLD.WIDTH + WORLD.KILL_MARGIN
+      const out = e.y > WORLD.BOTTOM + WORLD.KILL_MARGIN || e.x < this.leftLimit - WORLD.KILL_MARGIN || e.x > WORLD.WIDTH + WORLD.KILL_MARGIN
       if (out && e.alive) e.kill(e.kind === 'projectile' ? 'out' : 'fall')
       if (e.kind === 'projectile' && e.alive && e.spent) {
         this.remove(e)

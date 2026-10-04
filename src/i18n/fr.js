@@ -126,6 +126,18 @@ export default {
     usedThisTurn: 'Déjà utilisé ce tour',
     unlocksAfter: 'Débloqué après {count} niveaux',
     aimHint: 'Faites glisser vers l’arrière pour viser, puis tirez.',
+    engine: 'Engin',
+    engines: { catapult: 'Catapulte', trebuchet: 'Trébuchet' },
+    treb: {
+      arm: '1er clic : libérez le contrepoids',
+      release: '2e clic : lâchez la fronde !',
+      wait: 'Le tir est parti…',
+      angle: 'Angle',
+      speed: 'Vitesse',
+      armBtn: 'Armer',
+      releaseBtn: 'Lâcher !',
+      introHint: 'Trébuchet : un clic lance le balancier, un second lâche la fronde. Lâchez tôt pour un tir en cloche, tard pour un tir tendu. Le château est plus loin, mais le trébuchet frappe plus fort.',
+    },
     ammo: {
       stone: 'Pierre',
       boulder: 'Rocher',
@@ -167,6 +179,7 @@ export default {
     star3: { one: 'en {count} tir', other: 'en {count} tirs' },
     star2: { one: 'en {count} tir', other: 'en {count} tirs au plus' },
     novelty: {
+      'engine:trebuchet': 'Le trébuchet : un nouvel engin, plus puissant, qui tire de plus loin. Vous pourrez ensuite choisir votre engin avant chaque niveau.',
       'material:brick': 'La brique tient mieux que le bois, moins que la pierre.',
       'material:sandstone': 'Le grès est lourd mais s’effrite plus vite que la pierre.',
       'material:ice': 'La glace glisse : un étage peut partir d’une simple poussée.',
@@ -254,6 +267,12 @@ export default {
   tutorial: {
     title: 'Tutoriel : {name}',
     aimTitle: 'Tutoriel : viser et tirer',
+    engine: {
+      arm: 'Le trébuchet se joue au clic. Touchez la scène (ou « Armer », ou Espace) : le contrepoids tombe et le bras se met à tourner.',
+      release: 'Le bras tourne ! Touchez à nouveau pour lâcher la fronde. Les pointillés montrent le tir du moment : lâchez quand ils tombent sur le château.',
+      watch: 'La caméra suit le projectile jusqu’au château…',
+      done: 'Lâcher tôt : tir en cloche. Lâcher tard : tir tendu. Avant chaque niveau, vous pourrez choisir entre catapulte et trébuchet.',
+    },
     skip: 'Passer',
     close: 'Compris',
     aim: {
@@ -381,7 +400,7 @@ export default {
       l11: 'Voici mon rocher. Lourd, très lourd : garde-le pour la pierre, une simple pierre suffit au bois.',
       l12: 'Le guetteur, tout en haut de sa tour, voit tout le pays. Fais-le descendre.',
       l13: 'Des barils de poudre sous une tour de pierre… Une étincelle, et boum. Vise les barils.',
-      l14: 'Une chapelle de verre. Le verre se brise au moindre choc ; ses défenseurs se croient pourtant à l’abri.',
+      l14: 'Mon trébuchet est prêt ! Il tire de plus loin et frappe plus fort. Un clic lâche le contrepoids, un second la fronde : tout est dans l’instant.',
       l15: 'Un chevalier en armure, au fond du donjon. Il faudra que tout lui tombe dessus.',
       l16: 'Plus de pot de feu ? Qu’importe : le pouvoir Feu grégeois enflamme même une simple pierre.',
       l17: 'Une tour de pierre posée sur un pont de bois. Casse le pont, la tour suit : c’est la clé de voûte.',
@@ -489,6 +508,8 @@ export default {
     storyDesc: 'Affiche la Chronique avant les niveaux qui ouvrent un chapitre.',
     trajectoryAid: 'Aide à la trajectoire',
     trajectoryAidDesc: 'Affiche la courbe que suivra le projectile.',
+    slowSwing: 'Balancier lent',
+    slowSwingDesc: 'Le bras du trébuchet tourne deux fois plus lentement : l’instant du lâcher est plus facile à choisir.',
     captions: 'Sous-titres des sons',
     captionsDesc: 'Décrit à l’écran chaque son important, avec sa direction.',
     announcements: 'Annonces vocales',
@@ -508,6 +529,8 @@ export default {
     off: 'Désactivé',
   },
   help: {
+    trebuchetTitle: 'Le trébuchet',
+    trebuchet: 'Débloqué après le niveau 13, il se choisit avant chaque niveau (sauf au face-à-face). Il se joue uniquement au clic : le premier libère le contrepoids, le second lâche la fronde. Lâchez tôt pour un tir en cloche, tard pour un tir tendu. Il tire de plus loin que la catapulte mais frappe plus fort, et la caméra suit le tir. Un tic sonore monte avec l’angle du tir ; l’option « Balancier lent » ralentit le bras.',
     modesTitle: 'Modes de jeu',
     modes: 'Campagne : les 100 niveaux, avec étoiles et or. Mode libre : rejouez un niveau terminé sans limite. Deux joueurs, sur le même appareil : la campagne à deux en coopération, le duel (renommée), le tournoi en trois manches et le face-à-face (régicide).',
     workshopTitle: 'Atelier',
@@ -532,6 +555,7 @@ export default {
     ach: 'Chaque niveau propose trois succès (gagner sans boulet spécial, faire sauter tous les barils, abattre le roi en premier…). Ils se cumulent d’une partie à l’autre et rapportent de l’or.',
   },
   captions: {
+    swing: 'Le contrepoids tombe',
     gust: 'Rafale de vent',
     music: '♪ La musique s’emballe',
     launch: 'Tir de catapulte',
@@ -560,9 +584,11 @@ export default {
     center: 'au centre',
   },
   a11y: {
+    swing: 'Le balancier tourne. Appuyez de nouveau pour lâcher. Les tics montent à mesure que le tir se relève.',
     playerTurn: 'Au tour de {name}.',
     canvas: 'Champ de bataille. Niveau {level} : {targets} cible(s) restante(s), {shots} tir(s), vent {wind}.',
     keyboardHelp: 'Flèches pour viser, Espace pour tirer.',
+    keyboardHelpTreb: 'Trébuchet : Espace ou clic pour lancer le balancier, puis à nouveau pour lâcher la fronde.',
     levelStart: 'Le niveau commence. {targets} cible(s) à éliminer avec {shots} tir(s).',
     turn: 'Nouveau tour. {targets} cible(s) restante(s), {shots} tir(s). Vent : {wind}.',
     targetDown: 'Cible éliminée. Il en reste {left}.',

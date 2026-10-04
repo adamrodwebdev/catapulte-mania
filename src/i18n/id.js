@@ -126,6 +126,18 @@ export default {
     usedThisTurn: 'Sudah dipakai giliran ini',
     unlocksAfter: 'Terbuka setelah {count} level',
     aimHint: 'Tarik ke belakang untuk membidik, lalu tembak.',
+    engine: 'Mesin pengepung',
+    engines: { catapult: 'Katapel', trebuchet: 'Trebuset' },
+    treb: {
+      arm: 'Klik pertama: jatuhkan pemberat',
+      release: 'Klik kedua: lepaskan ambin!',
+      wait: 'Tembakan meluncur…',
+      angle: 'Sudut',
+      speed: 'Kecepatan',
+      armBtn: 'Siagakan',
+      releaseBtn: 'Lepas!',
+      introHint: 'Trebuset: satu klik mengayunkan lengan, klik kedua melepas ambin. Lepas lebih awal untuk tembakan melengkung tinggi, lebih lambat untuk tembakan datar. Kastel lebih jauh, tetapi trebuset menghantam lebih keras.',
+    },
     ammo: {
       stone: 'Batu',
       boulder: 'Bongkahan',
@@ -167,6 +179,7 @@ export default {
     star3: { other: 'dalam {count} tembakan' },
     star2: { other: 'dalam paling banyak {count} tembakan' },
     novelty: {
+      'engine:trebuchet': 'Trebuset: mesin baru yang lebih kuat dan menembak dari lebih jauh. Setelah ini, Anda bisa memilih mesin sebelum setiap level.',
       'material:brick': 'Bata lebih kuat dari kayu, tapi kalah dari batu.',
       'material:sandstone': 'Batu pasir berat tetapi lebih cepat hancur daripada batu.',
       'material:ice': 'Es licin: satu lantai bisa tergelincir hanya dengan satu dorongan.',
@@ -254,6 +267,12 @@ export default {
   tutorial: {
     title: 'Tutorial: {name}',
     aimTitle: 'Tutorial: membidik dan menembak',
+    engine: {
+      arm: 'Trebuset dimainkan dengan klik. Ketuk layar (atau “Siagakan”, atau Spasi): pemberat jatuh dan lengan mulai berayun.',
+      release: 'Lengan berayun! Ketuk lagi untuk melepas ambin. Garis titik-titik menunjukkan tembakan saat ini: lepaskan saat jatuh di kastel.',
+      watch: 'Kamera mengikuti proyektil sampai ke kastel…',
+      done: 'Lepas awal: melengkung tinggi. Lepas lambat: datar. Sebelum setiap level, Anda bisa memilih katapel atau trebuset.',
+    },
     skip: 'Lewati',
     close: 'Mengerti',
     aim: {
@@ -381,7 +400,7 @@ export default {
       l11: 'Ini batu besarku. Berat, sangat berat: simpan untuk batu, batu biasa cukup untuk kayu.',
       l12: 'Pengintai di puncak menaranya bisa melihat seluruh negeri. Turunkan dia.',
       l13: 'Tong mesiu di bawah menara batu… Satu percikan, dan duar. Bidik tongnya.',
-      l14: 'Kapel kaca. Kaca pecah oleh benturan sekecil apa pun, tetapi penjaganya merasa aman.',
+      l14: 'Trebusetku siap! Ia menembak dari lebih jauh dan menghantam lebih keras. Satu klik menjatuhkan pemberat, klik kedua melepas ambin: semuanya soal waktu.',
       l15: 'Seorang ksatria berzirah, jauh di dalam menara. Semuanya harus runtuh menimpanya.',
       l16: 'Pot api habis? Tak masalah: kekuatan Api Yunani membakar bahkan batu biasa.',
       l17: 'Menara batu berdiri di atas jembatan kayu. Patahkan jembatannya, menaranya ikut: itulah batu kuncinya.',
@@ -489,6 +508,8 @@ export default {
     storyDesc: 'Menampilkan Hikayat sebelum level yang membuka sebuah bab.',
     trajectoryAid: 'Bantuan lintasan',
     trajectoryAidDesc: 'Menampilkan kurva yang akan dilalui proyektil.',
+    slowSwing: 'Ayunan lambat',
+    slowSwingDesc: 'Lengan trebuset berayun dua kali lebih lambat sehingga saat melepas lebih mudah dipilih.',
     captions: 'Teks suara',
     captionsDesc: 'Menjelaskan setiap suara penting di layar, beserta arahnya.',
     announcements: 'Pengumuman suara',
@@ -508,6 +529,8 @@ export default {
     off: 'Nonaktif',
   },
   help: {
+    trebuchetTitle: 'Trebuset',
+    trebuchet: 'Terbuka setelah level 13 dan dipilih sebelum setiap level (kecuali mode berhadapan). Hanya dimainkan dengan klik: klik pertama menjatuhkan pemberat, klik kedua melepas ambin. Lepas awal untuk tembakan melengkung, lambat untuk tembakan datar. Menembak dari lebih jauh daripada katapel tetapi menghantam lebih keras, dan kamera mengikuti tembakan. Bunyi detak naik seiring sudut tembakan; opsi “Ayunan lambat” memperlambat lengan.',
     modesTitle: 'Mode permainan',
     modes: 'Kampanye: 100 level, dengan bintang dan emas. Main bebas: ulangi level yang sudah selesai tanpa batas. Dua pemain di perangkat yang sama: kampanye berdua secara kooperatif, duel (kemasyhuran), turnamen tiga babak, dan berhadapan (pembunuhan raja).',
     workshopTitle: 'Bengkel',
@@ -532,6 +555,7 @@ export default {
     ach: 'Setiap level punya tiga pencapaian (menang tanpa peluru khusus, meledakkan semua tong, menjatuhkan raja lebih dulu…). Pencapaian terkumpul dari satu permainan ke permainan berikutnya dan memberi emas.',
   },
   captions: {
+    swing: 'Pemberat jatuh',
     gust: 'Embusan angin',
     music: '♪ Musik memuncak',
     launch: 'Ketapel menembak',
@@ -560,9 +584,11 @@ export default {
     center: 'di tengah',
   },
   a11y: {
+    swing: 'Lengan berayun. Tekan lagi untuk melepas. Bunyi detak makin tinggi saat tembakan makin curam.',
     playerTurn: 'Giliran {name}.',
     canvas: 'Medan perang. Level {level}: sisa {targets} sasaran, {shots} tembakan, angin {wind}.',
     keyboardHelp: 'Tombol panah untuk membidik, Spasi untuk menembak.',
+    keyboardHelpTreb: 'Trebuset: Spasi atau klik untuk mengayunkan lengan, lalu sekali lagi untuk melepas ambin.',
     levelStart: 'Level dimulai. {targets} sasaran harus dilumpuhkan dengan {shots} tembakan.',
     turn: 'Giliran baru. Sisa {targets} sasaran, {shots} tembakan. Angin: {wind}.',
     targetDown: 'Sasaran tumbang. Sisa {left}.',

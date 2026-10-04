@@ -22,6 +22,9 @@ import { StoryRepository } from '../../game/story/StoryRepository.js'
 import { TutorialCoach } from '../../game/tutorial/Tutorial.js'
 import { HotSeatMatch } from '../../game/modes/HotSeatMatch.js'
 import ToggleSwitch from '../ui/ToggleSwitch.vue'
+import SegmentedControl from '../ui/SegmentedControl.vue'
+import TrebuchetPanel from '../game/TrebuchetPanel.vue'
+import { TREBUCHET_UNLOCK } from '../../game/Trebuchet.js'
 
 const app = useApp()
 const { state, t } = app
@@ -70,6 +73,26 @@ const turnBanner = ref(null)
 let turnTimer = null
 const aiming = computed(() => phase.value === 'playing' && hud.value?.state === 'aiming')
 
+/* ---------- Engin : catapulte ou trébuchet ---------- */
+
+/** Niveaux réussis par le profil (campagne solo, ou à deux si plus avancée). */
+const completedForEngine = computed(() => Math.max(state.profile?.completed ?? 0, isCoop.value ? (state.profile?.coop?.completed ?? 0) : 0))
+/** Niveau d'apprentissage du trébuchet, au premier passage : le trébuchet est imposé. */
+const trebuchetLesson = computed(() => {
+  if (mode.value !== 'story' || level.value.tutorial !== 'engine:trebuchet') return false
+  return !state.profile?.levels[state.levelId]?.completed && state.settings.tutorials !== false
+})
+/** Le trébuchet est débloqué après le niveau 13 (jamais au face-à-face : il tire depuis l'arrière). */
+const engineChoice = computed(() => !isVersus.value && !trebuchetLesson.value && completedForEngine.value >= TREBUCHET_UNLOCK)
+const engine = computed(() => (trebuchetLesson.value || (engineChoice.value && state.settings.engine === 'trebuchet') ? 'trebuchet' : 'catapult'))
+const isTrebuchet = computed(() => hud.value?.engine === 'trebuchet')
+/** Changement d'engin depuis l'introduction : la partie est reconstruite, l'introduction reste affichée. */
+function chooseEngine(value) {
+  if (!engineChoice.value || value === engine.value) return
+  app.setSetting('engine', value)
+  startLevel({ rebuild: true })
+}
+
 /* ---------- Tutoriel guidé ---------- */
 
 /** Tutoriel en cours (premier passage d'un niveau qui présente un outil). */
@@ -104,6 +127,14 @@ function stopCoach() {
   if (controller) controller.session.options.trajectoryAid = state.settings.trajectoryAid
 }
 const coachNotify = (event, detail) => coach?.notify(event, detail)
+/** Titre du tutoriel affiché dans l'introduction. */
+const coachTitle = computed(() => {
+  const tool = coachTool.value
+  if (tool === 'aim') return t('tutorial.aimTitle')
+  const [kind, name] = tool.split(':')
+  const label = kind === 'ammo' ? t(`game.ammo.${name}`) : kind === 'engine' ? t(`game.engines.${name}`) : t(`powers.${name}`)
+  return t('tutorial.title', { name: label })
+})
 watch(
   () => hud.value?.turn,
   (turn, prev) => {
@@ -114,11 +145,11 @@ watch(showPowers, (open) => open && coachNotify('menu'))
 
 /* ---------- Cycle de vie ---------- */
 
-async function startLevel() {
+async function startLevel({ rebuild = false } = {}) {
   destroyController()
   end.value = null
   showPowers.value = false
-  phase.value = 'loading'
+  if (!rebuild) phase.value = 'loading'
   const profile = state.profile
   if (mode.value === 'hotseat') {
     if (!tourney || tourney.finished) newTourney()
@@ -155,10 +186,19 @@ async function startLevel() {
       mode: rules,
       // Portails : un dernier tir contre une vidéo, en campagne solo uniquement.
       continueOffer: state.rewardedAvailable && mode.value === 'story',
+      engine: engine.value,
     }),
   )
   controller.on('turn', ({ name }) => showTurn(name))
   controller.on('aimed', () => coachNotify('aim'))
+  // Tir, balancier, lâcher ou division (bouton, clavier, ou clic sur la scène au trébuchet).
+  controller.on('trigger', ({ result, ammo }) => {
+    if (result === 'fired') coachNotify('fire', ammo)
+    else if (result === 'armed') {
+      coachNotify('arm')
+      coachNotify('fire', ammo)
+    } else if (result === 'released') coachNotify('release')
+  })
   controller.on('hud', (h) => (hud.value = h))
   controller.on('caption', (c) => {
     app.caption(c.key, c.side)
@@ -180,7 +220,7 @@ async function startLevel() {
   stopCoach()
   if (mode.value === 'story' && level.value.tutorial && !rec?.completed && state.settings.tutorials !== false) startCoach(level.value.tutorial)
   // Premier passage d'un niveau qui ouvre un chapitre : la Chronique d'abord.
-  const beat = isCampaign.value && !rec?.completed && state.settings.story !== false ? StoryRepository.before(state.levelId) : null
+  const beat = !rebuild && isCampaign.value && !rec?.completed && state.settings.story !== false ? StoryRepository.before(state.levelId) : null
   storyBeat.value = beat
   phase.value = beat ? 'story' : 'intro'
   await nextTick()
@@ -258,14 +298,10 @@ const pause = () => {
   controller?.pause()
 }
 const resume = () => controller?.resume()
+/** Tirer (catapulte), balancier puis lâcher (trébuchet), ou diviser la mitraille. */
 const fire = () => {
-  if (!controller) return
-  app.services.audio.unlock()
-  if (hud.value?.canActivate) controller.session.activate()
-  else if (aiming.value) {
-    const ammo = controller.session.selectedAmmo
-    if (controller.session.fire()) coachNotify('fire', ammo)
-  }
+  if (!controller || phase.value !== 'playing') return
+  controller.trigger()
 }
 function aim(kind, value) {
   const s = controller?.session
@@ -275,6 +311,7 @@ function aim(kind, value) {
   coachNotify('aim')
 }
 function nudge(da, dp) {
+  if (isTrebuchet.value) return
   controller?.session.nudge(da, dp)
   coachNotify('aim')
 }
@@ -543,7 +580,7 @@ function formatAnnouncement({ key, params = {} }) {
 
 const canvasLabel = computed(() =>
   hud.value
-    ? `${t('a11y.canvas', { level: state.levelId, targets: hud.value.targetsLeft, shots: hud.value.shotsLeft ?? '∞', wind: windText(hud.value.wind) })} ${t('a11y.keyboardHelp')}`
+    ? `${t('a11y.canvas', { level: state.levelId, targets: hud.value.targetsLeft, shots: hud.value.shotsLeft ?? '∞', wind: windText(hud.value.wind) })} ${isTrebuchet.value ? t('a11y.keyboardHelpTreb') : t('a11y.keyboardHelp')}`
     : t('app.title'),
 )
 </script>
@@ -559,17 +596,18 @@ const canvasLabel = computed(() =>
       <PowersMenu v-if="showPowers && phase === 'playing'" :powers="hud.powers" :coach="coachAnchor" @use="usePower" @close="showPowers = false" />
 
       <div v-show="phase === 'playing'" class="hud-bottom">
-        <AimPanel :angle="hud.angle" :power="hud.power" :disabled="!aiming" :coach="coachAnchor" @aim="aim" @nudge="nudge" />
+        <TrebuchetPanel v-if="isTrebuchet" :hud="hud" />
+        <AimPanel v-else :angle="hud.angle" :power="hud.power" :disabled="!aiming" :coach="coachAnchor" @aim="aim" @nudge="nudge" />
         <AmmoBar :ammo="hud.ammo" :disabled="!aiming" :coach="coachAnchor" @select="selectAmmo" />
         <button
           type="button"
-          :class="['fire-btn', { 'fire-btn--split': hud.canActivate, 'coach-focus': coachAnchor === 'fire' }]"
+          :class="['fire-btn', { 'fire-btn--split': hud.canActivate, 'fire-btn--release': hud.armed, 'coach-focus': coachAnchor === 'fire' }]"
           data-coach="fire"
-          :disabled="!aiming && !hud.canActivate"
+          :disabled="!aiming && !hud.canActivate && !hud.armed"
           @click="fire"
         >
           <AppIcon :name="hud.canActivate ? 'volley' : 'target'" :size="28" />
-          <span>{{ hud.canActivate ? t('game.split') : t('game.fire') }}</span>
+          <span>{{ hud.canActivate ? t('game.split') : hud.armed ? t('game.treb.releaseBtn') : isTrebuchet ? t('game.treb.armBtn') : t('game.fire') }}</span>
         </button>
       </div>
       <CoachBubble v-if="coachStep && phase === 'playing'" :tool="coachTool" :step="coachStep" :progress="coachProgress" @skip="stopCoach" />
@@ -618,7 +656,17 @@ const canvasLabel = computed(() =>
           </template>
         </p>
       </template>
-      <p v-if="coachStep" class="intro-tutorial"><AppIcon name="help" :size="18" />{{ coachTool === 'aim' ? t('tutorial.aimTitle') : t('tutorial.title', { name: coachTool.startsWith('ammo:') ? t(`game.ammo.${coachTool.slice(5)}`) : t(`powers.${coachTool.slice(6)}`) }) }}</p>
+      <p v-if="coachStep" class="intro-tutorial"><AppIcon name="help" :size="18" />{{ coachTitle }}</p>
+      <SegmentedControl
+        v-if="engineChoice"
+        class="intro-engine"
+        name="intro-engine"
+        :label="t('game.engine')"
+        :model-value="engine"
+        :options="[{ value: 'catapult', label: t('game.engines.catapult') }, { value: 'trebuchet', label: t('game.engines.trebuchet') }]"
+        @update:model-value="chooseEngine"
+      />
+      <p v-if="engine === 'trebuchet'" class="intro-engine__hint">{{ t('game.treb.introHint') }}</p>
       <ul v-if="novelties.length" class="novelties">
         <li v-for="n in novelties" :key="n" class="novelties__item">
           <span class="novelties__tag">{{ t('intro.new') }}</span>

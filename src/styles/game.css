@@ -892,3 +892,102 @@
     opacity: 1;
   }
 }
+
+/* ---------- Trébuchet (v3.7) ---------- */
+.treb-panel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.treb-panel__dial {
+  flex: none;
+  width: 5.5rem;
+  height: auto;
+}
+
+.treb-panel__arc {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.treb-panel__sweet {
+  fill: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.treb-panel__needle {
+  stroke: var(--danger);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.treb-panel__hub {
+  fill: var(--text);
+}
+
+.treb-panel__text {
+  min-width: 0;
+}
+
+.treb-panel__step {
+  margin: 0;
+  font-weight: 700;
+}
+
+.treb-panel__step--release {
+  color: var(--danger);
+}
+
+.treb-panel__values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: var(--space-1) 0 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.treb-panel__values strong {
+  color: var(--text);
+}
+
+.fire-btn--release {
+  background: var(--accent);
+  color: var(--c-ink);
+  animation: pulse calc(0.5s * var(--speed)) ease-in-out infinite alternate;
+}
+
+.intro-engine {
+  margin-inline: auto;
+}
+
+.intro-engine__hint {
+  font-size: var(--fs-0);
+  color: var(--text-muted);
+}
+
+@media (max-width: 900px) {
+  .treb-panel {
+    grid-area: aim;
+  }
+}
+
+@media (max-width: 640px), (max-height: 480px) {
+  .treb-panel__dial {
+    width: 3.6rem;
+  }
+
+  .treb-panel__values {
+    font-size: var(--fs-0);
+  }
+}
+
+/* Tutoriel du trébuchet : l'engin est en bas à gauche, la bulle se place au centre du ciel. */
+.coach.coach--center {
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(30rem, calc(100% - 2 * var(--space-4)));
+}
