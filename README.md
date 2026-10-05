@@ -309,7 +309,7 @@ Notre site Netlify n'est ouvert qu'aux appareils autorisés (deux aujourd'hui). 
   - `GATE_SECRET` : un texte secret d'au moins 32 caractères (il signe le « badge » enregistré dans le navigateur).
 - **Ajouter un appareil** : ajouter une clé à `ACCESS_KEYS`, puis redéployer.
 - **Retirer ou remplacer un appareil** (appareil perdu, données du navigateur effacées) : remplacer sa clé par une nouvelle, puis redéployer. L'ancienne clé ne fonctionne plus.
-- Sans ces deux variables, le site reste fermé (sécurité par défaut).
+- Sans ces deux variables, le site reste fermé (sécurité par défaut) et affiche « verrou non configuré ». Après avoir ajouté ou modifié une variable, il faut **redéployer** (Deploys → Trigger deploy → Deploy site) pour qu'elle soit prise en compte.
 
 Le code du verrou se trouve dans `netlify/gate/AccessGate.js` (logique, testée) et `netlify/edge-functions/gate.js` (branchement sur Netlify).
 

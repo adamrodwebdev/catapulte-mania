@@ -65,9 +65,10 @@ export default async function handler(request, context) {
       return response
     }
     return page(lang, 401, null)
-  } catch {
+  } catch (error) {
     // Stockage indisponible : on reste fermé plutôt que d'ouvrir le site.
-    return page(lang, 503, 'config')
+    console.error('verrou : stockage indisponible', error?.message ?? error)
+    return page(lang, 503, 'storage')
   }
 }
 

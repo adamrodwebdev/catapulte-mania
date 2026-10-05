@@ -40,7 +40,7 @@ export default [
   {
     // Fonction edge Netlify (environnement Deno) : verrou d'accès du site.
     files: ['netlify/**/*.js'],
-    languageOptions: { globals: { Netlify: 'readonly', Response: 'readonly', Request: 'readonly' } },
+    languageOptions: { globals: { Netlify: 'readonly', Response: 'readonly', Request: 'readonly', console: 'readonly' } },
   },
   {
     // Tests automatiques (Node).

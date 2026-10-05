@@ -142,6 +142,7 @@ const TEXT = {
     invalid: 'Clé inconnue.',
     taken: 'Cette clé est déjà utilisée sur un autre appareil.',
     config: 'Le verrou d’accès n’est pas configuré.',
+    storage: 'Le verrou d’accès est momentanément indisponible. Réessayez dans un instant.',
   },
   en: {
     title: 'Restricted access',
@@ -151,6 +152,7 @@ const TEXT = {
     invalid: 'Unknown key.',
     taken: 'This key is already in use on another device.',
     config: 'The access lock is not configured.',
+    storage: 'The access lock is temporarily unavailable. Please try again shortly.',
   },
   id: {
     title: 'Akses terbatas',
@@ -160,6 +162,7 @@ const TEXT = {
     invalid: 'Kunci tidak dikenal.',
     taken: 'Kunci ini sudah dipakai di perangkat lain.',
     config: 'Kunci akses belum dikonfigurasi.',
+    storage: 'Kunci akses sedang tidak tersedia. Coba lagi sebentar lagi.',
   },
 }
 
@@ -168,12 +171,12 @@ export function pickLang(acceptLanguage) {
   return first === 'en' || first === 'id' ? first : 'fr'
 }
 
-/** Page de saisie (message facultatif : 'invalid' | 'taken' | 'config'). */
+/** Page de saisie (message facultatif : 'invalid' | 'taken' | 'config' | 'storage'). */
 export function gatePage(lang, message = null) {
   const t = TEXT[lang] ?? TEXT.fr
   const note = message ? `<p class="m" role="alert">${t[message]}</p>` : ''
   const form =
-    message === 'config'
+    message === 'config' || message === 'storage'
       ? ''
       : `<form method="post" action="${CLAIM_PATH}"><label for="k">${t.label}</label><input id="k" name="cle" type="password" autocomplete="off" required minlength="20" maxlength="128" pattern="[A-Za-z0-9_\\-]+"><button>${t.submit}</button></form>`
   return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${t.title} – Catapulte Mania</title><style>
