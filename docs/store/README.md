@@ -13,3 +13,13 @@ Générés automatiquement depuis le jeu (aucun montage) :
 
 Vérifiez les formats exacts demandés par chaque portail au moment de la soumission : ils changent parfois.
 La page de confidentialité à indiquer dans les fiches est `privacy.html` (à la racine du site).
+
+## CrazyGames (`crazygames/`)
+
+Couvertures conformes à leurs règles : **seulement le titre** (pas de slogan, pas de score, pas de logo), sans bordure.
+
+| Fichier | Format demandé |
+|---|---|
+| `crazygames/cover-1920x1080.png` | Paysage 16:9 |
+| `crazygames/cover-800x1200.png` | Portrait 2:3 |
+| `crazygames/cover-800x800.png` | Carré 1:1 |
