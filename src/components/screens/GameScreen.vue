@@ -22,7 +22,7 @@ import { StoryRepository } from '../../game/story/StoryRepository.js'
 import { TutorialCoach } from '../../game/tutorial/Tutorial.js'
 import { HotSeatMatch } from '../../game/modes/HotSeatMatch.js'
 import { EndlessRun } from '../../domain/EndlessRun.js'
-import { CastleCode, buildCustomLevel } from '../../game/editor/CastleDesign.js'
+import { CastleCode, buildCustomLevel, STORAGE_KEYS } from '../../game/editor/CastleDesign.js'
 import { eventFor } from '../../game/events/Season.js'
 import { dayKey } from '../../game/daily/DailyChallenge.js'
 import ToggleSwitch from '../ui/ToggleSwitch.vue'
@@ -667,7 +667,14 @@ function newSiege() {
 function onCustomEnd({ won, scores }) {
   const fromEditor = state.match.custom?.fromEditor
   // Prendre son propre château prouve qu'il est faisable : on peut alors le partager.
-  if (won && fromEditor) state.editorVerified = state.match.custom.code
+  if (won && fromEditor) {
+    state.editorVerified = state.match.custom.code
+    try {
+      app.services.storage.writeJson(STORAGE_KEYS.verified, state.match.custom.code)
+    } catch {
+      /* sans stockage : la preuve vaut pour la session */
+    }
+  }
   setTimeout(() => {
     end.value = { kind: 'custom', won, score: scores?.[0] ?? 0, fromEditor }
     phase.value = 'ended'

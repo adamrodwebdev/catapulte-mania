@@ -1,6 +1,6 @@
 {
   "name": "catapulte-mania",
-  "version": "4.0.1",
+  "version": "4.0.2",
   "private": true,
   "description": "Jeu de catapulte médiéval 100 % front-end (Vue 3 + Vite + Matter.js) : 40 niveaux, pouvoirs spéciaux, multilingue (FR / EN / ID) et accessible.",
   "type": "module",

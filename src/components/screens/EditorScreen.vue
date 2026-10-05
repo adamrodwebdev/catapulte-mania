@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, markRaw } from 'vue'
 import { useApp } from '../../app/AppContext.js'
 import AppIcon from '../ui/AppIcon.vue'
 import ModalPanel from '../ui/ModalPanel.vue'
-import { emptyDesign, placePart, removeAt, CastleCode, PARTS, LIMITS } from '../../game/editor/CastleDesign.js'
+import { emptyDesign, placePart, removeAt, CastleCode, PARTS, LIMITS, STORAGE_KEYS } from '../../game/editor/CastleDesign.js'
 import { MATERIAL_NAMES } from '../../game/entities/materials.js'
 
 /**
@@ -30,7 +30,7 @@ const message = ref('')
 
 function loadDraft() {
   try {
-    const code = app.services.storage.readJson('castleDraft')
+    const code = app.services.storage.readJson(STORAGE_KEYS.draft)
     if (typeof code === 'string') return CastleCode.decode(code, { draft: true })
   } catch {
     /* brouillon illisible : on repart d'un château vide */
@@ -39,7 +39,7 @@ function loadDraft() {
 }
 function saveDraft() {
   try {
-    app.services.storage.writeJson('castleDraft', CastleCode.encode(design.value))
+    app.services.storage.writeJson(STORAGE_KEYS.draft, CastleCode.encode(design.value))
   } catch {
     /* sans stockage : le brouillon vit le temps de la session */
   }
@@ -56,6 +56,15 @@ const counts = computed(() => ({
   parts: design.value.parts.length,
   targets: design.value.parts.filter((p) => PARTS[p.kind].target).length,
 }))
+// Château déjà pris par son auteur (dans cette session, ou mémorisé sur l'appareil).
+if (!state.editorVerified) {
+  try {
+    const saved = app.services.storage.readJson(STORAGE_KEYS.verified)
+    if (typeof saved === 'string' && saved.length <= 4000) state.editorVerified = saved
+  } catch {
+    /* rien de mémorisé */
+  }
+}
 const verified = computed(() => Boolean(code.value) && state.editorVerified === code.value)
 const playable = computed(() => counts.value.targets > 0)
 

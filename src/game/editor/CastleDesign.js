@@ -31,6 +31,12 @@ const KINDS = Object.keys(PARTS)
 /** Zone constructible (devant : la catapulte ; derrière : le bord du terrain). */
 export const ZONE = Object.freeze({ left: 950, right: 2250, top: 230 })
 export const LIMITS = Object.freeze({ parts: 60, targets: 12, barrels: 8 })
+/**
+ * Clés de stockage de l'atelier (minuscules : le service de stockage
+ * n'accepte que [a-z0-9:_-]). Le brouillon, et le dernier château pris par
+ * son auteur (preuve qu'il est faisable, condition pour le partager).
+ */
+export const STORAGE_KEYS = Object.freeze({ draft: 'castle-draft', verified: 'castle-verified' })
 const AMMO = Object.freeze(['boulder', 'fire', 'bomb', 'split'])
 
 /** Château vide, prêt à construire. */

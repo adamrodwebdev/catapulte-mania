@@ -2,6 +2,15 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [4.0.2] – 2026-10-05
+### Corrigé
+- **Atelier** : le château en construction n'était jamais enregistré (nom de
+  stockage refusé par le service de stockage, erreur passée sous silence).
+  Après avoir pris son château, on revenait donc à un atelier vide et le
+  partage restait impossible. Le brouillon est désormais bien conservé, et la
+  preuve qu'on a pris son château est mémorisée sur l'appareil.
+- Contrôles automatiques GitHub : l'étape « Style du code » repasse au vert.
+
 ## [4.0.1] – 2026-10-05
 ### Modifié
 - Le studio s'appelle désormais **Adamrodwebtech** : générique de lancement,
