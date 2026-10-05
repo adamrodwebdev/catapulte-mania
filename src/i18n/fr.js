@@ -679,11 +679,11 @@ export default {
     rightsTitle: 'Vos droits',
     rights: 'Vous pouvez effacer vos profils à tout moment depuis l’écran des profils, ou en vidant les données du site dans votre navigateur. Aucune autre donnée n’est conservée.',
     publisherTitle: 'Éditeur',
-    publisher: 'Catapulte Mania est édité par le studio {name}. Version {version}.',
+    publisher: 'Catapulte Mania est édité par {name}. Version {version}.',
     contact: 'Contact :',
   },
   studio: {
-    label: 'Solo Levelling présente Catapulte Mania',
+    label: 'Adamrodwebtech présente Catapulte Mania',
     presents: 'présente',
   },
   captions: {

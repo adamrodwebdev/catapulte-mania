@@ -2,6 +2,20 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [4.0.1] – 2026-10-05
+### Modifié
+- Le studio s'appelle désormais **Adamrodwebtech** : générique de lancement,
+  page « Confidentialité et mentions », page privacy.html, balise auteur.
+- Adresse de contact affichée : adamrodwebdev@gmail.com.
+
+### Ajouté
+- **Verrou du site Netlify** : la version publiée sur notre site n'est ouverte
+  qu'aux appareils autorisés (deux). Une clé d'accès par appareil, liée au
+  premier appareil qui la saisit (cookie signé HMAC-SHA-256, HttpOnly, Secure ;
+  liaison mémorisée dans Netlify Blobs). Sans cookie valide : page de saisie
+  (401), rien n'est servi ni indexé. Fermé par défaut si la configuration
+  manque. La démo et les versions portails ne sont pas concernées.
+
 ## [4.0.0] – 2026-10-04
 ### Ajouté
 - **Siège sans fin** : des châteaux qui s'enchaînent, de plus en plus durs

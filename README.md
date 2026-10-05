@@ -299,6 +299,20 @@ Pour tester sur un téléphone connecté au même Wi-Fi : utilisez l'adresse « 
 2. « Add new site » → « Import an existing project » → choisissez le dépôt GitHub.
 3. Netlify lit la configuration tout seul et publie le site. À chaque nouveau commit sur GitHub, le site se met à jour.
 
+**Accès limité à quelques appareils (verrou du site Netlify)** :
+
+Notre site Netlify n'est ouvert qu'aux appareils autorisés (deux aujourd'hui). La démo et les versions pour portails n'ont pas de verrou.
+
+- Chaque appareil reçoit sa propre **clé d'accès**. La première fois qu'on ouvre le site, une page demande la clé : une fois saisie, elle est **liée à cet appareil** (à ce navigateur) et ne fonctionne plus ailleurs.
+- Les clés se règlent dans Netlify : *Project configuration → Environment variables*.
+  - `ACCESS_KEYS` : les clés, séparées par des virgules (une par appareil, au moins 20 caractères : lettres, chiffres, `-` ou `_`) ;
+  - `GATE_SECRET` : un texte secret d'au moins 32 caractères (il signe le « badge » enregistré dans le navigateur).
+- **Ajouter un appareil** : ajouter une clé à `ACCESS_KEYS`, puis redéployer.
+- **Retirer ou remplacer un appareil** (appareil perdu, données du navigateur effacées) : remplacer sa clé par une nouvelle, puis redéployer. L'ancienne clé ne fonctionne plus.
+- Sans ces deux variables, le site reste fermé (sécurité par défaut).
+
+Le code du verrou se trouve dans `netlify/gate/AccessGate.js` (logique, testée) et `netlify/edge-functions/gate.js` (branchement sur Netlify).
+
 Tout autre hébergeur de fichiers statiques convient (GitHub Pages, Cloudflare Pages, OVH…) : il suffit d'envoyer le contenu du dossier `dist/`.
 
 ### Publier sur un portail de jeux (CrazyGames, Poki)
@@ -440,6 +454,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v3.3.0 | Les personnages de la Chronique en pixel art (sans images), une réplique avant chaque niveau, histoire réécrite |
 | v3.4.0 | Campagne à deux en coopération, nouvelles conditions de victoire (renommée, tournoi, régicide), tout en Difficile à deux, 6 arènes avec un roi |
 | v3.5.0 | Versions pour les portails CrazyGames et Poki (vidéos récompensées facultatives, publicités entre les niveaux, sauvegarde synchronisée), langues chargées à la demande |
+| v4.0.1 | Studio renommé Adamrodwebtech, adresse de contact, verrou du site Netlify (accès limité à deux appareils) |
 | v4.0.0 | Siège sans fin, atelier de châteaux (éditeur et partage), vidéos récompensées facultatives (indice, pouvoir offert), événements saisonniers, préparation des boutiques |
 | v3.9.0 | Défi du jour (même défi pour tous, série de jours) et liens « Bats mon tir » rejoués par le moteur ; célébrations et progression sur les portails |
 | v3.8.0 | Nouveau nom : Catapulte Mania ; générique du studio Solo Levelling ; trébuchet rééquilibré (fenêtre de tir plus longue) et balancier infini ; sang désactivé par défaut sur les portails ; page de confidentialité ; visuels des fiches |

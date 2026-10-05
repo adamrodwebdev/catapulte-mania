@@ -679,11 +679,11 @@ export default {
     rightsTitle: 'Hak Anda',
     rights: 'Anda dapat menghapus profil kapan saja dari layar profil, atau dengan menghapus data situs di peramban. Tidak ada data lain yang disimpan.',
     publisherTitle: 'Penerbit',
-    publisher: 'Catapulte Mania diterbitkan oleh studio {name}. Versi {version}.',
+    publisher: 'Catapulte Mania diterbitkan oleh {name}. Versi {version}.',
     contact: 'Kontak:',
   },
   studio: {
-    label: 'Solo Levelling mempersembahkan Catapulte Mania',
+    label: 'Adamrodwebtech mempersembahkan Catapulte Mania',
     presents: 'mempersembahkan',
   },
   captions: {

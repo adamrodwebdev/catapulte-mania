@@ -3,11 +3,11 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useApp } from '../../app/AppContext.js'
 
 /**
- * Générique du studio (v3.8) : « Solo Levelling présente ».
+ * Générique du studio (v3.8, renommé en v4.0.1) : « Adamrodwebtech présente ».
  *
- * Une étincelle gravit seule un escalier de cinq marches (« solo », « levelling »),
- * éclate au sommet comme un passage de niveau, l'aube se lève et le nom
- * du studio apparaît. 2,6 s en tout, entièrement en CSS et SVG (aucune
+ * Une étincelle gravit un escalier de cinq marches (la progression, niveau
+ * après niveau), éclate au sommet comme un passage de niveau, l'aube se lève
+ * et le nom du studio apparaît. 2,6 s en tout, entièrement en CSS et SVG (aucune
  * image, aucune police supplémentaire : 0 requête réseau).
  *
  * - Passable d'un clic, d'un toucher ou d'une touche.
@@ -19,7 +19,7 @@ const { t, reducedMotion } = useApp()
 
 const leaving = ref(false)
 const still = reducedMotion()
-const NAME = 'Solo Levelling'
+const NAME = 'Adamrodwebtech'
 let timer = null
 
 function finish() {

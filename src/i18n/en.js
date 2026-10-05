@@ -679,11 +679,11 @@ export default {
     rightsTitle: 'Your rights',
     rights: 'You can delete your profiles at any time from the profiles screen, or by clearing the site’s data in your browser. No other data is kept.',
     publisherTitle: 'Publisher',
-    publisher: 'Catapulte Mania is published by the {name} studio. Version {version}.',
+    publisher: 'Catapulte Mania is published by {name}. Version {version}.',
     contact: 'Contact:',
   },
   studio: {
-    label: 'Solo Levelling presents Catapulte Mania',
+    label: 'Adamrodwebtech presents Catapulte Mania',
     presents: 'presents',
   },
   captions: {

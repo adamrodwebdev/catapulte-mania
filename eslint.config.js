@@ -17,7 +17,7 @@ const browserGlobals = Object.fromEntries(
 )
 
 export default [
-  { ignores: ['dist/**', 'dist-demo/**', 'node_modules/**', 'coverage/**', '.scratch/**'] },
+  { ignores: ['dist/**', 'dist-demo/**', 'dist-crazygames/**', 'dist-poki/**', 'node_modules/**', 'coverage/**', '.scratch/**'] },
   js.configs.recommended,
   {
     files: ['**/*.{js,mjs}'],
@@ -36,5 +36,10 @@ export default [
       'prefer-const': 'error',
       'no-var': 'error',
     },
+  },
+  {
+    // Fonction edge Netlify (environnement Deno) : verrou d'accès du site.
+    files: ['netlify/**/*.js'],
+    languageOptions: { globals: { Netlify: 'readonly', Response: 'readonly', Request: 'readonly' } },
   },
 ]

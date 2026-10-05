@@ -38,8 +38,8 @@ export const DIFFICULTY = deepFreeze({
  * facultatif : laissé vide, la ligne n'est pas affichée.
  */
 export const LEGAL = deepFreeze({
-  publisher: 'Solo Levelling',
-  contact: '',
+  publisher: 'Adamrodwebtech',
+  contact: 'adamrodwebdev@gmail.com',
 })
 
 /** Est-on dans la build de démonstration ? (constante remplacée au build par Vite) */
