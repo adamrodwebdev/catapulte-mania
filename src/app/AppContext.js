@@ -51,9 +51,16 @@ export const SCREENS = Object.freeze(['home', 'profiles', 'levels', 'game', 'set
  */
 export async function createAppContext({ ads = new NoAdService() } = {}) {
   // Portail avec sauvegarde synchronisée : le stockage du portail remplace le localStorage.
+  // localStorage peut être interdit (cadre isolé d'un portail) : la sauvegarde du portail suffit alors.
+  let local
+  try {
+    local = globalThis.localStorage ?? null
+  } catch {
+    local = null
+  }
   let cloud
   try {
-    cloud = ads.cloudStorage ? new CloudStorageBackend(ads.cloudStorage, globalThis.localStorage ?? null) : null
+    cloud = ads.cloudStorage ? new CloudStorageBackend(ads.cloudStorage, local) : null
   } catch {
     cloud = null
   }

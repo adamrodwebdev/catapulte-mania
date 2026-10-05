@@ -135,6 +135,26 @@ function serviceWorkerPlugin() {
   }
 }
 
+/**
+ * Portails : le jeu tourne dans un cadre isolé (iframe « sandbox », origine
+ * « null »). Le navigateur y refuse les modules JavaScript et les polices
+ * venant du serveur sans en-têtes CORS : on livre donc un script classique
+ * unique (sans découpage) et des polices intégrées au CSS.
+ */
+function portalScriptPlugin() {
+  return {
+    name: 'ctc-portal-script',
+    apply: 'build',
+    enforce: 'post',
+    transformIndexHtml(html) {
+      return html
+        .replace(/<script type="module" crossorigin src=/g, '<script defer src=')
+        .replace(/<link rel="stylesheet" crossorigin href=/g, '<link rel="stylesheet" href=')
+        .replace(/<link rel="modulepreload"[^>]*>\n?/g, '')
+    },
+  }
+}
+
 function escapeRe(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -153,7 +173,7 @@ export default defineConfig(({ mode }) => {
       siteUrlPlugin(siteUrl),
       cspPlugin(target),
       // Portails : ni service worker ni fichiers SEO (ils servent et référencent le jeu eux-mêmes).
-      ...(isDemo ? [singleFilePlugin()] : target === 'web' ? [seoFilesPlugin(siteUrl), serviceWorkerPlugin()] : []),
+      ...(isDemo ? [singleFilePlugin()] : target === 'web' ? [seoFilesPlugin(siteUrl), serviceWorkerPlugin()] : [portalScriptPlugin()]),
     ],
     define: {
       __DEMO__: JSON.stringify(isDemo),
@@ -165,8 +185,9 @@ export default defineConfig(({ mode }) => {
       target: 'es2020',
       sourcemap: false,
       cssCodeSplit: !isDemo,
-      assetsInlineLimit: isDemo ? Number.MAX_SAFE_INTEGER : 4096,
-      rollupOptions: isDemo ? { output: { inlineDynamicImports: true } } : {},
+      assetsInlineLimit: isDemo || target !== 'web' ? Number.MAX_SAFE_INTEGER : 4096,
+      modulePreload: target === 'web' && !isDemo ? undefined : false,
+      rollupOptions: isDemo ? { output: { inlineDynamicImports: true } } : target !== 'web' ? { output: { format: 'iife', inlineDynamicImports: true } } : {},
     },
     server: { host: true },
   }

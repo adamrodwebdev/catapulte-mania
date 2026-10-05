@@ -2,6 +2,18 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [4.1.1] – 2026-10-05
+### Corrigé
+- **Versions portails : écran vide dans l'outil de test CrazyGames.** Le jeu y
+  tourne dans un cadre isolé (iframe « sandbox ») où le navigateur refuse les
+  modules JavaScript et les polices servis sans en-têtes CORS. Les versions
+  portails sont désormais livrées en un script classique unique, polices
+  intégrées au CSS. Vérifié dans des cadres isolés de tous types.
+- Écran de jeu et atelier chargés de façon explicite : ils s'ouvraient mal
+  quand tout le jeu tient dans un seul fichier (démo, portails).
+- Démarrage plus robuste : délai maximal pour le SDK du portail, et si le
+  démarrage avec le portail échoue, le jeu démarre quand même sans lui.
+
 ## [4.1.0] – 2026-10-05
 ### Modifié (conformité CrazyGames)
 - **Vidéos récompensées hors du jeu** : l'indice de trajectoire et le pouvoir

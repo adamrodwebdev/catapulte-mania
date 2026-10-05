@@ -19,9 +19,11 @@ import ModesScreen from './components/screens/ModesScreen.vue'
  * L'écran de jeu (et le moteur physique) est chargé à la demande :
  * la page d'accueil reste légère et s'affiche instantanément.
  */
-const GameScreen = defineAsyncComponent(() => import('./components/screens/GameScreen.vue'))
+// « .then((m) => m.default) » : explicite, pour que le chargement fonctionne aussi
+// quand tout le jeu tient dans un seul fichier (démo, portails).
+const GameScreen = defineAsyncComponent(() => import('./components/screens/GameScreen.vue').then((m) => m.default))
 /** L'atelier de châteaux (éditeur) est lui aussi chargé à la demande. */
-const EditorScreen = defineAsyncComponent(() => import('./components/screens/EditorScreen.vue'))
+const EditorScreen = defineAsyncComponent(() => import('./components/screens/EditorScreen.vue').then((m) => m.default))
 
 const { state, t } = useApp()
 const SCREENS = {

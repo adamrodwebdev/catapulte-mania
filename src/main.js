@@ -18,7 +18,13 @@ import './styles/studio.css'
 
 // Portails : le SDK s'initialise d'abord (sauvegarde synchronisée). Notre site : rien à charger.
 createAdService()
-  .then((ads) => createAppContext({ ads }))
+  .then((ads) =>
+    createAppContext({ ads }).catch((err) => {
+      // Dernier recours : sans les services du portail plutôt qu'un écran vide.
+      console.error('[Catapulte Mania] démarrage avec le portail impossible', err)
+      return createAppContext()
+    }),
+  )
   .then((ctx) => {
     const app = createApp(App)
     provideApp(app, ctx)

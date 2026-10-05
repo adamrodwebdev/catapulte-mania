@@ -21,7 +21,8 @@ export class CrazyGamesAdService extends AdService {
       await loadScript(SDK_URLS.crazygames)
       const sdk = globalThis.CrazyGames?.SDK
       if (!sdk) return
-      await sdk.init()
+      // Délai maximal : sans réponse du portail, le jeu démarre quand même.
+      await Promise.race([sdk.init(), new Promise((_, reject) => setTimeout(() => reject(new Error('sdk init timeout')), 8000))])
       if (sdk.environment === 'disabled') return
       this.#sdk = sdk
       sdk.game?.loadingStart?.()
