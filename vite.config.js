@@ -82,7 +82,10 @@ function singleFilePlugin() {
     name: 'ctc-single-file',
     apply: 'build',
     enforce: 'post',
-    generateBundle(_opts, bundle) {
+    // order 'post' : après le plugin interne de Vite qui remplit ses marqueurs de
+    // préchargement (sinon « __VITE_PRELOAD__ » reste dans le code et le jeu
+    // reste bloqué sur « Chargement… »).
+    generateBundle: { order: 'post', handler(_opts, bundle) {
       const htmlFile = Object.values(bundle).find((f) => f.fileName.endsWith('.html'))
       if (!htmlFile) return
       let html = String(htmlFile.source)
@@ -90,7 +93,9 @@ function singleFilePlugin() {
       const styleHashes = []
       for (const [name, file] of Object.entries(bundle)) {
         if (file.type === 'chunk' && name.endsWith('.js')) {
-          const code = file.code.replace(/<\/script/gi, '<\\/script')
+          // Fichier unique : rien à précharger (même valeur que Vite avec modulePreload: false).
+          const code = file.code.replaceAll('__VITE_PRELOAD__', 'void 0').replace(/<\/script/gi, '<\\/script')
+          if (/__VITE_[A-Z_]+__/.test(code)) this.error(`marqueur Vite non remplacé dans ${name}`)
           const re = new RegExp(`<script[^>]*src="[^"]*${escapeRe(name)}"[^>]*></script>`)
           if (re.test(html)) {
             html = html.replace(re, () => `<script type="module">${code}</script>`)
@@ -116,8 +121,10 @@ function singleFilePlugin() {
       )
       // Le manifest et les fichiers SEO n'ont pas de sens pour un fichier isolé.
       html = html.replace(/<link rel="manifest"[^>]*>\n?/, '').replace(/ *<link rel="apple-touch-icon"[^>]*>\n?/, '')
+      // La démo n'est pas indexée : la page de référence reste le jeu complet (lien canonique).
+      html = html.replace(/<meta name="robots"[^>]*>/, '<meta name="robots" content="noindex, follow">')
       htmlFile.source = html
-    },
+    } },
   }
 }
 
