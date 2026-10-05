@@ -25,6 +25,8 @@ export class CrazyGamesAdService extends AdService {
       if (sdk.environment === 'disabled') return
       this.#sdk = sdk
       sdk.game?.loadingStart?.()
+      // Son coupé depuis le site CrazyGames : on suit le réglage, et ses changements.
+      sdk.game?.addSettingsChangeListener?.((settings) => this.emit('mute', settings?.muteAudio === true))
     } catch {
       this.#sdk = null // bloqueur de pub, réseau… : le jeu continue sans
     }
@@ -32,6 +34,23 @@ export class CrazyGamesAdService extends AdService {
 
   get rewardedAvailable() {
     return this.#sdk !== null
+  }
+
+  get portalMuted() {
+    try {
+      return this.#sdk?.game?.settings?.muteAudio === true
+    } catch {
+      return false
+    }
+  }
+
+  get locale() {
+    try {
+      const locale = this.#sdk?.user?.systemInfo?.locale
+      return typeof locale === 'string' && /^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*$/.test(locale) ? locale : null
+    } catch {
+      return null
+    }
   }
 
   get cloudStorage() {

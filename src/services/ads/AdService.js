@@ -65,6 +65,21 @@ export class AdService extends EventBus {
   reportProgress(percent) {} // eslint-disable-line no-unused-vars
 
   /** Stockage synchronisé de la plateforme (interface de localStorage) ou null. */
+  /**
+   * Le portail demande-t-il de couper le son ? (événement `mute` à chaque changement)
+   */
+  get portalMuted() {
+    return false
+  }
+
+  /**
+   * Langue du joueur selon le portail (ex. « en-US »), ou null.
+   * Règle CrazyGames : utiliser la langue fournie par le SDK, l'anglais à défaut.
+   */
+  get locale() {
+    return null
+  }
+
   get cloudStorage() {
     return null
   }

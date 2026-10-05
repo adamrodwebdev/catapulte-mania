@@ -179,6 +179,9 @@ watch(showPowers, (open) => open && coachNotify('menu'))
 async function startLevel({ rebuild = false } = {}) {
   destroyController()
   end.value = null
+  pendingHint.value = null
+  pendingFree.value = null
+  introRewardFailed.value = false
   showPowers.value = false
   if (!rebuild) phase.value = 'loading'
   const profile = state.profile
@@ -285,8 +288,12 @@ async function startLevel({ rebuild = false } = {}) {
   stopCoach()
   if (mode.value === 'story' && level.value.tutorial && !rec?.completed && state.settings.tutorials !== false) startCoach(level.value.tutorial)
   // Premier passage d'un niveau qui ouvre un chapitre : la Chronique d'abord.
-  const beat = !rebuild && isCampaign.value && !rec?.completed && state.settings.story !== false ? StoryRepository.before(state.levelId) : null
+  // Démarrage rapide (nouveau joueur sur un portail) : directement dans la partie, le tutoriel guide.
+  const quick = !rebuild && state.match.quick === true
+  if (quick) state.match.quick = false
+  const beat = !quick && !rebuild && isCampaign.value && !rec?.completed && state.settings.story !== false ? StoryRepository.before(state.levelId) : null
   storyBeat.value = beat
+  if (quick) return play()
   phase.value = beat ? 'story' : 'intro'
   await nextTick()
   observeHud()
@@ -433,20 +440,45 @@ function usePower(id) {
   }
 }
 /* Vidéos récompensées en partie (portails, campagne solo) : toujours facultatives. */
+/*
+ * Vidéos récompensées facultatives (portails, campagne solo).
+ * Règle des portails : jamais de bouton vidéo pendant qu'on joue. Elles sont
+ * donc proposées sur l'écran d'introduction du niveau ; le ticket obtenu est
+ * gardé et utilisé ensuite (l'indice au premier tir, le pouvoir quand le
+ * joueur le choisit). Les tickets ne valent que pour ce niveau.
+ */
 const rewardBusy = ref(false)
-async function askHint() {
-  if (rewardBusy.value || !controller) return
+const pendingHint = shallowRef(null)
+const pendingFree = shallowRef(null)
+const introRewardFailed = ref(false)
+const introRewards = computed(() =>
+  phase.value === 'intro' && state.rewardedAvailable && isCampaign.value && !isCoop.value && hud.value?.rewards
+    ? { hint: hud.value.rewards.hint && !pendingHint.value && !state.settings.trajectoryAid, free: hud.value.rewards.freePower && !pendingFree.value && Boolean(hud.value.powers?.some((p) => p.unlocked)) }
+    : null,
+)
+async function watchFor(purpose) {
+  if (rewardBusy.value) return
   rewardBusy.value = true
-  const ticket = await app.services.ads.rewarded('hint')
+  introRewardFailed.value = false
+  const ticket = await app.services.ads.rewarded(purpose)
   rewardBusy.value = false
-  if (ticket && controller?.session.grantHint(ticket)) app.announce(t('ads.hintGranted'))
+  if (!ticket) {
+    introRewardFailed.value = true
+    return
+  }
+  if (purpose === 'hint') pendingHint.value = markRaw(ticket)
+  else pendingFree.value = markRaw(ticket)
 }
-async function usePowerFree(id) {
-  if (rewardBusy.value || !controller) return
-  rewardBusy.value = true
-  const ticket = await app.services.ads.rewarded('free-power')
-  rewardBusy.value = false
-  if (ticket && controller?.session.usePowerFree(id, ticket)) {
+// L'indice obtenu à l'introduction s'applique au premier tir.
+watch(aiming, (now) => {
+  if (!now || !pendingHint.value || !controller) return
+  if (controller.session.grantHint(pendingHint.value)) app.announce(t('ads.hintGranted'))
+  pendingHint.value = null
+})
+function usePowerFree(id) {
+  if (!pendingFree.value || !controller) return
+  if (controller.session.usePowerFree(id, pendingFree.value)) {
+    pendingFree.value = null
     showPowers.value = false
     coachNotify('power', id)
   }
@@ -843,7 +875,7 @@ const canvasLabel = computed(() =>
         v-if="showPowers && phase === 'playing'"
         :powers="hud.powers"
         :coach="coachAnchor"
-        :free-offer="state.rewardedAvailable && Boolean(hud.rewards?.freePower)"
+        :free-offer="Boolean(pendingFree) && Boolean(hud.rewards?.freePower)"
         :free-busy="rewardBusy"
         @use="usePower"
         @use-free="usePowerFree"
@@ -856,15 +888,6 @@ const canvasLabel = computed(() =>
         <button type="button" class="btn btn--small" @click="stopWatching">{{ t('daily.skip') }}</button>
       </div>
       <div v-show="phase === 'playing' && !(isChallenge && challengeStage === 'watch')" class="hud-bottom">
-        <button
-          v-if="state.rewardedAvailable && hud.rewards?.hint && aiming && !state.settings.trajectoryAid && !coachStep"
-          type="button"
-          class="btn btn--reward btn--small hint-btn"
-          :disabled="rewardBusy"
-          @click="askHint"
-        >
-          <AppIcon name="play" :size="16" />{{ t('ads.hint') }}
-        </button>
         <TrebuchetPanel v-if="isTrebuchet" :hud="hud" />
         <AimPanel v-else :angle="hud.angle" :power="hud.power" :disabled="!aiming" :coach="coachAnchor" @aim="aim" @nudge="nudge" />
         <AmmoBar :ammo="hud.ammo" :disabled="!aiming" :coach="coachAnchor" @select="selectAmmo" />
@@ -958,6 +981,14 @@ const canvasLabel = computed(() =>
           {{ t(`intro.novelty.${n}`) }}
         </li>
       </ul>
+      <div v-if="introRewards && (introRewards.hint || introRewards.free || pendingHint || pendingFree)" class="intro-rewards">
+        <p class="intro-rewards__title">{{ t('ads.introTitle') }}</p>
+        <button v-if="introRewards.hint" type="button" class="btn btn--reward btn--small" :disabled="rewardBusy" @click="watchFor('hint')"><AppIcon name="play" :size="16" />{{ t('ads.introHint') }}</button>
+        <p v-else-if="pendingHint" class="notice">{{ t('ads.introHintReady') }}</p>
+        <button v-if="introRewards.free" type="button" class="btn btn--reward btn--small" :disabled="rewardBusy" @click="watchFor('free-power')"><AppIcon name="play" :size="16" />{{ t('ads.introFree') }}</button>
+        <p v-else-if="pendingFree" class="notice">{{ t('ads.introFreeReady') }}</p>
+        <p v-if="introRewardFailed" class="notice notice--warning" role="alert">{{ t('ads.unavailable') }}</p>
+      </div>
       <div class="modal__actions">
         <button type="button" class="btn btn--primary btn--large" data-autofocus @click="play">{{ isChallenge ? t('daily.yourTurn') : t('intro.go') }}</button>
         <button v-if="isChallenge" type="button" class="btn" @click="watchChallenge"><AppIcon name="play" />{{ t('daily.watch') }}</button>

@@ -2,6 +2,23 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [4.1.0] – 2026-10-05
+### Modifié (conformité CrazyGames)
+- **Vidéos récompensées hors du jeu** : l'indice de trajectoire et le pouvoir
+  offert se proposent désormais sur l'écran d'introduction du niveau, plus
+  jamais pendant qu'on joue (règle des portails). La récompense est gardée et
+  utilisée ensuite : l'indice au premier tir, le pouvoir quand on le choisit.
+- **Langue du portail** : sur CrazyGames, la langue fournie par le SDK passe en
+  premier ; à défaut d'une langue disponible, l'anglais (et non plus le français).
+- **Démarrage en un clic** sur les portails : un nouveau joueur qui clique sur
+  « Jouer » part directement au premier niveau, avec un profil créé pour lui
+  (nom par défaut, difficulté Normale) ; le tutoriel le guide en jeu.
+- **Son coupé par le portail** : le jeu suit le réglage « muet » du site
+  CrazyGames (SDK), en plus de ses propres réglages.
+### Outillage
+- Règles ESLint recommandées lues dans ESLint (le paquet @eslint/js 10.0.0,
+  obsolète, est retiré) ; package-lock.json ajouté ; Node 22 ou 24.
+
 ## [4.0.2] – 2026-10-05
 ### Corrigé
 - **Atelier** : le château en construction n'était jamais enregistré (nom de

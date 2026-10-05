@@ -992,11 +992,21 @@
   width: min(30rem, calc(100% - 2 * var(--space-4)));
 }
 
-/* Vidéos récompensées en partie (portails). */
-.hint-btn {
-  position: absolute;
-  bottom: calc(100% + var(--space-2));
-  left: var(--space-3);
+/* Vidéos récompensées facultatives, proposées avant le niveau (portails). */
+.intro-rewards {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border, currentColor);
+}
+.intro-rewards__title {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.9rem;
+  opacity: 0.85;
 }
 .power-free {
   margin-top: var(--space-1);

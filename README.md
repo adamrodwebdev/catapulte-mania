@@ -454,6 +454,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v3.3.0 | Les personnages de la Chronique en pixel art (sans images), une réplique avant chaque niveau, histoire réécrite |
 | v3.4.0 | Campagne à deux en coopération, nouvelles conditions de victoire (renommée, tournoi, régicide), tout en Difficile à deux, 6 arènes avec un roi |
 | v3.5.0 | Versions pour les portails CrazyGames et Poki (vidéos récompensées facultatives, publicités entre les niveaux, sauvegarde synchronisée), langues chargées à la demande |
+| v4.1.0 | Conformité CrazyGames : vidéos récompensées hors du jeu, langue du portail (anglais à défaut), démarrage en un clic, son coupé par le portail |
 | v4.0.2 | Atelier : château en construction et preuve de victoire réellement enregistrés (le partage fonctionne) |
 | v4.0.1 | Studio renommé Adamrodwebtech, adresse de contact, verrou du site Netlify (accès limité à deux appareils) |
 | v4.0.0 | Siège sans fin, atelier de châteaux (éditeur et partage), vidéos récompensées facultatives (indice, pouvoir offert), événements saisonniers, préparation des boutiques |

@@ -7,7 +7,7 @@ import SiegeLandscape from '../ui/SiegeLandscape.vue'
 import ModalPanel from '../ui/ModalPanel.vue'
 import { DailyChallenge, dayKey } from '../../game/daily/DailyChallenge.js'
 import { eventFor } from '../../game/events/Season.js'
-import { IS_DEMO, PLAYABLE_LEVELS, APP_VERSION } from '../../config/gameConfig.js'
+import { IS_DEMO, IS_PORTAL, PLAYABLE_LEVELS, APP_VERSION } from '../../config/gameConfig.js'
 
 const app = useApp()
 const { state, t } = app
@@ -38,6 +38,18 @@ function acceptChallenge() {
   app.startChallenge()
 }
 
+/** Jouer : sur un portail, un nouveau joueur part directement au premier niveau. */
+async function playNow() {
+  app.services.audio.unlock()
+  if (IS_PORTAL && !lastProfile.value) {
+    try {
+      if (await app.quickStart()) return
+    } catch {
+      /* profil impossible à créer : écran des profils */
+    }
+  }
+  open('profiles')
+}
 function open(screen) {
   app.services.audio.unlock()
   app.go(screen)
@@ -67,7 +79,7 @@ function open(screen) {
             </button>
           </li>
           <li>
-            <button type="button" :class="['banner__item', { 'banner__item--primary': !lastProfile }]" @click="open('profiles')">
+            <button type="button" :class="['banner__item', { 'banner__item--primary': !lastProfile }]" @click="playNow">
               <AppIcon name="target" />
               <span class="banner__text">{{ t('menu.play') }}</span>
             </button>

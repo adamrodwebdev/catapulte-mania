@@ -16,7 +16,7 @@ import { ENDLESS } from '../domain/EndlessRun.js'
 import { loadDictionary } from '../i18n/loader.js'
 import { NoAdService } from '../services/ads/AdService.js'
 import { CloudStorageBackend } from '../services/CloudStorageBackend.js'
-import { GAME, PLAYABLE_LEVELS } from '../config/gameConfig.js'
+import { GAME, PLAYABLE_LEVELS, IS_PORTAL } from '../config/gameConfig.js'
 import { ValidationError } from '../core/utils/Guard.js'
 
 const KEY = Symbol('app')
@@ -65,7 +65,8 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
       ? urlLang
       : settings.hasStoredLanguage
         ? settings.get('language')
-        : I18nService.detect('', globalThis.navigator?.languages || [], GAME.LANGUAGES, GAME.DEFAULT_LANGUAGE)
+        : // Sur un portail : langue fournie par le portail d'abord, l'anglais à défaut (règle CrazyGames).
+          I18nService.detect('', [ads.locale, ...(globalThis.navigator?.languages || [])].filter(Boolean), GAME.LANGUAGES, IS_PORTAL ? 'en' : GAME.DEFAULT_LANGUAGE)
   // Seule la langue du joueur est téléchargée avant l'affichage (v3.5).
   const i18n = new I18nService({ [locale]: await loadDictionary(locale) }, locale, 'en', {
     available: GAME.LANGUAGES,
@@ -125,6 +126,9 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     state.adPlaying = false
     audio.adMuted = false
   })
+  // Son coupé par le portail (réglage du site CrazyGames).
+  audio.portalMuted = ads.portalMuted
+  ads.on('mute', (muted) => (audio.portalMuted = muted))
 
   /**
    * Double l'or de la dernière victoire contre une vidéo récompensée.
@@ -564,10 +568,25 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
    * @param {{ mode: string, levelId?: number, arenaId?: number, duelId?: number, players?: string[] }} match
    */
   function startMatch(match) {
+    const quick = match.quick === true
     const levels = Array.isArray(match.levels) && match.levels.length === 3 && match.levels.every((id) => Number.isInteger(id) && id >= 1 && id <= GAME.LEVEL_COUNT) ? [...match.levels] : null
-    state.match = { mode: match.mode, levelId: match.levelId ?? state.levelId, levels, arenaId: match.arenaId ?? 1, duelId: match.duelId ?? 1, players: [...(match.players || [])], daily: null, challenge: null }
+    state.match = { mode: match.mode, levelId: match.levelId ?? state.levelId, levels, arenaId: match.arenaId ?? 1, duelId: match.duelId ?? 1, players: [...(match.players || [])], daily: null, challenge: null, quick }
     if (match.levelId) state.levelId = match.levelId
     go('game')
+  }
+
+  /**
+   * Portails (règle CrazyGames : un nouveau joueur arrive dans la partie en un
+   * clic au plus) : sans aucun profil, on lui en crée un (nom par défaut,
+   * difficulté Normale, modifiable ensuite) et on lance le premier niveau
+   * directement. Renvoie false s'il existe déjà un profil.
+   */
+  async function quickStart() {
+    await refreshSlots()
+    if (state.slots.some((s) => s.status !== 'empty')) return false
+    await createProfile(0, t('profiles.defaultName'), 'normal')
+    startMatch({ mode: 'story', levelId: 1, quick: true })
+    return true
   }
 
   /** Niveaux jouables à deux : chapitre 1 + tout ce qu'un profil a débloqué. */
@@ -652,6 +671,7 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     startEndless,
     recordEndless,
     startCustom,
+    quickStart,
     shareCastle,
     afterProfileChosen,
     shareRun,
