@@ -266,7 +266,7 @@ cd catapulte-mania
 
 ## 6. Lancer le jeu en mode développement
 
-**Prérequis :** Node.js version 22.12 ou plus récente : <https://nodejs.org> (prendre la version « LTS »).
+**Prérequis :** Node.js en version **22 (22.13 ou plus) ou 24** : <https://nodejs.org> (prendre la version « LTS »). Les versions impaires (23, 25) ne sont pas prises en charge par les outils.
 
 Dans le terminal, à l'intérieur du dossier du projet :
 

@@ -1,8 +1,16 @@
 /**
  * Configuration ESLint (format « flat config »).
  * Les fichiers .vue sont vérifiés par le compilateur de Vite au build.
+ *
+ * Règles recommandées : lues directement dans ESLint (celles que l'équipe
+ * d'ESLint marque « recommended »). Le paquet @eslint/js en version 10.0.0
+ * est obsolète et en oublie plusieurs : on ne l'utilise plus.
  */
-import js from '@eslint/js'
+import { builtinRules } from 'eslint/use-at-your-own-risk'
+
+const recommended = {
+  rules: Object.fromEntries([...builtinRules].filter(([, rule]) => rule.meta?.docs?.recommended).map(([name]) => [name, 'error'])),
+}
 
 const browserGlobals = Object.fromEntries(
   [
@@ -17,8 +25,8 @@ const browserGlobals = Object.fromEntries(
 )
 
 export default [
-  { ignores: ['dist/**', 'dist-demo/**', 'dist-crazygames/**', 'dist-poki/**', 'node_modules/**', 'coverage/**', '.scratch/**'] },
-  js.configs.recommended,
+  { ignores: ['dist/**', 'dist-demo/**', 'dist-crazygames/**', 'dist-poki/**', 'node_modules/**', 'coverage/**', '.scratch/**', 'src/game/story/portraits.data.js'] },
+  recommended,
   {
     files: ['**/*.{js,mjs}'],
     languageOptions: {
