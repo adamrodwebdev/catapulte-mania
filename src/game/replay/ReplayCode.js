@@ -53,7 +53,7 @@ const codeSchema = Schema.object(
     l: Schema.int({ min: 1, max: GAME.LEVEL_COUNT }),
     e: Schema.enum(['catapult', 'trebuchet']),
     n: Schema.string({ minLength: 0, maxLength: 16, pattern: /^(?:|[\p{L}\p{N}][\p{L}\p{N} _'-]{0,15})$/u }),
-    a: Schema.array((raw, path) => raw, { maxLength: MAX_ACTIONS }),
+    a: Schema.array((raw) => raw, { maxLength: MAX_ACTIONS }),
   },
   { strict: true },
 )

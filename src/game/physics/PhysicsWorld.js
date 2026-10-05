@@ -1,7 +1,6 @@
 import Matter from 'matter-js'
 import { WindField, WIND_PROFILES, windageOf } from './WindField.js'
 import { WORLD, CATEGORY } from './constants.js'
-import { Guard } from '../../core/utils/Guard.js'
 import { Projectile } from '../entities/Projectile.js'
 import { SeededRandom } from '../../core/utils/SeededRandom.js'
 import { StructuralIntegrity } from './StructuralIntegrity.js'

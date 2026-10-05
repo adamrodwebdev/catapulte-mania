@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { ACHIEVEMENTS, achievementsFor, evaluateAchievements, emptyRun, killFamily } from '../src/game/progression/Achievements.js'
+import { ACHIEVEMENTS, evaluateAchievements, emptyRun, killFamily } from '../src/game/progression/Achievements.js'
 import { LevelRepository } from '../src/game/levels/LevelRepository.js'
 import { ScoreKeeper } from '../src/game/score/ScoreKeeper.js'
 

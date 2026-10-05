@@ -53,7 +53,7 @@ export class Block extends Entity {
   }
 
   /** Choc reçu : réduit par le blindage du matériau (explosions et feu passent par damage()). */
-  receiveImpact(energy, other) {
+  receiveImpact(energy, _other) {
     return this.damage(energy * this.armor, 'impact')
   }
 }

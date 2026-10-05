@@ -51,7 +51,7 @@ export const SCREENS = Object.freeze(['home', 'profiles', 'levels', 'game', 'set
  */
 export async function createAppContext({ ads = new NoAdService() } = {}) {
   // Portail avec sauvegarde synchronisée : le stockage du portail remplace le localStorage.
-  let cloud = null
+  let cloud
   try {
     cloud = ads.cloudStorage ? new CloudStorageBackend(ads.cloudStorage, globalThis.localStorage ?? null) : null
   } catch {
@@ -491,7 +491,7 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
 
   /** Au démarrage : un château partagé par lien ? */
   async function readIncomingCastle() {
-    let code = null
+    let code
     try {
       code = ads.inviteParam('chateau')
       if (!code && globalThis.location?.hash.startsWith('#chateau=')) code = location.hash.slice(9)
@@ -516,7 +516,7 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
 
   /** Au démarrage : un défi reçu par lien (portail ou #defi= sur notre site) ? */
   function readIncomingChallenge() {
-    let code = null
+    let code
     try {
       code = ads.inviteParam('defi')
       if (!code && globalThis.location?.hash.startsWith('#defi=')) code = location.hash.slice(6)
