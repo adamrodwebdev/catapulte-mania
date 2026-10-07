@@ -2,6 +2,23 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [4.3.0] – 2026-10-07
+### Rendu et effets
+- **Particules refaites** : fumée et poussière en volutes douces qui gonflent ;
+  feu, braises, étincelles et éclairs en lumière additive (ils brillent) ;
+  le bois se brise en échardes, la pierre en morceaux qui rebondissent au sol.
+- **Chocs** : étincelles sur la pierre, le fer et le marbre, copeaux sur le
+  bois, gerbe de terre quand un projectile touche le sol.
+- **Explosions** : éclair, boule de feu, onde de choc, braises, colonne de
+  fumée et trace de suie au sol.
+- **Victoire** : pluie de confettis au-dessus des ruines.
+- Scores flottants qui apparaissent en grossissant.
+- **Décor** : nuages ombrés (dessous plus sombre), brume à l'horizon, voile
+  atmosphérique sur les collines lointaines, rangées d'arbres, oiseaux,
+  herbe en deux tons, couches de terre, blocs biseautés (arête éclairée,
+  arête d'ombre).
+- Couvertures et vidéos d'aperçu CrazyGames refaites avec ce rendu.
+
 ## [4.2.0] – 2026-10-07
 Suite au refus CrazyGames (« qualité générale pas encore au niveau ») : les
 premières minutes et l'interface de jeu revues.

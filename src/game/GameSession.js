@@ -844,6 +844,11 @@ export class GameSession extends EventBus {
       : this.players.map((pl) => pl.score.finalScore({ won, shotsLeft: pl.shotsLeft ?? 0 }))
     const happy = this.players.length > 1 || won
     this.#setState(STATE.ENDED)
+    // Château pris : confettis au-dessus des ruines.
+    if (won && this.#mode.id !== 'versus' && !this.options.reducedMotion) {
+      const left = this.#castleLeft()
+      this.particles.confetti((left + this.focus.right) / 2, WORLD.GROUND_Y - 380, Math.max(300, this.focus.right - left))
+    }
     this.#feedback({ sound: happy ? 'victory' : 'defeat', x: 1000, caption: happy ? 'victory' : 'defeat', haptic: happy ? 'victory' : 'defeat' })
     this.emit('end', { won, result, winner, scores, reason, renown: [...this.#renown], mode: this.#mode.id })
   }
@@ -929,8 +934,16 @@ export class GameSession extends EventBus {
       }
       this.emit('hud', this.hud)
     })
-    ev.on('impact', ({ entity, energy, x, material }) => {
+    ev.on('impact', ({ entity, energy, x, y, material }) => {
       if (energy < 25) return
+      // Éclats, étincelles, gerbes de terre : la matière réagit au choc.
+      if (energy > 60) {
+        if (entity.kind === 'projectile') {
+          if (y > WORLD.GROUND_Y - 30) this.particles.groundHit(x, energy)
+        } else if (entity.kind === 'block' || entity.kind === 'barrel') {
+          this.particles.impact(x, y, entity.kind === 'barrel' ? 'barrel' : material, energy)
+        }
+      }
       const sound = entity.kind === 'target' ? 'hit' : entity.kind === 'barrel' ? 'wood' : material
       this.#feedback({ sound, x, intensity: clamp(energy / 400, 0.3, 1.2), caption: null, haptic: energy > 300 ? 'impact' : null })
       if (energy > 400) this.camera.shake(Math.min(6, energy / 300))
@@ -941,7 +954,8 @@ export class GameSession extends EventBus {
       this.#feedback({ sound: 'explosion', x, intensity: 1, caption: 'explosion', haptic: 'explosion' })
     })
     ev.on('structure:collapse', ({ entity }) => {
-      this.particles.dust(entity.x, entity.y - entity.height / 2, 8)
+      this.particles.dust(entity.x, entity.y - entity.height / 2, 12)
+      this.particles.dust(entity.x, WORLD.GROUND_Y - 10, 8, '190,175,150')
       this.camera.shake(5)
       this.#feedback({ sound: entity.sound || 'wood', x: entity.x, intensity: 1, caption: 'collapse', haptic: 'impact' })
     })

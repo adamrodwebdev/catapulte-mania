@@ -112,6 +112,21 @@ function blockPainter(material) {
       ctx.fillStyle = 'rgba(255,255,255,0.08)'
       ctx.fill()
     }
+    // Biseau : arête éclairée en haut et à gauche, arête sombre en bas et à droite.
+    if (s.shape !== 'triangle') {
+      const px = s.pixel ?? 1
+      const bw = Math.min(4, Math.max(1.5 * px, Math.min(s.w, s.h) * 0.12))
+      ctx.save()
+      ctx.clip()
+      ctx.fillStyle = 'rgba(255,255,255,0.28)'
+      ctx.fillRect(-s.w / 2, -s.h / 2, s.w, bw)
+      ctx.fillRect(-s.w / 2, -s.h / 2, bw, s.h)
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'
+      ctx.fillRect(-s.w / 2, s.h / 2 - bw, s.w, bw)
+      ctx.fillRect(s.w / 2 - bw, -s.h / 2, bw, s.h)
+      ctx.restore()
+      shapePath(ctx, s)
+    }
     scorch(ctx, s)
     cracks(ctx, s)
     shapePath(ctx, s)
@@ -768,19 +783,53 @@ function sky(ctx, s) {
     ctx.fill()
   }
   weather(ctx, th, viewW, viewH, animate ? time : 0)
+  // Brume claire à l'horizon : profondeur atmosphérique.
+  const haze = ctx.createLinearGradient(0, viewH * 0.45, 0, viewH)
+  haze.addColorStop(0, th.skyBottom + '00')
+  haze.addColorStop(1, th.skyBottom + (th.night ? '33' : '88'))
+  ctx.fillStyle = haze
+  ctx.fillRect(0, viewH * 0.45, viewW, viewH * 0.55)
   const r = new SeededRandom(11 + theme)
-  ctx.fillStyle = th.night ? 'rgba(200,210,255,0.08)' : th.weather === 'rain' ? 'rgba(90,98,115,0.6)' : 'rgba(255,255,255,0.55)'
-  for (let i = 0; i < 6; i++) {
+  const light = th.night ? 'rgba(200,210,255,0.10)' : th.weather === 'rain' ? 'rgba(110,118,135,0.75)' : 'rgba(255,255,255,0.82)'
+  const shade = th.night ? 'rgba(120,130,180,0.08)' : th.weather === 'rain' ? 'rgba(60,66,80,0.6)' : 'rgba(170,185,210,0.45)'
+  for (let i = 0; i < 7; i++) {
     // Les nuages suivent le vent : sens et vitesse (brise lente par temps calme).
     const speed = r.range(0.004, 0.012) * (wind === 0 ? 1 : Math.sign(wind) * (0.6 + 4 * Math.abs(wind)))
     const span = viewW + 300
     const cx = ((((r.range(0, span) + (animate ? time * speed : 0)) % span) + span) % span) - 150
     const cy = r.range(viewH * 0.06, viewH * 0.4)
-    const cw = r.range(60, 140) * (viewH / 600)
-    for (let k = 0; k < 4; k++) {
+    const cw = r.range(60, 150) * (viewH / 600)
+    const puffs = Array.from({ length: 5 }, (_, k) => [cx + (k - 2) * cw * 0.28, cy - Math.sin((k / 4) * Math.PI) * cw * 0.16, cw * (0.2 + 0.1 * Math.sin((k / 4) * Math.PI))])
+    // Dessous ombré, puis dessus éclairé, légèrement décalé vers le haut.
+    ctx.fillStyle = shade
+    for (const [x, y, rr] of puffs) {
       ctx.beginPath()
-      ctx.ellipse(cx + (k - 1.5) * cw * 0.32, cy - (k % 2) * cw * 0.12, cw * 0.32, cw * 0.18, 0, 0, TAU)
+      ctx.ellipse(x, y + rr * 0.25, rr * 1.15, rr * 0.75, 0, 0, TAU)
       ctx.fill()
+    }
+    ctx.fillStyle = light
+    for (const [x, y, rr] of puffs) {
+      ctx.beginPath()
+      ctx.ellipse(x, y - rr * 0.08, rr * 1.05, rr * 0.68, 0, 0, TAU)
+      ctx.fill()
+    }
+  }
+  // Oiseaux au loin (jour, sans pluie) : quelques « v » qui battent des ailes.
+  if (!th.night && th.weather !== 'rain' && animate !== false) {
+    ctx.strokeStyle = 'rgba(40,38,52,0.55)'
+    ctx.lineWidth = Math.max(1.2, viewH / 500)
+    ctx.lineCap = 'round'
+    const span = viewW + 400
+    for (let i = 0; i < 4; i++) {
+      const bx = ((r.range(0, span) + time * r.range(0.02, 0.04)) % span) - 200
+      const by = r.range(viewH * 0.12, viewH * 0.32) + Math.sin(time / 900 + i) * 6
+      const flap = Math.sin(time / 110 + i * 1.7) * 0.6
+      const w = r.range(6, 10) * (viewH / 600)
+      ctx.beginPath()
+      ctx.moveTo(bx - w, by - w * flap)
+      ctx.quadraticCurveTo(bx - w * 0.4, by - w * 0.3, bx, by)
+      ctx.quadraticCurveTo(bx + w * 0.4, by - w * 0.3, bx + w, by - w * flap)
+      ctx.stroke()
     }
   }
 }
@@ -830,7 +879,7 @@ function far(ctx, s) {
   const right = WORLD.WIDTH + 1600
   const base = WORLD.GROUND_Y
   const layers = th.peaks ? [[th.farDark, 620, 260], [th.far, 300, 150]] : [[th.farDark, 330, 170], [th.far, 210, 120]]
-  for (const [color, height, step] of layers) {
+  layers.forEach(([color, height, step], li) => {
     const pts = []
     for (let x = left; x <= right; x += step) pts.push([x, base - height * r.range(0.45, 1)])
     ctx.beginPath()
@@ -853,7 +902,42 @@ function far(ctx, s) {
         ctx.fill()
       }
     }
-  }
+    // Voile de brume sur la couche du fond : elle recule.
+    if (li === 0) {
+      const v = ctx.createLinearGradient(0, base - height, 0, base)
+      v.addColorStop(0, th.skyBottom + '00')
+      v.addColorStop(1, th.skyBottom + (th.night ? '22' : '55'))
+      ctx.fillStyle = v
+      ctx.fillRect(left, base - height, right - left, height)
+    }
+    // Rangée d'arbres sur la couche proche (sauf désert et neige).
+    if (li === layers.length - 1 && !th.arid) {
+      ctx.fillStyle = th.farDark
+      for (let i = 0; i < pts.length - 1; i++) {
+        const [x0, y0] = pts[i]
+        const [x1, y1] = pts[i + 1]
+        for (let k = 0; k < 3; k++) {
+          const f = r.range(0.1, 0.9)
+          const tx = x0 + (x1 - x0) * f
+          const ty = y0 + (y1 - y0) * f
+          const tr = r.range(10, 18)
+          if (th.peaks || th.weather === 'fog') {
+            ctx.beginPath()
+            ctx.moveTo(tx, ty - tr * 2.6)
+            ctx.lineTo(tx - tr, ty + 4)
+            ctx.lineTo(tx + tr, ty + 4)
+            ctx.closePath()
+            ctx.fill()
+          } else {
+            ctx.beginPath()
+            ctx.arc(tx, ty - tr * 0.6, tr, 0, TAU)
+            ctx.arc(tx + tr * 0.7, ty - tr * 0.2, tr * 0.75, 0, TAU)
+            ctx.fill()
+          }
+        }
+      }
+    }
+  })
   // Château lointain sur une colline (masqué en face-à-face : il prêterait à confusion).
   if (!castle) return
   const cx = 1450
@@ -887,17 +971,41 @@ function ground(ctx, s) {
   g.addColorStop(1, '#2a2019')
   ctx.fillStyle = g
   ctx.fillRect(left, y, right - left, 900)
+  // Couches de terre plus sombres en profondeur, et la lisière d'herbe qui projette son ombre.
+  ctx.fillStyle = 'rgba(0,0,0,0.12)'
+  ctx.fillRect(left, y + 12, right - left, 10)
+  const r = new SeededRandom(5)
+  ctx.strokeStyle = 'rgba(255,240,210,0.07)'
+  ctx.lineWidth = 3
+  for (let band = 0; band < 3; band++) {
+    ctx.beginPath()
+    const by = y + 60 + band * 70
+    ctx.moveTo(left, by)
+    for (let x = left; x <= right; x += 140) ctx.lineTo(x, by + r.range(-8, 8))
+    ctx.stroke()
+  }
   ctx.fillStyle = th.grass
   ctx.fillRect(left, y - 4, right - left, 16)
-  const r = new SeededRandom(5)
-  for (let x = left; x < right; x += 9) {
-    const hh = r.range(5, 13)
-    ctx.beginPath()
-    ctx.moveTo(x, y + 2)
-    ctx.lineTo(x + 3, y - hh)
-    ctx.lineTo(x + 6, y + 2)
-    ctx.fill()
+  // Brins d'herbe en deux tons (clair devant, foncé derrière).
+  const dark = 'rgba(0,0,0,0.22)'
+  for (let pass = 0; pass < 2; pass++) {
+    ctx.fillStyle = pass === 0 ? th.grass : th.grass
+    for (let x = left + pass * 4; x < right; x += 9) {
+      const hh = r.range(5, 13) * (pass === 0 ? 1.15 : 0.85)
+      ctx.beginPath()
+      ctx.moveTo(x, y + 2)
+      ctx.lineTo(x + 3 + r.range(-1.5, 1.5), y - hh)
+      ctx.lineTo(x + 6, y + 2)
+      ctx.fill()
+      if (pass === 0) {
+        ctx.fillStyle = dark
+        ctx.fill()
+        ctx.fillStyle = th.grass
+      }
+    }
   }
+  ctx.fillStyle = 'rgba(255,255,230,0.18)'
+  ctx.fillRect(left, y - 4, right - left, 3)
   for (let i = 0; i < 90; i++) {
     const x = r.range(left, right)
     const yy = y + r.range(24, 140)

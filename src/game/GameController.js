@@ -42,6 +42,8 @@ export class GameController extends EventBus {
   /** Relâcher après avoir tiré vers l'arrière déclenche le tir (sauf « visée précise »). */
   #releaseToFire = true
   #hudTimer = 0
+  /** Durée moyenne d'une image (ms), pour alléger les effets sur un appareil lent. */
+  #frameAvg = 16.7
   #handlers = {}
   /** Relecture d'une partie (« Bats mon tir ») : le joueur regarde, les commandes sont coupées. */
   #replayer = null
@@ -145,6 +147,9 @@ export class GameController extends EventBus {
       this.#raf = requestAnimationFrame(frame)
       const dt = now - this.#last
       this.#last = now
+      // Appareil qui peine (moins de ~45 images/s en continu) : moins de particules.
+      this.#frameAvg = this.#frameAvg * 0.97 + Math.min(dt, 100) * 0.03
+      if (this.#frameAvg > 22 && this.session.particles.density > 0.55) this.session.particles.density = 0.55
       if (!this.#paused) {
         if (this.#replayer && !this.#replayer.done) this.#replayer.advance(dt)
         else this.session.update(dt)
