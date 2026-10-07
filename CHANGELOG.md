@@ -2,6 +2,32 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [4.4.0] – 2026-10-07
+### Engins et personnages redessinés
+- **Matières réalistes** : bois de charpente veiné (texture générée pixel par
+  pixel), arêtes éclairées, bois de bout à cernes, entailles ; fer forgé avec
+  reflets et rivets ; cordes torsadées ; cuir cousu ; cotte de mailles.
+- **Catapulte** : mangonneau à torsion avec écheveau de cordes tordues,
+  rondelle de fer et levier, poteau d'arrêt et coussin de cuir, treuil
+  arrière, roues à rayons cerclées de fer, flanc éloigné en profondeur.
+- **Trébuchet** : poutres assemblées par ligatures et équerres, palier d'axe,
+  caisse de contrepoids remplie de pierres, crochet de lâcher, fronde à deux
+  cordes et poche de cuir, roues pleines.
+- **Animations** : corde de rappel tendue tant que le bras est armé, flou de
+  mouvement du bras au tir, contrepoids qui se balance, fanion qui ondule.
+- **Personnages** : soldat en gambison et chapeau de fer, chevalier en grand
+  heaume, mailles et écu armorié, roi en velours, hermine et couronne
+  sertie ; visages ombrés. Ils respirent, clignent des yeux et grimacent ou
+  tremblent quand ils sont touchés (le roi en perd sa couronne de travers).
+- Le réglage « mouvements réduits » fige respiration, clignements et fanion.
+
+### Performance
+- Chaque engin et chaque personnage est dessiné une seule fois en image, à la
+  résolution utile pour le zoom, puis recopié : l'image coûte moins cher
+  qu'avant (mesuré : 53 à 58 images/s au repos, 44 à 46 pendant une explosion
+  sur une machine sans carte graphique, contre 57 et 38 auparavant).
+- Couvertures CrazyGames refaites avec les nouveaux engins.
+
 ## [4.3.0] – 2026-10-07
 ### Rendu et effets
 - **Particules refaites** : fumée et poussière en volutes douces qui gonflent ;

@@ -13,6 +13,8 @@ export class Renderer {
   #canvas
   #assets
   #wind = new WindLayer()
+  /** Dernier angle de bras connu par engin, pour en déduire la vitesse (flou, balancement). */
+  #motion = new WeakMap()
   dpr = 1
 
   /**
@@ -81,7 +83,7 @@ export class Renderer {
       assets.draw(ctx, e.assetKey, {
         w: e.width, h: e.height, vertices: e.localVertices, shape: e.shape, damage: e.damageRatio,
         burning: e.burning > 0, time, seed: e.id, pixel,
-        extra: e.kind === 'target' ? { hurt: time - e.hurtAt < 600 || e.damageRatio > 0.6, team: e.team } : undefined,
+        extra: e.kind === 'target' ? { hurt: time - e.hurtAt < 600 || e.damageRatio > 0.6, team: e.team, still: animate === false } : undefined,
       })
       ctx.restore()
     }
@@ -97,9 +99,11 @@ export class Renderer {
       if (c.kind === 'trebuchet') {
         // Repère local de l'engin : la fronde est donnée en coordonnées monde.
         const sling = c.rig.sling ? { x: (c.rig.sling.x - c.x) * c.dir, y: c.rig.sling.y - c.y } : null
-        assets.draw(ctx, 'trebuchet', { w: 260, h: 260, pixel, time, extra: { theta: c.rig.theta, sling, load: c.loaded ? c.load : null, loadRadius: c.loadRadius, registry: assets, skin: c.skin, flag: c.flag } })
+        const thetaSpeed = this.#angularSpeed(c, c.rig.theta, time)
+        assets.draw(ctx, 'trebuchet', { w: 260, h: 260, pixel, time, extra: { theta: c.rig.theta, sling, load: c.loaded ? c.load : null, loadRadius: c.loadRadius, registry: assets, skin: c.skin, flag: c.flag, thetaSpeed, still: animate === false } })
       } else {
-        assets.draw(ctx, 'catapult', { w: 180, h: 140, pixel, time, extra: { armAngle: c.armAngle, load: c.load, loadRadius: c.loadRadius, registry: assets, skin: c.skin, flag: c.flag } })
+        const armSpeed = this.#angularSpeed(c, c.armAngle, time)
+        assets.draw(ctx, 'catapult', { w: 180, h: 140, pixel, time, extra: { armAngle: c.armAngle, load: c.load, loadRadius: c.loadRadius, registry: assets, skin: c.skin, flag: c.flag, armSpeed, still: animate === false } })
       }
       ctx.restore()
     }
@@ -114,6 +118,23 @@ export class Renderer {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
     ctx.fillStyle = this.#vignette(ctx, camera.viewW, camera.viewH)
     ctx.fillRect(0, 0, camera.viewW, camera.viewH)
+  }
+
+  /**
+   * Vitesse angulaire du bras (rad/s), lissée. Purement visuelle : elle ne lit
+   * que l'angle déjà calculé par la physique.
+   */
+  #angularSpeed(engine, angle, time) {
+    if (typeof engine !== 'object' || engine === null || !Number.isFinite(angle) || !Number.isFinite(time)) return 0
+    const prev = this.#motion.get(engine)
+    let speed = 0
+    if (prev) {
+      const dt = (time - prev.time) / 1000
+      if (dt <= 0) speed = prev.speed
+      else if (dt < 0.25) speed = prev.speed * 0.4 + ((angle - prev.angle) / dt) * 0.6
+    }
+    this.#motion.set(engine, { angle, time, speed })
+    return Math.max(-60, Math.min(60, speed))
   }
 
   /**

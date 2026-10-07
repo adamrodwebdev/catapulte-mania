@@ -20,7 +20,7 @@ const browserGlobals = Object.fromEntries(
     'matchMedia', 'getComputedStyle', 'Image', 'HTMLElement', 'HTMLCanvasElement',
     'CanvasRenderingContext2D', 'AudioContext', 'URL', 'URLSearchParams', 'structuredClone',
     'CustomEvent', 'Event', 'EventTarget', 'ResizeObserver', 'KeyboardEvent', 'PointerEvent',
-    'DOMException', 'ImageData', 'queueMicrotask', 'btoa', 'atob', 'Path2D', 'createImageBitmap', 'OffscreenCanvas',
+    'DOMException', 'ImageData', 'DOMMatrix', 'queueMicrotask', 'btoa', 'atob', 'Path2D', 'createImageBitmap', 'OffscreenCanvas',
   ].map((name) => [name, 'readonly']),
 )
 
