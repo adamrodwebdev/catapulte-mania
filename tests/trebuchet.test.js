@@ -190,10 +190,10 @@ test('aide à la trajectoire au trébuchet : visible seulement pendant le balanc
   assert.ok(Array.isArray(pts) && pts.length > 1)
 })
 
-test("le trébuchet se débloque après le niveau 13 ; le 14 est son niveau d'apprentissage", () => {
-  assert.equal(TREBUCHET_UNLOCK, 13)
-  assert.equal(LevelRepository.tutorialFor(14), 'engine:trebuchet')
-  assert.ok(LevelRepository.novelties(14).includes('engine:trebuchet'))
+test("le trébuchet se débloque après le niveau 3 ; le 4 est son niveau d'apprentissage (v4.2 : montré tôt)", () => {
+  assert.equal(TREBUCHET_UNLOCK, 3)
+  assert.equal(LevelRepository.tutorialFor(4), 'engine:trebuchet')
+  assert.ok(LevelRepository.novelties(4).includes('engine:trebuchet'))
   const steps = tutorialSteps('engine:trebuchet')
   assert.deepEqual(steps.map((x) => x.until), ['arm', 'release', 'turn', 'arm'])
   const coach = new TutorialCoach('engine:trebuchet')

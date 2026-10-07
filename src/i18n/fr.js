@@ -276,7 +276,8 @@ export default {
   },
   tutorial: {
     title: 'Tutoriel : {name}',
-    aimTitle: 'Tutoriel : viser et tirer',
+    aimTitle: 'Premier tir',
+    dragTitle: 'Viser',
     engine: {
       arm: 'Le trébuchet se joue au clic. Touchez la scène (ou « Armer », ou Espace) : le contrepoids tombe et le bras se met à tourner.',
       release: 'Le bras tourne ! Touchez à nouveau pour lâcher la fronde. Les pointillés montrent le tir du moment : lâchez quand ils tombent sur le château.',
@@ -286,10 +287,15 @@ export default {
     skip: 'Passer',
     close: 'Compris',
     aim: {
-      aim: 'Réglez l’angle et la puissance : faites glisser vers l’arrière depuis la catapulte, ou utilisez les curseurs en bas. Les pointillés montrent la trajectoire.',
-      fire: 'Parfait. Appuyez sur « Tirer » (ou sur Espace).',
-      watch: 'Observez : un soldat tombe au moindre choc, mais les murs le protègent.',
-      done: 'À vous ! Dans les niveaux suivants, le vent (en haut à droite) déviera vos tirs.',
+      fire: 'Tout est prêt : appuyez sur « Tirer » !',
+      watch: 'En plein dans le mille ! Faites tomber tous les soldats.',
+      aim: 'Pour viser vous-même : tirez vers l\'arrière, n\'importe où sur la scène, puis relâchez.',
+      done: 'Bravo ! Les pointillés montrent toujours où ira la pierre.',
+    },
+    drag: {
+      aim: 'Tirez vers l\'arrière puis relâchez pour tirer. Les pointillés montrent où ira la pierre.',
+      watch: 'Observez la chute…',
+      done: 'À vous de jouer ! Plus loin, le vent (en haut à droite) poussera vos tirs.',
     },
     step: {
       select: 'Choisissez « {name} » dans la barre des munitions.',
@@ -518,6 +524,8 @@ export default {
     storyDesc: 'Affiche la Chronique avant les niveaux qui ouvrent un chapitre.',
     trajectoryAid: 'Aide à la trajectoire',
     trajectoryAidDesc: 'Affiche la courbe que suivra le projectile.',
+    preciseAim: 'Visée précise',
+    preciseAimDesc: 'Curseurs d\'angle et de puissance, et bouton « Tirer » pour déclencher le tir. Sinon : tirez vers l\'arrière et relâchez.',
     slowSwing: 'Balancier lent',
     slowSwingDesc: 'La fenêtre de tir du trébuchet dure plus longtemps : l’instant du lâcher est plus facile à choisir.',
     infiniteSwing: 'Balancier infini',
@@ -542,7 +550,7 @@ export default {
   },
   help: {
     trebuchetTitle: 'Le trébuchet',
-    trebuchet: 'Débloqué après le niveau 13, il se choisit avant chaque niveau (sauf au face-à-face). Il se joue uniquement au clic : le premier libère le contrepoids, le second lâche la fronde. Lâchez tôt pour un tir en cloche, tard pour un tir tendu. Il tire de plus loin que la catapulte mais frappe plus fort (pierres plus lourdes), et la caméra suit le tir. Un tic sonore monte avec l’angle du tir ; l’option « Balancier lent » ralentit le bras.',
+    trebuchet: 'Débloqué après le niveau 3, il se choisit avant chaque niveau (sauf au face-à-face). Il se joue uniquement au clic : le premier libère le contrepoids, le second lâche la fronde. Lâchez tôt pour un tir en cloche, tard pour un tir tendu. Il tire de plus loin que la catapulte mais frappe plus fort (pierres plus lourdes), et la caméra suit le tir. Un tic sonore monte avec l’angle du tir ; l’option « Balancier lent » ralentit le bras.',
     modesTitle: 'Modes de jeu',
     modes: 'Campagne : les 100 niveaux, avec étoiles et or. Mode libre : rejouez un niveau terminé sans limite. Deux joueurs, sur le même appareil : la campagne à deux en coopération, le duel (renommée), le tournoi en trois manches et le face-à-face (régicide).',
     workshopTitle: 'Atelier',

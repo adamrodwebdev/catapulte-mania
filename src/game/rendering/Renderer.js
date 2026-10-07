@@ -73,6 +73,7 @@ export class Renderer {
 
     const order = { block: 0, barrel: 1, target: 2, projectile: 3 }
     const list = [...scene.entities].sort((a, b) => order[a.kind] - order[b.kind])
+    this.#drawShadows(ctx, list, scene.catapults || [])
     for (const e of list) {
       ctx.save()
       ctx.translate(e.x, e.y)
@@ -108,6 +109,48 @@ export class Renderer {
     scene.particles.draw(ctx, pixel)
 
     if (scene.trajectory && scene.trajectory.length) this.#drawTrajectory(ctx, scene.trajectory, pixel, scene.highContrast)
+
+    // Vignette légère : resserre le regard sur la scène (en coordonnées écran).
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
+    ctx.fillStyle = this.#vignette(ctx, camera.viewW, camera.viewH)
+    ctx.fillRect(0, 0, camera.viewW, camera.viewH)
+  }
+
+  /**
+   * Ombres de contact au sol (v4.2) : une ellipse douce sous chaque objet,
+   * plus pâle et plus large à mesure qu'il s'élève. Donne du poids à la scène.
+   */
+  #drawShadows(ctx, entities, catapults) {
+    const ground = WORLD.GROUND_Y
+    ctx.save()
+    ctx.fillStyle = '#1d1408'
+    const shadow = (x, halfW, height) => {
+      if (height > 420 || halfW <= 0) return
+      const k = 1 - height / 420
+      ctx.globalAlpha = 0.28 * k
+      ctx.beginPath()
+      ctx.ellipse(x, ground + 3, halfW * (1.15 - 0.3 * k + 0.3), 7 + 5 * (1 - k), 0, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    for (const e of entities) {
+      if (e.kind === 'projectile' && e.y > ground - 2) continue
+      const bottom = e.y + Math.max(e.width, e.height) / 2
+      shadow(e.x, Math.max(e.width, 12) / 2, Math.max(0, ground - bottom))
+    }
+    for (const c of catapults) shadow(c.x + (c.kind === 'trebuchet' ? 0 : 10 * c.dir), c.kind === 'trebuchet' ? 120 : 85, 0)
+    ctx.restore()
+  }
+
+  #vignetteCache = { w: 0, h: 0, g: null }
+  #vignette(ctx, w, h) {
+    const c = this.#vignetteCache
+    if (c.w !== w || c.h !== h || !c.g) {
+      const g = ctx.createRadialGradient(w / 2, h * 0.45, Math.min(w, h) * 0.45, w / 2, h * 0.45, Math.hypot(w, h) * 0.62)
+      g.addColorStop(0, 'rgba(20, 12, 4, 0)')
+      g.addColorStop(1, 'rgba(20, 12, 4, 0.28)')
+      Object.assign(c, { w, h, g })
+    }
+    return c.g
   }
 
   /** Flèche de visée : direction = angle, longueur = puissance. */

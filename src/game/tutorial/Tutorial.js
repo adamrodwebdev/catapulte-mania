@@ -27,7 +27,7 @@ const IMMEDIATE = new Set(['quake'])
  * @returns {readonly { id: string, anchor: string | null, until: string }[]}
  */
 export function tutorialSteps(tool) {
-  Guard.string(tool, 'tutorial tool', { pattern: /^(?:aim|ammo:[a-z]+|power:[a-z]+|engine:trebuchet)$/ })
+  Guard.string(tool, 'tutorial tool', { pattern: /^(?:aim|drag|ammo:[a-z]+|power:[a-z]+|engine:trebuchet)$/ })
   if (tool === 'engine:trebuchet') {
     // Le trébuchet : 1er clic pour lancer le balancier, 2e clic pour lâcher.
     return deepFreeze([
@@ -38,9 +38,18 @@ export function tutorialSteps(tool) {
     ])
   }
   if (tool === 'aim') {
+    // Niveau 1 : le premier tir est déjà réglé ; on tire tout de suite, on apprend à viser ensuite.
     return deepFreeze([
-      { id: 'aim', anchor: 'aim', until: 'aim' },
       { id: 'fire', anchor: 'fire', until: 'fire' },
+      { id: 'watch', anchor: null, until: 'turn' },
+      { id: 'aim', anchor: 'drag', until: 'aim' },
+      { id: 'done', anchor: null, until: 'fire' },
+    ])
+  }
+  if (tool === 'drag') {
+    // Niveau 2 : viser soi-même, en tirant vers l'arrière puis en relâchant.
+    return deepFreeze([
+      { id: 'aim', anchor: 'drag', until: 'fire' },
       { id: 'watch', anchor: null, until: 'turn' },
       { id: 'done', anchor: null, until: 'fire' },
     ])

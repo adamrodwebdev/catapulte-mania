@@ -41,7 +41,7 @@ export const TREBUCHET_GEOMETRY = Object.freeze({
 export const TREBUCHET_X = -520
 
 /** Le trébuchet se débloque après ce niveau (niveau suivant = tutoriel). */
-export const TREBUCHET_UNLOCK = 13
+export const TREBUCHET_UNLOCK = 3
 
 /**
  * Le trébuchet lance des pierres plus lourdes que la catapulte (×1,5) : ses

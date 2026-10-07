@@ -41,6 +41,7 @@ function onVolume(e, key = 'volume') {
         <ToggleSwitch id="opt-story" :model-value="s.story" :label="t('settings.story')" :description="t('settings.storyDesc')" @update:model-value="set('story')($event)" />
         <ToggleSwitch id="opt-tutorials" :model-value="s.tutorials" :label="t('settings.tutorials')" :description="t('settings.tutorialsDesc')" @update:model-value="set('tutorials')($event)" />
         <ToggleSwitch id="opt-aid" :model-value="s.trajectoryAid" :label="t('settings.trajectoryAid')" :description="t('settings.trajectoryAidDesc')" @update:model-value="set('trajectoryAid')($event)" />
+        <ToggleSwitch id="opt-precise" :model-value="s.preciseAim" :label="t('settings.preciseAim')" :description="t('settings.preciseAimDesc')" @update:model-value="set('preciseAim')($event)" />
         <ToggleSwitch id="opt-infinite-swing" :model-value="s.infiniteSwing" :label="t('settings.infiniteSwing')" :description="t('settings.infiniteSwingDesc')" @update:model-value="set('infiniteSwing')($event)" />
         <ToggleSwitch id="opt-slow-swing" :model-value="s.slowSwing" :label="t('settings.slowSwing')" :description="t('settings.slowSwingDesc')" @update:model-value="set('slowSwing')($event)" />
         <ToggleSwitch id="opt-contrast" :model-value="s.contrast === 'high'" :label="t('settings.contrast')" @update:model-value="app.setSetting('contrast', $event ? 'high' : 'normal')" />

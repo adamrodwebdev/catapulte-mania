@@ -276,7 +276,8 @@ export default {
   },
   tutorial: {
     title: 'Tutorial: {name}',
-    aimTitle: 'Tutorial: membidik dan menembak',
+    aimTitle: 'Tembakan pertama',
+    dragTitle: 'Membidik',
     engine: {
       arm: 'Trebuset dimainkan dengan klik. Ketuk layar (atau “Siagakan”, atau Spasi): pemberat jatuh dan lengan mulai berayun.',
       release: 'Lengan berayun! Ketuk lagi untuk melepas ambin. Garis titik-titik menunjukkan tembakan saat ini: lepaskan saat jatuh di kastel.',
@@ -286,10 +287,15 @@ export default {
     skip: 'Lewati',
     close: 'Mengerti',
     aim: {
-      aim: 'Atur sudut dan kekuatan: tarik ke belakang dari katapel, atau gunakan penggeser di bawah. Garis titik-titik menunjukkan lintasan.',
-      fire: 'Bagus. Tekan “Tembak” (atau Spasi).',
-      watch: 'Perhatikan: prajurit jatuh oleh benturan sekecil apa pun, tetapi dinding melindunginya.',
-      done: 'Giliranmu! Di level berikutnya, angin (kanan atas) akan membelokkan tembakanmu.',
+      fire: 'Semua siap: tekan “Tembak”!',
+      watch: 'Tepat sasaran! Jatuhkan semua prajurit.',
+      aim: 'Untuk membidik sendiri: tarik ke belakang di mana saja di layar, lalu lepaskan.',
+      done: 'Bagus! Garis titik-titik selalu menunjukkan arah batu.',
+    },
+    drag: {
+      aim: 'Tarik ke belakang, lalu lepaskan untuk menembak. Garis titik-titik menunjukkan tempat batu jatuh.',
+      watch: 'Lihat runtuhnya…',
+      done: 'Giliran Anda! Nanti, angin (kanan atas) akan mendorong tembakan Anda.',
     },
     step: {
       select: 'Pilih “{name}” di bilah amunisi.',
@@ -518,6 +524,8 @@ export default {
     storyDesc: 'Menampilkan Hikayat sebelum level yang membuka sebuah bab.',
     trajectoryAid: 'Bantuan lintasan',
     trajectoryAidDesc: 'Menampilkan kurva yang akan dilalui proyektil.',
+    preciseAim: 'Bidikan presisi',
+    preciseAimDesc: 'Penggeser sudut dan kekuatan, ditambah tombol “Tembak”. Jika tidak: tarik ke belakang lalu lepaskan.',
     slowSwing: 'Ayunan lambat',
     slowSwingDesc: 'Jendela tembak trebuset berlangsung lebih lama sehingga saat melepas lebih mudah dipilih.',
     infiniteSwing: 'Ayunan tanpa henti',
@@ -542,7 +550,7 @@ export default {
   },
   help: {
     trebuchetTitle: 'Trebuset',
-    trebuchet: 'Terbuka setelah level 13 dan dipilih sebelum setiap level (kecuali mode berhadapan). Hanya dimainkan dengan klik: klik pertama menjatuhkan pemberat, klik kedua melepas ambin. Lepas awal untuk tembakan melengkung, lambat untuk tembakan datar. Menembak dari lebih jauh daripada katapel tetapi menghantam lebih keras (batu lebih berat), dan kamera mengikuti tembakan. Bunyi detak naik seiring sudut tembakan; opsi “Ayunan lambat” memperlambat lengan.',
+    trebuchet: 'Terbuka setelah level 3 dan dipilih sebelum setiap level (kecuali mode berhadapan). Hanya dimainkan dengan klik: klik pertama menjatuhkan pemberat, klik kedua melepas ambin. Lepas awal untuk tembakan melengkung, lambat untuk tembakan datar. Menembak dari lebih jauh daripada katapel tetapi menghantam lebih keras (batu lebih berat), dan kamera mengikuti tembakan. Bunyi detak naik seiring sudut tembakan; opsi “Ayunan lambat” memperlambat lengan.',
     modesTitle: 'Mode permainan',
     modes: 'Kampanye: 100 level, dengan bintang dan emas. Main bebas: ulangi level yang sudah selesai tanpa batas. Dua pemain di perangkat yang sama: kampanye berdua secara kooperatif, duel (kemasyhuran), turnamen tiga babak, dan berhadapan (pembunuhan raja).',
     workshopTitle: 'Bengkel',

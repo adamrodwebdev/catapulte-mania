@@ -82,7 +82,7 @@ export class LevelRepository {
       const power = PowerRegistry.all().find((p) => p.unlockAfter === id - 1)
       // Le trébuchet a son propre niveau d'apprentissage, juste après son déblocage.
       const engine = id === TREBUCHET_UNLOCK + 1 ? 'engine:trebuchet' : null
-      const tutorial = id === 1 ? 'aim' : fresh.length ? `ammo:${fresh[0]}` : power ? `power:${power.id}` : engine
+      const tutorial = id === 1 ? 'aim' : id === 2 ? 'drag' : fresh.length ? `ammo:${fresh[0]}` : power ? `power:${power.id}` : engine
       return buildLevel(spec, id, Math.ceil(id / GAME.LEVELS_PER_CHAPTER), 0, { tutorial })
     })
   }

@@ -1,6 +1,7 @@
 import { AdService } from './AdService.js'
 import { AdPolicy } from './AdPolicy.js'
 import { loadScript, SDK_URLS } from './loadScript.js'
+import { ADS_ENABLED } from '../../config/gameConfig.js'
 
 /**
  * CrazyGames (SDK v3) : interstitiels « midgame », vidéos « rewarded »,
@@ -34,7 +35,7 @@ export class CrazyGamesAdService extends AdService {
   }
 
   get rewardedAvailable() {
-    return this.#sdk !== null
+    return ADS_ENABLED && this.#sdk !== null
   }
 
   get portalMuted() {
@@ -106,6 +107,7 @@ export class CrazyGamesAdService extends AdService {
   }
 
   _showInterstitial(pause) {
+    if (!ADS_ENABLED) return Promise.resolve(false)
     return this.#request('midgame', pause)
   }
 

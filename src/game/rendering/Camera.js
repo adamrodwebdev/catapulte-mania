@@ -89,7 +89,8 @@ export class Camera {
       // Trébuchet : on suit le projectile en gardant le sol en bas de l'écran ;
       // plus il monte, plus on dézoome (jamais en deçà de la vue d'ensemble).
       const fit = this.#fitScale()
-      const span = WORLD.GROUND_Y + 90 - py + 160
+      // Ce qui doit rester visible : le projectile ET le haut du château (on voit l'impact en entier).
+      const span = WORLD.GROUND_Y + 90 - Math.min(py, this.#focus.top) + 160
       const s = clamp(Math.min(this.#usableH / Math.max(1, span), 0.9), fit, Math.max(fit, 0.9))
       const halfW = this.viewW / s / 2
       const x = clamp(px + halfW * 0.25, this.#focus.left - 100 + halfW, Math.max(this.#focus.left - 100 + halfW, this.#focus.right + 300 - halfW))

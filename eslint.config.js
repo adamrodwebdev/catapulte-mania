@@ -32,7 +32,7 @@ export default [
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
-      globals: { ...browserGlobals, __DEMO__: 'readonly', __APP_VERSION__: 'readonly', __TARGET__: 'readonly', process: 'readonly' },
+      globals: { ...browserGlobals, __DEMO__: 'readonly', __APP_VERSION__: 'readonly', __TARGET__: 'readonly', __ADS__: 'readonly', process: 'readonly' },
     },
     rules: {
       'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],

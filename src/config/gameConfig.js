@@ -44,6 +44,13 @@ export const LEGAL = deepFreeze({
 
 /** Est-on dans la build de démonstration ? (constante remplacée au build par Vite) */
 export const IS_DEMO = typeof __DEMO__ !== 'undefined' && __DEMO__ === true
+
+/**
+ * Publicités autorisées dans ce build ? Non pour la période de test d'un portail
+ * (CrazyGames « Basic launch » : aucune pub, aucun bouton vidéo affiché).
+ * Constante remplacée au build (variable CTC_ADS=off).
+ */
+export const ADS_ENABLED = typeof __ADS__ === 'undefined' || __ADS__ !== false
 export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'
 /**
  * Plateforme visée par ce build (v3.5) : 'web' (notre site, sans publicité),

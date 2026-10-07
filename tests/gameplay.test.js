@@ -158,12 +158,30 @@ test('séisme sans aucun tir : arme les règles et peut gagner le niveau', () =>
 })
 
 test('puissance au début du tour : 100 % par défaut, réglable', () => {
-  const a = new GameSession(LevelRepository.get(1), { difficulty: 'normal', completedLevels: 0 })
+  const a = new GameSession(LevelRepository.get(4), { difficulty: 'normal', completedLevels: 0 })
   assert.equal(a.hud.power, 100)
   a.destroy()
-  const b = new GameSession(LevelRepository.get(1), { difficulty: 'normal', completedLevels: 0, startPower: 75 })
+  const b = new GameSession(LevelRepository.get(4), { difficulty: 'normal', completedLevels: 0, startPower: 75 })
   assert.equal(b.hud.power, 75)
   b.destroy()
+})
+
+test('premiers pas : niveau 1 réglé pour toucher, trajectoire montrée jusqu’au niveau 3', () => {
+  for (const diff of ['easy', 'normal', 'hard']) {
+    const s = new GameSession(LevelRepository.get(1), { difficulty: diff, completedLevels: 0, reducedMotion: true })
+    for (let i = 0; i < 200 && s.state !== 'aiming'; i++) s.update(1000 / 60)
+    assert.ok(Array.isArray(s.trajectory), 'trajectoire visible')
+    s.fire()
+    for (let i = 0; i < 600; i++) s.update(1000 / 60)
+    assert.ok(s.targetsLeft < LevelRepository.get(1).targets.length, `premier tir réussi (${diff})`)
+    s.destroy()
+  }
+  const three = new GameSession(LevelRepository.get(3), { difficulty: 'normal', completedLevels: 2, reducedMotion: true })
+  for (let i = 0; i < 200 && three.state !== 'aiming'; i++) three.update(1000 / 60)
+  assert.ok(Array.isArray(three.trajectory))
+  const four = new GameSession(LevelRepository.get(4), { difficulty: 'normal', completedLevels: 3, reducedMotion: true })
+  for (let i = 0; i < 200 && four.state !== 'aiming'; i++) four.update(1000 / 60)
+  assert.equal(four.trajectory, null, 'au-delà : selon le réglage du joueur')
 })
 
 test('étoiles au nombre de tirs : 3 en un tir (deux pour les grands châteaux)', () => {

@@ -9,6 +9,7 @@ import HelpScreen from './components/screens/HelpScreen.vue'
 import WorkshopScreen from './components/screens/WorkshopScreen.vue'
 import MultiplayerScreen from './components/screens/MultiplayerScreen.vue'
 import StudioIntro from './components/ui/StudioIntro.vue'
+import { IS_PORTAL } from './config/gameConfig.js'
 import PrivacyScreen from './components/screens/PrivacyScreen.vue'
 import ModesScreen from './components/screens/ModesScreen.vue'
 
@@ -46,6 +47,8 @@ const current = computed(() => SCREENS[state.screen] || HomeScreen)
  * contient ?nointro, pratique pour les tests). Stockage indisponible : on l'affiche.
  */
 function introSeen() {
+  // Portails : le joueur arrive directement sur le jeu, sans générique (règle de prise en main).
+  if (IS_PORTAL) return true
   try {
     if (new URLSearchParams(location.search).has('nointro')) return true
     return sessionStorage.getItem('ctc:intro') === '1'

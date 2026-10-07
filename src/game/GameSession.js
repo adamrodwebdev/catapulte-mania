@@ -24,6 +24,9 @@ import { NO_EFFECTS } from './progression/UpgradeCatalog.js'
 import { renownOf, COUP_DE_GRACE } from './modes/Renown.js'
 import { RewardTicket } from '../services/ads/RewardTicket.js'
 
+/** Niveaux de « premiers pas » (trajectoire montrée, premier tir réglé). */
+export const ASSIST_LEVELS = 3
+
 /** États d'une partie. */
 export const STATE = Object.freeze({
   SETTLING: 'settling',
@@ -106,6 +109,7 @@ export class GameSession extends EventBus {
   #pendingLaunch = null
   /** Vidéos récompensées (v4.0) : indice de trajectoire et pouvoir offert, une fois par niveau chacun. */
   #hint = false
+  #assist = false
   #hintUsed = false
   #freePowerUsed = false
   /** Repère sonore du balancier : dernière tranche de 15° annoncée. */
@@ -131,7 +135,13 @@ export class GameSession extends EventBus {
     this.#unlockedPowers = new Set(this.#mode.powersEnabled ? PowerRegistry.unlocked(completedLevels).map((p) => p.id) : [])
     const diff = DIFFICULTY[this.#difficulty]
     this.#windRng = new SeededRandom(level.seed)
-    this.options = { trajectoryAid, reducedMotion, blood, startPower, trail: fx.trail || 'smoke' }
+    /**
+     * Premiers pas (campagne, niveaux 1 à 3) : la trajectoire est montrée et le
+     * premier tir est déjà réglé pour toucher. Un nouveau joueur réussit son
+     * premier tir avant d'avoir rien lu (exigence de prise en main des portails).
+     */
+    this.#assist = this.#mode.id === 'story' && level.id <= ASSIST_LEVELS
+    this.options = { trajectoryAid: trajectoryAid || this.#assist, reducedMotion, blood, startPower, trail: fx.trail || 'smoke' }
     /** Proposer un dernier tir contre une vidéo (campagne solo, portails). */
     this.continueOffer = Guard.boolean(continueOffer, 'continueOffer')
     const versus = this.#mode.id === 'versus'
@@ -190,12 +200,39 @@ export class GameSession extends EventBus {
     this.#loadEngine()
     this.#bindWorldEvents()
     this.#rollWind()
+    // Niveau 1 : premier tir déjà réglé ; niveaux 2 et 3 : le joueur vise, la trajectoire le guide.
+    if (this.#assist && level.id === 1 && this.#engine === 'catapult') this.#aimAtFirstTarget()
+  }
+
+  /** Règle la visée (angle de 35°) pour que la pierre arrive sur la cible la plus proche. */
+  #aimAtFirstTarget() {
+    const target = this.world
+      .filter((e) => e.kind === 'target' && e.alive)
+      .sort((a, b) => a.x - b.x)[0]
+    if (!target) return
+    const c = this.catapult
+    const angle = 35
+    let lo = 0.05
+    let hi = 1
+    for (let i = 0; i < 20; i++) {
+      const mid = (lo + hi) / 2
+      c.setAim(angle, mid)
+      const pts = TrajectoryPredictor.predict(c.launchPoint, c.velocity, { wind: this.world.wind, maxPoints: 400, every: 1 })
+      const at = pts.find((p) => p.x >= target.x)
+      if ((at ? at.y : Infinity) > target.y) lo = mid
+      else hi = mid
+    }
+    c.setAim(angle, Math.round(((lo + hi) / 2) * 100) / 100)
   }
 
   /* ---------- Lecture d'état ---------- */
 
   get level() {
     return this.#level
+  }
+  /** Niveau de premiers pas (trajectoire toujours montrée). */
+  get assist() {
+    return this.#assist
   }
   get mode() {
     return this.#mode
@@ -820,7 +857,7 @@ export class GameSession extends EventBus {
     } else if (this.#state === STATE.FLYING && flying.length && this.camera.follow) {
       const dir = this.catapult.dir
       const lead = flying.reduce((a, b) => (b.x * dir > a.x * dir ? b : a))
-      this.camera.track(lead.x, lead.y, { keepGround: treb })
+      this.camera.track(lead.x, lead.y, { keepGround: true })
     } else if (treb && this.#state === STATE.FLYING && this.camera.follow) {
       // Le projectile a frappé : la caméra reste sur le château le temps qu'il s'effondre.
       this.camera.frame(this.#castleLeft() - 250, this.focus.right + 60, 0.8)

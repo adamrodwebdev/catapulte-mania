@@ -399,3 +399,16 @@ kbd {
   font-size: 1.1rem;
   text-align: center;
 }
+
+/* Boutons d'action toujours visibles (v4.2) : sur un petit écran (cadre d'un
+   portail, téléphone), « Jouer » / « Niveau suivant » restent en bas de la
+   fenêtre au lieu de disparaître sous le contenu à faire défiler. */
+.modal__panel > .modal__actions {
+  position: sticky;
+  bottom: calc(-1 * var(--space-5));
+  z-index: 1;
+  width: calc(100% + 2 * var(--space-5));
+  margin: 0 calc(-1 * var(--space-5)) calc(-1 * var(--space-5));
+  padding: var(--space-3) var(--space-5) var(--space-5);
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--surface) 0%, transparent), var(--surface) 30%);
+}

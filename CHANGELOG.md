@@ -2,6 +2,44 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [4.2.0] – 2026-10-07
+Suite au refus CrazyGames (« qualité générale pas encore au niveau ») : les
+premières minutes et l'interface de jeu revues.
+
+### Prise en main
+- **Premier tir réussi** : au niveau 1, la visée est déjà réglée pour toucher ;
+  la trajectoire est montrée aux niveaux 1 à 3 quel que soit le réglage.
+- **Tutoriel en images** : niveau 1 « appuyez sur Tirer », puis une main animée
+  montre le geste (tirer vers l'arrière, relâcher) ; bulle d'une phrase,
+  sans portrait, « Passer » en haut à droite.
+- **Tirer, relâcher** : par défaut, relâcher après avoir tiré vers l'arrière
+  déclenche le tir, comme une fronde.
+- Portails : pas de générique du studio, sous-titres des bruitages désactivés
+  par défaut (toujours disponibles dans les options).
+- Le trébuchet se débloque après le niveau 3 (au lieu du 13) : ce qui
+  distingue le jeu se voit dès les premières minutes.
+
+### Interface
+- **Barre de commandes compacte** : munitions + bouton Tirer, en bas à droite,
+  sans panneau ; un petit repère « 35° · 47 % ». Les curseurs restent
+  disponibles avec la nouvelle option « Visée précise ».
+- Bandeau du haut allégé ; le terrain de jeu gagne environ un quart de
+  l'écran.
+- **Caméra** : pendant le vol, le sol et tout le château restent à l'écran ;
+  l'impact et l'effondrement ne passent plus derrière les commandes.
+- Fenêtres de début et de fin de niveau : les boutons (« À l'assaut ! »,
+  « Niveau suivant ») restent visibles même sur un petit écran.
+
+### Rendu
+- Ombres de contact sous les blocs, les défenseurs et l'engin ; vignette
+  légère.
+
+### Technique
+- Touche Échap retirée de la pause (réservée au navigateur sur les portails) ;
+  P met en pause.
+- Build sans publicité pour la période de test d'un portail
+  (`npm run build:crazygames:basic`, variable `CTC_ADS=off`).
+
 ## [4.1.1] – 2026-10-05
 ### Corrigé
 - **Versions portails : écran vide dans l'outil de test CrazyGames.** Le jeu y

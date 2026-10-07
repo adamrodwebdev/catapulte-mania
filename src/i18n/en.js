@@ -276,7 +276,8 @@ export default {
   },
   tutorial: {
     title: 'Tutorial: {name}',
-    aimTitle: 'Tutorial: aim and fire',
+    aimTitle: 'First shot',
+    dragTitle: 'Aiming',
     engine: {
       arm: 'The trebuchet is played by clicking. Tap the scene (or “Arm”, or Space): the counterweight drops and the arm starts to swing.',
       release: 'The arm is swinging! Tap again to release the sling. The dotted line shows the shot right now: release when it lands on the castle.',
@@ -286,10 +287,15 @@ export default {
     skip: 'Skip',
     close: 'Got it',
     aim: {
-      aim: 'Set the angle and power: drag backwards from the catapult, or use the sliders below. The dotted line shows the trajectory.',
-      fire: 'Perfect. Press “Fire” (or Space).',
-      watch: 'Watch: a soldier falls at the slightest knock, but the walls protect him.',
-      done: 'Your turn! In the next levels, the wind (top right) will push your shots.',
+      fire: 'All set: press “Fire”!',
+      watch: 'Bullseye! Knock every soldier down.',
+      aim: 'To aim yourself: drag backwards anywhere on the scene, then let go.',
+      done: 'Well done! The dotted line always shows where the stone will go.',
+    },
+    drag: {
+      aim: 'Drag backwards, then let go to fire. The dotted line shows where the stone will land.',
+      watch: 'Watch it fall…',
+      done: 'Your turn! Later on, the wind (top right) will push your shots.',
     },
     step: {
       select: 'Pick “{name}” in the ammo bar.',
@@ -518,6 +524,8 @@ export default {
     storyDesc: 'Shows the Chronicle before the levels that open a chapter.',
     trajectoryAid: 'Trajectory aid',
     trajectoryAidDesc: 'Shows the curve the projectile will follow.',
+    preciseAim: 'Precise aiming',
+    preciseAimDesc: 'Angle and power sliders, plus a “Fire” button to shoot. Otherwise: drag backwards and let go.',
     slowSwing: 'Slow swing',
     slowSwingDesc: 'The trebuchet’s release window lasts longer, making the release easier to time.',
     infiniteSwing: 'Endless swing',
@@ -542,7 +550,7 @@ export default {
   },
   help: {
     trebuchetTitle: 'The trebuchet',
-    trebuchet: 'Unlocked after level 13, you choose it before each level (except head-to-head). It is played only by clicking: the first click drops the counterweight, the second releases the sling. Release early for a high lob, late for a flat shot. It fires from further back than the catapult but hits harder (heavier stones), and the camera follows the shot. A tick sound rises with the shot angle; the “Slow swing” option slows the arm down.',
+    trebuchet: 'Unlocked after level 3, you choose it before each level (except head-to-head). It is played only by clicking: the first click drops the counterweight, the second releases the sling. Release early for a high lob, late for a flat shot. It fires from further back than the catapult but hits harder (heavier stones), and the camera follows the shot. A tick sound rises with the shot angle; the “Slow swing” option slows the arm down.',
     modesTitle: 'Game modes',
     modes: 'Campaign: all 100 levels, with stars and gold. Free play: replay a cleared level without limits. Two players on the same device: the cooperative two-player campaign, the duel (renown), the three-round tournament and the face-off (regicide).',
     workshopTitle: 'Workshop',

@@ -117,6 +117,8 @@ const engine = computed(() => {
   return trebuchetLesson.value || (engineChoice.value && state.settings.engine === 'trebuchet') ? 'trebuchet' : 'catapult'
 })
 const isTrebuchet = computed(() => hud.value?.engine === 'trebuchet')
+/** Visée précise (curseurs) : option ; par défaut, on vise dans la scène et une barre fine suffit. */
+const precise = computed(() => state.settings.preciseAim === true)
 /** Changement d'engin depuis l'introduction : la partie est reconstruite, l'introduction reste affichée. */
 function chooseEngine(value) {
   if (!engineChoice.value || value === engine.value) return
@@ -365,7 +367,9 @@ function measureInsets() {
   const top = root.value.querySelector('.hud-top')?.getBoundingClientRect()
   const bottom = root.value.querySelector('.hud-bottom')?.getBoundingClientRect()
   const h = root.value.clientHeight
-  const bottomInset = bottom && bottom.height ? h - bottom.top : 0
+  // Barre compacte : les boutons se posent sur la terre du premier plan, la scène garde la hauteur.
+  const compact = root.value.querySelector('.hud-bottom--compact')
+  const bottomInset = bottom && bottom.height ? h - bottom.top - (compact ? bottom.height * 0.55 : 0) : 0
   controller.setInsets(top ? top.bottom : 0, bottomInset)
   // Les sous-titres et l'astuce se placent juste au-dessus des commandes.
   root.value.style.setProperty('--hud-bottom-h', `${Math.round(bottomInset)}px`)
@@ -797,7 +801,7 @@ function onKey(e) {
   if (phase.value === 'paused' && (e.key === 'p' || e.key === 'P')) return resume()
   if (phase.value !== 'playing' || showPowers.value) return
   if (controller?.replaying) {
-    if (e.code === 'Escape') stopWatching()
+    if (e.code === 'KeyP') stopWatching()
     return
   }
   const fast = e.shiftKey ? 5 : 1
@@ -823,8 +827,8 @@ function onKey(e) {
       if (e.target instanceof HTMLButtonElement) return
       fire()
       break
+    // Pas d'Échap : sur les portails, cette touche sert au navigateur (sortie du plein écran).
     case 'KeyP':
-    case 'Escape':
       pause()
       break
     default:
@@ -887,9 +891,12 @@ const canvasLabel = computed(() =>
         <span>{{ state.match.challenge?.name ? t('daily.watchingName', { name: state.match.challenge.name }) : t('daily.watching') }}</span>
         <button type="button" class="btn btn--small" @click="stopWatching">{{ t('daily.skip') }}</button>
       </div>
-      <div v-show="phase === 'playing' && !(isChallenge && challengeStage === 'watch')" class="hud-bottom">
+      <div v-show="phase === 'playing' && !(isChallenge && challengeStage === 'watch')" :class="['hud-bottom', { 'hud-bottom--compact': !precise }]">
         <TrebuchetPanel v-if="isTrebuchet" :hud="hud" />
-        <AimPanel v-else :angle="hud.angle" :power="hud.power" :disabled="!aiming" :coach="coachAnchor" @aim="aim" @nudge="nudge" />
+        <AimPanel v-else-if="precise" :angle="hud.angle" :power="hud.power" :disabled="!aiming" :coach="coachAnchor" @aim="aim" @nudge="nudge" />
+        <p v-else class="aim-readout" data-coach="aim" :aria-label="`${t('game.angle')} ${hud.angle}°, ${t('game.power')} ${hud.power} %`">
+          <span>{{ hud.angle }}°</span><span class="aim-readout__sep" aria-hidden="true">·</span><span>{{ hud.power }} %</span>
+        </p>
         <AmmoBar :ammo="hud.ammo" :disabled="!aiming" :coach="coachAnchor" @select="selectAmmo" />
         <button
           type="button"
@@ -903,6 +910,16 @@ const canvasLabel = computed(() =>
         </button>
       </div>
       <CoachBubble v-if="coachStep && phase === 'playing'" :tool="coachTool" :step="coachStep" :progress="coachProgress" @skip="stopCoach" />
+      <!-- Geste de visée montré en image : une main tire vers l'arrière puis relâche. -->
+      <div v-if="coachAnchor === 'drag' && aiming" class="drag-hint" aria-hidden="true">
+        <svg viewBox="0 0 160 120" width="160" height="120">
+          <path class="drag-hint__trail" d="M120 30 Q 70 50 40 95" />
+          <g class="drag-hint__hand">
+            <circle cx="0" cy="0" r="16" class="drag-hint__dot" />
+            <path d="M-6 -2 v-16 a5 5 0 0 1 10 0 v12 h2 v-6 a5 5 0 0 1 10 0 v14 c0 10 -6 18 -16 18 h-4 c-6 0 -10 -4 -12 -9 l-6 -12 a4 4 0 0 1 7 -4 z" class="drag-hint__finger" />
+          </g>
+        </svg>
+      </div>
     </template>
 
     <CaptionFeed />
@@ -1034,6 +1051,17 @@ const canvasLabel = computed(() =>
           <div><dt>{{ t('end.best') }}</dt><dd>{{ end.best.toLocaleString(state.locale) }}</dd></div>
         </dl>
         <p class="end__shots">{{ t('end.shotsUsed', { count: end.shotsUsed }) }}<template v-if="end.stars < 3"> · {{ t('end.star3Hint', { count: level.par }) }}</template></p>
+      </template>
+      <div class="modal__actions">
+        <button v-if="end.hasNext" type="button" class="btn btn--primary btn--large" data-autofocus @click="nextLevel">
+          {{ t('end.next') }}
+        </button>
+        <button type="button" :class="['btn', { 'btn--primary btn--large': !end.won }]" :data-autofocus="!end.hasNext ? '' : undefined" @click="restart">
+          <AppIcon name="refresh" />{{ t('end.retry') }}
+        </button>
+        <button type="button" class="btn btn--ghost" @click="quit"><AppIcon name="map" />{{ t('end.levels') }}</button>
+      </div>
+      <template v-if="end.won">
         <p v-if="end.newBest" class="end__badge">{{ t('end.newBest') }}</p>
         <AchievementList :level="level" :mask="end.achMask" :fresh="end.achFresh" compact />
         <p v-if="end.gold" class="end__gold"><AppIcon name="coin" />{{ t('end.gold', { gold: end.gold }) }}</p>
@@ -1049,15 +1077,6 @@ const canvasLabel = computed(() =>
       </template>
       <p v-else>{{ t('end.defeatHint') }}</p>
       <p v-if="!end.saved" class="notice notice--warning" role="alert">{{ t('end.saveError') }}</p>
-      <div class="modal__actions">
-        <button v-if="end.hasNext" type="button" class="btn btn--primary btn--large" data-autofocus @click="nextLevel">
-          {{ t('end.next') }}
-        </button>
-        <button type="button" :class="['btn', { 'btn--primary btn--large': !end.won }]" :data-autofocus="!end.hasNext ? '' : undefined" @click="restart">
-          <AppIcon name="refresh" />{{ t('end.retry') }}
-        </button>
-        <button type="button" class="btn btn--ghost" @click="quit"><AppIcon name="map" />{{ t('end.levels') }}</button>
-      </div>
     </ModalPanel>
 
     <!-- Atelier : fin de partie -->

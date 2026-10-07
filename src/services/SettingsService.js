@@ -10,6 +10,8 @@ const DEFINITIONS = Object.freeze({
   motion: { validate: Schema.enum(['system', 'reduced', 'full']), fallback: 'system' },
   uiScale: { validate: Schema.enum([1, 1.15, 1.3]), fallback: 1 },
   trajectoryAid: { validate: Schema.boolean(), fallback: false },
+  /** Visée précise : curseurs d'angle et de puissance + bouton Tirer (sinon : tirer, relâcher). */
+  preciseAim: { validate: Schema.boolean(), fallback: false },
   // Tutoriels guidés au premier passage des niveaux qui présentent un outil.
   tutorials: { validate: Schema.boolean(), fallback: true },
   // Récit (la Chronique) avant les niveaux qui ouvrent un chapitre.
@@ -22,7 +24,8 @@ const DEFINITIONS = Object.freeze({
   slowSwing: { validate: Schema.boolean(), fallback: false },
   // Balancier infini du trébuchet (sauf en Difficile) : tout le temps de choisir son tir.
   infiniteSwing: { validate: Schema.boolean(), fallback: false },
-  captions: { validate: Schema.boolean(), fallback: true },
+  // Portails : sous-titres de bruitages proposés dans les options, pas imposés (image dégagée).
+  captions: { validate: Schema.boolean(), fallback: !IS_PORTAL },
   announcements: { validate: Schema.boolean(), fallback: true },
   haptics: { validate: Schema.boolean(), fallback: true },
   screenShake: { validate: Schema.boolean(), fallback: true },

@@ -836,18 +836,11 @@
   }
 }
 
-/* Maître Gontran accompagne les tutoriels. */
+/* Bulle de tutoriel compacte (v4.2) : une phrase, l'image fait le reste. */
 .coach {
-  padding-left: calc(var(--space-4) + 3.6rem);
-}
-.coach__portrait {
-  position: absolute;
-  left: var(--space-2);
-  bottom: var(--space-2);
-}
-@media (max-height: 520px) {
-  .coach { padding-left: calc(var(--space-3) + 3rem); }
-  .coach__portrait { height: 3.5rem !important; }
+  width: min(22rem, calc(100% - 2 * var(--space-4)));
+  padding: var(--space-2) var(--space-3);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
 }
 
 /* Vent (v3.6) : la couleur suit la force ; « rafale » clignote doucement. */
@@ -1011,4 +1004,122 @@
 .power-free {
   margin-top: var(--space-1);
   width: 100%;
+}
+
+/* ---------- Barre basse compacte (v4.2) ----------
+   Par défaut on vise dans la scène (tirer vers l'arrière, relâcher) : il ne
+   reste en bas qu'une rangée discrète, alignée à droite, sans panneau. */
+.hud-bottom--compact {
+  left: auto;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.hud-bottom--compact .ammo {
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-1);
+  box-shadow: var(--shadow);
+}
+.hud-bottom--compact .fire-btn {
+  width: 4.6rem;
+  height: 4.6rem;
+}
+.hud-bottom--compact .trebuchet-panel,
+.hud-bottom--compact .treb-panel {
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-1) var(--space-2);
+}
+.aim-readout {
+  margin: 0;
+  align-self: center;
+  display: inline-flex;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+}
+.aim-readout__sep {
+  opacity: 0.5;
+}
+
+/* Geste de visée (tutoriel) : une main tire vers l'arrière, en boucle. */
+.drag-hint {
+  position: absolute;
+  z-index: 7;
+  left: clamp(4rem, 14vw, 12rem);
+  bottom: calc(var(--hud-bottom-h, 5rem) + 8vh);
+  pointer-events: none;
+}
+.drag-hint__trail {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 4;
+  stroke-dasharray: 2 10;
+  stroke-linecap: round;
+  opacity: 0.85;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.5));
+}
+.drag-hint__dot {
+  fill: rgb(255 255 255 / 0.35);
+  stroke: #fff;
+  stroke-width: 3;
+}
+.drag-hint__finger {
+  fill: #fff;
+  stroke: var(--c-ink, #2b2118);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.drag-hint__hand {
+  offset-path: path('M120 30 Q 70 50 40 95');
+  offset-rotate: 0deg;
+  animation: drag-hint calc(1.8s * var(--speed, 1)) ease-in-out infinite;
+}
+@keyframes drag-hint {
+  0% { offset-distance: 0%; opacity: 0; }
+  12% { opacity: 1; }
+  70% { offset-distance: 100%; opacity: 1; }
+  85% { offset-distance: 100%; opacity: 0; }
+  100% { offset-distance: 0%; opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .drag-hint__hand { animation: none; offset-distance: 100%; }
+}
+
+/* Bandeau haut allégé pendant la partie : le titre du chapitre passe en infobulle. */
+.game .hud-top {
+  padding: var(--space-1) var(--space-3);
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+}
+.game .hud-top__chapter {
+  display: none;
+}
+
+/* Bulle de tutoriel : « Passer » en haut à droite, la bulle ne fait que la consigne. */
+.coach {
+  padding-right: 5.5rem;
+}
+.coach .coach__skip {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-2);
+  margin: 0;
+  min-height: 2rem;
+}
+.hud-bottom--compact .fire-btn {
+  margin-bottom: 6px;
 }

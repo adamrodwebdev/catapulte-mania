@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 import { useApp } from '../../app/AppContext.js'
 import AppIcon from '../ui/AppIcon.vue'
-import PixelPortrait from '../ui/PixelPortrait.vue'
 
 /**
  * Bulle du tutoriel guidé : consigne de l'étape en cours, progression et
@@ -24,12 +23,13 @@ const name = computed(() => props.tool.split(':')[1] || '')
 const toolName = computed(() =>
   kind.value === 'ammo' ? t(`game.ammo.${name.value}`) : kind.value === 'power' ? t(`powers.${name.value}`) : kind.value === 'engine' ? t(`game.engines.${name.value}`) : '',
 )
-const title = computed(() => (kind.value === 'aim' ? t('tutorial.aimTitle') : t('tutorial.title', { name: toolName.value })))
+const title = computed(() => (kind.value === 'aim' ? t('tutorial.aimTitle') : kind.value === 'drag' ? t('tutorial.dragTitle') : t('tutorial.title', { name: toolName.value })))
 
 /** Texte de l'étape : générique (choisir, ouvrir, activer) ou propre à l'outil. */
 const text = computed(() => {
   const id = props.step.id
   if (kind.value === 'aim') return t(`tutorial.aim.${id}`)
+  if (kind.value === 'drag') return t(`tutorial.drag.${id}`)
   if (kind.value === 'engine') return t(`tutorial.engine.${id}`)
   if (id === 'select' || id === 'open' || id === 'use') return t(`tutorial.step.${id}`, { name: toolName.value })
   if (id === 'watch') return t('tutorial.step.watch')
@@ -40,7 +40,6 @@ const text = computed(() => {
 
 <template>
   <aside :class="['coach', { 'coach--center': kind === 'engine' }]" role="status" aria-live="polite" :aria-label="title">
-    <PixelPortrait id="gontran" height="4.5rem" decorative class="coach__portrait" />
     <p class="coach__head">
       <AppIcon name="help" :size="18" />
       <span class="coach__title">{{ title }}</span>

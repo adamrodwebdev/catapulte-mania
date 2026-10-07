@@ -39,6 +39,8 @@ export class GameController extends EventBus {
   #paused = false
   #resizeObs = null
   #drag = null
+  /** Relâcher après avoir tiré vers l'arrière déclenche le tir (sauf « visée précise »). */
+  #releaseToFire = true
   #hudTimer = 0
   #handlers = {}
   /** Relecture d'une partie (« Bats mon tir ») : le joueur regarde, les commandes sont coupées. */
@@ -78,6 +80,7 @@ export class GameController extends EventBus {
       season,
     }, mode)
     if (Array.isArray(replay)) this.#replayer = new ReplayPlayer(this.session, replay)
+    this.#releaseToFire = settings.preciseAim !== true
     const focus = this.session.focus
     this.session.camera.setFocus(focus.left, focus.right, focus.top)
     this.session.on('hud', (h) => this.emit('hud', h))
@@ -99,7 +102,9 @@ export class GameController extends EventBus {
 
   /** Met à jour les options en cours de partie. */
   applySettings(settings, reducedMotion) {
-    this.session.options.trajectoryAid = settings.trajectoryAid
+    // Les niveaux de premiers pas gardent la trajectoire visible quel que soit le réglage.
+    this.session.options.trajectoryAid = settings.trajectoryAid || this.session.assist
+    this.#releaseToFire = settings.preciseAim !== true
     this.session.options.reducedMotion = reducedMotion
     this.session.camera.shakeEnabled = settings.screenShake && !reducedMotion
     this.session.options.blood = settings.blood
@@ -236,6 +241,9 @@ export class GameController extends EventBus {
       const tap = !d.moved && performance.now() - d.t < TAP_MAX_MS
       if (tap && this.session.state === STATE.FLYING) this.session.activate()
       if (d.moved) this.emit('announce', { key: 'a11y.aim', params: { angle: Math.round(this.session.catapult.angle), power: Math.round(this.session.catapult.power * 100) } })
+      // Comme une fronde : on tire vers l'arrière, on relâche, ça part.
+      // (Visée précise : on règle au doigt puis on appuie sur « Tirer ».)
+      if (d.moved && this.#releaseToFire && this.session.state === STATE.AIMING && this.session.catapult.power > 0.04) this.trigger()
     }
     const cancel = () => (this.#drag = null)
     const visibility = () => {

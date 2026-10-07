@@ -186,6 +186,8 @@ export default defineConfig(({ mode }) => {
       __DEMO__: JSON.stringify(isDemo),
       __TARGET__: JSON.stringify(target),
       __APP_VERSION__: JSON.stringify(pkg.version),
+      // CTC_ADS=off : build sans publicité (période de test d'un portail).
+      __ADS__: JSON.stringify(process.env.CTC_ADS !== 'off'),
     },
     build: {
       outDir: isDemo ? 'dist-demo' : target === 'web' ? 'dist' : `dist-${target}`,
