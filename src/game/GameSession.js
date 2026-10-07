@@ -188,6 +188,7 @@ export class GameSession extends EventBus {
       top: level.focus.top,
     })
     this.particles = new ParticleSystem()
+    this.particles.surfaceAt = (x, y) => this.world.solidAt(x, y)
     this.particles.density = reducedMotion ? 0.35 : 1
     this.camera = new Camera()
     this.camera.follow = !reducedMotion
@@ -898,6 +899,8 @@ export class GameSession extends EventBus {
     for (const e of this.world.entities()) {
       if (e.burning > 0 && e.kind !== 'projectile') this.particles.flame(e.x, e.y - e.height / 2, e.width)
       if (e.kind === 'projectile' && !e.hasImpacted) this.particles.trail(e.x, e.y, e.ignites, this.options.trail)
+      // Boulet encore brûlant après l'impact : il continue de flamber.
+      if (e.kind === 'projectile' && e.hasImpacted && e.heatMs > 0) this.particles.flame(e.x, e.y - e.radius * 0.6, e.radius * 1.2)
     }
   }
 
@@ -919,8 +922,7 @@ export class GameSession extends EventBus {
         if (gained) this.particles.text(entity.x, entity.y - 40, `+${gained}`)
         if (this.options.blood) {
           const vx = entity.body.velocity.x
-          const foot = Math.min(entity.y + entity.height / 2, WORLD.GROUND_Y)
-          this.particles.blood(entity.x, entity.y, foot, Math.abs(vx) > 0.5 ? Math.sign(vx) : 0)
+          this.particles.blood(entity.x, entity.y, WORLD.GROUND_Y, Math.abs(vx) > 0.5 ? Math.sign(vx) : 0)
         } else {
           this.particles.dust(entity.x, entity.y, 10)
         }

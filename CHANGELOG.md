@@ -2,6 +2,38 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [4.5.0] – 2026-10-07
+### Châteaux aux matières réalistes
+- Chaque bloc reçoit un appareillage ajusté à sa taille, peint à partir de
+  textures générées pixel par pixel : **pierre** taillée en assises (teinte
+  propre à chaque pierre, arêtes, éclats, coulures), **brique** en quinconce,
+  **grès** veiné en strates, **marbre** veiné et poli, **bois** en planches
+  clouées et aboutées, **chaume** en bottes liées de ficelle, **fer** en tôles
+  rivetées avec coulures de rouille, **vitrail** sous plomb translucide,
+  **glace** translucide avec fractures, bulles et bords givrés.
+- Baril de poudre à douelles et cercles de fer.
+- Fissures à bord éclaté ; un bloc en feu noircit et sa braise palpite.
+- Les textures sont préparées pendant le chargement (aucune saccade en jeu)
+  et chaque bloc est recopié depuis une image en cache.
+
+### Personnages vivants
+- Personnages découpés en calques (corps, tête, bras ou écu) animés
+  séparément : regard jeté derrière soi, lance soulevée puis reposée d'un coup
+  sec, écu réajusté, sceptre brandi, hochements de tête, léger balancement.
+- Quand un projectile est en vol, tous lèvent les yeux : les soldats pointent
+  leur lance, les chevaliers lèvent leur écu, le roi brandit son sceptre.
+
+### Sang en particules
+- Plus de flaque posée d'avance (elle flottait en l'air quand le personnage
+  était en haut d'une tour) : une gerbe de gouttes vole, retombe et tache le
+  sol là où elle tombe ; une goutte qui rencontre un mur s'y écrase.
+
+### Feu
+- Le boulet enflammé reste brûlant 4,5 s après son premier choc : il met le
+  feu au bois, à la paille, aux barils et aux personnages sur lesquels il
+  rebondit, roule ou s'immobilise. La pierre, la brique, le fer, le verre et
+  la glace ne prennent pas feu.
+
 ## [4.4.0] – 2026-10-07
 ### Engins et personnages redessinés
 - **Matières réalistes** : bois de charpente veiné (texture générée pixel par

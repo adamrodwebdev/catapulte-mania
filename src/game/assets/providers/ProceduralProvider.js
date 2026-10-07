@@ -1,4 +1,10 @@
 import { PAINTERS } from '../procedural/painters.js'
+import { warmMaterial } from '../procedural/materials.js'
+import { warmBaseTextures } from '../procedural/realism.js'
+
+/** Laisse respirer l'interface entre deux textures (chargement progressif). */
+const yieldToUi = () => new Promise((resolve) => setTimeout(resolve, 0))
+let baseWarm = null
 
 /**
  * Fournisseur de visuels vectoriels : chaque clé correspond à une fonction
@@ -7,6 +13,15 @@ import { PAINTERS } from '../procedural/painters.js'
 export class ProceduralProvider {
   async load(key) {
     if (!PAINTERS[key]) throw new Error(`no procedural painter for "${key}"`)
+    // Les textures réalistes (calculées pixel par pixel) sont préparées pendant
+    // le chargement, une par une, plutôt qu'au milieu d'une partie.
+    if (typeof document === 'undefined' && typeof OffscreenCanvas === 'undefined') return
+    baseWarm ??= yieldToUi().then(warmBaseTextures)
+    await baseWarm
+    if (key.startsWith('block.')) {
+      await yieldToUi()
+      warmMaterial(key.slice(6))
+    }
   }
 
   isReady(key) {

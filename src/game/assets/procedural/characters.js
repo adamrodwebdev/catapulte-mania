@@ -238,24 +238,11 @@ function head(g, cx, cy, r, state, { old = false, stubble = true } = {}) {
 
 /* ---------- Soldat (26 × 50) ---------- */
 
-function soldier(g, { state, team }) {
+function soldierBody(g, { team }) {
   const c = TEAM[team]
   // Jambe éloignée.
   limb(g, [[3, 9], [3.4, 20]], 4.6, '#35313b')
   boot(g, 3.6, 25)
-  // Hampe de la lance.
-  g.beginPath()
-  roundRect(g, 13.3, -31, 2, 56, 1)
-  g.fillStyle = woodPattern(g, { angle: Math.PI / 2, unitsPerTile: 120 })
-  g.fill()
-  g.fillStyle = 'rgba(0,0,0,0.12)'
-  g.fill()
-  const sh = g.createLinearGradient(13.3, 0, 15.3, 0)
-  sh.addColorStop(0, 'rgba(255,236,200,0.35)')
-  sh.addColorStop(1, 'rgba(0,0,0,0.45)')
-  g.fillStyle = sh
-  g.fill()
-  edge(g, 0.5)
   // Jambe proche.
   limb(g, [[-3.5, 9], [-3.8, 20]], 4.8, '#423c48')
   boot(g, -3.6, 25)
@@ -320,8 +307,6 @@ function soldier(g, { state, team }) {
   // Bras.
   limb(g, [[-8.6, -6], [-10.6, 0.5], [-10.2, 6.5]], 4.4, '#bfa97f')
   hand(g, -10.2, 7.6)
-  limb(g, [[8.6, -6], [12, -0.5], [14.1, 3]], 4.4, '#c9b48a')
-  hand(g, 14.3, 3.4, 1.9)
   // Cou et col matelassé.
   g.beginPath()
   g.rect(-2.6, -12, 5, 4)
@@ -332,6 +317,47 @@ function soldier(g, { state, team }) {
   g.fillStyle = '#b8a27a'
   g.fill()
   edge(g, 0.45)
+}
+
+function soldierArm(g) {
+  // Hampe de la lance.
+  g.beginPath()
+  roundRect(g, 13.3, -31, 2, 56, 1)
+  g.fillStyle = woodPattern(g, { angle: Math.PI / 2, unitsPerTile: 120 })
+  g.fill()
+  g.fillStyle = 'rgba(0,0,0,0.12)'
+  g.fill()
+  const sh = g.createLinearGradient(13.3, 0, 15.3, 0)
+  sh.addColorStop(0, 'rgba(255,236,200,0.35)')
+  sh.addColorStop(1, 'rgba(0,0,0,0.45)')
+  g.fillStyle = sh
+  g.fill()
+  edge(g, 0.5)
+  limb(g, [[8.6, -6], [12, -0.5], [14.1, 3]], 4.4, '#c9b48a')
+  hand(g, 14.3, 3.4, 1.9)
+  // Fer de lance en feuille.
+  g.beginPath()
+  g.moveTo(14.3, -41)
+  g.quadraticCurveTo(17.4, -35, 15.6, -31)
+  g.lineTo(13, -31)
+  g.quadraticCurveTo(11.2, -35, 14.3, -41)
+  g.fillStyle = metalGradient(g, 11.5, -36, 17, -36, '#b8c0ca')
+  g.fill()
+  edge(g, 0.5)
+  g.beginPath()
+  g.moveTo(14.3, -40)
+  g.lineTo(14.3, -31.5)
+  g.lineWidth = 0.4
+  g.strokeStyle = 'rgba(255,255,255,0.7)'
+  g.stroke()
+  g.beginPath()
+  g.rect(13.2, -31.2, 2.2, 2.6)
+  g.fillStyle = metalGradient(g, 13, -31, 15.5, -28.5, '#6b717b')
+  g.fill()
+  edge(g, 0.4)
+}
+
+function soldierHead(g, { state }) {
   head(g, -1, -16, 6.8, state)
   // Chapeau de fer : ombre portée du bord sur le front.
   g.save()
@@ -368,32 +394,11 @@ function soldier(g, { state, team }) {
   g.fill()
   edge(g, 0.6)
   for (const x of [-7, -3, 1, 5]) rivet(g, x, -20.3, 0.45, STEEL)
-  // Fer de lance en feuille.
-  g.beginPath()
-  g.moveTo(14.3, -41)
-  g.quadraticCurveTo(17.4, -35, 15.6, -31)
-  g.lineTo(13, -31)
-  g.quadraticCurveTo(11.2, -35, 14.3, -41)
-  g.fillStyle = metalGradient(g, 11.5, -36, 17, -36, '#b8c0ca')
-  g.fill()
-  edge(g, 0.5)
-  g.beginPath()
-  g.moveTo(14.3, -40)
-  g.lineTo(14.3, -31.5)
-  g.lineWidth = 0.4
-  g.strokeStyle = 'rgba(255,255,255,0.7)'
-  g.stroke()
-  g.beginPath()
-  g.rect(13.2, -31.2, 2.2, 2.6)
-  g.fillStyle = metalGradient(g, 13, -31, 15.5, -28.5, '#6b717b')
-  g.fill()
-  edge(g, 0.4)
 }
 
 /* ---------- Chevalier (30 × 54) ---------- */
 
-function knight(g, { state, team }) {
-  const c = TEAM[team]
+function knightBody(g) {
   // Fourreau et épée (côté éloigné).
   g.beginPath()
   g.moveTo(9.5, 4)
@@ -498,6 +503,10 @@ function knight(g, { state, team }) {
   g.fill()
   lightOver(g, -9, -12, 9, -8, 0.2, 0.45)
   edge(g, 0.45)
+}
+
+function knightHead(g, { state, team }) {
+  const c = TEAM[team]
   // Grand heaume.
   const helm = () => {
     g.beginPath()
@@ -578,6 +587,10 @@ function knight(g, { state, team }) {
   g.lineWidth = 0.4
   g.strokeStyle = c.dark
   g.stroke()
+}
+
+function knightShield(g, { team }) {
+  const c = TEAM[team]
   // Écu (bras gauche, devant le corps).
   const shield = () => {
     g.beginPath()
@@ -663,7 +676,7 @@ function ermine(g, x0, y0, x1, y1) {
   edge(g, 0.5)
 }
 
-function king(g, { state }) {
+function kingBody(g) {
   // Chaussures pointues.
   for (const x of [-5, 3.5]) {
     g.beginPath()
@@ -731,6 +744,30 @@ function king(g, { state }) {
   // Bras : manches de velours, mains, sceptre.
   limb(g, [[-9.6, -6], [-12, 1], [-11, 6.5]], 4.6, '#532269')
   hand(g, -10.8, 7.6)
+  // Pèlerine d'hermine sur les épaules.
+  g.beginPath()
+  g.moveTo(-12.6, -6)
+  g.quadraticCurveTo(-12, -11, -6, -11)
+  g.lineTo(6, -11)
+  g.quadraticCurveTo(12, -11, 12.6, -6)
+  g.quadraticCurveTo(12.4, -1.6, 9, -1)
+  g.quadraticCurveTo(0, 0.6, -9, -1)
+  g.quadraticCurveTo(-12.4, -1.6, -12.6, -6)
+  g.closePath()
+  ermine(g, -13, -11, 13, 0.6)
+  // Chaîne d'or et médaillon.
+  g.beginPath()
+  g.moveTo(-7, -9)
+  g.quadraticCurveTo(-1, 2, 5.6, -9)
+  g.setLineDash([0.9, 0.5])
+  g.lineWidth = 0.9
+  g.strokeStyle = GOLD
+  g.stroke()
+  g.setLineDash([])
+  rivet(g, -0.8, -3.2, 1.6, GOLD)
+}
+
+function kingArm(g) {
   // Sceptre d'or surmonté d'un globe crucigère.
   g.beginPath()
   g.moveTo(11.4, 15)
@@ -760,27 +797,9 @@ function king(g, { state }) {
   g.stroke()
   limb(g, [[9.6, -6], [12.4, 0.5], [12.6, 6]], 4.6, '#5b2a72')
   hand(g, 12.8, 6.6, 1.9)
-  // Pèlerine d'hermine sur les épaules.
-  g.beginPath()
-  g.moveTo(-12.6, -6)
-  g.quadraticCurveTo(-12, -11, -6, -11)
-  g.lineTo(6, -11)
-  g.quadraticCurveTo(12, -11, 12.6, -6)
-  g.quadraticCurveTo(12.4, -1.6, 9, -1)
-  g.quadraticCurveTo(0, 0.6, -9, -1)
-  g.quadraticCurveTo(-12.4, -1.6, -12.6, -6)
-  g.closePath()
-  ermine(g, -13, -11, 13, 0.6)
-  // Chaîne d'or et médaillon.
-  g.beginPath()
-  g.moveTo(-7, -9)
-  g.quadraticCurveTo(-1, 2, 5.6, -9)
-  g.setLineDash([0.9, 0.5])
-  g.lineWidth = 0.9
-  g.strokeStyle = GOLD
-  g.stroke()
-  g.setLineDash([])
-  rivet(g, -0.8, -3.2, 1.6, GOLD)
+}
+
+function kingHead(g, { state }) {
   // Cheveux blancs (derrière la tête).
   g.beginPath()
   g.moveTo(-1, -24)
@@ -896,36 +915,170 @@ function king(g, { state }) {
 
 /* ---------- Animation (à chaque image) ---------- */
 
-const BOXES = {
-  soldier: { size: [26, 50], box: { x: -17, y: -43, w: 36, h: 70 }, paint: soldier },
-  knight: { size: [30, 54], box: { x: -19, y: -38, w: 38, h: 67 }, paint: knight },
-  king: { size: [32, 58], box: { x: -19, y: -37, w: 38, h: 68 }, paint: king },
+/**
+ * Chaque personnage est découpé en calques mis en cache séparément (corps,
+ * tête, bras ou écu) : on les anime par de simples transformations autour
+ * d'un pivot (cou, épaule), sans redessiner le détail.
+ */
+const RIGS = {
+  soldier: {
+    size: [26, 50],
+    box: { x: -17, y: -43, w: 36, h: 70 },
+    layers: [
+      { name: 'body', paint: soldierBody },
+      { name: 'arm', paint: soldierArm, pivot: [8.6, -6] },
+      { name: 'head', paint: soldierHead, pivot: [-1, -10.5], face: true },
+    ],
+    // Gestes au repos : regarder derrière soi, soulever puis reposer la lance, lever les yeux.
+    actions: ['lookBack', 'thump', 'lookUp'],
+  },
+  knight: {
+    size: [30, 54],
+    box: { x: -19, y: -38, w: 38, h: 67 },
+    layers: [
+      { name: 'body', paint: knightBody },
+      { name: 'head', paint: knightHead, pivot: [-1, -10.5], face: true },
+      { name: 'shield', paint: knightShield, pivot: [-9, -8] },
+    ],
+    actions: ['lookBack', 'shield', 'nod'],
+  },
+  king: {
+    size: [32, 58],
+    box: { x: -19, y: -37, w: 38, h: 68 },
+    layers: [
+      { name: 'body', paint: kingBody },
+      { name: 'arm', paint: kingArm, pivot: [9.6, -6] },
+      { name: 'head', paint: kingHead, pivot: [-1, -10.5], face: true },
+    ],
+    actions: ['brandish', 'lookBack', 'nod'],
+  },
+}
+
+const smooth = (u) => u * u * (3 - 2 * u)
+/** Enveloppe d'un geste : monte, tient, redescend (u dans [0, 1]). */
+const envelope = (u, a = 0.12, b = 0.55) => (u < a || u > b ? 0 : u < a + 0.07 ? smooth((u - a) / 0.07) : u > b - 0.07 ? smooth((b - u) / 0.07) : 1)
+
+/** Vigilance lissée par personnage (ils se tournent vers le ciel puis se détendent). */
+const alertness = new Map()
+function alertLevel(id, alert, t) {
+  const prev = alertness.get(id)
+  let v = alert ? 1 : 0
+  if (prev && t >= prev.t && t - prev.t < 0.5) {
+    const k = Math.min(1, (t - prev.t) * (alert ? 6 : 1.6))
+    v = prev.v + ((alert ? 1 : 0) - prev.v) * k
+  }
+  if (alertness.size > 400) alertness.clear()
+  alertness.set(id, { v, t })
+  return v
+}
+
+/** Pose de chaque calque à l'instant t. */
+function pose(type, t, seed, { hurt, alert }) {
+  const rig = RIGS[type]
+  const P = { body: { dx: 0, dy: 0 }, head: { rot: 0, flip: 1, dy: 0 }, arm: { rot: 0, dy: 0 }, shield: { rot: 0, dx: 0, dy: 0 } }
+  // Report du poids d'une jambe sur l'autre.
+  P.body.dx = Math.sin(t * 0.7 + seed * 3) * 0.35
+  if (hurt) {
+    P.head.rot = -0.22 + Math.sin(t * 31 + seed) * 0.08
+    P.arm.rot = Math.sin(t * 24 + seed) * 0.25
+    P.shield.dy = -2
+    return P
+  }
+  // Geste du moment : un par cycle, choisi d'après l'identité du personnage.
+  const cycle = 3.6 + (seed % 2.4)
+  const k = (t + seed * 7) / cycle
+  const action = rig.actions[Math.floor(k + seed * 13) % rig.actions.length]
+  const u = k - Math.floor(k)
+  const e = envelope(u)
+  // Micro-mouvements permanents : la tête et le bras ne sont jamais tout à fait figés.
+  P.head.rot = Math.sin(t * 0.9 + seed * 2) * 0.035
+  P.arm.rot = Math.sin(t * 1.1 + seed) * 0.03
+  switch (action) {
+    case 'lookBack':
+      // La tête pivote : on « écrase » puis retourne le calque (le visage passe de gauche à droite).
+      P.head.flip = Math.cos(Math.PI * e)
+      break
+    case 'lookUp':
+      P.head.rot += 0.16 * e
+      break
+    case 'nod':
+      P.head.rot += Math.sin(u * 40) * 0.07 * e
+      break
+    case 'thump': {
+      // Soulève la lance puis la repose d'un coup sec.
+      const lift = u < 0.3 ? smooth(Math.max(0, (u - 0.15) / 0.15)) : u < 0.34 ? 1 - (u - 0.3) / 0.04 : 0
+      P.arm.dy = -3.2 * lift
+      break
+    }
+    case 'shield':
+      P.shield.dy = -1.6 * e
+      P.shield.rot = 0.07 * e
+      break
+    case 'brandish':
+      P.arm.dy = -3 * e
+      P.arm.rot += (-0.16 + Math.sin(u * 30) * 0.05) * e
+      break
+  }
+  // Un projectile en vol : tous lèvent les yeux et se préparent.
+  if (alert > 0) {
+    P.head.rot = P.head.rot * (1 - alert) + 0.15 * alert
+    P.head.flip = P.head.flip * (1 - alert) + alert
+    if (type === 'soldier') P.arm.rot += -0.22 * alert
+    if (type === 'knight') {
+      P.shield.dy += -3.6 * alert
+      P.shield.dx += -1 * alert
+    }
+    if (type === 'king') {
+      P.arm.dy += -2.5 * alert
+      P.arm.rot += -0.12 * alert
+    }
+  }
+  return P
 }
 
 function animated(type) {
-  const { size, box, paint } = BOXES[type]
-  const [W, H] = size
+  const rig = RIGS[type]
+  const [W, H] = rig.size
   return (ctx, s) => {
     const ex = s.extra ?? {}
     const t = (s.time ?? 0) / 1000
-    const seed = (s.seed ?? 1) * 0.618
+    const seed = ((s.seed ?? 1) * 0.618) % 97
     const team = ex.team === 2 ? 2 : 1
     // Clignement : ~0,13 s toutes les 3,4 à 5 s selon le personnage.
     const period = 3.4 + (seed % 1.6)
     const state = ex.hurt ? 'hurt' : !ex.still && (t + seed * 3) % period < 0.13 ? 'blink' : 'idle'
+    const still = Boolean(ex.still)
+    const alert = still ? 0 : alertLevel(s.seed ?? 0, Boolean(ex.alert), t)
+    const P = still ? null : pose(type, t, seed, { hurt: Boolean(ex.hurt), alert })
     ctx.save()
     ctx.scale(s.w / W, s.h / H)
-    if (ex.still) {
-      // Mouvements réduits : ni respiration ni tremblement.
-    } else if (ex.hurt) ctx.translate(Math.sin(t * 55 + seed) * 0.7, 0)
-    else {
-      // Respiration : le buste se soulève très légèrement, les pieds restent au sol.
-      const b = Math.sin(t * 2.3 + seed * 5) * 0.014
-      ctx.translate(0, H / 2)
-      ctx.scale(1 - b * 0.4, 1 + b)
-      ctx.translate(0, -H / 2)
+    if (P) {
+      if (ex.hurt) ctx.translate(Math.sin(t * 55 + seed) * 0.7, 0)
+      else {
+        // Respiration : le buste se soulève très légèrement, les pieds restent au sol.
+        const b = Math.sin(t * 2.3 + seed * 5) * 0.014
+        ctx.translate(P.body.dx, H / 2)
+        ctx.scale(1 - b * 0.4, 1 + b)
+        ctx.translate(0, -H / 2)
+      }
     }
-    cached(ctx, `chr.${type}.${team}.${state}`, box, (g) => paint(g, { state, team }), 4)
+    for (const layer of rig.layers) {
+      const key = `chr.${type}.${layer.name}.${team}.${layer.face ? state : 'any'}`
+      const paint = (g) => layer.paint(g, { state, team })
+      const q = P && layer.pivot ? P[layer.name] : null
+      if (!q) {
+        cached(ctx, key, rig.box, paint, 4)
+        continue
+      }
+      const [px, py] = layer.pivot
+      ctx.save()
+      ctx.translate(px + (q.dx ?? 0), py + (q.dy ?? 0))
+      if (q.rot) ctx.rotate(q.rot)
+      if (q.flip !== undefined && q.flip !== 1) ctx.scale(Math.abs(q.flip) < 0.08 ? 0.08 * Math.sign(q.flip || 1) : q.flip, 1)
+      ctx.translate(-px, -py)
+      cached(ctx, key, rig.box, paint, 4)
+      ctx.restore()
+    }
     ctx.restore()
   }
 }

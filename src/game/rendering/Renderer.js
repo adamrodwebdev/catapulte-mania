@@ -76,6 +76,8 @@ export class Renderer {
     const order = { block: 0, barrel: 1, target: 2, projectile: 3 }
     const list = [...scene.entities].sort((a, b) => order[a.kind] - order[b.kind])
     this.#drawShadows(ctx, list, scene.catapults || [])
+    // Un projectile en vol : les défenseurs lèvent les yeux (animation seulement).
+    const alert = list.some((e) => e.kind === 'projectile' && !e.hasImpacted && e.alive !== false)
     for (const e of list) {
       ctx.save()
       ctx.translate(e.x, e.y)
@@ -83,7 +85,7 @@ export class Renderer {
       assets.draw(ctx, e.assetKey, {
         w: e.width, h: e.height, vertices: e.localVertices, shape: e.shape, damage: e.damageRatio,
         burning: e.burning > 0, time, seed: e.id, pixel,
-        extra: e.kind === 'target' ? { hurt: time - e.hurtAt < 600 || e.damageRatio > 0.6, team: e.team, still: animate === false } : undefined,
+        extra: e.kind === 'target' ? { hurt: time - e.hurtAt < 600 || e.damageRatio > 0.6, team: e.team, still: animate === false, alert } : undefined,
       })
       ctx.restore()
     }

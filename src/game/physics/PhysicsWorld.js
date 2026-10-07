@@ -29,6 +29,9 @@ const { Engine, Composite, Bodies, Body, Events, Sleeping, Query, Vertices } = M
  *  - un mur porteur frappé assez fort cède et fait s'effondrer ce qu'il soutient ;
  *  - rien ne reste suspendu dans le vide quand son appui disparaît.
  */
+/** Durée pendant laquelle un boulet enflammé reste brûlant après son premier choc (ms). */
+export const HOT_BALL_MS = 4500
+
 export class PhysicsWorld {
   /** @type {Map<number, import('../entities/Entity.js').Entity>} */
   #entities = new Map()
@@ -250,6 +253,22 @@ export class PhysicsWorld {
   }
 
   /** Entités dont le centre est dans le rayon donné. */
+  /**
+   * Le point (x, y) est-il à l'intérieur d'un bloc ou d'un baril ? (effets visuels)
+   * @param {number} x
+   * @param {number} y
+   */
+  solidAt(x, y) {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false
+    for (const e of this.#entities.values()) {
+      if (!e.alive || (e.kind !== 'block' && e.kind !== 'barrel')) continue
+      const b = e.body.bounds
+      if (x < b.min.x || x > b.max.x || y < b.min.y || y > b.max.y) continue
+      if (Vertices.contains(e.body.vertices, { x, y })) return true
+    }
+    return false
+  }
+
   queryRadius(x, y, radius) {
     const r2 = radius * radius
     return this.filter((e) => e.alive && (e.x - x) ** 2 + (e.y - y) ** 2 <= r2)
@@ -352,6 +371,7 @@ export class PhysicsWorld {
       for (const [p, other] of [[a, b], [b, a]]) {
         if (p && p.kind === 'projectile' && !p.hasImpacted && p.alive) {
           p.hasImpacted = true
+          if (p.ignites) p.heatMs = HOT_BALL_MS * p.fireFactor
           if (p.ignites && other && other.ignite(7000)) this.#events.emit('fire:start', { entity: other })
           if (p.ignites) {
             for (const near of this.queryRadius(p.x, p.y, 95 * p.fireFactor)) {
@@ -362,6 +382,9 @@ export class PhysicsWorld {
             this.#pendingExplosions.push({ at: this.#time, x: p.x, y: p.y, spec: { radius: 150 * p.blastFactor, power: 12 * Math.sqrt(p.blastFactor), damage: 800 * p.blastFactor, source: p } })
             p.kill('explosion')
           }
+        } else if (p && p.kind === 'projectile' && p.hasImpacted && p.hot && other && other.flammable && other.ignite(6000)) {
+          // Boulet encore brûlant qui rebondit, roule ou retombe sur du bois, de la paille…
+          this.#events.emit('fire:start', { entity: other })
         }
       }
 
@@ -443,6 +466,13 @@ export class PhysicsWorld {
    * va plus loin et prend plus facilement ; contre le vent, il peine.
    */
   #spreadFire() {
+    // Boulet brûlant immobilisé contre (ou sous) un matériau inflammable.
+    for (const p of this.filter((e) => e.kind === 'projectile' && e.hasImpacted && e.hot)) {
+      for (const near of this.queryRadius(p.x, p.y, p.radius + 22)) {
+        if (near === p || !near.flammable || near.burning !== 0) continue
+        if (this.#rng.chance(0.7) && near.ignite(6000)) this.#events.emit('fire:start', { entity: near })
+      }
+    }
     const burning = this.filter((e) => e.burning > 0 && e.alive && e.kind !== 'projectile')
     const wind = this.windField.profile.fire ? this.windField.base : 0
     for (const src of burning) {

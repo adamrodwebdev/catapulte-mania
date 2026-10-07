@@ -457,6 +457,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v3.5.0 | Versions pour les portails CrazyGames et Poki (vidéos récompensées facultatives, publicités entre les niveaux, sauvegarde synchronisée), langues chargées à la demande |
 | v4.3.0 | Rendu modernisé : particules (fumée douce, feu lumineux, échardes, étincelles, explosions avec onde de choc, confettis), décor plus riche (nuages ombrés, arbres, oiseaux, brume), blocs biseautés |
 | v4.4.0 | Engins et personnages redessinés : bois veiné, fer, cordes et cuir réalistes ; flou du bras, contrepoids qui se balance, fanion ; personnages qui respirent, clignent des yeux et réagissent aux coups |
+| v4.5.0 | Châteaux aux matières réalistes (pierre, brique, grès, marbre, bois, chaume, fer, vitrail, glace) ; personnages animés et attentifs aux tirs ; sang en particules ; le boulet enflammé embrase ce sur quoi il retombe |
 | v4.2.0 | Qualité des premières minutes (refus CrazyGames) : premier tir réussi, tutoriel en images, tirer-relâcher, barre de commandes compacte, caméra qui garde l'impact visible, trébuchet dès le niveau 4 |
 | v4.1.1 | Versions portails jouables dans le cadre isolé de CrazyGames (script classique unique), démarrage plus robuste |
 | v4.1.0 | Conformité CrazyGames : vidéos récompensées hors du jeu, langue du portail (anglais à défaut), démarrage en un clic, son coupé par le portail |

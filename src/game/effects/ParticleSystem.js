@@ -73,9 +73,22 @@ export class ParticleSystem {
   density = 1
   /** Vent du moment (−1..1 et au-delà en Difficile) : pousse fumée et flammes. */
   wind = 0
+  /**
+   * Test « ce point est-il dans un bloc ? » fourni par la partie (facultatif).
+   * Les gouttes de sang s'écrasent sur les murs au lieu de les traverser.
+   * @type {((x: number, y: number) => boolean) | null}
+   */
+  surfaceAt = null
 
   get count() {
     return this.#items.length
+  }
+
+  /** Nombre de particules d'un type donné (diagnostic et tests). */
+  countOf(kind) {
+    let n = 0
+    for (const p of this.#items) if (p.kind === kind) n++
+    return n
   }
 
   #spawn(p) {
@@ -239,19 +252,45 @@ export class ParticleSystem {
    * Mort d'une cible : gerbe de gouttes de sang projetées dans le sens du choc,
    * puis une tache au sol qui s'étale brièvement et s'efface en quelques secondes.
    */
-  blood(x, y, groundY, dir = 0) {
+  blood(x, y, _groundY = WORLD.GROUND_Y, dir = 0) {
     const r = this.#rng
-    for (let i = 0; i < this.#n(16); i++) {
-      const a = -Math.PI / 2 + r.range(-1.1, 1.1) + dir * 0.5
-      const sp = r.range(2, 6.5)
+    // Gerbe de gouttes : elles volent, retombent et tachent là où elles touchent
+    // (le sol, ou un mur sur leur trajet). Aucune flaque n'est posée d'avance.
+    for (let i = 0; i < this.#n(28); i++) {
+      const a = -Math.PI / 2 + r.range(-1.25, 1.25) + dir * 0.55
+      const sp = r.range(1.5, 7.5)
       this.#spawn({
-        kind: 'drop', x: x + r.range(-6, 6), y: y + r.range(-14, 6),
-        vx: Math.cos(a) * sp + dir * r.range(0.5, 2), vy: Math.sin(a) * sp, max: r.range(450, 850),
-        size: r.range(2, 4.5), color: r.pick(['#8e1414', '#a51c1c', '#6d0d0d']), floor: groundY,
+        kind: 'drop', x: x + r.range(-5, 5), y: y + r.range(-16, 6),
+        vx: Math.cos(a) * sp + dir * r.range(0.5, 2.2), vy: Math.sin(a) * sp, max: 2600,
+        size: r.range(0.9, 3.2), color: r.pick(['#8e1414', '#a51c1c', '#6d0d0d', '#7d1010']), splat: true,
       })
     }
-    const lobes = Array.from({ length: 6 }, () => ({ dx: r.range(-22, 22), dy: r.range(-3, 3), r: r.range(6, 14) }))
-    this.#spawn({ kind: 'stain', x, y: groundY - 2, vx: 0, vy: 0, max: 3600, size: 1, color: '#7a1010', lobes, opacity: 0.85 })
+    // Fine brume rouge, très brève.
+    for (let i = 0; i < this.#n(6); i++) {
+      this.#spawn({
+        kind: 'smoke', x: x + r.range(-6, 6), y: y + r.range(-14, 4), vx: r.range(-0.6, 0.6) + dir * 0.6, vy: r.range(-0.7, 0.1),
+        max: r.range(300, 520), size: r.range(7, 13), grow: 0.45, rgb: '150,18,18', opacity: 0.32,
+      })
+    }
+  }
+
+  /** Une goutte touche une surface : petite tache, et parfois quelques éclaboussures. */
+  #splat(p, onGround) {
+    const r = this.#rng
+    p.life = p.max
+    const s = p.size
+    if (onGround) {
+      const lobes = [{ dx: 0, dy: 0, r: s * r.range(1.6, 2.6) }]
+      if (s > 1.8) lobes.push({ dx: r.range(-1, 1) * s * 2.2, dy: r.range(-0.4, 0.4), r: s * r.range(0.6, 1.1) })
+      this.#spawn({ kind: 'stain', x: p.x, y: WORLD.GROUND_Y - 1, vx: 0, vy: 0, max: 6000, size: 1, color: '#6d0d0d', lobes, opacity: 0.82 })
+    } else {
+      this.#spawn({ kind: 'dot', x: p.x, y: p.y, vx: 0, vy: 0, max: 1800, size: s * 0.9, color: '#6d0d0d' })
+    }
+    if (s > 2 && r.chance(0.6)) {
+      for (let i = 0; i < 2; i++) {
+        this.#spawn({ kind: 'drop', x: p.x, y: p.y - 1, vx: r.range(-1.6, 1.6), vy: r.range(-2.2, -0.8), max: 500, size: s * 0.35, color: p.color })
+      }
+    }
   }
 
   /** Victoire : pluie de confettis au-dessus du château, et quelques éclats dorés. */
@@ -317,10 +356,13 @@ export class ParticleSystem {
           break
         case 'drop':
           p.vy += 0.28 * k
-          if (p.y > p.floor) {
-            p.y = p.floor
-            p.vx = 0
-            p.vy = 0
+          p.vx *= 0.995
+          if (p.y >= WORLD.GROUND_Y - 1) {
+            p.y = WORLD.GROUND_Y - 1
+            if (p.splat) this.#splat(p, true)
+            else p.life = p.max
+          } else if (p.splat && p.life > 70 && p.vy > 0 && this.surfaceAt && this.surfaceAt(p.x, p.y)) {
+            this.#splat(p, false)
           }
           break
         case 'confetti':
@@ -380,13 +422,18 @@ export class ParticleSystem {
           ctx.restore()
           break
         }
-        case 'drop':
-          ctx.globalAlpha = Math.min(1, (1 - t) * 1.8)
-          ctx.fillStyle = p.color
+        case 'drop': {
+          // Goutte étirée dans le sens de sa course.
+          ctx.globalAlpha = p.splat ? 1 : Math.min(1, (1 - t) * 1.8)
+          ctx.strokeStyle = p.color
+          ctx.lineCap = 'round'
+          ctx.lineWidth = p.size * 1.5
           ctx.beginPath()
-          ctx.arc(p.x, p.y, p.size, 0, TAU)
-          ctx.fill()
+          ctx.moveTo(p.x, p.y)
+          ctx.lineTo(p.x - p.vx * 1.1, p.y - p.vy * 1.1)
+          ctx.stroke()
           break
+        }
         case 'dot':
           ctx.globalAlpha = 1 - t
           ctx.fillStyle = p.color

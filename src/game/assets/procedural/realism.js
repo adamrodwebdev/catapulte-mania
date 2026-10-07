@@ -39,7 +39,7 @@ function hash(x, y, seed) {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967295
 }
 
-function noise(x, y, seed, px, py) {
+export function noise(x, y, seed, px, py) {
   const xi = Math.floor(x)
   const yi = Math.floor(y)
   const xf = x - xi
@@ -56,7 +56,7 @@ function noise(x, y, seed, px, py) {
 }
 
 /** Bruit fractal périodique (px × py cellules à l'octave de base). */
-function fbm(x, y, seed, px, py, octaves = 4) {
+export function fbm(x, y, seed, px, py, octaves = 4) {
   let sum = 0
   let amp = 0.5
   let f = 1
@@ -72,7 +72,7 @@ function fbm(x, y, seed, px, py, octaves = 4) {
 
 const tiles = new Map()
 
-function tile(name, w, h, paint) {
+export function tile(name, w, h, paint) {
   if (!tiles.has(name)) {
     const c = makeCanvas(w, h)
     const g = c.getContext('2d')
@@ -159,11 +159,18 @@ function mailTile() {
  * Motif d'une texture, orienté et mis à l'échelle (unités locales).
  * @param {number} unitsPerTile largeur couverte par une tuile, en unités du monde
  */
-function pattern(g, canvas, { angle = 0, x = 0, y = 0, unitsPerTile = 256 } = {}) {
+export function pattern(g, canvas, { angle = 0, x = 0, y = 0, unitsPerTile = 256 } = {}) {
   const p = g.createPattern(canvas, 'repeat')
   const s = unitsPerTile / canvas.width
   if (p && typeof DOMMatrix !== 'undefined') p.setTransform(new DOMMatrix().translateSelf(x, y).rotateSelf((angle * 180) / Math.PI).scaleSelf(s, s))
   return p
+}
+
+/** Prépare les textures de base (appelé pendant le chargement). */
+export function warmBaseTextures() {
+  woodTile()
+  ironTile()
+  mailTile()
 }
 
 export const woodPattern = (g, opts) => pattern(g, woodTile(), opts)
@@ -209,6 +216,38 @@ export function sprite(key, box, res, paint) {
 /** Recopie un sprite à sa place (repère local courant). */
 export function blit(ctx, canvas, box, res) {
   ctx.drawImage(canvas, box.x - 1 / res, box.y - 1 / res, canvas.width / res, canvas.height / res)
+}
+
+/**
+ * Budget de fabrication d'images par tranche de 16 ms : quand le zoom change
+ * de palier, les nouvelles versions sont fabriquées petit à petit ; en
+ * attendant, on recopie la version d'un autre palier (légèrement floue).
+ */
+const BUDGET_MS = 4
+let budgetStart = 0
+let budgetUsed = 0
+const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now())
+
+export function cachedBudget(ctx, key, box, paint, maxRes = 4) {
+  const res = resolution(ctx, maxRes)
+  const id = `${key}@${res}`
+  if (!sprites.has(id)) {
+    const t = now()
+    if (t - budgetStart > 16) {
+      budgetStart = t
+      budgetUsed = 0
+    }
+    if (budgetUsed > BUDGET_MS) {
+      // Une autre résolution déjà prête ? On l'utilise pour cette image.
+      for (const level of LEVELS) {
+        const other = sprites.get(`${key}@${level}`)
+        if (other) return blit(ctx, other, box, level)
+      }
+    }
+    sprite(key, box, res, paint)
+    budgetUsed += now() - t
+  }
+  blit(ctx, sprites.get(id), box, res)
 }
 
 /** Dessine un élément statique via le cache (création au premier appel). */

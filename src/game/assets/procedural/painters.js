@@ -13,6 +13,7 @@ import { SeededRandom } from '../../../core/utils/SeededRandom.js'
 import { WORLD } from '../../physics/constants.js'
 import { catapult, trebuchet } from './engines.js'
 import { CHARACTER_PAINTERS } from './characters.js'
+import { drawBlockBody, drawBarrelBody } from './materials.js'
 
 export { CATAPULT_GEOMETRY, CATAPULT_SKINS } from './engines.js'
 
@@ -62,38 +63,55 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath()
 }
 
-/** Fissures déterministes, de plus en plus nombreuses avec les dégâts. */
+/** Fissures déterministes, de plus en plus nombreuses et larges avec les dégâts. */
 function cracks(ctx, s) {
   const dmg = s.damage ?? 0
   if (dmg < 0.12) return
   const r = new SeededRandom(((s.seed ?? 1) * 2654435761) >>> 0)
   const count = Math.ceil(dmg * 5)
-  ctx.save()
-  ctx.clip()
-  ctx.strokeStyle = 'rgba(25,20,30,0.75)'
-  ctx.lineWidth = 1.4 * (s.pixel ?? 1)
+  const lines = []
   for (let i = 0; i < count; i++) {
     let x = r.range(-s.w / 2, s.w / 2)
     let y = r.range(-s.h / 2, s.h / 2)
-    ctx.beginPath()
-    ctx.moveTo(x, y)
+    const pts = [[x, y]]
     const steps = 3 + r.int(0, 3)
     const dir = r.range(0, TAU)
     for (let k = 0; k < steps; k++) {
       x += Math.cos(dir + r.range(-0.9, 0.9)) * (6 + dmg * 10)
       y += Math.sin(dir + r.range(-0.9, 0.9)) * (6 + dmg * 10)
-      ctx.lineTo(x, y)
+      pts.push([x, y])
     }
+    lines.push(pts)
+  }
+  const stroke = (dx, dy, width, color) => {
+    ctx.beginPath()
+    for (const pts of lines) pts.forEach(([x, y], k) => (k ? ctx.lineTo(x + dx, y + dy) : ctx.moveTo(x + dx, y + dy)))
+    ctx.lineWidth = width
+    ctx.strokeStyle = color
     ctx.stroke()
   }
+  ctx.save()
+  ctx.clip()
+  ctx.lineJoin = 'round'
+  // Bord éclaté (clair) décalé, puis la fente sombre.
+  stroke(0.6, 0.6, 0.9 + dmg, 'rgba(255,248,235,0.28)')
+  stroke(0, 0, 0.7 + dmg * 1.4, 'rgba(18,12,10,0.85)')
   ctx.restore()
 }
 
+/** Bloc en feu : le bois noircit par le bas, lueur de braise qui palpite. */
 function scorch(ctx, s) {
   if (!s.burning) return
+  const t = (s.time ?? 0) / 1000
+  const h = s.h ?? 20
   ctx.save()
   ctx.globalCompositeOperation = 'source-atop'
-  ctx.fillStyle = 'rgba(255,110,30,0.28)'
+  const char = ctx.createLinearGradient(0, h / 2, 0, -h / 2)
+  char.addColorStop(0, 'rgba(20,10,4,0.62)')
+  char.addColorStop(1, 'rgba(20,10,4,0.25)')
+  ctx.fillStyle = char
+  ctx.fill()
+  ctx.fillStyle = `rgba(255,${90 + Math.round(30 * Math.sin(t * 9 + (s.seed ?? 0)))},20,${0.2 + 0.1 * Math.sin(t * 13 + (s.seed ?? 0) * 2)})`
   ctx.fill()
   ctx.restore()
 }
@@ -102,38 +120,12 @@ function scorch(ctx, s) {
 
 function blockPainter(material) {
   return (ctx, s) => {
+    // Corps du bloc : appareillage réaliste en cache (voir materials.js).
+    drawBlockBody(ctx, material, s)
+    // Par-dessus, à chaque image : brûlure et fissures selon les dégâts.
     shapePath(ctx, s)
-    ctx.fillStyle = materialPattern(ctx, material)
-    ctx.fill()
-    // Volume : lumière en haut à gauche, ombre en bas.
-    const g = ctx.createLinearGradient(0, -s.h / 2, 0, s.h / 2)
-    g.addColorStop(0, 'rgba(255,255,255,0.18)')
-    g.addColorStop(1, 'rgba(0,0,0,0.22)')
-    ctx.fillStyle = g
-    ctx.fill()
-    if (material === 'glass') {
-      ctx.fillStyle = 'rgba(255,255,255,0.08)'
-      ctx.fill()
-    }
-    // Biseau : arête éclairée en haut et à gauche, arête sombre en bas et à droite.
-    if (s.shape !== 'triangle') {
-      const px = s.pixel ?? 1
-      const bw = Math.min(4, Math.max(1.5 * px, Math.min(s.w, s.h) * 0.12))
-      ctx.save()
-      ctx.clip()
-      ctx.fillStyle = 'rgba(255,255,255,0.28)'
-      ctx.fillRect(-s.w / 2, -s.h / 2, s.w, bw)
-      ctx.fillRect(-s.w / 2, -s.h / 2, bw, s.h)
-      ctx.fillStyle = 'rgba(0,0,0,0.25)'
-      ctx.fillRect(-s.w / 2, s.h / 2 - bw, s.w, bw)
-      ctx.fillRect(s.w / 2 - bw, -s.h / 2, bw, s.h)
-      ctx.restore()
-      shapePath(ctx, s)
-    }
     scorch(ctx, s)
     cracks(ctx, s)
-    shapePath(ctx, s)
-    outline(ctx, s)
   }
 }
 
@@ -141,38 +133,15 @@ function blockPainter(material) {
 
 function barrel(ctx, s) {
   const { w, h } = s
+  drawBarrelBody(ctx, s)
   ctx.beginPath()
   ctx.moveTo(-w * 0.42, -h / 2)
-  ctx.quadraticCurveTo(-w * 0.58, 0, -w * 0.42, h / 2)
+  ctx.quadraticCurveTo(-w * 0.6, 0, -w * 0.42, h / 2)
   ctx.lineTo(w * 0.42, h / 2)
-  ctx.quadraticCurveTo(w * 0.58, 0, w * 0.42, -h / 2)
+  ctx.quadraticCurveTo(w * 0.6, 0, w * 0.42, -h / 2)
   ctx.closePath()
-  ctx.fillStyle = materialPattern(ctx, 'wood')
-  ctx.fill()
-  ctx.fillStyle = 'rgba(120,40,20,0.35)'
-  ctx.fill()
   scorch(ctx, s)
   cracks(ctx, s)
-  ctx.beginPath()
-  ctx.moveTo(-w * 0.42, -h / 2)
-  ctx.quadraticCurveTo(-w * 0.58, 0, -w * 0.42, h / 2)
-  ctx.lineTo(w * 0.42, h / 2)
-  ctx.quadraticCurveTo(w * 0.58, 0, w * 0.42, -h / 2)
-  ctx.closePath()
-  outline(ctx, s)
-  ctx.fillStyle = '#4b515b'
-  for (const y of [-0.32, 0.26]) ctx.fillRect(-w * 0.52, h * y, w * 1.04, h * 0.08)
-  // Pictogramme de danger : flamme dorée sur disque.
-  ctx.beginPath()
-  ctx.arc(0, 0, w * 0.22, 0, TAU)
-  ctx.fillStyle = '#1e1a2b'
-  ctx.fill()
-  ctx.beginPath()
-  ctx.moveTo(0, -w * 0.15)
-  ctx.quadraticCurveTo(w * 0.14, 0, 0, w * 0.14)
-  ctx.quadraticCurveTo(-w * 0.14, 0, 0, -w * 0.15)
-  ctx.fillStyle = '#e9a23b'
-  ctx.fill()
 }
 
 function ball(ctx, s, base, light) {

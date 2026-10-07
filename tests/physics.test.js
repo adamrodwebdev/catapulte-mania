@@ -320,3 +320,28 @@ test('séisme avant le premier tir : les règles de chute sont armées', () => {
   assert.equal(w.armed, true)
   w.destroy()
 })
+
+test('feu : le boulet enflammé reste brûlant et embrase le bois sur lequel il retombe', () => {
+  const w = new PhysicsWorld(new EventBus(), { seed: 7 })
+  // Le boulet touche d'abord le sol (rien d'inflammable autour), puis roule jusqu'à une palissade.
+  const wood = w.add(new Block({ material: 'wood', x: 900, y: G - 40, w: 20, h: 80 }))
+  const p = w.add(new Projectile('fire', 640, G - 30))
+  Matter.Body.setVelocity(p.body, { x: 7, y: 2 })
+  for (let i = 0; i < 20 && !p.hasImpacted; i++) w.stepOnce()
+  assert.ok(p.hasImpacted, 'premier choc : le sol')
+  assert.equal(wood.burning, 0, 'trop loin au premier choc')
+  assert.ok(p.hot, 'le boulet est encore brûlant après le choc')
+  for (let i = 0; i < 300 && wood.burning === 0; i++) w.stepOnce()
+  assert.ok(wood.burning > 0, 'le bois touché ensuite prend feu')
+})
+
+test('feu : la pierre ne s’embrase pas et le boulet finit par refroidir', () => {
+  const w = new PhysicsWorld(new EventBus(), { seed: 7 })
+  const stone = w.add(new Block({ material: 'stone', x: 900, y: G - 40, w: 20, h: 80 }))
+  const p = w.add(new Projectile('fire', 640, G - 30))
+  Matter.Body.setVelocity(p.body, { x: 7, y: 2 })
+  // 6 s de simulation : plus que la durée de chaleur du boulet.
+  for (let i = 0; i < Math.ceil(6000 / WORLD.STEP_MS); i++) w.stepOnce()
+  assert.equal(stone.burning, 0)
+  assert.equal(p.hot, false, 'refroidi au bout de quelques secondes')
+})

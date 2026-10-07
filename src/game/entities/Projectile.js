@@ -46,6 +46,12 @@ export class Projectile extends Entity {
     this.ageMs = 0
     this.restMs = 0
     this.spent = false
+    /**
+     * Chaleur restante après le premier choc (ms). Un boulet enflammé continue de
+     * brûler un moment : il met le feu à ce qu'il touche en rebondissant, en
+     * roulant ou en s'immobilisant contre un matériau inflammable.
+     */
+    this.heatMs = 0
     if (this.ignites) this.burning = Infinity
   }
 
@@ -59,10 +65,21 @@ export class Projectile extends Entity {
     return false
   }
 
+  /** Le boulet est-il encore assez chaud pour enflammer ce qu'il touche ? */
+  get hot() {
+    return this.ignites && this.alive && !this.spent && (!this.hasImpacted || this.heatMs > 0)
+  }
+
   update(dtMs) {
     this.ageMs += dtMs
     if (this.speed < 0.45) this.restMs += dtMs
     else this.restMs = 0
-    if (this.restMs > 650 || this.ageMs > 12000) this.spent = true
+    if (this.hasImpacted && this.heatMs > 0) {
+      this.heatMs = Math.max(0, this.heatMs - dtMs)
+      if (this.heatMs === 0) this.burning = 0
+    }
+    // Encore brûlant, il reste un peu plus longtemps là où il s'est arrêté.
+    const restLimit = this.heatMs > 0 ? 1800 : 650
+    if (this.restMs > restLimit || this.ageMs > 12000) this.spent = true
   }
 }
