@@ -193,7 +193,10 @@ export default defineConfig(({ mode }) => {
       outDir: isDemo ? 'dist-demo' : target === 'web' ? 'dist' : `dist-${target}`,
       target: 'es2020',
       sourcemap: false,
-      cssCodeSplit: !isDemo,
+      // Démo : CSS dans le fichier unique. Portails (format iife) : un seul fichier
+      // CSS lié dans index.html ; sinon Vite l'injecterait depuis le JavaScript
+      // et le premier affichage attendrait l'exécution du script.
+      cssCodeSplit: !isDemo && target === 'web',
       assetsInlineLimit: isDemo || target !== 'web' ? Number.MAX_SAFE_INTEGER : 4096,
       modulePreload: target === 'web' && !isDemo ? undefined : false,
       rollupOptions: isDemo ? { output: { inlineDynamicImports: true } } : target !== 'web' ? { output: { format: 'iife', inlineDynamicImports: true } } : {},
