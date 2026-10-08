@@ -369,6 +369,7 @@ src/
 │   ├── physics/            Monde physique (Matter.js)
 │   ├── entities/           Entity → Block, Projectile, Target, Barrel
 │   ├── levels/             Les 100 niveaux (plans réutilisables), les arènes du face-à-face, les châteaux de duel
+│   ├── aim/                AimInput → la visée au geste et au clavier (module pur, testé)
 │   ├── powers/             Power → les 7 pouvoirs, PowerRegistry
 │   ├── score/              ScoreKeeper, règles de score et d'étoiles
 │   ├── rendering/          Renderer, Camera
@@ -465,6 +466,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v4.6.0 | Châteaux plus lointains, sur plateaux rocheux, avec plus de barils et de défenseurs ; coffre d'or quotidien ; démo de 10 niveaux vitrine ; atelier signalé dès qu'une amélioration est abordable |
 | v5.0.0 | Terrains (lacs, lave, neige, montagnes), corbeaux et vouivres, boulet de givre et vapeur, percée des murs, 7 pouvoirs repensés, munitions débloquées tôt, chevaliers en armure, aide à la visée réactivable en jeu, cris des soldats |
 | v5.1.0 | Lacs et lave réalistes, rondes des défenseurs, ogres, repère d'impact du trébuchet, baliste (arme ultime) |
+| v5.2.0 | Visée professionnelle : module AimInput (pas de 0,5°, mode précision, annulation, clavier accéléré, molette), viseur gradué et repères du tir précédent |
 | v4.2.0 | Qualité des premières minutes (refus CrazyGames) : premier tir réussi, tutoriel en images, tirer-relâcher, barre de commandes compacte, caméra qui garde l'impact visible, trébuchet dès le niveau 4 |
 | v4.1.1 | Versions portails jouables dans le cadre isolé de CrazyGames (script classique unique), démarrage plus robuste |
 | v4.1.0 | Conformité CrazyGames : vidéos récompensées hors du jeu, langue du portail (anglais à défaut), démarrage en un clic, son coupé par le portail |

@@ -126,7 +126,8 @@ export class Renderer {
       ctx.restore()
     }
 
-    if (scene.aim) this.#drawAim(ctx, scene.aim, pixel)
+    // Viseur un peu plus petit sur les écrans bas (téléphone à l'horizontale).
+    if (scene.aim) this.#drawAim(ctx, scene.aim, pixel * Math.max(0.72, Math.min(1, camera.viewH / 720)), scene.highContrast)
     if (scene.landing) this.#drawLanding(ctx, scene.landing, time, pixel)
 
     scene.particles.draw(ctx, pixel)
@@ -335,36 +336,216 @@ export class Renderer {
     ctx.restore()
   }
 
-  /** Flèche de visée : direction = angle, longueur = puissance. */
-  #drawAim(ctx, { x, y, angle, power, dir = 1 }, pixel) {
-    const a = (-angle * Math.PI) / 180
-    const len = 60 + power * 150
+  /**
+   * Viseur (v5.2) : rapporteur d'angle, jauge de puissance, valeurs exactes,
+   * repères du tir précédent, et la fronde pendant le geste.
+   * Tailles exprimées en pixels d'écran (`pixel` = 1 / zoom) : le viseur garde
+   * la même taille à l'écran quel que soit le cadrage.
+   */
+  #drawAim(ctx, aim, pixel, highContrast) {
+    const { x, y, angle, power, dir = 1, min = 5, max = 80, last = null } = aim
+    const px = Math.max(0.6, pixel)
+    const R = 92 * px
+    const rad = (deg) => (deg * Math.PI) / 180
+    // Repère du viseur : x vers l'avant du tir, y vers le haut (angles trigonométriques).
+    const at = (deg, r) => ({ x: x + Math.cos(rad(deg)) * r * dir, y: y - Math.sin(rad(deg)) * r })
+    const off = aim.cancelling
+    const ink = 'rgba(30,26,43,0.75)'
+    const light = highContrast ? '#ffd400' : '#fff6dc'
     ctx.save()
-    ctx.translate(x, y)
-    if (dir === -1) ctx.scale(-1, 1)
-    ctx.rotate(a)
     ctx.lineCap = 'round'
-    ctx.setLineDash([10 * Math.max(1, pixel), 8 * Math.max(1, pixel)])
-    ctx.lineWidth = 7 * pixel
-    ctx.strokeStyle = 'rgba(30,26,43,0.65)'
+    ctx.globalAlpha = off ? 0.45 : 1
+
+    // 1. Trajectoire du tir précédent (fantôme), en pointillés pâles.
+    if (last?.path?.length > 1) {
+      ctx.fillStyle = 'rgba(255,246,220,0.38)'
+      for (let i = 1; i < last.path.length; i += 2) {
+        const q = last.path[i]
+        ctx.beginPath()
+        ctx.arc(q.x, q.y, 2.2 * px, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+
+    // 2. Rapporteur : arc des angles permis, graduations tous les 5°, plus longues tous les 15°.
+    ctx.lineWidth = 7 * px
+    ctx.strokeStyle = 'rgba(30,26,43,0.35)'
     ctx.beginPath()
-    ctx.moveTo(24, 0)
-    ctx.lineTo(len, 0)
+    ctx.arc(x, y, R, dir > 0 ? -rad(max) : Math.PI + rad(min), dir > 0 ? -rad(min) : Math.PI + rad(max))
     ctx.stroke()
-    ctx.lineWidth = 3.5 * pixel
-    ctx.strokeStyle = '#f6d98a'
-    ctx.stroke()
-    ctx.setLineDash([])
+    ctx.lineWidth = 1.6 * px
+    ctx.strokeStyle = 'rgba(255,246,220,0.75)'
+    for (let a = Math.ceil(min / 5) * 5; a <= max; a += 5) {
+      const big = a % 15 === 0
+      const p0 = at(a, R - (big ? 7 : 4) * px)
+      const p1 = at(a, R + (big ? 7 : 4) * px)
+      ctx.beginPath()
+      ctx.moveTo(p0.x, p0.y)
+      ctx.lineTo(p1.x, p1.y)
+      ctx.stroke()
+    }
+    // Mode précision : graduations au degré autour de l'angle visé.
+    if (aim.fine) {
+      ctx.lineWidth = 1 * px
+      for (let a = Math.ceil(angle) - 6; a <= Math.floor(angle) + 6; a++) {
+        if (a < min || a > max) continue
+        const p0 = at(a, R - 3 * px)
+        const p1 = at(a, R + 3 * px)
+        ctx.beginPath()
+        ctx.moveTo(p0.x, p0.y)
+        ctx.lineTo(p1.x, p1.y)
+        ctx.stroke()
+      }
+    }
+    // Angle du tir précédent : petit triangle creux sur l'arc.
+    if (last && Number.isFinite(last.angle)) {
+      const g = at(last.angle, R + 12 * px)
+      const g1 = at(last.angle - 2.2, R + 20 * px)
+      const g2 = at(last.angle + 2.2, R + 20 * px)
+      ctx.beginPath()
+      ctx.moveTo(g.x, g.y)
+      ctx.lineTo(g1.x, g1.y)
+      ctx.lineTo(g2.x, g2.y)
+      ctx.closePath()
+      ctx.lineWidth = 1.6 * px
+      ctx.strokeStyle = 'rgba(255,246,220,0.8)'
+      ctx.stroke()
+    }
+
+    // 3. Jauge de puissance, dans l'axe du tir : du vert au rouge.
+    const r0 = 26 * px
+    const L = 130 * px
+    const tip = at(angle, r0 + L * power)
+    const base = at(angle, r0)
+    const end = at(angle, r0 + L)
+    ctx.lineWidth = 10 * px
+    ctx.strokeStyle = ink
     ctx.beginPath()
-    ctx.moveTo(len + 16, 0)
-    ctx.lineTo(len - 4, -10)
-    ctx.lineTo(len - 4, 10)
-    ctx.closePath()
-    ctx.fillStyle = '#f6d98a'
+    ctx.moveTo(base.x, base.y)
+    ctx.lineTo(end.x, end.y)
+    ctx.stroke()
+    if (power > 0.002) {
+      const gr = ctx.createLinearGradient(base.x, base.y, end.x, end.y)
+      gr.addColorStop(0, '#6fcf5b')
+      gr.addColorStop(0.6, '#f2c94c')
+      gr.addColorStop(1, '#e2553b')
+      ctx.lineWidth = 6 * px
+      ctx.strokeStyle = gr
+      ctx.beginPath()
+      ctx.moveTo(base.x, base.y)
+      ctx.lineTo(tip.x, tip.y)
+      ctx.stroke()
+    }
+    // Puissance du tir précédent : encoche sur la jauge.
+    if (last && Number.isFinite(last.power)) {
+      const n = at(angle, r0 + L * last.power)
+      const nx = Math.sin(rad(angle)) * 8 * px
+      const ny = Math.cos(rad(angle)) * 8 * px * dir
+      ctx.lineWidth = 2 * px
+      ctx.strokeStyle = light
+      ctx.beginPath()
+      ctx.moveTo(n.x - nx * dir, n.y - ny * dir)
+      ctx.lineTo(n.x + nx * dir, n.y + ny * dir)
+      ctx.stroke()
+    }
+    // Aiguille de l'angle (traverse le rapporteur) et pointe de la jauge.
+    const needle0 = at(angle, R - 12 * px)
+    const needle1 = at(angle, R + 12 * px)
+    ctx.lineWidth = 4 * px
+    ctx.strokeStyle = light
+    ctx.beginPath()
+    ctx.moveTo(needle0.x, needle0.y)
+    ctx.lineTo(needle1.x, needle1.y)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.arc(tip.x, tip.y, 6 * px, 0, Math.PI * 2)
+    ctx.fillStyle = light
     ctx.fill()
-    ctx.lineWidth = 2 * pixel
-    ctx.strokeStyle = '#1e1a2b'
+    ctx.lineWidth = 2 * px
+    ctx.strokeStyle = ink
     ctx.stroke()
+
+    // 4. Valeurs exactes, dans une pastille au bout de la jauge.
+    const fmt = (v) => (Number.isInteger(v) ? String(v) : v.toFixed(1))
+    const label = `${fmt(Math.round(angle * 2) / 2)}°  ${fmt(Math.round(power * 200) / 2)} %`
+    ctx.font = `700 ${Math.round(14 * px)}px Inter, system-ui, sans-serif`
+    const w = ctx.measureText(label).width + 16 * px
+    // Place fixe, au-dessus du rapporteur : l'œil la retrouve toujours au même endroit.
+    const bx = x + dir * R * 0.15 - (dir > 0 ? 0 : w)
+    const by = y - R - 44 * px
+    ctx.fillStyle = 'rgba(30,26,43,0.82)'
+    ctx.beginPath()
+    ctx.roundRect?.(bx, by, w, 24 * px, 12 * px)
+    if (!ctx.roundRect) ctx.rect(bx, by, w, 24 * px)
+    ctx.fill()
+    ctx.fillStyle = light
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(label, bx + 8 * px, by + 12.5 * px)
+    if (aim.fine) {
+      // Loupe : mode précision actif.
+      const mx = bx + w + 14 * px
+      const my = by + 12 * px
+      ctx.lineWidth = 2.4 * px
+      ctx.strokeStyle = light
+      ctx.beginPath()
+      ctx.arc(mx, my - 2 * px, 6 * px, 0, Math.PI * 2)
+      ctx.moveTo(mx + 4 * px, my + 2.5 * px)
+      ctx.lineTo(mx + 9 * px, my + 7.5 * px)
+      ctx.stroke()
+    }
+
+    // 5. La fronde pendant le geste, là où le doigt s'est posé : deux brins
+    //    tendus du point de départ jusqu'au doigt (le geste se fait n'importe où).
+    if (aim.dragging && aim.pointer && aim.anchor) {
+      const pt = aim.pointer
+      const an0 = aim.anchor
+      const k = 0.4 + power * 0.6
+      const nx = -(pt.y - an0.y)
+      const ny = pt.x - an0.x
+      const nl = Math.hypot(nx, ny) || 1
+      ctx.globalAlpha = off ? 0.5 : 0.9
+      for (const side of [-1, 1]) {
+        ctx.lineWidth = (3.4 - power * 1.4) * px
+        ctx.strokeStyle = '#7a5a36'
+        ctx.beginPath()
+        ctx.moveTo(an0.x + (side * nx * 9 * px) / nl, an0.y + (side * ny * 9 * px) / nl)
+        ctx.lineTo(pt.x, pt.y)
+        ctx.stroke()
+      }
+      ctx.beginPath()
+      ctx.arc(pt.x, pt.y, (9 + 5 * k) * px, 0, Math.PI * 2)
+      ctx.fillStyle = off ? 'rgba(200,60,50,0.35)' : 'rgba(255,246,220,0.25)'
+      ctx.fill()
+      ctx.lineWidth = 2 * px
+      ctx.strokeStyle = off ? '#d9534f' : light
+      ctx.stroke()
+      if (aim.fine) {
+        ctx.setLineDash([4 * px, 4 * px])
+        ctx.beginPath()
+        ctx.arc(pt.x, pt.y, 26 * px, 0, Math.PI * 2)
+        ctx.stroke()
+        ctx.setLineDash([])
+      }
+      // Point de départ du geste : y revenir annule le tir.
+      if (aim.anchor) {
+        const an = aim.anchor
+        ctx.globalAlpha = off ? 1 : 0.6
+        ctx.lineWidth = 2 * px
+        ctx.strokeStyle = off ? '#d9534f' : light
+        ctx.beginPath()
+        ctx.arc(an.x, an.y, 12 * px, 0, Math.PI * 2)
+        ctx.stroke()
+        if (off) {
+          ctx.beginPath()
+          ctx.moveTo(an.x - 6 * px, an.y - 6 * px)
+          ctx.lineTo(an.x + 6 * px, an.y + 6 * px)
+          ctx.moveTo(an.x + 6 * px, an.y - 6 * px)
+          ctx.lineTo(an.x - 6 * px, an.y + 6 * px)
+          ctx.stroke()
+        }
+      }
+    }
     ctx.restore()
   }
 

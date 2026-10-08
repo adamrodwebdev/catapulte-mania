@@ -422,10 +422,12 @@ function observeHud() {
 
 onMounted(() => {
   window.addEventListener('keydown', onKey)
+  window.addEventListener('keyup', onKeyUp)
   startLevel()
 })
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey)
+  window.removeEventListener('keyup', onKeyUp)
   hudObs?.disconnect()
   destroyController()
 })
@@ -837,6 +839,11 @@ function formatDay(key) {
 
 /* ---------- Clavier ---------- */
 
+const ARROWS = Object.freeze({ ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' })
+function onKeyUp(e) {
+  const arrow = ARROWS[e.code]
+  if (arrow) controller?.aimKey(arrow, false)
+}
 function onKey(e) {
   if (e.target instanceof HTMLElement && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) && e.target.type !== 'range') return
   if (phase.value === 'paused' && (e.key === 'p' || e.key === 'P')) return resume()
@@ -845,24 +852,16 @@ function onKey(e) {
     if (e.code === 'KeyP') stopWatching()
     return
   }
-  const fast = e.shiftKey ? 5 : 1
+  // Flèches (v5.2) : maintien avec accélération, Maj pour la précision (voir AimInput).
+  const arrow = ARROWS[e.code]
+  if (arrow) {
+    if (e.target?.type === 'range' || isTrebuchet.value) return
+    e.preventDefault()
+    controller?.aimKey(arrow, true, e.shiftKey)
+    coachNotify('aim')
+    return
+  }
   switch (e.code) {
-    case 'ArrowLeft':
-      if (e.target?.type === 'range') return
-      nudge(-fast, 0)
-      break
-    case 'ArrowRight':
-      if (e.target?.type === 'range') return
-      nudge(fast, 0)
-      break
-    case 'ArrowUp':
-      if (e.target?.type === 'range') return
-      nudge(0, 0.01 * fast)
-      break
-    case 'ArrowDown':
-      if (e.target?.type === 'range') return
-      nudge(0, -0.01 * fast)
-      break
     case 'Space':
     case 'Enter':
       if (e.target instanceof HTMLButtonElement) return

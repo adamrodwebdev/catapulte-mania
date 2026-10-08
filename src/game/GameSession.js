@@ -128,6 +128,8 @@ export class GameSession extends EventBus {
   #landingCache = null
   /** Le repère d'impact était-il sur le château à l'image précédente ? (signal sonore) */
   #landingOn = false
+  /** Tir suivi pour tracer sa trajectoire (repère fantôme du tir suivant). */
+  #tracked = null
   /** Repère sonore du balancier : dernière tranche de 15° annoncée. */
   #tickBand = null
   options = { trajectoryAid: false, reducedMotion: false, blood: true, screams: true }
@@ -392,8 +394,9 @@ export class GameSession extends EventBus {
       targetsTotal: this.#level.targets.length,
       wind: Math.round(this.world.wind * 100) / 100,
       ...this.#windView(),
-      angle: Math.round(this.catapult.angle),
-      power: Math.round(this.catapult.power * 100),
+      // Valeurs exactes de la visée (pas de 0,5° et 0,5 %, v5.2).
+      angle: Math.round(this.catapult.angle * 2) / 2,
+      power: Math.round(this.catapult.power * 200) / 2,
       engine: this.#engine,
       armed: this.armed,
       landing: this.#landingView(),
@@ -652,9 +655,13 @@ export class GameSession extends EventBus {
       // Éventail : trois (Salve) ou cinq (Pluie de feu) projectiles.
       const spreads = shot.count === 5 ? [-5, -2.5, 0, 2.5, 5] : shot.count === 3 ? [-2.5, 0, 2.5] : [0]
       const mid = (spreads.length - 1) / 2
+      // Repère fantôme (v5.2) : la trajectoire du projectile central est mémorisée.
+      const ghost = treb ? null : { angle: this.catapult.angle, power: this.catapult.power, path: [{ x: start.x, y: start.y }] }
+      player.lastShot = ghost
       spreads.forEach((deg, i) => {
         const p = new Projectile(projType, start.x - i * 4, start.y + i * 3, shot.mods)
         this.world.add(p)
+        if (ghost && i === Math.floor(mid)) this.#tracked = { p, path: ghost.path, n: 0 }
         const a = (deg * Math.PI) / 180
         const factor = 1 + (i - mid) * 0.02
         Matter.Body.setVelocity(p.body, {
@@ -713,6 +720,7 @@ export class GameSession extends EventBus {
     this.particles.wind = this.world.windField.sample(this.catapult.x, this.world.time).value
     this.particles.update(dt * timeScale)
     this.#visualEffects()
+    this.#trackGhost()
     this.#updateCamera(dt)
     if (this.#state === STATE.AIMING || this.#state === STATE.FLYING) this.#watchGusts()
     if (this.armed) {
@@ -1031,6 +1039,20 @@ export class GameSession extends EventBus {
     const to = this.focus.right + 120
     const f = (x) => Math.max(0, Math.min(1, (x - from) / (to - from)))
     return { at: Math.round(f(l.x) * 1000) / 1000, castle: [Math.round(f(this.#castleLeft()) * 1000) / 1000, Math.round(f(this.focus.right) * 1000) / 1000], on: l.onCastle }
+  }
+
+  /** Trace la course du tir en cours (un point tous les 3 rafraîchissements), jusqu'au premier choc. */
+  #trackGhost() {
+    const tr = this.#tracked
+    if (!tr) return
+    const p = tr.p
+    if (++tr.n % 3 === 0 || p.hasImpacted || !p.alive) tr.path.push({ x: Math.round(p.x), y: Math.round(p.y) })
+    if (p.hasImpacted || !p.alive || tr.path.length > 400) this.#tracked = null
+  }
+
+  /** Dernier tir du joueur actif : angle, puissance et trajectoire (repères de la visée). */
+  get lastShot() {
+    return this.player.lastShot ?? null
   }
 
   /** Bord avant du château (premier bloc debout). */
