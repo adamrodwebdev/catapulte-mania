@@ -4,6 +4,8 @@
  */
 const PATTERNS = Object.freeze({
   launch: [18],
+  // Visée (v5.2) : repère tous les 5° / 10 %, à peine perceptible.
+  tick: [4],
   impact: [12],
   explosion: [60, 30, 90],
   kill: [25, 20, 25],

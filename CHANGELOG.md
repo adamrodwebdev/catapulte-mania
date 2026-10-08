@@ -2,6 +2,31 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [5.2.0] – 2026-10-08
+### Visée professionnelle (nouveau module `src/game/aim/AimInput.js`)
+Inspirée de la fronde d'Angry Birds, du mode précision des jeux de golf, des
+courbes de réponse des manettes et des réglages au clavier des jeux
+d'artillerie (Worms, Pocket Tanks). Module pur, sans DOM, couvert par 12 tests.
+- **Précise** : angle et puissance au pas de 0,5° et 0,5 % ; la valeur
+  affichée est exactement celle qui part.
+- **Stable** : zone morte au départ ; tant que le geste est court, l'angle ne
+  suit que progressivement (fini les sauts de 10° pour un pixel).
+- **Fine** : puissance sur une courbe progressive ; **mode précision** en
+  restant immobile un instant, avec Maj ou un second doigt (le même geste règle
+  alors bien plus finement) ; on en sort en bougeant franchement, sans à-coup.
+- **Fluide** : l'affichage suit le doigt avec un lissage de 45 ms, quelle que
+  soit la fréquence de l'écran.
+- **Sûre** : un simple appui ne tire jamais ; relâcher près du point de
+  départ **annule** le tir (et rétablit la visée d'avant).
+- **Clavier** : flèches maintenues avec accélération (un appui = un pas
+  exact), Maj pour la précision ; **molette** pour la puissance.
+- **Viseur** : rapporteur gradué (tous les 5°, au degré en précision),
+  jauge de puissance du vert au rouge, valeurs exactes toujours au même
+  endroit, **repères du tir précédent** (angle, puissance et trajectoire en
+  pointillés pâles), fronde tendue là où le doigt s'est posé, loupe en mode
+  précision ; repère sonore et micro-vibration tous les 5° et 10 %.
+- Même visée pour la baliste (de 0 à 60°).
+
 ## [5.1.0] – 2026-10-08
 ### Lacs et lave réalistes
 - Textures calculées une fois au chargement (bruit fractal, cellules de

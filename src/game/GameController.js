@@ -1,12 +1,14 @@
 import { EventBus } from '../core/utils/EventBus.js'
-import { clamp, toDeg } from '../core/utils/math.js'
+import { clamp } from '../core/utils/math.js'
 import { GameSession, STATE } from './GameSession.js'
 import { AssetRegistry } from './assets/AssetRegistry.js'
 import { Renderer } from './rendering/Renderer.js'
 import { WORLD } from './physics/constants.js'
 import { ReplayPlayer } from './replay/ReplayPlayer.js'
+import { AimInput } from './aim/AimInput.js'
+import { BALLISTA_AIM } from './Ballista.js'
+import { AIM } from './aim.js'
 
-const TAP_MAX_PX = 12
 const TAP_MAX_MS = 320
 
 /** Le registre de visuels est partagé entre les niveaux (chargé une seule fois). */
@@ -47,6 +49,10 @@ export class GameController extends EventBus {
   #handlers = {}
   /** Relecture d'une partie (« Bats mon tir ») : le joueur regarde, les commandes sont coupées. */
   #replayer = null
+  /** Visée au geste et au clavier (v5.2, voir aim/AimInput.js). */
+  #aim = null
+  /** Pointeurs posés (un second doigt = mode précision). */
+  #pointers = new Set()
 
   /**
    * @param {HTMLCanvasElement} canvas
@@ -83,6 +89,9 @@ export class GameController extends EventBus {
       season,
     }, mode)
     if (Array.isArray(replay)) this.#replayer = new ReplayPlayer(this.session, replay)
+    const bounds = this.session.engine === 'ballista' ? BALLISTA_AIM : AIM
+    this.#aim = new AimInput({ minAngle: bounds.MIN_ANGLE, maxAngle: bounds.MAX_ANGLE, dir: this.session.catapult.dir })
+    this.#aim.set(this.session.catapult.angle, this.session.catapult.power)
     this.#releaseToFire = settings.preciseAim !== true
     const focus = this.session.focus
     this.session.camera.setFocus(focus.left, focus.right, focus.top)
@@ -155,6 +164,7 @@ export class GameController extends EventBus {
       if (!this.#paused) {
         if (this.#replayer && !this.#replayer.done) this.#replayer.advance(dt)
         else this.session.update(dt)
+        this.#tickAim(dt)
       }
       this.#renderer.render(this.#sceneWithAim())
       this.#hudTimer += dt
@@ -173,7 +183,14 @@ export class GameController extends EventBus {
     const scene = this.session.scene()
     if (this.session.state === STATE.AIMING && this.session.engine !== 'trebuchet') {
       const c = this.session.catapult
-      scene.aim = { ...c.launchPoint, angle: c.angle, power: c.power, dir: c.dir }
+      const bounds = this.session.engine === 'ballista' ? BALLISTA_AIM : AIM
+      scene.aim = {
+        ...c.launchPoint, angle: c.angle, power: c.power, dir: c.dir,
+        min: bounds.MIN_ANGLE, max: bounds.MAX_ANGLE,
+        // Dernier tir de ce joueur (repères fantômes) et état du geste.
+        last: this.session.lastShot,
+        ...this.aimState,
+      }
     }
     return scene
   }
@@ -221,48 +238,136 @@ export class GameController extends EventBus {
         if (e.button === 0 || e.pointerType !== 'mouse') this.trigger()
         return
       }
+      this.#pointers.add(e.pointerId)
+      // Un second doigt pendant la visée : mode précision.
+      if (this.#drag) return
       cv.setPointerCapture?.(e.pointerId)
-      this.#drag = {
-        id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), moved: false,
-        angle: this.session.catapult.angle, power: this.session.catapult.power,
-      }
+      this.#drag = { id: e.pointerId, t: performance.now() }
+      const p = this.#local(e)
+      this.#syncAim()
+      this.#aim.dir = this.session.catapult.dir
+      this.#aim.begin(p.x, p.y, e.timeStamp || performance.now(), { w: cv.clientWidth, h: cv.clientHeight })
     }
     const move = (e) => {
       const d = this.#drag
       if (!d || d.id !== e.pointerId || this.session.state !== STATE.AIMING) return
-      // On tire vers l'arrière, comme une fronde (inversé pour la catapulte de droite).
-      const dx = (d.x - e.clientX) * this.session.catapult.dir
-      const dy = e.clientY - d.y
-      const len = Math.hypot(dx, dy)
-      if (len < TAP_MAX_PX && !d.moved) return
-      d.moved = true
-      const rect = cv.getBoundingClientRect()
-      const span = Math.min(rect.width, rect.height) * 0.42
-      const angle = dx <= 0 && dy <= 0 ? d.angle : toDeg(Math.atan2(Math.max(dy, 0), Math.max(dx, 0.0001)))
-      this.session.aim(angle, clamp(len / span, 0, 1))
-      this.emit('aimed')
+      const p = this.#local(e)
+      const r = this.#aim.move(p.x, p.y, e.timeStamp || performance.now(), { fine: e.shiftKey || this.#pointers.size > 1 })
+      if (r.changed) this.emit('aimed')
+      if (r.ticks) this.#aimTick()
     }
     const up = (e) => {
+      this.#pointers.delete(e.pointerId)
       const d = this.#drag
-      this.#drag = null
       if (!d || d.id !== e.pointerId) return
-      const tap = !d.moved && performance.now() - d.t < TAP_MAX_MS
+      this.#drag = null
+      const r = this.#aim.end()
+      const tap = !r.moved && performance.now() - d.t < TAP_MAX_MS
       if (tap && this.session.state === STATE.FLYING) this.session.activate()
-      if (d.moved) this.emit('announce', { key: 'a11y.aim', params: { angle: Math.round(this.session.catapult.angle), power: Math.round(this.session.catapult.power * 100) } })
+      if (!r.moved || this.session.state !== STATE.AIMING) return
+      // Ce qui part est exactement ce qui est affiché (valeurs au pas).
+      this.session.aim(this.#aim.target.angle, this.#aim.target.power)
+      if (r.cancel) {
+        this.emit('announce', { key: 'a11y.aimCancel' })
+        this.emit('caption', { key: 'aimCancel', side: 'left' })
+        return
+      }
+      this.emit('announce', { key: 'a11y.aim', params: { angle: this.#aim.target.angle, power: Math.round(this.#aim.target.power * 1000) / 10 } })
       // Comme une fronde : on tire vers l'arrière, on relâche, ça part.
       // (Visée précise : on règle au doigt puis on appuie sur « Tirer ».)
-      if (d.moved && this.#releaseToFire && this.session.state === STATE.AIMING && this.session.catapult.power > 0.04) this.trigger()
+      if (r.fire && this.#releaseToFire) this.trigger()
     }
-    const cancel = () => (this.#drag = null)
+    const wheel = (e) => {
+      if (this.#paused || this.#replayer || this.session.state !== STATE.AIMING || this.session.engine === 'trebuchet') return
+      e.preventDefault()
+      this.#syncAim()
+      if (this.#aim.wheel(e.deltaY, { angle: e.shiftKey })) {
+        this.session.aim(this.#aim.target.angle, this.#aim.target.power)
+        this.emit('aimed')
+      }
+    }
+    const cancel = (e) => {
+      this.#pointers.delete(e?.pointerId)
+      if (this.#drag && (!e || e.pointerId === this.#drag.id)) {
+        this.#drag = null
+        this.#aim.abort()
+        this.session.aim(this.#aim.target.angle, this.#aim.target.power)
+      }
+    }
     const visibility = () => {
       if (document.hidden) this.pause()
     }
-    this.#handlers = { down, move, up, cancel, visibility }
+    this.#handlers = { down, move, up, cancel, visibility, wheel }
     cv.addEventListener('pointerdown', down)
     cv.addEventListener('pointermove', move)
     cv.addEventListener('pointerup', up)
     cv.addEventListener('pointercancel', cancel)
+    cv.addEventListener('wheel', wheel, { passive: false })
     document.addEventListener('visibilitychange', visibility)
+  }
+
+  /** Position du pointeur dans le canevas (px CSS). */
+  #local(e) {
+    const r = this.#canvas.getBoundingClientRect()
+    return { x: e.clientX - r.left, y: e.clientY - r.top }
+  }
+
+  /** La visée a pu changer ailleurs (curseurs, début de tour) : on s'y recale. */
+  #syncAim() {
+    const c = this.session.catapult
+    const t = this.#aim.target
+    if (Math.abs(c.angle - t.angle) > 1e-6 || Math.abs(c.power - t.power) > 1e-6) this.#aim.set(c.angle, c.power)
+  }
+
+  /** Image par image : touches maintenues et lissage de la visée affichée. */
+  #tickAim(dt) {
+    if (this.session.engine === 'trebuchet' || this.#replayer) return
+    if (!this.#drag && !this.#aim.keysHeld) this.#syncAim()
+    const r = this.#aim.tick(dt)
+    if (r.ticks) this.#aimTick()
+    if (r.changed && this.session.state === STATE.AIMING) {
+      const v = this.#drag || this.#aim.keysHeld ? this.#aim.display : this.#aim.target
+      this.session.aim(v.angle, v.power)
+      if (this.#aim.keysHeld) this.emit('aimed')
+    }
+  }
+
+  /** Repère discret tous les 5° / 10 % : léger clic et micro-vibration. */
+  #aimTick() {
+    this.#audio.play('tick', { intensity: 0.25 })
+    this.#haptics.pulse('tick')
+  }
+
+  /**
+   * Clavier (v5.2) : flèches maintenues, avec accélération ; Maj pour la précision.
+   * @param {'left'|'right'|'up'|'down'} key
+   * @param {boolean} down appui ou relâcher
+   * @param {boolean} [fine]
+   */
+  aimKey(key, down, fine = false) {
+    if (this.#paused || this.#replayer || this.session.engine === 'trebuchet') return
+    this.session.skipIntro()
+    if (down) {
+      if (this.session.state !== STATE.AIMING) return
+      this.#syncAim()
+      this.#aim.keyDown(key, fine)
+    } else {
+      this.#aim.keyUp(key)
+      if (this.session.state === STATE.AIMING) {
+        this.session.aim(this.#aim.target.angle, this.#aim.target.power)
+        this.emit('announce', { key: 'a11y.aim', params: { angle: this.#aim.target.angle, power: Math.round(this.#aim.target.power * 1000) / 10 } })
+      }
+    }
+  }
+
+  /** État de la visée pour le dessin (geste, précision, annulation). */
+  get aimState() {
+    const a = this.#aim
+    if (!a || !this.#drag || !a.dragging) return { dragging: false, fine: a?.fine ?? false }
+    const cam = this.session.camera
+    const anchor = cam.screenToWorld(a.anchor.x, a.anchor.y)
+    const pointer = cam.screenToWorld(a.pointer.x, a.pointer.y)
+    return { dragging: true, fine: a.fine, cancelling: a.cancelling, anchor, pointer }
   }
 
   /* ---------- Retours sensoriels ---------- */
@@ -285,6 +390,7 @@ export class GameController extends EventBus {
     cv.removeEventListener('pointermove', h.move)
     cv.removeEventListener('pointerup', h.up)
     cv.removeEventListener('pointercancel', h.cancel)
+    cv.removeEventListener('wheel', h.wheel)
     document.removeEventListener('visibilitychange', h.visibility)
     this.session.destroy()
     this.clear()

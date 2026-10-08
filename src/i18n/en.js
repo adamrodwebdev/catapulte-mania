@@ -605,8 +605,8 @@ export default {
     goalTitle: 'The goal',
     goal: 'Soldiers hide in every fortress. Set your catapult’s angle and power to take them all out before you run out of shots.',
     aimTitle: 'Aiming and firing',
-    aimTouch: 'Touch screen or mouse: drag backwards, like a slingshot, then press “Fire”.',
-    aimKeys: 'Keyboard: ← → for angle, ↑ ↓ for power (Shift to go faster), Space to fire, 1 to 6 for ammo, P to pause.',
+    aimTouch: 'Touch screen or mouse: drag backwards like a slingshot and let go to fire. Hold still for a moment (or press Shift, or put down a second finger) for precision mode: the same gesture then adjusts far more finely. Let go near your starting point to cancel. The mouse wheel adjusts the power. Faint marks show your previous shot.',
+    aimKeys: 'Keyboard: hold ← → for the angle and ↑ ↓ for the power (one tap = one exact step, holding speeds up, Shift for precision), Space to fire, 1 to 6 for ammo, P to pause.',
     aidTitle: 'Trajectory aid',
     aid: 'Turn it on with the target button next to “Fire”, or in the settings, to see the shot’s curve. It accounts for the wind. It is shown automatically during the first three levels.',
     windTitle: 'Wind',
@@ -810,6 +810,7 @@ export default {
       swat: 'The ogre swats the shot away',
       shove: 'The ogre shoves a block away',
     },
+    aimCancel: 'Shot cancelled',
   },
   a11y: {
     swing: 'The arm is swinging. Press again to release. The ticks rise as the shot gets steeper.',
@@ -826,6 +827,7 @@ export default {
     windLeft: 'to the left',
     windRight: 'to the right',
     stars: '{count} star(s) out of 3',
+    aimCancel: 'Shot cancelled.',
   },
   demo: {
     banner: 'Demo: {count} playable levels',

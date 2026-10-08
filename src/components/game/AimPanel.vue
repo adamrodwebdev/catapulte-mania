@@ -29,7 +29,7 @@ function onRange(kind, e) {
       <button type="button" class="btn btn--step" :disabled="disabled" :aria-label="`${t('game.angle')} −1`" @click="emit('nudge', -1, 0)">
         <AppIcon name="minus" :size="18" />
       </button>
-      <input id="aim-angle" class="range range--aim" type="range" :min="minAngle" :max="maxAngle" step="1" :value="angle" :disabled="disabled" :aria-valuetext="`${angle}°`" @input="onRange('angle', $event)">
+      <input id="aim-angle" class="range range--aim" type="range" :min="minAngle" :max="maxAngle" step="0.5" :value="angle" :disabled="disabled" :aria-valuetext="`${angle}°`" @input="onRange('angle', $event)">
       <button type="button" class="btn btn--step" :disabled="disabled" :aria-label="`${t('game.angle')} +1`" @click="emit('nudge', 1, 0)">
         <AppIcon name="plus" :size="18" />
       </button>
@@ -40,7 +40,7 @@ function onRange(kind, e) {
       <button type="button" class="btn btn--step" :disabled="disabled" :aria-label="`${t('game.power')} −1`" @click="emit('nudge', 0, -0.01)">
         <AppIcon name="minus" :size="18" />
       </button>
-      <input id="aim-power" class="range range--aim" type="range" min="0" max="100" step="1" :value="power" :disabled="disabled" :aria-valuetext="`${power} %`" @input="onRange('power', $event)">
+      <input id="aim-power" class="range range--aim" type="range" min="0" max="100" step="0.5" :value="power" :disabled="disabled" :aria-valuetext="`${power} %`" @input="onRange('power', $event)">
       <button type="button" class="btn btn--step" :disabled="disabled" :aria-label="`${t('game.power')} +1`" @click="emit('nudge', 0, 0.01)">
         <AppIcon name="plus" :size="18" />
       </button>

@@ -605,8 +605,8 @@ export default {
     goalTitle: 'Tujuan',
     goal: 'Prajurit bersembunyi di setiap benteng. Atur sudut dan kekuatan ketapelmu untuk melumpuhkan mereka semua sebelum tembakanmu habis.',
     aimTitle: 'Membidik dan menembak',
-    aimTouch: 'Layar sentuh atau mouse: tarik ke belakang seperti ketapel, lalu tekan “Tembak”.',
-    aimKeys: 'Keyboard: ← → untuk sudut, ↑ ↓ untuk kekuatan (Shift agar lebih cepat), Spasi untuk menembak, 1 sampai 6 untuk amunisi, P untuk jeda.',
+    aimTouch: 'Layar sentuh atau mouse: tarik ke belakang seperti ketapel lalu lepaskan untuk menembak. Diam sejenak (atau tekan Shift, atau letakkan jari kedua) untuk mode presisi: gerakan yang sama mengatur jauh lebih halus. Lepaskan di dekat titik awal untuk membatalkan. Roda mouse mengatur kekuatan. Tanda samar menunjukkan tembakan sebelumnya.',
+    aimKeys: 'Keyboard: tahan ← → untuk sudut dan ↑ ↓ untuk kekuatan (satu tekan = satu langkah tepat, ditahan makin cepat, Shift untuk presisi), Spasi untuk menembak, 1 sampai 6 untuk amunisi, P untuk jeda.',
     aidTitle: 'Bantuan lintasan',
     aid: 'Aktifkan dengan tombol sasaran di samping “Tembak”, atau di pengaturan, untuk melihat kurva tembakan. Angin ikut diperhitungkan. Otomatis tampil di tiga level pertama.',
     windTitle: 'Angin',
@@ -810,6 +810,7 @@ export default {
       swat: 'Ogre memukul balik tembakan',
       shove: 'Ogre mendorong sebuah balok',
     },
+    aimCancel: 'Tembakan dibatalkan',
   },
   a11y: {
     swing: 'Lengan berayun. Tekan lagi untuk melepas. Bunyi detak makin tinggi saat tembakan makin curam.',
@@ -826,6 +827,7 @@ export default {
     windLeft: 'ke kiri',
     windRight: 'ke kanan',
     stars: '{count} dari 3 bintang',
+    aimCancel: 'Tembakan dibatalkan.',
   },
   demo: {
     banner: 'Demo: {count} level dapat dimainkan',

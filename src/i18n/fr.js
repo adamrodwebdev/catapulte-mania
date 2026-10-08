@@ -605,8 +605,8 @@ export default {
     goalTitle: 'Le but',
     goal: 'Des soldats se cachent dans chaque forteresse. Réglez l’angle et la puissance de votre catapulte pour les éliminer tous avant d’épuiser vos tirs.',
     aimTitle: 'Viser et tirer',
-    aimTouch: 'Écran tactile ou souris : faites glisser vers l’arrière, comme une fronde, puis appuyez sur « Tirer ».',
-    aimKeys: 'Clavier : ← → pour l’angle, ↑ ↓ pour la puissance (Maj pour aller plus vite), Espace pour tirer, 1 à 6 pour les munitions, P pour la pause.',
+    aimTouch: 'Écran tactile ou souris : faites glisser vers l’arrière, comme une fronde, et relâchez pour tirer. Restez immobile un instant (ou appuyez sur Maj, ou posez un second doigt) pour le mode précision : le même geste règle alors bien plus finement. Relâchez près du point de départ pour annuler. La molette règle la puissance. Des repères pâles montrent votre tir précédent.',
+    aimKeys: 'Clavier : maintenez ← → pour l’angle et ↑ ↓ pour la puissance (un appui = un pas exact, le maintien accélère, Maj pour la précision), Espace pour tirer, 1 à 6 pour les munitions, P pour la pause.',
     aidTitle: 'Aide à la trajectoire',
     aid: 'Activez-la avec le bouton cible à côté de « Tirer », ou dans les réglages, pour voir la courbe du tir. Elle tient compte du vent. Elle s’affiche d’office pendant les trois premiers niveaux.',
     windTitle: 'Le vent',
@@ -810,6 +810,7 @@ export default {
       swat: 'L’ogre renvoie le tir',
       shove: 'L’ogre repousse un bloc',
     },
+    aimCancel: 'Tir annulé',
   },
   a11y: {
     swing: 'Le balancier tourne. Appuyez de nouveau pour lâcher. Les tics montent à mesure que le tir se relève.',
@@ -826,6 +827,7 @@ export default {
     windLeft: 'vers la gauche',
     windRight: 'vers la droite',
     stars: '{count} étoile(s) sur 3',
+    aimCancel: 'Tir annulé.',
   },
   demo: {
     banner: 'Démo : {count} niveaux jouables',
