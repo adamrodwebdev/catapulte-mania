@@ -422,6 +422,66 @@
   animation: fade-in calc(0.2s * var(--speed)) ease-out;
 }
 
+/* Note du lâcher au trébuchet (v5.3) : brève, sous le HUD, couleur ET texte. */
+.timing-badge {
+  position: absolute;
+  z-index: 16;
+  left: 50%;
+  top: calc(var(--hud-top-h, 4rem) + var(--space-6, 3rem));
+  transform: translateX(-50%);
+  margin: 0;
+  padding: var(--space-1) var(--space-4);
+  font-family: var(--font-display);
+  font-size: var(--fs-3);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: #6b6b6b;
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+.timing-badge--perfect {
+  background: linear-gradient(180deg, #f2c54b, #b98510);
+  color: #2a1a00;
+  text-shadow: none;
+}
+.timing-badge--great {
+  background: #2f8f3a;
+}
+.timing-badge--good {
+  background: #2c6aa0;
+}
+.timing-badge--miss {
+  background: #8a3a2c;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .timing-badge {
+    animation: timing-pop calc(1.4s * var(--speed, 1)) ease-out both;
+  }
+}
+@keyframes timing-pop {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.6);
+  }
+  12% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.12);
+  }
+  22% {
+    transform: translateX(-50%) scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+}
+
 .intro-players {
   display: flex;
   flex-wrap: wrap;

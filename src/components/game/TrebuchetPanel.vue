@@ -4,6 +4,7 @@ import { useApp } from '../../app/AppContext.js'
 
 /**
  * Commandes du trébuchet (v3.7) : il se joue uniquement au clic.
+ * v5.3 : la barre porte la cible choisie au sol (repère doré).
  * Le cadran montre en direct l'angle et la vitesse qu'aurait le tir si l'on
  * lâchait maintenant ; le texte rappelle le prochain geste.
  */
@@ -14,9 +15,13 @@ const { t } = useApp()
 
 const armed = computed(() => props.hud.armed)
 /** Repère d'impact (v5.1) : où tomberait le tir, et où est le château, sur une barre de 0 à 1. */
-const landing = computed(() => (armed.value ? props.hud.landing : null))
+// v5.3 : en visée, la barre montre la cible (glisser sur le terrain pour la déplacer).
+const landing = computed(() => props.hud.landing ?? null)
 const onTarget = computed(() => Boolean(landing.value?.on))
-const step = computed(() => (armed.value ? (onTarget.value ? 'now' : 'release') : props.hud.rewinding ? 'rewind' : props.hud.state === 'aiming' ? 'arm' : 'wait'))
+const hasTarget = computed(() => typeof landing.value?.target === 'number')
+const step = computed(() =>
+  armed.value ? (onTarget.value ? 'now' : 'release') : props.hud.rewinding ? 'rewind' : props.hud.state === 'aiming' ? (hasTarget.value ? 'target' : 'arm') : 'wait',
+)
 /** Aiguille du cadran : 0° à droite (tir tendu), 90° en haut (tir vertical). */
 const needle = computed(() => {
   const a = Math.max(-20, Math.min(110, props.hud.angle))
@@ -38,7 +43,8 @@ const needle = computed(() => {
       <!-- Barre de visée : la zone du château, et le point d'impact qui la traverse pendant le balancier. -->
       <div v-if="landing" class="treb-bar" aria-hidden="true">
         <span class="treb-bar__castle" :style="{ left: `${landing.castle[0] * 100}%`, width: `${Math.max(2, (landing.castle[1] - landing.castle[0]) * 100)}%` }" />
-        <span :class="['treb-bar__mark', { 'treb-bar__mark--on': onTarget }]" :style="{ left: `${landing.at * 100}%` }" />
+        <span v-if="hasTarget" class="treb-bar__target" :style="{ left: `${landing.target * 100}%` }" />
+        <span v-if="typeof landing.at === 'number'" :class="['treb-bar__mark', { 'treb-bar__mark--on': onTarget }]" :style="{ left: `${landing.at * 100}%` }" />
       </div>
       <p class="treb-panel__values">
         <span>{{ t('game.treb.angle') }} <strong>{{ armed ? `${hud.angle}°` : '–' }}</strong></span>

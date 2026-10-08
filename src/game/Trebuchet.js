@@ -65,6 +65,8 @@ const WINDOW_EASE = 80
 const REWIND_MS = 650
 
 const STEP = 1000 / 120
+/** Pas de la simulation du balancier (ms) : un lâcher se joue à ce pas près. */
+export const TREBUCHET_STEP = STEP
 /** Gravité Matter (px/ms²) : 1 × 0,001. */
 const G = WORLD.GRAVITY * WORLD.GRAVITY_SCALE
 /** Contrepoids (accélération angulaire max, rad/ms²) et amortissement. */
