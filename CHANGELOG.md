@@ -2,6 +2,34 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [5.3.0] – 2026-10-08
+### Commande du trébuchet (nouveau module `src/game/aim/TrebuchetInput.js`)
+Même démarche que la visée de la v5.2, appliquée au trébuchet. Inspirée de la
+jauge de swing des jeux de golf (un geste, un instant juste, une note), du
+cercle d'approche des jeux de rythme (osu!), et des décomptes sonores. Module
+pur, sans DOM, couvert par 12 tests.
+- **Précise** : on vise un point. Un fanion doré se plante sur le terrain
+  (d'un glissé, ou avec ← →, Maj pour les petits pas) ; le module calcule
+  l'instant de lâcher qui y mène, pas de simulation par pas de simulation, et
+  montre l'impact idéal. Cible hors de portée : fanion gris barré.
+- **Concise** : un seul geste au choix. Appui bref = balancier, second appui
+  = lâcher (comme avant), ou **appui maintenu** : la fronde part au relâcher.
+  Même chose avec Espace.
+- **Rapide** : une cible par défaut sur le défenseur le plus proche à chaque
+  tour ; la table des lâchers est calculée une fois par tour (moins de 0,2 s),
+  déplacer la cible ne coûte qu'une lecture.
+- **Agréable** : pendant le balancier, un cercle se referme sur le fanion,
+  trois tics comptent les temps puis une note claire marque l'instant parfait
+  (avec vibration) ; chaque lâcher reçoit une note — **Parfait, Très bien,
+  Bien, Raté** — en grand à l'écran, en sous-titre et lue aux lecteurs d'écran.
+  La note juge le geste (écart à l'impact idéal), pas la position de la cible.
+- **Difficulté** : en Facile, un lâcher à 26 ms près se cale sur l'instant
+  parfait (l'instant corrigé est celui qui est rejoué) ; en Difficile, ni
+  cercle ni impact idéal, seuls les tics guident.
+- La barre du panneau montre la cible dès la visée.
+- Téléphone en portrait : le panneau du trébuchet passe sur sa propre ligne au
+  lieu de déborder, et la scène reste visible au-dessus.
+
 ## [5.2.0] – 2026-10-08
 ### Visée professionnelle (nouveau module `src/game/aim/AimInput.js`)
 Inspirée de la fronde d'Angry Birds, du mode précision des jeux de golf, des

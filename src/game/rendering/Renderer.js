@@ -128,6 +128,7 @@ export class Renderer {
 
     // Viseur un peu plus petit sur les écrans bas (téléphone à l'horizontale).
     if (scene.aim) this.#drawAim(ctx, scene.aim, pixel * Math.max(0.72, Math.min(1, camera.viewH / 720)), scene.highContrast)
+    if (scene.trebTarget) this.#drawTrebTarget(ctx, scene.trebTarget, time, pixel, scene.highContrast)
     if (scene.landing) this.#drawLanding(ctx, scene.landing, time, pixel)
 
     scene.particles.draw(ctx, pixel)
@@ -333,6 +334,100 @@ export class Renderer {
     ctx.moveTo(l.x - 8, l.y)
     ctx.lineTo(l.x + 8, l.y)
     ctx.stroke()
+    ctx.restore()
+  }
+
+  /**
+   * Cible du trébuchet (v5.3) : un fanion planté au sol, l'impact idéal, et le
+   * cercle d'approche qui se referme sur la cible à l'instant parfait (comme
+   * dans les jeux de rythme). Hors de portée : fanion gris barré.
+   * Tailles en pixels d'écran (`pixel` = 1 / zoom).
+   */
+  #drawTrebTarget(ctx, t, time, pixel, highContrast) {
+    const px = Math.max(0.6, pixel)
+    const gold = highContrast ? '#ffd400' : '#e8b62c'
+    const col = t.reachable ? gold : '#8b8b8b'
+    const r = 15 * px
+    ctx.save()
+    ctx.lineCap = 'round'
+    // Anneaux au sol (ellipses : la cible est posée sur le terrain).
+    ctx.lineWidth = 2.5 * px
+    ctx.strokeStyle = 'rgba(30,26,43,0.55)'
+    ctx.beginPath()
+    ctx.ellipse(t.x, t.y, r + 2 * px, (r + 2 * px) * 0.42, 0, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.strokeStyle = col
+    ctx.beginPath()
+    ctx.ellipse(t.x, t.y, r, r * 0.4, 0, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.ellipse(t.x, t.y, r * 0.42, r * 0.17, 0, 0, Math.PI * 2)
+    ctx.stroke()
+    // Fanion : mât et flamme, lisibles de loin.
+    const top = t.y - 46 * px
+    ctx.lineWidth = 2.5 * px
+    ctx.strokeStyle = '#4a3420'
+    ctx.beginPath()
+    ctx.moveTo(t.x, t.y)
+    ctx.lineTo(t.x, top)
+    ctx.stroke()
+    const wave = t.armed ? Math.sin(time / 120) * 2 * px : 0
+    ctx.fillStyle = col
+    ctx.strokeStyle = 'rgba(30,26,43,0.7)'
+    ctx.lineWidth = 1.5 * px
+    ctx.beginPath()
+    ctx.moveTo(t.x, top)
+    ctx.quadraticCurveTo(t.x + 12 * px, top + 3 * px + wave, t.x + 24 * px, top + 7 * px)
+    ctx.quadraticCurveTo(t.x + 12 * px, top + 11 * px + wave, t.x, top + 15 * px)
+    ctx.closePath()
+    ctx.fill()
+    ctx.stroke()
+    if (!t.reachable) {
+      // Hors de portée : croix sur la cible.
+      ctx.strokeStyle = '#c0392b'
+      ctx.lineWidth = 3 * px
+      ctx.beginPath()
+      ctx.moveTo(t.x - 9 * px, t.y - 9 * px)
+      ctx.lineTo(t.x + 9 * px, t.y + 9 * px)
+      ctx.moveTo(t.x + 9 * px, t.y - 9 * px)
+      ctx.lineTo(t.x - 9 * px, t.y + 9 * px)
+      ctx.stroke()
+    } else if (t.ideal && Math.hypot(t.ideal.x - t.x, t.ideal.y - t.y) > 10) {
+      // Impact idéal (le plus proche possible de la cible) : petit losange relié à la cible.
+      const { x, y } = t.ideal
+      ctx.setLineDash([4 * px, 4 * px])
+      ctx.strokeStyle = 'rgba(255,246,220,0.8)'
+      ctx.lineWidth = 1.5 * px
+      ctx.beginPath()
+      ctx.moveTo(t.x, t.y)
+      ctx.lineTo(x, y)
+      ctx.stroke()
+      ctx.setLineDash([])
+      ctx.fillStyle = '#fff6dc'
+      ctx.beginPath()
+      ctx.moveTo(x, y - 5 * px)
+      ctx.lineTo(x + 5 * px, y)
+      ctx.lineTo(x, y + 5 * px)
+      ctx.lineTo(x - 5 * px, y)
+      ctx.closePath()
+      ctx.fill()
+    }
+    // Cercle d'approche : il se referme sur la cible à l'instant parfait.
+    if (t.armed && t.reachable && typeof t.approach === 'number') {
+      const late = typeof t.ms === 'number' && t.ms < 0
+      const rr = r + t.approach * 70 * px
+      ctx.lineWidth = (t.window ? 4 : 2.5) * px
+      ctx.strokeStyle = t.window ? gold : late ? 'rgba(192,57,43,0.8)' : 'rgba(255,246,220,0.85)'
+      ctx.beginPath()
+      ctx.arc(t.x, t.y - r * 0.4, rr, 0, Math.PI * 2)
+      ctx.stroke()
+      if (t.window) {
+        ctx.fillStyle = `rgba(232,182,44,${0.18 + 0.1 * Math.sin(time / 60)})`
+        ctx.beginPath()
+        ctx.ellipse(t.x, t.y, r, r * 0.4, 0, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
     ctx.restore()
   }
 

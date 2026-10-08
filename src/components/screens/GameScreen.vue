@@ -98,6 +98,9 @@ function newTourney() {
 /** Bandeau « Au tour de… » (modes à deux). */
 const turnBanner = ref(null)
 let turnTimer = null
+/** Note du dernier lâcher au trébuchet (v5.3) : { grade, key } pendant un instant. */
+const timingBadge = ref(null)
+let timingTimer = null
 const aiming = computed(() => phase.value === 'playing' && hud.value?.state === 'aiming')
 
 /* ---------- Engin : catapulte ou trébuchet ---------- */
@@ -305,6 +308,7 @@ async function startLevel({ rebuild = false } = {}) {
       coachNotify('fire', ammo)
     } else if (result === 'released') coachNotify('release')
   })
+  controller.on('timing', ({ grade }) => showTiming(grade))
   controller.on('hud', (h) => (hud.value = h))
   controller.on('caption', (c) => {
     app.caption(c.key, c.side)
@@ -388,6 +392,16 @@ function destroyController() {
   controller = null
 }
 
+const GRADES = Object.freeze(['perfect', 'great', 'good', 'miss'])
+function showTiming(grade) {
+  if (!GRADES.includes(grade)) return
+  clearTimeout(timingTimer)
+  // Nouvelle clé à chaque lâcher : l'animation repart même si la note est la même.
+  timingBadge.value = { grade, key: Date.now() }
+  app.announce(t(`game.treb.grade.${grade}`))
+  timingTimer = setTimeout(() => (timingBadge.value = null), 1400)
+}
+
 function showTurn(name) {
   clearTimeout(turnTimer)
   turnBanner.value = t('game.turnOf', { name })
@@ -405,7 +419,8 @@ function measureInsets() {
   const h = root.value.clientHeight
   // Barre compacte : les boutons se posent sur la terre du premier plan, la scène garde la hauteur.
   const compact = root.value.querySelector('.hud-bottom--compact')
-  const bottomInset = bottom && bottom.height ? h - bottom.top - (compact ? bottom.height * 0.55 : 0) : 0
+  // (Plafonné : sur deux lignes — trébuchet en portrait — le panneau ne doit pas masquer le château.)
+  const bottomInset = bottom && bottom.height ? h - bottom.top - (compact ? Math.min(bottom.height * 0.55, 56) : 0) : 0
   controller.setInsets(top ? top.bottom : 0, bottomInset)
   // Les sous-titres et l'astuce se placent juste au-dessus des commandes.
   root.value.style.setProperty('--hud-bottom-h', `${Math.round(bottomInset)}px`)
@@ -426,6 +441,7 @@ onMounted(() => {
   startLevel()
 })
 onBeforeUnmount(() => {
+  clearTimeout(timingTimer)
   window.removeEventListener('keydown', onKey)
   window.removeEventListener('keyup', onKeyUp)
   hudObs?.disconnect()
@@ -843,6 +859,8 @@ const ARROWS = Object.freeze({ ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 
 function onKeyUp(e) {
   const arrow = ARROWS[e.code]
   if (arrow) controller?.aimKey(arrow, false)
+  // Trébuchet (v5.3) : Espace maintenue puis relâchée = la fronde part au relâcher.
+  if ((e.code === 'Space' || e.code === 'Enter') && isTrebuchet.value) controller?.trebKey(false)
 }
 function onKey(e) {
   if (e.target instanceof HTMLElement && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) && e.target.type !== 'range') return
@@ -855,7 +873,14 @@ function onKey(e) {
   // Flèches (v5.2) : maintien avec accélération, Maj pour la précision (voir AimInput).
   const arrow = ARROWS[e.code]
   if (arrow) {
-    if (e.target?.type === 'range' || isTrebuchet.value) return
+    if (e.target?.type === 'range') return
+    // Trébuchet : ← → déplacent la cible au sol (Maj : par petits pas).
+    if (isTrebuchet.value) {
+      if (arrow !== 'left' && arrow !== 'right') return
+      e.preventDefault()
+      controller?.trebNudge(arrow === 'left' ? -1 : 1, e.shiftKey)
+      return
+    }
     e.preventDefault()
     controller?.aimKey(arrow, true, e.shiftKey)
     coachNotify('aim')
@@ -865,7 +890,9 @@ function onKey(e) {
     case 'Space':
     case 'Enter':
       if (e.target instanceof HTMLButtonElement) return
-      fire()
+      if (isTrebuchet.value) {
+        if (!e.repeat && phase.value === 'playing') controller?.trebKey(true)
+      } else fire()
       break
     // Pas d'Échap : sur les portails, cette touche sert au navigateur (sortie du plein écran).
     case 'KeyP':
@@ -914,6 +941,7 @@ const canvasLabel = computed(() =>
     <template v-if="hud">
       <GameHud :hud="hud" :title="matchTitle" :subtitle="matchSubtitle" :coach="coachAnchor" @pause="pause" @powers="showPowers = !showPowers" />
       <p v-if="turnBanner" class="turn-banner" aria-hidden="true">{{ turnBanner }}</p>
+      <p v-if="timingBadge" :key="timingBadge.key" :class="['timing-badge', `timing-badge--${timingBadge.grade}`]" aria-hidden="true">{{ t(`game.treb.grade.${timingBadge.grade}`) }}</p>
 
       <PowersMenu
         v-if="showPowers && phase === 'playing'"

@@ -1047,6 +1047,18 @@
   border-radius: var(--radius);
   padding: var(--space-1) var(--space-2);
 }
+/* Écran étroit (téléphone en portrait) : le panneau du trébuchet passe sur sa
+   propre ligne au lieu de déborder à gauche de l'écran (v5.3). */
+@media (max-width: 640px) {
+  .hud-bottom--compact:has(.treb-panel) {
+    left: var(--space-2);
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .hud-bottom--compact .treb-panel {
+    flex: 1 1 100%;
+  }
+}
 .aim-readout {
   margin: 0;
   align-self: center;
@@ -1236,6 +1248,15 @@
   margin-left: -2px;
   background: var(--text);
   border-radius: 2px;
+}
+.treb-bar__target {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  width: 10px;
+  margin-left: -5px;
+  border: 2px solid #d9a521;
+  border-radius: 50%;
 }
 .treb-bar__mark--on {
   background: #2f9e3a;
