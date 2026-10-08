@@ -10,6 +10,7 @@ import { WORLD } from './physics/constants.js'
 import { Block } from './entities/Block.js'
 import { Target } from './entities/Target.js'
 import { Barrel } from './entities/Barrel.js'
+import { Flyer } from './entities/Flyer.js'
 import { Projectile, PROJECTILE_TYPES } from './entities/Projectile.js'
 import { Catapult, AIM } from './Catapult.js'
 import { Trebuchet, TREBUCHET_X, TREBUCHET_MASS } from './Trebuchet.js'
@@ -47,7 +48,7 @@ const REST_CONFIRM_MS = 450
 const MAX_TURN_MS = 11000
 const IDLE_WIN_MS = 1200
 const FIRE_WAIT_MS = 20000
-const AMMO_ORDER = Object.freeze(['stone', 'boulder', 'fire', 'bomb', 'split'])
+const AMMO_ORDER = Object.freeze(['stone', 'fire', 'boulder', 'frost', 'bomb', 'split'])
 /** Engins de siège : catapulte (visée angle + puissance) ou trébuchet (deux clics). */
 export const ENGINES = Object.freeze(['catapult', 'trebuchet'])
 
@@ -124,7 +125,7 @@ export class GameSession extends EventBus {
   #freePowerUsed = false
   /** Repère sonore du balancier : dernière tranche de 15° annoncée. */
   #tickBand = null
-  options = { trajectoryAid: false, reducedMotion: false, blood: true }
+  options = { trajectoryAid: false, reducedMotion: false, blood: true, screams: true }
 
   /**
    * @param {object} level niveau gelé issu du LevelRepository
@@ -135,7 +136,7 @@ export class GameSession extends EventBus {
    * @param {object} opts options d'affichage et de difficulté
    * @param {import('./modes/GameMode.js').GameMode} [mode] règles (histoire par défaut)
    */
-  constructor(level, { difficulty, completedLevels, trajectoryAid = false, reducedMotion = false, screenShake = true, blood = true, startPower = 100, effects = NO_EFFECTS, continueOffer = false, engine = 'catapult', slowSwing = false, infiniteSwing = false, replay = false, season = null }, mode = null) {
+  constructor(level, { difficulty, completedLevels, trajectoryAid = false, reducedMotion = false, screenShake = true, blood = true, screams = true, startPower = 100, effects = NO_EFFECTS, continueOffer = false, engine = 'catapult', slowSwing = false, infiniteSwing = false, replay = false, season = null }, mode = null) {
     super()
     this.#level = level
     this.#difficulty = Guard.oneOf(difficulty, GAME.DIFFICULTIES, 'difficulty')
@@ -151,7 +152,7 @@ export class GameSession extends EventBus {
      * premier tir avant d'avoir rien lu (exigence de prise en main des portails).
      */
     this.#assist = this.#mode.id === 'story' && level.id <= ASSIST_LEVELS
-    this.options = { trajectoryAid: trajectoryAid || this.#assist, reducedMotion, blood, startPower, trail: fx.trail || 'smoke' }
+    this.options = { trajectoryAid: trajectoryAid || this.#assist, reducedMotion, blood, screams: Boolean(screams), startPower, trail: fx.trail || 'smoke' }
     /** Proposer un dernier tir contre une vidéo (campagne solo, portails). */
     this.continueOffer = Guard.boolean(continueOffer, 'continueOffer')
     const versus = this.#mode.id === 'versus'
@@ -190,7 +191,7 @@ export class GameSession extends EventBus {
       }
     })
 
-    this.world = new PhysicsWorld(this.#events, { seed: level.seed, windProfile: WIND_PROFILES[this.#difficulty] })
+    this.world = new PhysicsWorld(this.#events, { seed: level.seed, windProfile: WIND_PROFILES[this.#difficulty], zones: level.zones ?? [] })
     // Le trébuchet est en retrait : le monde s'étend jusqu'à lui (un tir lâché trop tôt part en arrière).
     if (this.#engine === 'trebuchet') this.world.leftLimit = TREBUCHET_X - 700
     /** Zone cadrée par la caméra : de l'engin au bout du château. */
@@ -209,6 +210,7 @@ export class GameSession extends EventBus {
     for (const b of level.blocks) this.world.add(new Block(b))
     for (const t of level.targets) this.world.add(new Target(t, diff.targetHp))
     for (const b of level.barrels) this.world.add(new Barrel(b))
+    for (const f of level.flyers ?? []) this.world.add(new Flyer(f))
     this.#applyStartPower()
     this.#loadEngine()
     this.#bindWorldEvents()
@@ -392,6 +394,7 @@ export class GameSession extends EventBus {
       ammo: this.ammo,
       powers: this.powers,
       canActivate: this.#activeProjectiles().some((p) => p.canActivate),
+      activateKind: this.#activeProjectiles().find((p) => p.canActivate)?.diveable ? 'dive' : 'split',
       rewards: this.rewardsLeft,
       hint: this.#hint,
       turn: this.#turn,
@@ -400,10 +403,11 @@ export class GameSession extends EventBus {
 
   /** Points de l'aide à la trajectoire (ou null si désactivée / hors visée). */
   get trajectory() {
-    if (!this.options.trajectoryAid && !this.#hint) return null
+    const falcon = this.#pendingPower === 'falcon'
+    if (!this.options.trajectoryAid && !this.#hint && !falcon) return null
     // Trébuchet : la courbe montre, en direct, le tir qu'on obtiendrait en lâchant maintenant.
     if (this.#engine === 'trebuchet' ? !this.armed : this.#state !== STATE.AIMING) return null
-    const calm = this.#pendingPower === 'calm'
+    const calm = falcon
     const field = this.world.windField
     const start = this.catapult.launchPoint
     const windage = windageOf({ type: this.player.selectedAmmo, radius: PROJECTILE_TYPES[this.player.selectedAmmo].radius })
@@ -411,7 +415,8 @@ export class GameSession extends EventBus {
       wind: calm ? 0 : this.world.wind,
       windAccel: calm || !field.dynamic ? null : field.frozen(start.x, this.world.time, windage),
       obstacles: this.world.filter((e) => e.kind !== 'projectile'),
-      maxPoints: this.#engine === 'trebuchet' ? 110 : 60,
+      // Œil du faucon : la courbe entière, jusqu'au point d'impact.
+      maxPoints: falcon ? 400 : this.#engine === 'trebuchet' ? 110 : 60,
     })
   }
 
@@ -461,13 +466,15 @@ export class GameSession extends EventBus {
     const power = PowerRegistry.get(id)
     if (this.#state !== STATE.AIMING || this.#powerUsedThisTurn || !this.#unlockedPowers.has(id)) return false
     this.#powerUsedThisTurn = true
-    this.#log.push({ k: 'p', d: this.steps - this.#aimStep, id })
+    this.#log.push({ k: 'p', d: this.steps, id })
     if (!free) this.score.spend(this.#mode.powerCost(power))
     if (power.immediate) {
       this.world.arm()
       power.activate(this)
-      this.camera.shake(14)
-      this.#feedback({ sound: 'explosion', x: 1700, intensity: 0.8, caption: 'quake', haptic: 'explosion' })
+      if (id === 'quake') {
+        this.camera.shake(14)
+        this.#feedback({ sound: 'explosion', x: 1700, intensity: 0.8, caption: 'quake', haptic: 'explosion' })
+      }
     } else {
       this.#pendingPower = id
       this.#feedback({ sound: 'power', x: this.catapult.x, caption: 'power' })
@@ -579,7 +586,9 @@ export class GameSession extends EventBus {
     // L'indice ne vaut que pour un tir.
     this.#hint = false
     const treb = this.#engine === 'trebuchet'
-    const entry = treb ? { k: 't', d: this.steps - this.#aimStep, a: type } : { k: 'f', d: this.steps - this.#aimStep, a: type, ang: this.catapult.angle, pow: this.catapult.power }
+    // v5.0 : pas ABSOLU du geste (depuis le début de la partie). Des créatures
+    // volent pendant la visée : un tir doit partir au même instant du monde.
+    const entry = treb ? { k: 't', d: this.steps, a: type } : { k: 'f', d: this.steps, a: type, ang: this.catapult.angle, pow: this.catapult.power }
     this.#log.push(entry)
     this.#fireStep = this.steps
     this.score.startShot(type)
@@ -591,12 +600,14 @@ export class GameSession extends EventBus {
       entry.l = this.steps - this.#fireStep
       if (treb) entry.r = this.catapult.simTime
       this.#spawnStep = this.steps
-      const spreads = shot.count === 3 ? [-2.5, 0, 2.5] : [0]
+      // Éventail : trois (Salve) ou cinq (Pluie de feu) projectiles.
+      const spreads = shot.count === 5 ? [-5, -2.5, 0, 2.5, 5] : shot.count === 3 ? [-2.5, 0, 2.5] : [0]
+      const mid = (spreads.length - 1) / 2
       spreads.forEach((deg, i) => {
         const p = new Projectile(type, start.x - i * 4, start.y + i * 3, shot.mods)
         this.world.add(p)
         const a = (deg * Math.PI) / 180
-        const factor = 1 + (i - 1) * 0.02 * (shot.count === 3 ? 1 : 0)
+        const factor = 1 + (i - mid) * 0.02
         Matter.Body.setVelocity(p.body, {
           x: (v.x * Math.cos(a) - v.y * Math.sin(a)) * factor,
           y: (v.x * Math.sin(a) + v.y * Math.cos(a)) * factor,
@@ -627,8 +638,13 @@ export class GameSession extends EventBus {
     const p = this.#activeProjectiles().find((x) => x.canActivate)
     if (!p) return false
     this.#log.push({ k: 'x', d: this.steps - this.#spawnStep })
-    this.world.splitProjectile(p)
-    this.#feedback({ sound: 'split', x: p.x, caption: 'split' })
+    if (p.diveable) {
+      this.world.dive(p)
+      this.#feedback({ sound: 'launch', x: p.x, intensity: 1.2, caption: 'dive' })
+    } else {
+      this.world.splitProjectile(p)
+      this.#feedback({ sound: 'split', x: p.x, caption: 'split' })
+    }
     this.emit('hud', this.hud)
     return true
   }
@@ -704,6 +720,7 @@ export class GameSession extends EventBus {
       particles: this.particles,
       trajectory: this.trajectory,
       theme: this.#level.chapter,
+      terrain: this.world.terrain,
       season: this.season,
       time: this.#time,
       animate: !this.options.reducedMotion,
@@ -723,7 +740,7 @@ export class GameSession extends EventBus {
   #castleTop() {
     let best = null
     for (const e of this.world.entities()) {
-      if (e.kind !== 'block' || !e.alive || e.x < 900) continue
+      if (e.kind !== 'block' || !e.alive || e.terrain || e.x < 900) continue
       const top = e.y - e.height / 2
       if (!best || top < best.y) best = { x: e.x, y: top }
     }
@@ -879,7 +896,7 @@ export class GameSession extends EventBus {
   #castleRoof() {
     let top = Infinity
     for (const e of this.world.entities()) {
-      if (!e.alive || e.x < 600 || (e.kind !== 'block' && e.kind !== 'target' && e.kind !== 'barrel')) continue
+      if (!e.alive || e.x < 600 || e.terrain || (e.kind !== 'block' && e.kind !== 'target' && e.kind !== 'barrel')) continue
       top = Math.min(top, e.y - e.height / 2)
     }
     return Number.isFinite(top) ? top - 40 : this.focus.top
@@ -945,14 +962,14 @@ export class GameSession extends EventBus {
   /** Bord avant du château (premier bloc debout). */
   #castleLeft() {
     let left = Infinity
-    for (const e of this.world.entities()) if (e.kind === 'block' && e.alive && e.x > 600) left = Math.min(left, e.x - e.width / 2)
+    for (const e of this.world.entities()) if (e.kind === 'block' && e.alive && !e.terrain && e.x > 600) left = Math.min(left, e.x - e.width / 2)
     return Number.isFinite(left) ? left : this.focus.right - 800
   }
 
   #visualEffects() {
     for (const e of this.world.entities()) {
       if (e.burning > 0 && e.kind !== 'projectile') this.particles.flame(e.x, e.y - e.height / 2, e.width)
-      if (e.kind === 'projectile' && !e.hasImpacted) this.particles.trail(e.x, e.y, e.ignites, this.options.trail)
+      if (e.kind === 'projectile' && !e.hasImpacted) this.particles.trail(e.x, e.y, e.ignites, e.frost ? 'snow' : this.options.trail)
       // Boulet encore brûlant après l'impact : il continue de flamber.
       if (e.kind === 'projectile' && e.hasImpacted && e.heatMs > 0) this.particles.flame(e.x, e.y - e.radius * 0.6, e.radius * 1.2)
     }
@@ -981,8 +998,12 @@ export class GameSession extends EventBus {
           this.particles.dust(entity.x, entity.y, 10)
         }
         this.#feedback({ sound: 'down', x: entity.x, caption: `down.${entity.type}`, haptic: 'kill' })
+        // Cri du défenseur (réglage « Cris des soldats ») : voix selon le personnage.
+        if (this.options.screams) this.#feedback({ sound: 'scream', x: entity.x, intensity: entity.type === 'knight' ? 1.3 : entity.type === 'king' ? 0.5 : 1, caption: 'scream' })
         this.emit('announce', { key: 'a11y.targetDown', params: { left: this.targetsLeft } })
         if (this.targetsLeft === 0 && !this.options.reducedMotion) this.#slowMo = 900
+      } else if (entity.kind === 'flyer') {
+        if (gained) this.particles.text(entity.x, entity.y - 30, `+${gained}`, '#cfe6ff')
       } else if (entity.kind === 'block') {
         this.particles.debris(entity.x, entity.y, entity.material, Math.max(entity.width, entity.height))
         if (gained && entity.scoreValue >= 100) this.particles.text(entity.x, entity.y - 20, `+${gained}`, '#e8eef7')
@@ -1019,6 +1040,42 @@ export class GameSession extends EventBus {
       this.particles.dust(entity.x, WORLD.GROUND_Y - 10, 8, '190,175,150')
       this.camera.shake(5)
       this.#feedback({ sound: entity.sound || 'wood', x: entity.x, intensity: 1, caption: 'collapse', haptic: 'impact' })
+    })
+    // v5.0 : percée, givre, vapeur, terrains et créatures volantes.
+    ev.on('breach', ({ x, y, material }) => {
+      this.particles.impact(x, y, material, 900)
+      this.camera.shake(7)
+      this.#feedback({ sound: 'breach', x, intensity: 1, caption: 'breach', haptic: 'impact' })
+    })
+    ev.on('frost', ({ x, y, radius }) => {
+      this.particles.frost(x, y, radius)
+      this.#feedback({ sound: 'frost', x, intensity: 0.9, caption: 'frost', haptic: 'impact' })
+    })
+    ev.on('steam', ({ x, y, radius, entity }) => {
+      this.particles.steam(x, y, radius)
+      // Vapeur « décorative » (boulet éteint dans l'eau) : sans sous-titre d'alerte.
+      this.#feedback({ sound: 'steam', x, intensity: entity ? 1 : 0.5, caption: entity ? 'steam' : null })
+    })
+    ev.on('terrain', ({ kind, x }) => {
+      if (kind === 'skip') this.particles.splash(x, false)
+      else if (kind === 'drown' || kind === 'thaw') this.particles.splash(x, true)
+      else if (kind === 'melt') this.particles.melt(x)
+      else if (kind === 'crust' || kind === 'freeze') this.particles.frost(x, WORLD.GROUND_Y - 10, 60)
+      else if (kind === 'snow') this.particles.dust(x, WORLD.GROUND_Y - 6, 6, '245,248,252')
+      const sound = { skip: 'splash', drown: 'splash', thaw: 'steam', melt: 'steam', crust: 'frost', freeze: 'frost', snow: 'snow' }[kind]
+      this.#feedback({ sound, x, intensity: kind === 'skip' ? 0.6 : 0.9, caption: `terrain.${kind}` })
+    })
+    ev.on('flyer:hit', ({ entity, x, y }) => {
+      this.particles.feathers(x, y, entity.type === 'wyvern' ? '#4a6b3a' : '#1f1f29', entity.type === 'wyvern' ? 16 : 12)
+      this.#feedback({ sound: 'flyer', x, intensity: 0.8, caption: `flyer.${entity.type}`, haptic: 'kill' })
+    })
+    ev.on('flyer:drop', ({ x }) => {
+      this.#feedback({ sound: 'fire', x, intensity: 0.7, caption: 'flyerDrop' })
+    })
+    ev.on('lightning', ({ x, y }) => {
+      this.particles.lightning(x, y, Math.min(-300, y - 700))
+      this.camera.shake(10)
+      this.#feedback({ sound: 'thunder', x, intensity: 1, caption: 'lightning', haptic: 'explosion' })
     })
     ev.on('fire:start', ({ entity }) => {
       this.#feedback({ sound: 'fire', x: entity.x, intensity: 0.6, caption: 'fire' })

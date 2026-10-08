@@ -16,6 +16,9 @@ export class StructureBuilder {
   blocks = []
   targets = []
   barrels = []
+  /** Terrains (lacs, lave, neige) et créatures volantes (v5.0, voir LevelCurve). */
+  zones = []
+  flyers = []
   ground = WORLD.GROUND_Y
 
   #mat(m) {

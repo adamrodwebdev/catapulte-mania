@@ -1,4 +1,5 @@
 import Matter from 'matter-js'
+import { FROST } from './catalog.js'
 
 let nextId = 1
 
@@ -34,6 +35,12 @@ export class Entity {
     this.alive = true
     /** Durée de combustion restante (ms). */
     this.burning = 0
+    /**
+     * Gel restant (ms), posé par un boulet de givre (v5.0) : l'objet devient
+     * cassant (voir FROST.BRITTLE) et ne peut plus brûler. Le feu qui le touche
+     * le fait fondre d'un coup : vapeur et eau bouillante (PhysicsWorld#steam).
+     */
+    this.frozenMs = 0
     /** Cause de la destruction, connue une fois l'entité morte. */
     this.deathCause = null
     /** Sommets locaux (forme non tournée) pour dessiner les polygones. */
@@ -70,7 +77,8 @@ export class Entity {
    */
   damage(amount, cause = 'impact') {
     if (!this.alive || !(amount > 0) || !Number.isFinite(this.maxHp)) return false
-    this.hp -= amount
+    // Gelé, l'objet est cassant : les chocs et les explosions portent bien plus.
+    this.hp -= this.frozenMs > 0 && cause !== 'fire' ? amount * FROST.BRITTLE : amount
     if (this.hp <= 0) {
       this.kill(cause)
       return true
@@ -85,9 +93,27 @@ export class Entity {
     this.deathCause = cause
   }
 
-  /** Enflamme l'entité si elle est inflammable. */
+  /** L'entité est-elle gelée ? */
+  get frozen() {
+    return this.frozenMs > 0
+  }
+
+  /**
+   * Gèle l'entité (boulet de givre). Un objet en feu s'éteint.
+   * @param {number} ms
+   * @returns {boolean} vrai si l'entité vient d'être gelée
+   */
+  freeze(ms) {
+    if (!this.alive || !(ms > 0)) return false
+    const was = this.frozenMs > 0
+    this.frozenMs = Math.max(this.frozenMs, Math.min(60000, ms))
+    this.burning = 0
+    return !was
+  }
+
+  /** Enflamme l'entité si elle est inflammable (jamais un objet gelé). */
   ignite(durationMs = 6000) {
-    if (!this.flammable || !this.alive) return false
+    if (!this.flammable || !this.alive || this.frozenMs > 0) return false
     const wasBurning = this.burning > 0
     this.burning = Math.max(this.burning, durationMs)
     return !wasBurning
@@ -104,6 +130,7 @@ export class Entity {
 
   /** Mise à jour par image : combustion. */
   update(dtMs) {
+    if (this.frozenMs > 0) this.frozenMs = Math.max(0, this.frozenMs - dtMs)
     if (this.burning > 0 && this.alive) {
       this.burning = Math.max(0, this.burning - dtMs)
       this.damage((this.burnDps ?? 22) * (dtMs / 1000), 'fire')

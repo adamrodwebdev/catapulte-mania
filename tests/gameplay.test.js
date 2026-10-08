@@ -28,7 +28,7 @@ test('la difficulté augmente : matériaux et munitions par chapitre', () => {
   assert.ok(!ch1.has('stone') && !ch1.has('iron'), 'chapitre 1 : bois et paille uniquement')
   assert.ok(mats([11, 12, 13, 14, 15]).has('stone'))
   assert.ok(mats([21, 22, 23]).has('iron'))
-  assert.deepEqual(LevelRepository.newAmmo(21), ['bomb'])
+  assert.deepEqual(LevelRepository.newAmmo(10), ['bomb'])
   // Le premier baril de poudre arrive dès le niveau 2 (différenciation, v4.5).
   assert.ok(LevelRepository.novelties(2).includes('barrel'))
 })
@@ -74,7 +74,7 @@ test('déroulement d’un tour : tir, munitions, fin de tour', () => {
   playUntilAiming(s)
   assert.equal(s.shotsLeft, 4)
   assert.equal(s.selectAmmo('boulder'), true)
-  assert.equal(s.selectAmmo('bomb'), false, 'munition absente du niveau')
+  assert.equal(s.selectAmmo('split'), false, 'munition absente du niveau')
   s.aim(45, 0.5)
   assert.equal(s.fire(), true)
   assert.equal(s.fire(), false, 'pas de second tir pendant le vol')
@@ -88,19 +88,19 @@ test('déroulement d’un tour : tir, munitions, fin de tour', () => {
 test('pouvoirs : verrouillés, un seul par tour, coût déduit', () => {
   const locked = new GameSession(LevelRepository.get(1), { difficulty: 'normal', completedLevels: 0 })
   playUntilAiming(locked)
-  assert.equal(locked.usePower('calm'), false, 'pas encore débloqué')
+  assert.equal(locked.usePower('falcon'), false, 'pas encore débloqué')
   locked.destroy()
 
   const s = new GameSession(LevelRepository.get(12), { difficulty: 'normal', completedLevels: 11 })
   playUntilAiming(s)
   assert.ok(PowerRegistry.get('titan').isUnlocked(11))
   assert.equal(s.usePower('titan'), true)
-  assert.equal(s.usePower('calm'), false, 'un seul pouvoir par tour')
+  assert.equal(s.usePower('falcon'), false, 'un seul pouvoir par tour')
   assert.equal(s.hud.powers.find((p) => p.id === 'titan').armed, true)
   s.aim(80, 0.05) // tir perdu : la partie continue
   s.fire()
   playUntilAiming(s)
-  assert.equal(s.usePower('calm'), true, 'nouveau tour : pouvoir à nouveau disponible')
+  assert.equal(s.usePower('falcon'), true, 'nouveau tour : pouvoir à nouveau disponible')
   s.destroy()
 })
 
@@ -202,10 +202,10 @@ test('démo : vitrine des meilleures mécaniques, chacune présentée à sa prem
     assert.equal(DEMO_SHOWCASE.length, 10)
     assert.equal(tut(1), 'aim')
     assert.equal(tut(4), 'engine:trebuchet', 'le trébuchet au 4e niveau de la démo')
-    assert.equal(tut(5), 'ammo:fire')
-    assert.equal(tut(6), 'ammo:boulder')
-    assert.equal(tut(7), 'ammo:bomb')
-    assert.equal(tut(8), 'ammo:split')
+    assert.equal(tut(3), 'ammo:fire')
+    // Chaque nouvelle munition a son tutoriel dans la démo.
+    const tools = Array.from({ length: 10 }, (_, i) => tut(i + 1))
+    for (const a of ['boulder', 'frost', 'bomb', 'split']) assert.ok(tools.includes(`ammo:${a}`), a)
     assert.ok(LevelRepository.get(2).barrels.length >= 1, 'un baril dès le niveau 2')
     // Les deux derniers niveaux montrent le décor de fin de partie.
     assert.ok(LevelRepository.get(10).blocks.some((b) => b.material === 'rock'), 'plateau ou aiguille rocheuse')
@@ -223,5 +223,7 @@ test('courbe de difficulté : châteaux plus loin, plus de décor, de barils et 
   assert.ok(avg(late, (l) => l.barrels.length) > avg(early, (l) => l.barrels.length) + 2, 'plus de barils')
   assert.ok(avg(late, (l) => l.targets.length) > avg(early, (l) => l.targets.length) + 3, 'plus de défenseurs')
   assert.ok(late.every((id) => LevelRepository.get(id).blocks.some((b) => b.material === 'rock')), 'décor rocheux en fin de partie')
-  assert.ok(early.every((id) => !LevelRepository.get(id).blocks.some((b) => b.material === 'rock')), 'premiers niveaux au sol')
+  // Plateaux réservés à la fin de partie ; la première montagne au niveau 8.
+  assert.ok(early.every((id) => !LevelRepository.get(id).blocks.some((b) => b.material === 'rock' && b.shape === 'rect')), 'premiers niveaux au sol')
+  assert.ok(LevelRepository.get(8).blocks.some((b) => b.material === 'rock' && b.shape === 'triangle'), 'montagne au niveau 8')
 })

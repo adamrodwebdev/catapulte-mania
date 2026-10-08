@@ -9,7 +9,9 @@ import { referenceScore, maxScore } from '../score/ScoreRules.js'
 import { achievementsFor } from '../progression/Achievements.js'
 import { PowerRegistry } from '../powers/PowerRegistry.js'
 import { TREBUCHET_UNLOCK } from '../Trebuchet.js'
-import { applyCurve } from './LevelCurve.js'
+import { applyCurve, ammoFor, AMMO_UNLOCK } from './LevelCurve.js'
+import { ZONE_KINDS } from '../physics/Terrain.js'
+import { FLYER_NAMES } from '../entities/Flyer.js'
 
 const coord = Schema.number({ min: -500, max: 4000 })
 const size = Schema.number({ min: 6, max: 600 })
@@ -19,13 +21,26 @@ const levelSchema = Schema.object(
   {
     shots: Schema.int({ min: 1, max: 12 }),
     wind: Schema.number({ min: 0, max: 1 }),
-    ammo: Schema.record(new RegExp(`^(?:${PROJECTILE_NAMES.join('|')})$`), Schema.int({ min: 0, max: 10 }), { maxKeys: 5 }),
+    ammo: Schema.record(new RegExp(`^(?:${PROJECTILE_NAMES.join('|')})$`), Schema.int({ min: 0, max: 10 }), { maxKeys: 6 }),
     blocks: Schema.array(
       Schema.object({ material: Schema.enum(MATERIAL_NAMES), x: coord, y: coord, w: size, h: size, shape: Schema.enum(['rect', 'triangle']) }),
       { maxLength: 200 },
     ),
     targets: Schema.array(Schema.object({ type: Schema.enum(Object.keys(TARGET_TYPES)), x: coord, y: coord }), { maxLength: 20 }),
     barrels: Schema.array(Schema.object({ x: coord, y: coord }), { maxLength: 20 }),
+    // v5.0 : terrains du sol et créatures volantes.
+    zones: Schema.array(Schema.object({ kind: Schema.enum(ZONE_KINDS), x0: coord, x1: coord }), { maxLength: 6 }),
+    flyers: Schema.array(
+      Schema.object({
+        type: Schema.enum(FLYER_NAMES),
+        x: coord,
+        y: Schema.number({ min: -800, max: 1000 }),
+        range: Schema.number({ min: 0, max: 900 }),
+        period: Schema.number({ min: 1500, max: 20000 }),
+        phase: Schema.number({ min: 0, max: 1 }),
+      }),
+      { maxLength: 8 },
+    ),
   },
   { strict: true },
 )
@@ -41,9 +56,17 @@ export function buildLevel(spec, id, chapter, seedSalt = 0, { tutorial = null, r
   const b = new StructureBuilder()
   spec.build(b)
   // Campagne : distance, décor et garnison selon le rang du niveau (LevelCurve).
-  if (rank) applyCurve(b, rank)
+  let ammo = { ...spec.ammo }
+  let shots = spec.shots
+  if (rank) {
+    const { terrain } = applyCurve(b, rank)
+    // Montagne ET douves de lave ou d'eau : un tir de plus pour composer avec les deux.
+    if (terrain.mountain && b.zones.some((z) => z.kind === 'lava' || z.kind === 'lake') && b.blocks.some((k) => k.material === 'rock' && k.shape === 'triangle' && k.x < 1100)) shots = Math.min(12, shots + 1)
+    const cold = b.zones.some((z) => z.kind !== 'lake')
+    ammo = ammoFor(rank, ammo, { cold })
+  }
   const data = levelSchema(
-    { shots: spec.shots, wind: spec.wind, ammo: { ...spec.ammo }, blocks: b.blocks, targets: b.targets, barrels: b.barrels },
+    { shots, wind: spec.wind, ammo, blocks: b.blocks, targets: b.targets, barrels: b.barrels, zones: b.zones, flyers: b.flyers },
     `level ${id}`,
   )
   if (!data.targets.length) throw new Error(`level ${id}: no target`)
@@ -73,7 +96,7 @@ export function buildLevel(spec, id, chapter, seedSalt = 0, { tutorial = null, r
  * châteaux de fin de partie (plateau rocheux, aiguille et baril).
  * Les autres niveaux suivent, verrouillés.
  */
-export const DEMO_SHOWCASE = Object.freeze([1, 2, 3, 4, 9, 13, 21, 25, 35, 63])
+export const DEMO_SHOWCASE = Object.freeze([1, 2, 3, 4, 5, 7, 10, 14, 24, 39])
 
 /** Ordre de jeu : numéros de campagne des niveaux 1, 2, 3… */
 function playOrder(demo) {
@@ -104,8 +127,11 @@ export class LevelRepository {
       const spec = specs[source - 1]
       const id = i + 1
       // Tutoriel : la visée au niveau 1, puis chaque munition et chaque pouvoir
-      // dans le niveau où ils apparaissent pour la première fois.
-      const fresh = Object.keys(spec.ammo).filter((a) => !seen.has(a))
+      // dans le niveau où ils apparaissent pour la première fois (munitions de
+      // la courbe comprises, dans l'ordre où elles se débloquent).
+      const fresh = Object.keys(ammoFor(source, spec.ammo))
+        .filter((a) => !seen.has(a))
+        .sort((a, b) => (AMMO_UNLOCK[a] ?? 99) - (AMMO_UNLOCK[b] ?? 99))
       fresh.forEach((a) => seen.add(a))
       const power = PowerRegistry.all().find((p) => p.unlockAfter === id - 1)
       // Le trébuchet a son propre niveau d'apprentissage, juste après son déblocage.
@@ -154,12 +180,18 @@ export class LevelRepository {
       l.blocks.forEach((b) => seen.add(`material:${b.material}`))
       l.targets.forEach((t) => seen.add(`target:${t.type}`))
       if (l.barrels.length) seen.add('barrel')
+      l.zones.forEach((z) => seen.add(`terrain:${z.kind}`))
+      l.flyers.forEach((f) => seen.add(`flyer:${f.type}`))
+      if (l.blocks.some((b) => b.material === 'rock' && b.shape === 'triangle' && b.h >= 150 && b.x < 1100)) seen.add('terrain:mountain')
     }
     const level = LevelRepository.get(id)
     const now = new Set()
     level.blocks.forEach((b) => now.add(`material:${b.material}`))
     level.targets.forEach((t) => now.add(`target:${t.type}`))
     if (level.barrels.length) now.add('barrel')
+    level.zones.forEach((z) => now.add(`terrain:${z.kind}`))
+    level.flyers.forEach((f) => now.add(`flyer:${f.type}`))
+    if (level.blocks.some((b) => b.material === 'rock' && b.shape === 'triangle' && b.h >= 150 && b.x < 1100)) now.add('terrain:mountain')
     LevelRepository.newAmmo(id).forEach((a) => now.add(`ammo:${a}`))
     if (id === TREBUCHET_UNLOCK + 1) now.add('engine:trebuchet')
     return [...now].filter((k) => !seen.has(k))

@@ -507,6 +507,18 @@ export class ParticleSystem {
           ctx.drawImage(soft('255,170,70'), p.x - s / 2, p.y - s / 2, s, s)
           break
         }
+        case 'bolt': {
+          ctx.globalAlpha = t < 0.15 ? 1 : (1 - t) * (0.6 + 0.4 * Math.sin(p.life / 18))
+          for (const [wdt, col] of [[9, 'rgba(150,190,255,0.5)'], [3.2, '#ffffff']]) {
+            ctx.strokeStyle = col
+            ctx.lineWidth = wdt * Math.max(1, pixel)
+            ctx.lineJoin = 'round'
+            ctx.beginPath()
+            p.pts.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)))
+            ctx.stroke()
+          }
+          break
+        }
         case 'glint': {
           ctx.globalAlpha = Math.sin(t * Math.PI)
           ctx.strokeStyle = '#ffffff'
@@ -539,6 +551,79 @@ export class ParticleSystem {
     }
     ctx.restore()
     ctx.globalAlpha = 1
+  }
+
+  /* ---------- Terrains, givre et vapeur (v5.0) ---------- */
+
+  /** Gerbe d'eau : ricochet (petite) ou boulet qui sombre (grande). */
+  splash(x, big = false) {
+    const r = this.#rng
+    const y = WORLD.GROUND_Y - 2
+    for (let i = 0; i < this.#n(big ? 26 : 14); i++) {
+      this.#spawn({ kind: 'drop', x: x + r.range(-10, 10), y, vx: r.range(-2.6, 2.6), vy: r.range(-7.5, -2.5) * (big ? 1.1 : 0.8), max: r.range(500, 900), size: r.range(1.4, 2.6), color: r.pick(['#d9eefc', '#9fc9e6', '#ffffff']) })
+    }
+    this.#spawn({ kind: 'ring', x, y, vx: 0, vy: 0, max: 520, size: big ? 70 : 42 })
+    if (big) this.dust(x, y - 10, 4, '230,242,250')
+  }
+
+  /** Vapeur et eau bouillante : nuage blanc qui monte, gouttelettes brûlantes. */
+  steam(x, y, radius = 80) {
+    const r = this.#rng
+    for (let i = 0; i < this.#n(Math.min(22, 8 + radius / 8)); i++) {
+      this.#spawn({
+        kind: 'smoke', x: x + r.range(-radius / 2, radius / 2), y: y + r.range(-radius / 3, radius / 4), vx: r.range(-0.8, 0.8), vy: r.range(-2.4, -0.8),
+        max: r.range(900, 1700), size: r.range(16, 30), grow: r.range(0.5, 0.9), rgb: '246,250,255', opacity: 0.62,
+      })
+    }
+    for (let i = 0; i < this.#n(12); i++) {
+      this.#spawn({ kind: 'drop', x, y, vx: r.range(-3.2, 3.2), vy: r.range(-5, -1.5), max: r.range(400, 700), size: r.range(1.2, 2), color: r.pick(['#e8f6ff', '#bfe3f7']) })
+    }
+  }
+
+  /** Givre : éclat bleuté, cristaux qui scintillent, brume froide au sol. */
+  frost(x, y, radius = 120) {
+    const r = this.#rng
+    this.#spawn({ kind: 'flash', x, y, vx: 0, vy: 0, max: 260, size: radius * 1.1, rgb: '190,230,255' })
+    this.#spawn({ kind: 'ring', x, y, vx: 0, vy: 0, max: 460, size: radius })
+    for (let i = 0; i < this.#n(18); i++) {
+      const a = r.range(0, TAU)
+      const sp = r.range(1.5, 5)
+      this.#spawn({ kind: 'shard', x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 2, max: r.range(600, 1100), size: r.range(3, 6), len: r.range(6, 12), color: r.pick(['#e6f6ff', '#bfe3f7', '#9fd0f0']), rot: r.range(0, TAU), vr: r.range(-0.3, 0.3), floor: WORLD.GROUND_Y + r.range(-2, 4) })
+    }
+    this.#glints(x, y, 10)
+    this.dust(x, y, 6, '225,240,250')
+  }
+
+  /** Lave : le projectile fond (gerbe de braises, fumée noire). */
+  melt(x) {
+    const r = this.#rng
+    const y = WORLD.GROUND_Y - 4
+    this.#spawn({ kind: 'flash', x, y, vx: 0, vy: 0, max: 240, size: 70, rgb: '255,150,60' })
+    for (let i = 0; i < this.#n(16); i++) {
+      this.#spawn({ kind: 'ember', x: x + r.range(-12, 12), y, vx: r.range(-2.4, 2.4), vy: r.range(-6, -2), max: r.range(500, 1000), size: r.range(1.8, 3.2), color: r.pick(['#ff8c3a', '#ffd36b', '#ff5a2a']) })
+    }
+    for (let i = 0; i < this.#n(5); i++) {
+      this.#spawn({ kind: 'smoke', x: x + r.range(-14, 14), y: y - 10, vx: r.range(-0.5, 0.5), vy: r.range(-1.6, -0.7), max: r.range(1000, 1700), size: r.range(12, 20), grow: 0.6, rgb: '50,40,38', opacity: 0.5 })
+    }
+  }
+
+  /** Plumes (corbeau) ou écailles (vouivre) qui retombent en tournoyant. */
+  feathers(x, y, color = '#20202a', amount = 12) {
+    const r = this.#rng
+    for (let i = 0; i < this.#n(amount); i++) {
+      this.#spawn({ kind: 'confetti', x: x + r.range(-14, 14), y: y + r.range(-10, 10), vx: r.range(-2.5, 2.5), vy: r.range(-3, 0), max: r.range(1400, 2200), size: r.range(7, 12), color, rot: r.range(0, TAU), vr: r.range(-0.15, 0.15), phase: r.range(0, TAU) })
+    }
+  }
+
+  /** Éclair (pouvoir Foudre) : tracé brisé du ciel jusqu'au point frappé. */
+  lightning(x, y, top = -400) {
+    const r = this.#rng
+    const pts = [{ x: x + r.range(-60, 60), y: top }]
+    const n = 9
+    for (let i = 1; i < n; i++) pts.push({ x: x + r.range(-34, 34) * (1 - i / n), y: top + ((y - top) * i) / n })
+    pts.push({ x, y })
+    this.#spawn({ kind: 'bolt', x, y, vx: 0, vy: 0, max: 360, size: 1, pts })
+    this.#spawn({ kind: 'flash', x, y, vx: 0, vy: 0, max: 300, size: 160, rgb: '220,235,255' })
   }
 
   /** Tache au sol (sang, suie) : s'étale vite, s'efface sur le dernier tiers. */

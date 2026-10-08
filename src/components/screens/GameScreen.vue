@@ -126,6 +126,32 @@ function chooseEngine(value) {
   startLevel({ rebuild: true })
 }
 
+/* ---------- Aide à la visée (v5.0) ---------- */
+
+/** L'aide est-elle visible en ce moment (réglage, premiers pas ou tutoriel en cours) ? */
+const aidActive = computed(() => state.settings.trajectoryAid === true || Boolean(controller?.session.assist) || Boolean(coachStep.value))
+/** Bouton de l'interface : active ou coupe l'aide à la visée (même réglage que dans les Réglages). */
+function toggleAid() {
+  app.setSetting('trajectoryAid', !state.settings.trajectoryAid)
+  if (assistTip.value) dismissAssistTip()
+}
+/**
+ * Carte d'explication, une seule fois : la première fois qu'on joue sans l'aide
+ * (après les niveaux de premiers pas), on dit qu'elle est coupée et comment la remettre.
+ */
+const assistTip = ref(false)
+function maybeAssistTip() {
+  if (assistTip.value || state.settings.assistTipSeen === true || !controller) return
+  if (phase.value !== 'playing' || coachStep.value || state.settings.trajectoryAid === true || controller.session.assist) return
+  if (!isCampaign.value) return
+  assistTip.value = true
+}
+function dismissAssistTip(enable = false) {
+  assistTip.value = false
+  app.setSetting('assistTipSeen', true)
+  if (enable) app.setSetting('trajectoryAid', true)
+}
+
 /* ---------- Tutoriel guidé ---------- */
 
 /** Tutoriel en cours (premier passage d'un niveau qui présente un outil). */
@@ -394,7 +420,7 @@ onBeforeUnmount(() => {
   destroyController()
 })
 watch(
-  () => [state.settings.trajectoryAid, state.settings.screenShake, state.settings.blood, state.settings.motion, state.systemReducedMotion, state.settings.slowSwing, state.settings.infiniteSwing],
+  () => [state.settings.trajectoryAid, state.settings.screenShake, state.settings.blood, state.settings.screams, state.settings.motion, state.systemReducedMotion, state.settings.slowSwing, state.settings.infiniteSwing],
   () => {
     controller?.applySettings({ ...state.settings }, app.reducedMotion())
     if (coach && controller) controller.session.options.trajectoryAid = true
@@ -475,6 +501,10 @@ async function watchFor(purpose) {
   else pendingFree.value = markRaw(ticket)
 }
 // L'indice obtenu à l'introduction s'applique au premier tir.
+// Aide à la visée : la carte d'explication apparaît au premier tour visé sans aide.
+watch(aiming, (now) => now && maybeAssistTip())
+watch(coachStep, (step) => !step && aiming.value && maybeAssistTip())
+
 watch(aiming, (now) => {
   if (!now || !pendingHint.value || !controller) return
   if (controller.session.grantHint(pendingHint.value)) app.announce(t('ads.hintGranted'))
@@ -833,7 +863,7 @@ function onKey(e) {
       pause()
       break
     default:
-      if (/^Digit[1-5]$/.test(e.code)) {
+      if (/^Digit[1-6]$/.test(e.code)) {
         const a = hud.value?.ammo[Number(e.code.slice(5)) - 1]
         if (a) selectAmmo(a.type)
         break
@@ -901,16 +931,38 @@ const canvasLabel = computed(() =>
         <AmmoBar :ammo="hud.ammo" :disabled="!aiming" :coach="coachAnchor" @select="selectAmmo" />
         <button
           type="button"
+          :class="['btn btn--icon aid-btn', { 'aid-btn--on': aidActive, 'coach-focus': assistTip }]"
+          data-coach="aid"
+          :aria-pressed="String(state.settings.trajectoryAid === true)"
+          :aria-label="t('game.aidToggle')"
+          :title="aidActive ? t('game.aidOn') : t('game.aidOff')"
+          @click="toggleAid"
+        >
+          <AppIcon name="aim" :size="22" />
+        </button>
+        <button
+          type="button"
           :class="['fire-btn', { 'fire-btn--split': hud.canActivate, 'fire-btn--release': hud.armed, 'coach-focus': coachAnchor === 'fire' }]"
           data-coach="fire"
           :disabled="!aiming && !hud.canActivate && !hud.armed"
           @click="fire"
         >
-          <AppIcon :name="hud.canActivate ? 'volley' : 'target'" :size="28" />
-          <span>{{ hud.canActivate ? t('game.split') : hud.armed ? t('game.treb.releaseBtn') : isTrebuchet ? t('game.treb.armBtn') : t('game.fire') }}</span>
+          <AppIcon :name="hud.canActivate ? (hud.activateKind === 'dive' ? 'meteor' : 'volley') : 'target'" :size="28" />
+          <span>{{ hud.canActivate ? (hud.activateKind === 'dive' ? t('game.dive') : t('game.split')) : hud.armed ? t('game.treb.releaseBtn') : isTrebuchet ? t('game.treb.armBtn') : t('game.fire') }}</span>
         </button>
       </div>
       <CoachBubble v-if="coachStep && phase === 'playing'" :tool="coachTool" :step="coachStep" :progress="coachProgress" @skip="stopCoach" />
+      <aside v-else-if="assistTip && phase === 'playing'" class="coach assist-tip" role="status" aria-live="polite" :aria-label="t('tutorial.assistTitle')">
+        <p class="coach__head">
+          <AppIcon name="aim" :size="18" />
+          <span class="coach__title">{{ t('tutorial.assistTitle') }}</span>
+        </p>
+        <p class="coach__text">{{ t('tutorial.assist') }}</p>
+        <p class="assist-tip__actions">
+          <button type="button" class="btn btn--primary" @click="dismissAssistTip(true)">{{ t('tutorial.assistOn') }}</button>
+          <button type="button" class="coach__skip" @click="dismissAssistTip(false)">{{ t('tutorial.assistOk') }}</button>
+        </p>
+      </aside>
       <!-- Geste de visée montré en image : une main tire vers l'arrière puis relâche. -->
       <div v-if="coachAnchor === 'drag' && aiming" class="drag-hint" aria-hidden="true">
         <svg viewBox="0 0 160 120" width="160" height="120">

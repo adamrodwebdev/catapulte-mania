@@ -28,6 +28,8 @@ export class Target extends Entity {
     /** Équipe (face-à-face) : 1 ou 2 ; 0 hors face-à-face. */
     this.team = def.team === 1 || def.team === 2 ? def.team : 0
     this.scoreValue = t.score
+    /** Résistance aux chocs et aux chutes (armure du chevalier). */
+    this.toughness = t.toughness ?? 1
     // Le feu est mortel : une cible qui s'enflamme succombe en 1,5 s environ.
     this.burnDps = (this.maxHp / 1.5) * 1.05
     /** Instant (ms de jeu) du dernier coup encaissé, pour l'animation. */

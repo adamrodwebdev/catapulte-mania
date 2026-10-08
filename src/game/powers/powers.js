@@ -1,61 +1,87 @@
 import { Power } from './Power.js'
 
-/** Accalmie : le vent tombe pour ce tir. */
-export class CalmPower extends Power {
+/*
+ * Pouvoirs spéciaux (v5.0, refonte) : chacun change la façon de jouer le tour,
+ * pas seulement un chiffre. Un pouvoir par tour, payé en points.
+ *
+ *  Œil du faucon  → on VOIT où tombera le tir (trajectoire complète) et le vent tombe ;
+ *  Force du Titan → un boulet géant qui perce les murs de pierre ;
+ *  Pierre d'aimant → le tir s'infléchit en vol vers le défenseur le plus proche ;
+ *  Météore        → touchez l'écran en vol : le projectile pique à la verticale et
+ *                   pulvérise ce qu'il frappe (onde de choc) ;
+ *  Pluie de feu   → cinq pots de feu grégeois en éventail ;
+ *  Foudre         → trois éclairs s'abattent aussitôt sur les points les plus hauts ;
+ *  Séisme         → la terre tremble aussitôt sous le château.
+ */
+
+/** Œil du faucon : trajectoire entière affichée pour ce tir, et plus un souffle de vent. */
+export class FalconPower extends Power {
   constructor() {
-    super({ id: 'calm', unlockAfter: 4, cost: 150, icon: 'wind' })
+    super({ id: 'falcon', unlockAfter: 5, cost: 120, icon: 'eye' })
   }
   modifyShot(shot) {
     shot.windOverride = 0
   }
 }
 
-/** Force du Titan : projectile 2,2 fois plus lourd. */
+/** Force du Titan : boulet géant (1,6 fois plus grand) et plus lourd. */
 export class TitanPower extends Power {
   constructor() {
-    super({ id: 'titan', unlockAfter: 7, cost: 250, icon: 'fist' })
+    super({ id: 'titan', unlockAfter: 8, cost: 200, icon: 'fist' })
   }
   modifyShot(shot) {
-    shot.mods.massFactor = 2.2
+    shot.mods.massFactor = 1.4
+    shot.mods.radiusFactor = 1.6
   }
 }
 
-/** Feu grégeois : le projectile enflamme ce qu'il touche. */
-export class GreekFirePower extends Power {
+/** Pierre d'aimant : le projectile est attiré par le défenseur le plus proche. */
+export class LodestonePower extends Power {
   constructor() {
-    super({ id: 'greekfire', unlockAfter: 15, cost: 200, icon: 'flame' })
+    super({ id: 'lodestone', unlockAfter: 11, cost: 250, icon: 'magnet' })
   }
   modifyShot(shot) {
+    shot.mods.homing = true
+  }
+}
+
+/** Météore : en vol, un toucher fait piquer le projectile, qui explose en onde de choc. */
+export class MeteorPower extends Power {
+  constructor() {
+    super({ id: 'meteor', unlockAfter: 15, cost: 250, icon: 'meteor' })
+  }
+  modifyShot(shot) {
+    shot.mods.dive = true
+  }
+}
+
+/** Pluie de feu : cinq pots de feu grégeois en éventail. */
+export class FirestormPower extends Power {
+  constructor() {
+    super({ id: 'firestorm', unlockAfter: 19, cost: 350, icon: 'flame' })
+  }
+  modifyShot(shot) {
+    shot.count = 5
     shot.mods.ignites = true
   }
 }
 
-/** Salve : trois projectiles tirés en éventail. */
-export class VolleyPower extends Power {
+/** Foudre : trois éclairs frappent aussitôt les points les plus hauts du château. */
+export class LightningPower extends Power {
   constructor() {
-    super({ id: 'volley', unlockAfter: 18, cost: 350, icon: 'volley' })
+    super({ id: 'lightning', unlockAfter: 24, cost: 400, icon: 'bolt', immediate: true })
   }
-  modifyShot(shot) {
-    shot.count = 3
-  }
-}
-
-/** Charge de poudre : le projectile explose à l'impact. */
-export class PowderPower extends Power {
-  constructor() {
-    super({ id: 'powder', unlockAfter: 21, cost: 300, icon: 'bomb' })
-  }
-  modifyShot(shot) {
-    shot.mods.explodes = true
+  activate(session) {
+    session.world.lightning(3)
   }
 }
 
 /** Séisme : la terre tremble immédiatement et ébranle les structures. */
 export class QuakePower extends Power {
   constructor() {
-    super({ id: 'quake', unlockAfter: 30, cost: 400, icon: 'quake', immediate: true })
+    super({ id: 'quake', unlockAfter: 30, cost: 300, icon: 'quake', immediate: true })
   }
   activate(session) {
-    session.world.quake(1)
+    session.world.quake(1.25)
   }
 }

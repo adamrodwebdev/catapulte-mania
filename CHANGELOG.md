@@ -2,6 +2,77 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [5.0.0] – 2026-10-08
+### Terrains et créatures
+- **Lacs** (dès le niveau 4) : un boulet qui touche l'eau ricoche une fois,
+  puis coule au second contact ; un défenseur qui y tombe se noie. Le givre
+  fige le lac en glace (on y glisse), le feu la refait fondre.
+- **Lave** (dès le niveau 24) : tout projectile y fond, sauf le boulet de
+  givre, qui la fige en une croûte de roche. Les défenseurs y brûlent, le bois
+  s'y enflamme.
+- **Neige** (dès le niveau 16, tout le chapitre Hiver) : le boulet y roule
+  sans s'arrêter et grossit en boule de neige, de plus en plus lourde. Un
+  boulet de feu la fait fondre là où il tombe.
+- **Montagnes** (dès le niveau 8) : de la roche indestructible entre la
+  catapulte et le château ; il faut tirer en cloche.
+- **Créatures volantes** : des nuées de corbeaux (dès le niveau 12) arrêtent
+  net les tirs qui les traversent ; une vouivre (dès le niveau 27) porte un
+  pot de feu grégeois qu'elle lâche sur le château quand on l'abat. Leur vol
+  dépend du seul temps de jeu (parties et relectures identiques).
+- Chaque chapitre a sa dominante (Marais : lacs, Désert : lave, Montagne :
+  montagnes, Hiver : neige et lacs gelés, Tempête : corbeaux, Trône : tout).
+
+### Munitions et physique
+- **Munitions débloquées tôt** : feu au niveau 3, rocher au 5, **givre** au 7,
+  bombe au 10, mitraille au 14 ; une fois découvertes, elles restent
+  disponibles.
+- **Boulet de givre** (nouveau) : il gèle tout autour de l'impact. Les blocs
+  gelés deviennent cassants (dégâts ×3, même le fer perd son blindage) et ne
+  brûlent plus. Le feu au contact de la glace la fait éclater en **vapeur** :
+  choc thermique qui fend le bloc, eau bouillante qui ébouillante les
+  défenseurs proches, et réaction en chaîne sur les blocs gelés voisins.
+- **Percée** : un projectile dont le choc détruit le bloc qu'il frappe le
+  traverse et poursuit sa course avec l'énergie restante. Le rocher (et le
+  boulet du Titan) perce plusieurs murs de pierre d'affilée ; une pierre
+  ordinaire ne perce que le bois, la paille, le verre… ou un bloc gelé.
+- **Chevaliers en armure** : ils encaissent les petits chocs (seuils ×2,2) ;
+  des chevaliers montent la garde dès le niveau 15.
+- **Garnison plus tôt** : défenseurs supplémentaires dès le niveau 3, barils
+  dès le niveau 6, sentinelles sur les toits dès le niveau 18.
+
+### Pouvoirs repensés (7)
+- Œil du faucon (trajectoire entière jusqu'à l'impact, vent nul), Force du
+  Titan (boulet géant qui perce la pierre), Pierre d'aimant (le tir
+  s'infléchit vers le défenseur le plus proche), Météore (un toucher en vol :
+  piqué vertical et onde de choc), Pluie de feu (cinq pots de feu grégeois),
+  Colère du ciel (trois éclairs sur les points les plus hauts), Séisme.
+
+### Accessibilité et confort
+- **Bouton « aide à la visée »** à côté de « Tirer » : on l'active ou on la
+  coupe à tout moment. La première fois qu'on joue sans elle (après les
+  niveaux de premiers pas, démo comprise), une carte explique qu'elle est
+  désactivée et comment la remettre.
+- **Cris des soldats** synthétisés (sans fichier audio), désactivables dans
+  les réglages ; sous-titrés pour les malentendants, comme tous les nouveaux
+  sons (percée, givre, vapeur, eau, foudre, créatures).
+- Aide : nouvelle rubrique « Terrains et créatures ».
+
+### Contrôles
+- Les 100 niveaux restent stables et gagnables en Difficile, à la catapulte
+  comme au trébuchet, et les 10 niveaux de la démo aussi (contrôle
+  automatique). Quelques réglages fins relevés par ce contrôle : pas de
+  sentinelle sur deux toits qui oscillent (niveaux 28 et 68), gardes postés
+  devant au niveau 66, un tir de plus quand une montagne s'ajoute à des douves.
+
+### Succès, démo, relectures
+- 3 nouveaux défis : Chasseur du ciel, Choc thermique, Terrain traître
+  (21 défis au total).
+- Démo : niveaux 1, 2, 3, 4, 5, 7, 10, 14, 24 et 39 (lac, montagne, lave,
+  corbeaux, vouivre, chaque munition).
+- Codes « Bats mon tir » en version 2 : instants de tir comptés depuis le
+  début de la partie (les créatures volent pendant la visée). Les anciens
+  liens ne sont plus acceptés.
+
 ## [4.6.0] – 2026-10-08
 ### Courbe de difficulté de la campagne
 - **Distance** : les dix premiers niveaux restent proches, puis le château

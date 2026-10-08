@@ -10,6 +10,8 @@ import { clamp } from '../../core/utils/math.js'
 export const SOUND_IDS = Object.freeze([
   'launch', 'creak', 'wood', 'straw', 'stone', 'iron', 'glass', 'hit', 'down', 'explosion',
   'fire', 'victory', 'defeat', 'power', 'click', 'split', 'star', 'gust', 'swing', 'tick',
+  // v5.0 : percée, givre, vapeur, eau, neige, créatures, foudre, cris des soldats.
+  'breach', 'frost', 'steam', 'splash', 'snow', 'flyer', 'thunder', 'scream',
 ])
 
 export class AudioService {
@@ -172,8 +174,80 @@ export class AudioService {
     o.stop(t + attack + decay + 0.05)
   }
 
+  /**
+   * Cri synthétisé (aucun enregistrement) : une voix en dents de scie dont la
+   * hauteur monte puis s'effondre, passée dans deux formants de voyelle « a »,
+   * avec un vibrato et un souffle. `pitch` distingue les voix (soldat, chevalier, roi).
+   */
+  #scream(out, t, pitch) {
+    const ctx = this.#ctx
+    const dur = 0.55 + Math.random() * 0.25
+    const base = pitch * (0.9 + Math.random() * 0.25)
+    const o = ctx.createOscillator()
+    o.type = 'sawtooth'
+    o.frequency.setValueAtTime(base, t)
+    o.frequency.linearRampToValueAtTime(base * 1.7, t + 0.08)
+    o.frequency.exponentialRampToValueAtTime(base * 0.55, t + dur)
+    const lfo = ctx.createOscillator()
+    lfo.frequency.value = 6 + Math.random() * 3
+    const lfoGain = ctx.createGain()
+    lfoGain.gain.value = base * 0.06
+    lfo.connect(lfoGain).connect(o.frequency)
+    const g = this.#env(t, 0.03, dur, 0.22)
+    for (const [f, q] of [[780, 6], [1250, 7], [2600, 9]]) {
+      const bp = ctx.createBiquadFilter()
+      bp.type = 'bandpass'
+      bp.frequency.value = f
+      bp.Q.value = q
+      o.connect(bp).connect(g)
+    }
+    g.connect(out)
+    o.start(t)
+    lfo.start(t)
+    o.stop(t + dur + 0.05)
+    lfo.stop(t + dur + 0.05)
+    this.#noiseHit(out, t, { type: 'bandpass', freq: 1500, q: 1.2, attack: 0.02, decay: dur * 0.7, peak: 0.05 })
+  }
+
   #synth(id, out, t, k) {
     switch (id) {
+      case 'breach':
+        // Mur qui éclate : grave sourd, craquement, gravats.
+        this.#tone(out, t, { freq: 60, to: 28, decay: 0.6, peak: 0.7 })
+        this.#noiseHit(out, t, { type: 'lowpass', freq: 1400, sweepTo: 200, decay: 0.7, peak: 0.7 })
+        for (let i = 0; i < 4; i++) this.#noiseHit(out, t + 0.08 + i * 0.07, { type: 'bandpass', freq: 900, q: 2, decay: 0.08, peak: 0.25 })
+        break
+      case 'frost':
+        // Givre : tintements cristallins et craquement aigu.
+        for (const [i, f] of [2093, 2637, 3136, 3951].entries()) this.#tone(out, t + i * 0.035, { freq: f, decay: 0.35, peak: 0.07 * k })
+        this.#noiseHit(out, t, { type: 'highpass', freq: 5000, decay: 0.25, peak: 0.25 })
+        break
+      case 'steam':
+        // Vapeur : sifflement qui monte, chuintement.
+        this.#noiseHit(out, t, { type: 'highpass', freq: 2500, sweepTo: 6000, attack: 0.04, decay: 0.9 * k, peak: 0.35 * k })
+        this.#tone(out, t, { type: 'sine', freq: 1800, to: 2600, attack: 0.05, decay: 0.6, peak: 0.04 })
+        break
+      case 'splash':
+        this.#noiseHit(out, t, { type: 'bandpass', freq: 900, sweepTo: 300, q: 0.8, attack: 0.01, decay: 0.45 * k, peak: 0.5 * k })
+        this.#tone(out, t + 0.02, { type: 'sine', freq: 420, to: 1100, decay: 0.12, peak: 0.08 })
+        break
+      case 'snow':
+        this.#noiseHit(out, t, { type: 'lowpass', freq: 700, decay: 0.25, peak: 0.25 })
+        break
+      case 'flyer':
+        // Croassement ou cri de la vouivre (rauque, bref).
+        this.#tone(out, t, { type: 'sawtooth', freq: 340, to: 220, attack: 0.01, decay: 0.18, peak: 0.12 })
+        this.#tone(out, t + 0.16, { type: 'sawtooth', freq: 300, to: 180, attack: 0.01, decay: 0.2, peak: 0.1 })
+        break
+      case 'thunder':
+        this.#noiseHit(out, t, { type: 'highpass', freq: 1800, decay: 0.08, peak: 0.6 })
+        this.#noiseHit(out, t + 0.05, { type: 'lowpass', freq: 600, sweepTo: 60, attack: 0.03, decay: 1.6, peak: 0.9 })
+        this.#tone(out, t + 0.05, { freq: 48, to: 30, decay: 1.2, peak: 0.5 })
+        break
+      case 'scream':
+        // L'intensité porte la voix : soldat (aigu), chevalier (grave), roi (entre les deux).
+        this.#scream(out, t, k >= 1.2 ? 170 : k <= 0.6 ? 230 : 300)
+        break
       case 'launch':
         this.#noiseHit(out, t, { type: 'bandpass', freq: 300, sweepTo: 1800, q: 0.8, attack: 0.05, decay: 0.45, peak: 0.45 })
         this.#tone(out, t, { type: 'triangle', freq: 140, to: 60, decay: 0.25, peak: 0.25 })

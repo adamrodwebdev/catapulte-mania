@@ -13,7 +13,7 @@ defineProps({
 })
 const emit = defineEmits(['use', 'use-free', 'close'])
 const { t } = useApp()
-const ICONS = { calm: 'wind', titan: 'fist', greekfire: 'flame', volley: 'volley', powder: 'bomb', quake: 'quake' }
+const ICONS = { falcon: 'eye', titan: 'fist', lodestone: 'magnet', meteor: 'meteor', firestorm: 'flame', lightning: 'bolt', quake: 'quake' }
 const panel = ref(null)
 onMounted(() => panel.value?.querySelector('button:not([disabled])')?.focus())
 </script>

@@ -33,7 +33,7 @@ const DUEL_SPECS = [
   },
   // 4. La citadelle nocturne : crypte et pont-levis.
   {
-    theme: 4, shots: 8, wind: 0.45, ammo: { boulder: 2, bomb: 3 },
+    theme: 4, shots: 8, wind: 0.45, ammo: { boulder: 2, bomb: 3, frost: 1 },
     build(b) {
       BP.crypt(b, { x: 1400, vault: 'iron', hall: 'wood', floors: 4, barrels: 2, side: false })
       BP.drawbridge(b, { x: 1900, gap: 320, floors: 4, m: 'stone', s: 'iron' })

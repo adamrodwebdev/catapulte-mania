@@ -24,6 +24,22 @@ const MAX_RIGHT = WORLD.WIDTH - 40
 const BARREL = { w: 34, h: 42 }
 /** Largeur maximale d'un bloc de roche (au-delà, le plateau est découpé). */
 const ROCK_MAX_W = 560
+/**
+ * Niveaux sans sentinelle sur le toit : leur toit oscille en se mettant en place
+ * et la sentinelle tomberait seule (relevé par scripts/check-levels.mjs).
+ */
+const SENTRY_SKIP = new Set([28, 68])
+/**
+ * Niveaux où un garde posé derrière le château serait hors de portée du
+ * trébuchet (au-delà de REACH_RIGHT) : il se poste devant (relevé par
+ * scripts/check-levels.mjs --engine trebuchet).
+ */
+const GUARDS_FRONT = new Set([66])
+const REACH_RIGHT = WORLD.WIDTH - 340
+/** Les terrains commencent au-delà de cette abscisse (la catapulte reste sur la terre ferme). */
+const FIELD_LEFT = 480
+/** Pied gauche minimal d'une montagne. */
+const MOUNTAIN_LEFT = 380
 
 /** Recul du château selon le rang du niveau. */
 export function distanceFor(rank) {
@@ -38,12 +54,62 @@ export function plateauFor(rank) {
   return 110 + ((rank * 13) % 71)
 }
 
-/** Barils et défenseurs supplémentaires. */
+/**
+ * Barils et défenseurs supplémentaires (v5.0 : plus tôt et plus nombreux).
+ * Des sentinelles montent aussi sur le toit plat le plus haut à partir du niveau 18.
+ */
 export function garrisonFor(rank) {
   return {
-    barrels: rank < 12 ? 0 : Math.min(4, 1 + Math.floor((rank - 12) / 22)),
-    guards: rank < 8 ? 0 : Math.min(4, 1 + Math.floor((rank - 8) / 23)),
+    barrels: rank < 6 ? 0 : Math.min(4, 1 + Math.floor((rank - 6) / 20)),
+    guards: rank < 3 ? 0 : Math.min(5, 1 + Math.floor((rank - 3) / 12)),
+    sentries: rank < 18 ? 0 : Math.min(2, 1 + Math.floor((rank - 18) / 40)),
     spire: rank >= 57 && rank % 3 === 0,
+  }
+}
+
+/**
+ * Munitions (v5.0) : chaque munition se débloque tôt dans la campagne (rang du
+ * niveau) et reste ensuite disponible au moins en un exemplaire.
+ */
+export const AMMO_UNLOCK = Object.freeze({ fire: 3, boulder: 5, frost: 7, bomb: 10, split: 14 })
+
+/**
+ * @param {number} rank
+ * @param {Record<string, number>} ammo munitions prévues par le niveau
+ * @param {{ cold?: boolean }} [terrain] terrain gelé ou brûlant : un givre de plus
+ */
+export function ammoFor(rank, ammo, { cold = false } = {}) {
+  const out = { ...ammo }
+  for (const [type, at] of Object.entries(AMMO_UNLOCK)) {
+    if (rank < at) continue
+    let base = 1
+    if (type === 'boulder' && rank >= 20) base = 2
+    if (type === 'frost' && cold) base = 2
+    out[type] = Math.min(10, Math.max(out[type] ?? 0, base))
+  }
+  return out
+}
+
+/**
+ * Terrains du niveau (v5.0), selon son rang et son chapitre :
+ * lac (douves) dès le niveau 4, montagne dès le 8, corbeaux dès le 12, neige dès
+ * le 16, lave dès le 24, vouivre dès le 27 ; chaque chapitre a ensuite sa
+ * dominante (Marais : lacs, Désert : lave, Montagne : montagnes et lave,
+ * Hiver : neige et lacs gelés, Tempête : corbeaux, Trône : un peu de tout).
+ */
+export function terrainFor(rank) {
+  const c = Math.ceil(rank / 10)
+  const lava = (rank >= 24 && rank % 7 === 3) || (c === 6 && rank % 2 === 0) || (c === 7 && rank % 3 === 1) || (c === 10 && rank % 3 === 0)
+  const lake = !lava && ((rank >= 4 && rank % 5 === 4) || (c === 5 && rank % 2 === 1) || (c === 8 && rank % 3 === 0) || (c === 10 && rank % 4 === 1))
+  const snow = c === 8 || (rank >= 16 && rank % 9 === 7)
+  return {
+    lava,
+    lake,
+    frozenLake: lake && c === 8,
+    snow,
+    mountain: (rank >= 8 && rank % 6 === 2) || (c === 7 && rank % 2 === 0) || (c >= 9 && rank % 5 === 3),
+    crows: (rank >= 12 && rank % 4 === 0) || c === 9 ? Math.min(3, 1 + Math.floor(rank / 35)) : 0,
+    wyvern: (rank >= 27 && rank % 6 === 3) || (c === 10 && rank % 2 === 0),
   }
 }
 
@@ -77,7 +143,7 @@ export function applyCurve(b, rank) {
   }
   const surface = G - ph
   const castle = extentOf(all())
-  const { barrels, guards, spire } = garrisonFor(rank)
+  const { barrels, guards, sentries, spire } = garrisonFor(rank)
 
   // 3. Emplacements libres au niveau du sol du château, devant puis derrière.
   const occupied = all()
@@ -88,6 +154,8 @@ export function applyCurve(b, rank) {
   const slot = (side, w) => {
     let x = side < 0 ? castle.left - w / 2 - 10 : castle.right + w / 2 + 10
     for (let i = 0; i < 40 && !free(x, w); i++) x += side * 12
+    // Trop loin derrière le château (hors de portée du trébuchet) : devant, alors.
+    if (side > 0 && GUARDS_FRONT.has(rank) && x + w / 2 > REACH_RIGHT) return slot(-1, w)
     take(x, w)
     return x
   }
@@ -104,7 +172,8 @@ export function applyCurve(b, rank) {
   }
   // Gardes : d'abord à l'abri derrière les murs, puis devant.
   for (let i = 0; i < guards; i++) {
-    const type = rank >= 40 && i === guards - 1 ? 'knight' : 'soldier'
+    // Chevaliers en armure parmi les gardes dès le niveau 15 (un sur deux).
+    const type = (rank >= 40 && i === guards - 1) || (rank >= 15 && i % 2 === 1) ? 'knight' : 'soldier'
     const t = TARGET_TYPES[type]
     const x = slot(i % 2 === 0 ? 1 : -1, t.w)
     extra.push({ kind: 'target', type, x, y: surface - t.h / 2 - 1 })
@@ -113,6 +182,17 @@ export function applyCurve(b, rank) {
   for (let i = 0; i < barrels; i++) {
     const x = slot(i % 2 === 0 ? -1 : 1, BARREL.w)
     extra.push({ kind: 'barrel', x, y: surface - BARREL.h / 2 - 1 })
+  }
+  // Sentinelles : sur les dalles les plus hautes et assez larges (rien au-dessus).
+  const roofs = b.blocks
+    .filter((k) => k.shape === 'rect' && k.w >= 60 && k.w > k.h * 2 && k.material !== 'rock')
+    .filter((k) => !b.blocks.some((o) => o !== k && o.y < k.y && Math.abs(o.x - k.x) < (o.w + k.w) / 2 && o.y + o.h / 2 > k.y - k.h / 2 - 70))
+    .filter((k) => !b.targets.some((t) => Math.abs(t.x - k.x) < k.w / 2 + 10 && t.y < k.y && t.y > k.y - 90))
+    .sort((p, q) => p.y - q.y)
+  for (let i = 0; i < (SENTRY_SKIP.has(rank) ? 0 : Math.min(sentries, roofs.length)); i++) {
+    const k = roofs[i]
+    const t = TARGET_TYPES.soldier
+    extra.push({ kind: 'target', type: 'soldier', x: k.x, y: k.y - k.h / 2 - t.h / 2 - 1 })
   }
   for (const e of extra) {
     if (e.kind === 'target') b.targets.push({ type: e.type, x: Math.round(e.x), y: Math.round(e.y) })
@@ -133,11 +213,59 @@ export function applyCurve(b, rank) {
     rocks.push({ material: 'rock', x: Math.round(right), y: G - ph / 2, w: tw, h: ph, shape: 'triangle' })
   }
   if (spireRock) rocks.push({ ...spireRock, x: Math.round(spireRock.x), y: Math.round(spireRock.y) })
+
+  // 5. Terrains : douves (lac, lave ou neige) devant le château, montagne et
+  //    champ au milieu, créatures dans le ciel.
+  const t = terrainFor(rank)
+  const front = Math.min(extentOf(all()).left, ...rocks.map((r) => r.x - r.w / 2))
+  const zones = []
+  const moatW = 160 + ((rank * 37) % 140)
+  const moat = { x1: Math.round(front - 14), x0: Math.round(Math.max(FIELD_LEFT, front - 14 - moatW)) }
+  const moatKind = t.lava ? 'lava' : t.lake ? (t.frozenLake ? 'ice' : 'lake') : t.snow ? 'snow' : null
+  if (moatKind && moat.x1 - moat.x0 >= 100) zones.push({ kind: moatKind, ...moat })
+  const fieldRight = zones.length ? moat.x0 - 30 : front - 20
+  let fieldLeft = FIELD_LEFT
+  if (t.mountain) {
+    const h = Math.round(160 + Math.min(320, rank * 3.2))
+    const w = Math.min(ROCK_MAX_W, Math.round(h * 1.5))
+    let mx = 560 + ((rank * 53) % 260)
+    // La montagne ne déborde jamais sur les douves.
+    mx = Math.min(mx, fieldRight - w / 2 - 10)
+    if (mx - w / 2 >= MOUNTAIN_LEFT) {
+      // Un triangle est centré sur son centre de gravité (au tiers de sa hauteur) : base légèrement enterrée.
+      rocks.push({ material: 'rock', x: Math.round(mx), y: Math.round(G + 12 - h / 3), w, h, shape: 'triangle' })
+      const h2 = Math.round(h * 0.62)
+      const w2 = Math.min(ROCK_MAX_W, Math.round(h2 * 1.7))
+      rocks.push({ material: 'rock', x: Math.round(mx + w * 0.28), y: Math.round(G + 12 - h2 / 3), w: w2, h: h2, shape: 'triangle' })
+      fieldLeft = Math.round(mx + w * 0.28 + w2 / 2 + 20)
+    }
+  }
+  // Champ de neige au milieu (en plus des douves) en hiver.
+  if (t.snow && moatKind !== 'snow' && fieldRight - fieldLeft >= 140) zones.push({ kind: 'snow', x0: fieldLeft, x1: Math.round(fieldRight) })
+  const flyers = []
+  for (let i = 0; i < t.crows; i++) {
+    flyers.push({
+      type: 'crow',
+      x: Math.round(Math.min(front - 120, 720 + i * 240 + ((rank * 31) % 120))),
+      y: Math.round(G - 330 - ((rank * 17 + i * 90) % 220)),
+      range: 110 + ((rank * 13 + i * 40) % 110),
+      period: 3000 + ((rank * 211 + i * 700) % 3000),
+      phase: Math.round((((rank * 7 + i * 3) % 10) / 10) * 100) / 100,
+    })
+  }
+  if (t.wyvern) {
+    const blocks = b.blocks.filter((k) => k.material !== 'rock')
+    const top = Math.min(...blocks.map((k) => k.y - k.h / 2))
+    const ext = extentOf(blocks)
+    flyers.push({ type: 'wyvern', x: Math.round((ext.left + ext.right) / 2), y: Math.round(Math.max(WORLD.TOP + 140, top - 150)), range: 150, period: 7000, phase: (rank % 4) / 4 })
+  }
+  b.zones.push(...zones)
+  b.flyers.push(...flyers)
   // La roche passe en premier : elle est posée avant le château.
   b.blocks.unshift(...rocks)
   for (const k of b.blocks) {
     k.x = Math.round(k.x * 10) / 10
     k.y = Math.round(k.y * 10) / 10
   }
-  return { dx, plateau: ph }
+  return { dx, plateau: ph, terrain: t }
 }

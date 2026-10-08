@@ -75,6 +75,10 @@ export class ScoreKeeper {
     } else if (entity.kind === 'barrel') {
       base = SCORE.BARREL
       this.#stats.barrelsExploded++
+    } else if (entity.kind === 'flyer') {
+      // Créature volante abattue (v5.0) : prime fixe, comptée dans la chaîne.
+      base = Number.isFinite(entity.scoreValue) ? Math.min(SCORE.FLYER_MAX, entity.scoreValue) : 0
+      this.#run.flyersDown++
     }
     if (!base) return 0
     const mult = Math.min(SCORE.CHAIN_MAX, 1 + this.#chain * SCORE.CHAIN_STEP)

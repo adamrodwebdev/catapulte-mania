@@ -4,7 +4,7 @@ import ScreenHeader from '../ui/ScreenHeader.vue'
 
 const app = useApp()
 const { t } = app
-const sections = ['goal', 'aim', 'aid', 'trebuchet', 'wind', 'materials', 'powers', 'score', 'modes', 'workshop']
+const sections = ['goal', 'aim', 'aid', 'trebuchet', 'wind', 'materials', 'terrain', 'powers', 'score', 'modes', 'workshop']
 </script>
 
 <template>

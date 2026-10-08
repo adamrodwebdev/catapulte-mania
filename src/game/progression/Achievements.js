@@ -68,16 +68,21 @@ export const ACHIEVEMENTS = deepFreeze({
   // --- Thème ---
   powder: { family: 'theme', icon: 'bomb', eligible: (l) => l.barrels.length > 0, test: (r, l) => r.barrelsExploded >= l.barrels.length },
   regicide: { family: 'theme', icon: 'crown', eligible: hasKing, test: (r) => r.firstKill === 'king' },
-  pyro: { family: 'theme', icon: 'flame', eligible: (l) => Boolean(l.ammo?.fire) || (l.id > 16 && flammable(l) >= 0.4), test: (r) => r.kills.fire >= 2 },
+  // Le feu est disponible presque partout depuis la v5.0 : le défi vise les niveaux pensés pour lui.
+  pyro: { family: 'theme', icon: 'flame', eligible: (l) => (l.ammo?.fire ?? 0) >= 2 || (l.id > 16 && flammable(l) >= 0.4), test: (r) => r.kills.fire >= 2 },
   artificer: { family: 'theme', icon: 'bomb', eligible: (l) => Boolean(l.ammo?.bomb) || l.barrels.length > 0, test: (r) => r.kills.explosion >= 2 },
   landslide: { family: 'theme', icon: 'quake', eligible: (l) => l.targets.length >= 3, test: (r) => r.kills.crush >= 2 },
   freefall: { family: 'theme', icon: 'star', eligible: (l) => perched(l) >= 2, test: (r) => r.kills.fall >= 1 },
+  // v5.0 : créatures volantes, vapeur, terrains.
+  skyhunter: { family: 'theme', icon: 'meteor', eligible: (l) => (l.flyers?.length ?? 0) > 0, test: (r, l) => r.flyersDown >= l.flyers.length },
+  thermal: { family: 'theme', icon: 'snowflake', eligible: (l) => (l.ammo?.frost ?? 0) >= 2, test: (r) => r.kills.steam >= 1 },
+  drowned: { family: 'theme', icon: 'map', eligible: (l) => Boolean(l.zones?.some((z) => z.kind === 'lake' || z.kind === 'lava')), test: (r) => r.kills.terrain >= 1 },
 })
 
 /** Les trois familles, dans l'ordre des trois succès d'un niveau. */
 const FAMILIES = Object.freeze(['style', 'feat', 'theme'])
 /** Défis de thème propres au niveau (roi, feu) : prioritaires. Les barils, désormais fréquents (v4.6), entrent dans le tirage commun. */
-const SPECIFIC = Object.freeze(['regicide', 'pyro'])
+const SPECIFIC = Object.freeze(['regicide', 'pyro', 'skyhunter', 'thermal'])
 
 /**
  * @typedef {{ shotsUsed: number, shotsLeft: number, specialsUsed: number, powersUsed: number,
@@ -88,13 +93,15 @@ const SPECIFIC = Object.freeze(['regicide', 'pyro'])
 
 /** Statistiques vides (début de partie). */
 export function emptyRun() {
-  return { specialsUsed: 0, maxChain: 0, maxShotKills: 0, firstShotKills: 0, firstKill: null, kills: { fire: 0, explosion: 0, crush: 0, fall: 0 } }
+  return { specialsUsed: 0, maxChain: 0, maxShotKills: 0, firstShotKills: 0, firstKill: null, flyersDown: 0, kills: { fire: 0, explosion: 0, crush: 0, fall: 0, steam: 0, terrain: 0 } }
 }
 
 /** Regroupe les causes de mort du moteur physique en familles de succès. */
 export function killFamily(cause) {
   if (cause === 'fire') return 'fire'
-  if (cause === 'explosion') return 'explosion'
+  if (cause === 'explosion' || cause === 'lightning') return 'explosion'
+  if (cause === 'scald') return 'steam'
+  if (cause === 'drown' || cause === 'burn') return 'terrain'
   if (cause === 'crush' || cause === 'pinned' || cause === 'squeezed') return 'crush'
   if (cause === 'fall' || cause === 'knockout') return 'fall'
   return null
