@@ -16,6 +16,7 @@ import { CHARACTER_PAINTERS } from './characters.js'
 import { drawBlockBody, drawBarrelBody } from './materials.js'
 
 export { CATAPULT_GEOMETRY, CATAPULT_SKINS } from './engines.js'
+import { CREATURE_PAINTERS } from './creatures.js'
 
 const INK = '#1e1a2b'
 const TAU = Math.PI * 2
@@ -581,6 +582,7 @@ export const PAINTERS = Object.freeze({
   ...CHARACTER_PAINTERS,
   barrel,
   ...projectiles,
+  ...CREATURE_PAINTERS,
   catapult,
   trebuchet,
   'deco.pumpkin': pumpkin,

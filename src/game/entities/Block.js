@@ -58,6 +58,7 @@ export class Block extends Entity {
 
   /** Choc reçu : réduit par le blindage du matériau (explosions et feu passent par damage()). */
   receiveImpact(energy, _other) {
-    return this.damage(energy * this.armor, 'impact')
+    // Gelé, même le fer perd son blindage.
+    return this.damage(energy * (this.frozenMs > 0 ? 1 : this.armor), 'impact')
   }
 }

@@ -10,9 +10,12 @@ test('chaque munition et chaque pouvoir a son niveau tutoriel, un seul par nivea
   const tools = LevelRepository.all().map((l) => l.tutorial).filter(Boolean)
   assert.equal(tools[0], 'aim')
   assert.equal(new Set(tools).size, tools.length, 'pas de doublon')
-  for (const ammo of ['fire', 'boulder', 'bomb', 'split']) assert.ok(tools.includes(`ammo:${ammo}`), ammo)
+  for (const ammo of ['fire', 'boulder', 'frost', 'bomb', 'split']) assert.ok(tools.includes(`ammo:${ammo}`), ammo)
   for (const p of PowerRegistry.all()) assert.ok(tools.includes(`power:${p.id}`), p.id)
-  assert.equal(LevelRepository.tutorialFor(9), 'ammo:fire', 'le feu grégeois arrive au niveau 9')
+  // v5.0 : les munitions arrivent tôt (feu 3, rocher 5, givre 7, bombe 10, mitraille 14).
+  assert.equal(LevelRepository.tutorialFor(3), 'ammo:fire')
+  assert.equal(LevelRepository.tutorialFor(7), 'ammo:frost')
+  assert.equal(LevelRepository.tutorialFor(14), 'ammo:split')
 })
 
 test('niveau tutoriel : la munition présentée reste disponible en Difficile', () => {
@@ -47,9 +50,9 @@ test('pouvoir immédiat (séisme) : pas d’étape de tir', () => {
 test('campagne : toute munition découverte reste disponible ensuite', () => {
   const l = LevelRepository.get(30)
   const fresh = new StoryMode({ completedLevels: 29 }).ammoFor(l, DIFFICULTY.hard)
-  for (const type of ['boulder', 'fire', 'bomb', 'split']) assert.ok(fresh[type] >= 1, type)
-  // Au niveau 5, rien n'a encore été découvert.
-  assert.deepEqual(new StoryMode({ completedLevels: 4 }).ammoFor(LevelRepository.get(5), DIFFICULTY.normal), {})
-  // Un niveau ancien rejoué après la découverte du feu en profite aussi.
-  assert.ok(new StoryMode({ completedLevels: 12 }).ammoFor(LevelRepository.get(3), DIFFICULTY.normal).fire >= 1)
+  for (const type of ['boulder', 'fire', 'frost', 'bomb', 'split']) assert.ok(fresh[type] >= 1, type)
+  // Au niveau 2, rien n'a encore été découvert (le feu arrive au niveau 3).
+  assert.deepEqual(new StoryMode({ completedLevels: 1 }).ammoFor(LevelRepository.get(2), DIFFICULTY.normal), {})
+  // Un niveau ancien rejoué après la découverte du rocher en profite aussi.
+  assert.ok(new StoryMode({ completedLevels: 12 }).ammoFor(LevelRepository.get(3), DIFFICULTY.normal).boulder >= 1)
 })

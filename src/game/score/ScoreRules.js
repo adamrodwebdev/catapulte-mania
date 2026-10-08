@@ -10,13 +10,17 @@ export const SCORE = deepFreeze({
   CHAIN_STEP: 0.1,
   CHAIN_MAX: 2,
   BARREL: 100,
+  /** Prime maximale d'une créature volante (voir Flyer.js). */
+  FLYER_MAX: 400,
 })
 
 /** Points « bruts » de tout ce qui peut être détruit dans le niveau. */
 export function destructibleValue(level) {
   const blocks = level.blocks.reduce((s, b) => s + MATERIALS[b.material].score, 0)
   const targets = level.targets.reduce((s, t) => s + TARGET_TYPES[t.type].score, 0)
-  return { blocks, targets, barrels: level.barrels.length * SCORE.BARREL }
+  // Créatures volantes (v5.0) : comptées au maximum dans les blocs (garde-fou anti-triche).
+  const flyers = (level.flyers?.length ?? 0) * SCORE.FLYER_MAX
+  return { blocks: blocks + flyers, targets, barrels: level.barrels.length * SCORE.BARREL }
 }
 
 /** Score de référence : toutes les cibles + la moitié des blocs, en un seul tir. */

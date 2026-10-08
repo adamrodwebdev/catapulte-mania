@@ -18,7 +18,7 @@ const app = useApp()
 const { state, t } = app
 const profile = computed(() => state.profile)
 const chapters = Array.from({ length: GAME.LEVEL_COUNT / GAME.LEVELS_PER_CHAPTER }, (_, i) => i + 1)
-const POWER_ICONS = { calm: 'wind', titan: 'fist', greekfire: 'flame', volley: 'volley', powder: 'bomb', quake: 'quake' }
+const POWER_ICONS = { falcon: 'eye', titan: 'fist', lodestone: 'magnet', meteor: 'meteor', firestorm: 'flame', lightning: 'bolt', quake: 'quake' }
 
 const chapter = ref(1)
 /** La Chronique : épisodes déjà découverts, à relire. */

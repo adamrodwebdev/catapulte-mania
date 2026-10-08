@@ -162,14 +162,19 @@ test('un bloc en mouvement qui touche une cible la tue', () => {
 
 test('la moindre collision avec un objet en mouvement tue un personnage', () => {
   const w = new PhysicsWorld(new EventBus())
-  const t = w.add(new Target({ type: 'knight', x: 1440, y: G - 27 }))
+  const t = w.add(new Target({ type: 'soldier', x: 1440, y: G - 25 }))
+  const k = w.add(new Target({ type: 'knight', x: 1800, y: G - 27 }))
   settle(w, 200)
   w.add(new Projectile('stone', 200, 200))
-  // Une simple botte de paille qui glisse doucement contre le chevalier.
-  const twig = w.add(new Block({ material: 'straw', x: 1466, y: G - 20, w: 16, h: 40 }))
+  // Une simple botte de paille qui glisse doucement contre le soldat… et contre le chevalier.
+  const twig = w.add(new Block({ material: 'straw', x: 1463, y: G - 20, w: 16, h: 40 }))
   Matter.Body.setVelocity(twig.body, { x: -1.5, y: 0 })
+  const twig2 = w.add(new Block({ material: 'straw', x: 1828, y: G - 20, w: 16, h: 40 }))
+  Matter.Body.setVelocity(twig2.body, { x: -0.6, y: 0 })
   settle(w, 200)
   assert.equal(t.alive, false)
+  // v5.0 : le chevalier en armure encaisse un frôlement.
+  assert.equal(k.alive, true)
 })
 
 test('un personnage immobile au milieu de blocs immobiles reste en vie', () => {

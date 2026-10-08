@@ -1,7 +1,7 @@
-import { CalmPower, TitanPower, GreekFirePower, VolleyPower, PowderPower, QuakePower } from './powers.js'
+import { FalconPower, TitanPower, LodestonePower, MeteorPower, FirestormPower, LightningPower, QuakePower } from './powers.js'
 import { Guard } from '../../core/utils/Guard.js'
 
-const POWERS = Object.freeze([new CalmPower(), new TitanPower(), new GreekFirePower(), new VolleyPower(), new PowderPower(), new QuakePower()])
+const POWERS = Object.freeze([new FalconPower(), new TitanPower(), new LodestonePower(), new MeteorPower(), new FirestormPower(), new LightningPower(), new QuakePower()])
 
 /** Catalogue des pouvoirs spéciaux. */
 export class PowerRegistry {

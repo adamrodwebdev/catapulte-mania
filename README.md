@@ -5,13 +5,15 @@ Réglez l'angle et la puissance, calculez la trajectoire, et faites tomber les f
 
 - 100 niveaux répartis en 10 chapitres : du bois et de la paille au début, puis la pierre, le fer, la brique, le grès, la glace et le marbre, des barils explosifs et de nouveaux projectiles
 - 3 difficultés (Facile, Normal, Difficile : un tir et la moitié des munitions spéciales en moins)
-- 6 pouvoirs spéciaux à débloquer (un seul par tour, chaque utilisation coûte des points)
+- **Terrains vivants** : lacs (le boulet ricoche une fois puis coule), lave (tout fond, sauf le givre qui la fige), neige (le boulet roule et grossit en boule de neige), montagnes indestructibles, corbeaux qui arrêtent les tirs et vouivres porteuses de feu grégeois
+- **6 munitions** débloquées tôt (feu au niveau 3, rocher au 5, givre au 7, bombe au 10, mitraille au 14) ; le rocher **perce** les murs de pierre ; le **givre** rend les blocs cassants, et le feu sur la glace libère une vapeur brûlante
+- 7 pouvoirs spéciaux qui changent la partie (Œil du faucon, Force du Titan, Pierre d'aimant, Météore, Pluie de feu, Colère du ciel, Séisme) : un seul par tour, chaque utilisation coûte des points
 - **Mode libre** : rejouer les niveaux terminés sans limite de tirs ni de munitions
 - **Deux joueurs** sur le même appareil : la campagne à deux en coopération, le duel, le tournoi et le face-à-face, chacun avec ses propres conditions de victoire
 - **Une histoire** : la Chronique, avec quatre personnages en pixel art, une réplique avant chaque niveau et un épisode à chaque chapitre
 - **Tutoriels guidés** : chaque nouvelle munition et chaque nouveau pouvoir s'apprennent dans un niveau dédié
 - **Bande son médiévale** composée en direct, qui s'intensifie aux moments forts
-- **300 succès** : trois défis par niveau, tirés de 18 défis différents (sur le fil, carton, chirurgien, éboulement…)
+- **300 succès** : trois défis par niveau, tirés de 21 défis différents (sur le fil, carton, chirurgien, éboulement…)
 - **Atelier** : de l'or gagné en jouant pour améliorer sa catapulte et changer son apparence
 - Français, English, Bahasa Indonesia
 - Thème clair, thème sombre et mode contraste élevé
@@ -365,7 +367,7 @@ src/
 │   ├── physics/            Monde physique (Matter.js)
 │   ├── entities/           Entity → Block, Projectile, Target, Barrel
 │   ├── levels/             Les 100 niveaux (plans réutilisables), les arènes du face-à-face, les châteaux de duel
-│   ├── powers/             Power → les 6 pouvoirs, PowerRegistry
+│   ├── powers/             Power → les 7 pouvoirs, PowerRegistry
 │   ├── score/              ScoreKeeper, règles de score et d'étoiles
 │   ├── rendering/          Renderer, Camera
 │   ├── assets/             Graphismes (procéduraux ou images, interchangeables)
@@ -459,6 +461,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v4.4.0 | Engins et personnages redessinés : bois veiné, fer, cordes et cuir réalistes ; flou du bras, contrepoids qui se balance, fanion ; personnages qui respirent, clignent des yeux et réagissent aux coups |
 | v4.5.0 | Châteaux aux matières réalistes (pierre, brique, grès, marbre, bois, chaume, fer, vitrail, glace) ; personnages animés et attentifs aux tirs ; sang en particules ; le boulet enflammé embrase ce sur quoi il retombe |
 | v4.6.0 | Châteaux plus lointains, sur plateaux rocheux, avec plus de barils et de défenseurs ; coffre d'or quotidien ; démo de 10 niveaux vitrine ; atelier signalé dès qu'une amélioration est abordable |
+| v5.0.0 | Terrains (lacs, lave, neige, montagnes), corbeaux et vouivres, boulet de givre et vapeur, percée des murs, 7 pouvoirs repensés, munitions débloquées tôt, chevaliers en armure, aide à la visée réactivable en jeu, cris des soldats |
 | v4.2.0 | Qualité des premières minutes (refus CrazyGames) : premier tir réussi, tutoriel en images, tirer-relâcher, barre de commandes compacte, caméra qui garde l'impact visible, trébuchet dès le niveau 4 |
 | v4.1.1 | Versions portails jouables dans le cadre isolé de CrazyGames (script classique unique), démarrage plus robuste |
 | v4.1.0 | Conformité CrazyGames : vidéos récompensées hors du jeu, langue du portail (anglais à défaut), démarrage en un clic, son coupé par le portail |

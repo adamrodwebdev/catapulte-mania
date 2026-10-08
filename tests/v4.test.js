@@ -135,7 +135,7 @@ test('vidéos récompensées en partie : indice et pouvoir offert, une fois chac
   assert.ok(Array.isArray(s.trajectory))
   assert.equal(s.grantHint(RewardTicket.issue('hint')), false, 'une fois par niveau')
   const before = s.score.current
-  assert.ok(s.usePowerFree('calm', RewardTicket.issue('free-power')))
+  assert.ok(s.usePowerFree('falcon', RewardTicket.issue('free-power')))
   assert.equal(s.score.current, before, 'aucun point retiré')
   assert.equal(s.hud.rewards.freePower, false)
   s.fire()

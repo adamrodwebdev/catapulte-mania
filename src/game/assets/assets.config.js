@@ -40,6 +40,10 @@ export const ASSET_MANIFEST = Object.freeze({
   'projectile.fire': { type: 'procedural' },
   'projectile.bomb': { type: 'procedural' },
   'projectile.split': { type: 'procedural' },
+  'projectile.frost': { type: 'procedural' },
+  // Créatures volantes (v5.0)
+  'flyer.crow': { type: 'procedural' },
+  'flyer.wyvern': { type: 'procedural' },
   catapult: { type: 'procedural' },
   trebuchet: { type: 'procedural' },
   // Décor de saison (événements)

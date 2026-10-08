@@ -104,7 +104,7 @@ test('code de défi : données non fiables refusées (format, pouvoirs, engin, d
   assert.throws(() => ReplayCode.decode('<script>'))
   assert.throws(() => ReplayCode.decode('bm90IGpzb24'))
   const enc = (o) => Buffer.from(JSON.stringify(o)).toString('base64url')
-  const ok = { v: 1, day: '', l: 20, e: 'catapult', n: '', a: [['f', 10, 0, 40, 0.8, 11]] }
+  const ok = { v: 2, day: '', l: 20, e: 'catapult', n: '', a: [['f', 10, 0, 40, 0.8, 11]] }
   assert.equal(ReplayCode.decode(enc(ok)).levelId, 20)
   assert.throws(() => ReplayCode.decode(enc({ ...ok, a: [['p', 0, 'titan'], ...ok.a] })), /unknown action/)
   assert.throws(() => ReplayCode.decode(enc({ ...ok, a: [['f', 10, 0, 40, 3, 11]] })))

@@ -56,4 +56,6 @@ export const CATEGORY = deepFreeze({
   TARGET: 0x0004,
   PROJECTILE: 0x0008,
   DEBRIS: 0x0010,
+  /** Créatures volantes (capteurs : elles arrêtent les projectiles sans les faire rebondir). */
+  FLYER: 0x0020,
 })

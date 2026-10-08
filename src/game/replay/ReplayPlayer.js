@@ -54,7 +54,7 @@ export class ReplayPlayer {
     this.#ticks++
     const s = this.#session
     const next = this.#queue[0]
-    if (s.state === STATE.AIMING && next && (next.k === 'f' || next.k === 't' || next.k === 'p') && s.steps - s.aimStep >= next.d) {
+    if (s.state === STATE.AIMING && next && (next.k === 'f' || next.k === 't' || next.k === 'p') && s.steps >= next.d) {
       this.#queue.shift()
       if (next.k === 'p') s.usePower(next.id)
       else {

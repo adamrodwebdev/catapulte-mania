@@ -49,6 +49,7 @@ function onVolume(e, key = 'volume') {
         <ToggleSwitch id="opt-announce" :model-value="s.announcements" :label="t('settings.announcements')" :description="t('settings.announcementsDesc')" @update:model-value="set('announcements')($event)" />
         <ToggleSwitch id="opt-shake" :model-value="s.screenShake" :label="t('settings.screenShake')" @update:model-value="set('screenShake')($event)" />
         <ToggleSwitch id="opt-blood" :model-value="s.blood" :label="t('settings.blood')" :description="t('settings.bloodDesc')" @update:model-value="set('blood')($event)" />
+        <ToggleSwitch id="opt-screams" :model-value="s.screams !== false" :label="t('settings.screams')" :description="t('settings.screamsDesc')" @update:model-value="set('screams')($event)" />
         <ToggleSwitch id="opt-haptics" :model-value="s.haptics" :label="t('settings.haptics')" :description="t('settings.hapticsDesc')" @update:model-value="set('haptics')($event)" />
       </section>
 

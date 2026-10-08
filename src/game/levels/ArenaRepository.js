@@ -41,7 +41,7 @@ const ARENA_SPECS = [
   },
   // 3. Les poudrières : une forteresse et ses deux tours, des barils au cœur.
   {
-    shots: 8, wind: 0.4, theme: 3, ammo: { boulder: 2, bomb: 2, fire: 1 },
+    shots: 8, wind: 0.4, theme: 3, ammo: { boulder: 2, bomb: 2, fire: 1, frost: 1 },
     build(b) {
       BP.fortress(b, { x: 900, floors: 5, side: 3, m: 'brick', top: 'wood', split: 2, s: 'stone', king: true, barrel: true })
     },

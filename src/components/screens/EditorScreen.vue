@@ -250,7 +250,7 @@ onBeforeUnmount(() => ro?.disconnect())
         <fieldset class="field">
           <legend class="field__label">{{ t('game.ammoTitle') }}</legend>
           <div class="editor__ammo">
-            <label v-for="a in ['boulder', 'fire', 'bomb', 'split']" :key="a" class="editor__ammo-item">
+            <label v-for="a in ['boulder', 'fire', 'frost', 'bomb', 'split']" :key="a" class="editor__ammo-item">
               <span>{{ t(`game.ammo.${a}`) }}</span>
               <input class="input" type="number" min="0" max="5" :value="design.ammo[a]" @change="setAmmo(a, Number($event.target.value) || 0)">
             </label>

@@ -22,7 +22,8 @@ export class Projectile extends Entity {
     Guard.oneOf(type, PROJECTILE_NAMES, 'projectile type')
     const t = PROJECTILE_TYPES[type]
     const massFactor = Guard.number(mods.massFactor ?? 1, 'massFactor', { min: 0.1, max: 5 })
-    const radius = mods.radius ?? t.radius
+    const radiusFactor = Guard.number(mods.radiusFactor ?? 1, 'radiusFactor', { min: 0.5, max: 2 })
+    const radius = (mods.radius ?? t.radius) * radiusFactor
     const body = Matter.Bodies.circle(x, y, radius, {
       density: t.density * massFactor,
       friction: 0.4,
@@ -37,10 +38,20 @@ export class Projectile extends Entity {
     this.ignites = Boolean(mods.ignites || t.ignites)
     this.explodes = Boolean(mods.explodes || t.explodes)
     this.splittable = t.splits
+    /** Boulet de givre : gèle ce qui l'entoure à l'impact (v5.0). */
+    this.frost = Boolean(t.frost)
+    /** Pouvoirs (v5.0) : Pierre d'aimant (attiré par les défenseurs), Météore (piqué au toucher). */
+    this.homing = Boolean(mods.homing)
+    this.diveable = Boolean(mods.dive)
+    this.diving = false
+    /** Ricochets sur l'eau (un seul permis) ; boule de neige : facteur de grossissement. */
+    this.skips = 0
+    this.snowScale = 1
+    this.onSnow = false
     /** Améliorations de l'atelier : rayon d'explosion (Poudre fine) et de mise à feu (Poix). */
     this.blastFactor = Guard.number(mods.blastFactor ?? 1, 'blastFactor', { min: 0.5, max: 3 })
     this.fireFactor = Guard.number(mods.fireFactor ?? 1, 'fireFactor', { min: 0.5, max: 3 })
-    this.empowered = massFactor > 1 || Boolean(mods.ignites) || Boolean(mods.explodes)
+    this.empowered = massFactor > 1 || radiusFactor > 1 || Boolean(mods.ignites) || Boolean(mods.explodes) || this.homing || this.diveable
     this.hasImpacted = false
     this.hasSplit = false
     this.ageMs = 0
@@ -57,7 +68,8 @@ export class Projectile extends Entity {
 
   /** Le joueur peut-il déclencher l'action spéciale en vol ? */
   get canActivate() {
-    return this.splittable && !this.hasSplit && !this.hasImpacted && this.alive
+    if (!this.alive || this.hasImpacted) return false
+    return (this.splittable && !this.hasSplit) || (this.diveable && !this.diving)
   }
 
   /** Les projectiles ne subissent pas de dégâts. */

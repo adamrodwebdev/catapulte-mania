@@ -19,7 +19,7 @@ import { deepFreeze, Guard } from '../../core/utils/Guard.js'
  */
 
 /** Pouvoirs déclenchés immédiatement (pas de tir à faire ensuite). */
-const IMMEDIATE = new Set(['quake'])
+const IMMEDIATE = new Set(['quake', 'lightning'])
 
 /**
  * Étapes d'un tutoriel.

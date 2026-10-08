@@ -15,10 +15,12 @@ import { AIM } from '../aim.js'
  * gestes dans le moteur. Les pouvoirs (interdits en défi) sont refusés.
  */
 
-const AMMO = Object.freeze(['stone', 'boulder', 'fire', 'bomb', 'split'])
+const AMMO = Object.freeze(['stone', 'boulder', 'fire', 'bomb', 'split', 'frost'])
 export const MAX_CODE_LENGTH = 4000
 const MAX_ACTIONS = 60
 const STEPS = Schema.int({ min: 0, max: 30000 })
+/** v2 (v5.0) : instants des tirs comptés depuis le début de la partie (pas absolus). */
+const AT = Schema.int({ min: 0, max: 1_000_000 })
 
 const actionSchema = (raw, path) => {
   if (!Array.isArray(raw) || raw.length < 2) throw new ValidationError(path, 'action expected')
@@ -26,7 +28,7 @@ const actionSchema = (raw, path) => {
   if (k === 'f' && raw.length === 6) {
     return {
       k,
-      d: STEPS(raw[1], `${path}.d`),
+      d: AT(raw[1], `${path}.d`),
       a: AMMO[Schema.int({ min: 0, max: AMMO.length - 1 })(raw[2], `${path}.a`)],
       ang: Schema.number({ min: AIM.MIN_ANGLE, max: AIM.MAX_ANGLE })(raw[3], `${path}.ang`),
       pow: Schema.number({ min: 0, max: 1 })(raw[4], `${path}.pow`),
@@ -36,7 +38,7 @@ const actionSchema = (raw, path) => {
   if (k === 't' && raw.length === 5) {
     return {
       k,
-      d: STEPS(raw[1], `${path}.d`),
+      d: AT(raw[1], `${path}.d`),
       a: AMMO[Schema.int({ min: 0, max: AMMO.length - 1 })(raw[2], `${path}.a`)],
       r: Schema.number({ min: 0, max: 5000 })(raw[3], `${path}.r`),
       l: Schema.int({ min: 0, max: 3000 })(raw[4], `${path}.l`),
@@ -48,7 +50,7 @@ const actionSchema = (raw, path) => {
 
 const codeSchema = Schema.object(
   {
-    v: Schema.enum([1]),
+    v: Schema.enum([2]),
     day: Schema.string({ minLength: 0, maxLength: 10, pattern: /^(?:|\d{4}-\d{2}-\d{2})$/ }),
     l: Schema.int({ min: 1, max: GAME.LEVEL_COUNT }),
     e: Schema.enum(['catapult', 'trebuchet']),
@@ -86,7 +88,7 @@ export class ReplayCode {
       if (x.k === 'x') return ['x', x.d]
       throw new ValidationError('log', `action ${x.k} cannot be shared`)
     })
-    const data = { v: 1, day, l: levelId, e: engine, n: PROFILE_NAME.test(name) ? name : '', a }
+    const data = { v: 2, day, l: levelId, e: engine, n: PROFILE_NAME.test(name) ? name : '', a }
     ReplayCode.#validate(data)
     return toBase64Url(JSON.stringify(data))
   }

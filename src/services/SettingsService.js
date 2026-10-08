@@ -31,6 +31,10 @@ const DEFINITIONS = Object.freeze({
   screenShake: { validate: Schema.boolean(), fallback: true },
   // Portails (public familial) : sang désactivé par défaut, remplacé par de la poussière.
   blood: { validate: Schema.boolean(), fallback: !IS_PORTAL },
+  // v5.0 : cris synthétisés des défenseurs qui tombent (désactivables).
+  screams: { validate: Schema.boolean(), fallback: true },
+  // Carte « l'aide à la visée est désactivée » déjà montrée (v5.0).
+  assistTipSeen: { validate: Schema.boolean(), fallback: false },
   volume: { validate: Schema.number({ min: 0, max: 1 }), fallback: 0.7 },
   // Volume de la musique (0 = coupée), séparé des effets sonores.
   music: { validate: Schema.number({ min: 0, max: 1 }), fallback: 0.5 },

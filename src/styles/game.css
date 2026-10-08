@@ -241,7 +241,7 @@
   left: max(var(--space-2), env(safe-area-inset-left));
   right: max(var(--space-2), env(safe-area-inset-right));
   display: grid;
-  grid-template-columns: minmax(14rem, 1.4fr) auto auto;
+  grid-template-columns: minmax(14rem, 1.4fr) auto auto auto;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
@@ -326,6 +326,11 @@
 
 .ammo__item--fire .ammo__icon {
   background: radial-gradient(circle at 50% 60%, #ffe28a, #f07a1a 55%, #a3322b);
+}
+
+.ammo__item--frost .ammo__icon {
+  background: radial-gradient(circle at 35% 30%, #ffffff, #bfe6ff 45%, #4f95c7 85%);
+  box-shadow: 0 0 6px rgba(160, 215, 255, 0.8);
 }
 
 .ammo__item--bomb .ammo__icon {
@@ -559,10 +564,14 @@
 /* ---------- Responsive ---------- */
 @media (max-width: 900px) {
   .hud-bottom {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr auto auto;
     grid-template-areas:
-      'aim fire'
-      'ammo fire';
+      'aim aid fire'
+      'ammo aid fire';
+  }
+
+  .aid-btn {
+    grid-area: aid;
   }
 
   .aim-panel {
@@ -1176,4 +1185,29 @@
   :root:not([data-motion='full']) .end__stars .stars__star {
     animation: none;
   }
+}
+
+/* ---------- Aide à la visée (v5.0) : bouton et carte d'explication ---------- */
+.aid-btn {
+  align-self: end;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border: 2px solid var(--border);
+  color: var(--text-muted, var(--text));
+  box-shadow: var(--shadow);
+}
+.aid-btn--on {
+  border-color: var(--accent);
+  color: var(--accent-text);
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
+}
+.assist-tip__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+}
+.assist-tip__actions .coach__skip {
+  margin: 0;
 }

@@ -72,6 +72,7 @@ export class GameController extends EventBus {
       reducedMotion,
       screenShake: settings.screenShake,
       blood: settings.blood,
+      screams: settings.screams !== false,
       startPower: settings.startPower,
       effects,
       continueOffer,
@@ -110,6 +111,7 @@ export class GameController extends EventBus {
     this.session.options.reducedMotion = reducedMotion
     this.session.camera.shakeEnabled = settings.screenShake && !reducedMotion
     this.session.options.blood = settings.blood
+    this.session.options.screams = settings.screams !== false
     this.session.options.startPower = settings.startPower
     if (this.session.engine === 'trebuchet') {
       this.session.infiniteSwing = settings.infiniteSwing === true && this.session.difficulty !== 'hard'
