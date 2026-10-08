@@ -28,7 +28,7 @@ export class Block extends Entity {
       restitution: m.restitution,
       slop: 0.03,
       angle: def.angle ?? 0,
-      collisionFilter: { category: CATEGORY.BLOCK },
+      collisionFilter: { category: m.static ? CATEGORY.TERRAIN : CATEGORY.BLOCK },
       // Roche du décor : immobile.
       isStatic: Boolean(m.static),
     }

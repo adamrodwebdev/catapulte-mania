@@ -12,6 +12,8 @@ export const SOUND_IDS = Object.freeze([
   'fire', 'victory', 'defeat', 'power', 'click', 'split', 'star', 'gust', 'swing', 'tick',
   // v5.0 : percée, givre, vapeur, eau, neige, créatures, foudre, cris des soldats.
   'breach', 'frost', 'steam', 'splash', 'snow', 'flyer', 'thunder', 'scream',
+  // v5.1 : repère du trébuchet sur la cible, carreau de baliste.
+  'lock', 'bolt',
 ])
 
 export class AudioService {
@@ -243,6 +245,16 @@ export class AudioService {
         this.#noiseHit(out, t, { type: 'highpass', freq: 1800, decay: 0.08, peak: 0.6 })
         this.#noiseHit(out, t + 0.05, { type: 'lowpass', freq: 600, sweepTo: 60, attack: 0.03, decay: 1.6, peak: 0.9 })
         this.#tone(out, t + 0.05, { freq: 48, to: 30, decay: 1.2, peak: 0.5 })
+        break
+      case 'lock':
+        // « C'est le moment » : deux notes claires et montantes.
+        this.#tone(out, t, { type: 'triangle', freq: 988, decay: 0.08, peak: 0.16 })
+        this.#tone(out, t + 0.07, { type: 'triangle', freq: 1480, decay: 0.16, peak: 0.16 })
+        break
+      case 'bolt':
+        // Baliste : claquement de corde tendue et sifflement du carreau.
+        this.#tone(out, t, { type: 'sawtooth', freq: 180, to: 70, attack: 0.002, decay: 0.12, peak: 0.25 })
+        this.#noiseHit(out, t, { type: 'bandpass', freq: 2200, sweepTo: 900, q: 2, attack: 0.01, decay: 0.35, peak: 0.3 })
         break
       case 'scream':
         // L'intensité porte la voix : soldat (aigu), chevalier (grave), roi (entre les deux).

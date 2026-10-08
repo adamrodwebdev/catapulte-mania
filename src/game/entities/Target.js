@@ -30,6 +30,18 @@ export class Target extends Entity {
     this.scoreValue = t.score
     /** Résistance aux chocs et aux chutes (armure du chevalier). */
     this.toughness = t.toughness ?? 1
+    /**
+     * Ronde (v5.1) : le défenseur va et vient autour de sa position de départ
+     * (demi-longueur `patrol`), fait demi-tour devant un mur, un vide ou un
+     * terrain dangereux. Le monde physique le fait marcher (PhysicsWorld#patrol).
+     */
+    this.patrol = Guard.int(def.patrol ?? 0, 'patrol', { min: 0, max: 200 })
+    this.home = def.x
+    this.facing = -1
+    this.walking = false
+    /** Ogre : instant du dernier revers (animation) et prochain revers possible (ms de monde). */
+    this.swatAt = -Infinity
+    this.swatReady = 0
     // Le feu est mortel : une cible qui s'enflamme succombe en 1,5 s environ.
     this.burnDps = (this.maxHp / 1.5) * 1.05
     /** Instant (ms de jeu) du dernier coup encaissé, pour l'animation. */

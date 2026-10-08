@@ -1211,3 +1211,47 @@
 .assist-tip__actions .coach__skip {
   margin: 0;
 }
+
+/* ---------- Trébuchet (v5.1) : barre de visée ---------- */
+.treb-bar {
+  position: relative;
+  height: 12px;
+  margin: 4px 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text) 14%, transparent);
+  overflow: hidden;
+}
+.treb-bar__castle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--success, #3d8a3a) 55%, transparent);
+  border-radius: 4px;
+}
+.treb-bar__mark {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 4px;
+  margin-left: -2px;
+  background: var(--text);
+  border-radius: 2px;
+}
+.treb-bar__mark--on {
+  background: #2f9e3a;
+  box-shadow: 0 0 0 3px rgba(80, 200, 90, 0.45);
+}
+.treb-panel__step--now {
+  color: #2f9e3a;
+  font-weight: 800;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .treb-panel__step--now {
+    animation: treb-now 0.5s ease-in-out infinite alternate;
+  }
+}
+@keyframes treb-now {
+  to {
+    transform: scale(1.08);
+  }
+}

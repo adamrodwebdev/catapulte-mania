@@ -128,7 +128,11 @@ export default {
     unlocksAfter: 'Terbuka setelah {count} level',
     aimHint: 'Tarik ke belakang untuk membidik, lalu tembak.',
     engine: 'Mesin pengepung',
-    engines: { catapult: 'Katapel', trebuchet: 'Trebuset' },
+    engines: {
+      catapult: 'Katapel',
+      trebuchet: 'Trebuset',
+      ballista: 'Balista',
+    },
     treb: {
       arm: 'Klik pertama: jatuhkan pemberat',
       release: 'Klik kedua: lepaskan ambin!',
@@ -139,6 +143,7 @@ export default {
       armBtn: 'Siagakan',
       releaseBtn: 'Lepas!',
       introHint: 'Trebuset: satu klik mengayunkan lengan, klik kedua melepas ambin. Lepas lebih awal untuk tembakan melengkung tinggi, lebih lambat untuk tembakan datar. Kastel lebih jauh, tetapi trebuset menghantam lebih keras.',
+      now: 'Sekarang! Lepaskan!',
     },
     ammo: {
       stone: 'Batu',
@@ -160,6 +165,8 @@ export default {
     aidOn: 'Pemandu bidik: aktif',
     aidOff: 'Pemandu bidik: nonaktif',
     aidToggle: 'Pemandu bidik',
+    ballistaHint: 'Balista: anak panah besi yang cepat dan lurus. Hampir tak terpengaruh angin, menembus setiap dinding yang dihancurkannya dan menembus gunung. Garis bidiknya selalu terlihat.',
+    ballistaLocked: 'Senjata pamungkas: balista terbuka setelah {levels} level dan {stars} bintang.',
   },
   powers: {
     falcon: 'Mata Elang',
@@ -215,6 +222,7 @@ export default {
       'terrain:mountain': 'Gunung menghalangi: tak bisa dihancurkan, tembaklah melengkung di atasnya.',
       'flyer:crow': 'Gagak: menghentikan tembakan yang mengenainya. Tembak jatuh atau pilih waktu yang tepat.',
       'flyer:wyvern': 'Wyvern membawa pot api Yunani: jatuhkan di atas kastel dan potnya membakar kastel.',
+      'target:ogre': 'Ogre: ia memukul balik tembakan ringan dengan gadanya dan mendorong balok yang menimpanya. Gunakan bahan peledak, api, es, atau batu besar.',
     },
   },
   ads: {
@@ -613,6 +621,8 @@ export default {
     ach: 'Setiap level punya tiga pencapaian (menang tanpa peluru khusus, meledakkan semua tong, menjatuhkan raja lebih dulu…). Pencapaian terkumpul dari satu permainan ke permainan berikutnya dan memberi emas.',
     terrainTitle: 'Medan dan makhluk',
     terrain: 'Di danau, tembakan memantul sekali lalu tenggelam. Lava melelehkan semua proyektil kecuali es, yang membekukannya. Di salju, tembakan terus menggelinding dan menjadi bola salju. Gunung tak bisa dihancurkan. Gagak menghentikan tembakan; wyvern yang jatuh menjatuhkan api Yunani. Es membuat balok rapuh, dan api pada benda beku melepaskan uap panas.',
+    enginesTitle: 'Waktu yang tepat untuk trebuset, dan balista',
+    engines: 'Pada trebuset, tanda sasaran menyapu medan selama lengan berayun: lepaskan saat tanda itu menjadi hijau di atas kastel (bunyi denting juga memberi tahu). Balista, senjata pamungkas, terbuka setelah 70 level dan 180 bintang: anak panahnya presisi, sangat kuat, dan menembus gunung.',
   },
   modes: {
     title: 'Mode lainnya',
@@ -754,7 +764,12 @@ export default {
     collapse: 'Dinding penopang runtuh',
     victory: 'Fanfare kemenangan',
     defeat: 'Terompet kekalahan',
-    down: { soldier: 'Prajurit tumbang', knight: 'Ksatria tumbang', king: 'Sang raja telah jatuh' },
+    down: {
+      soldier: 'Prajurit tumbang',
+      knight: 'Ksatria tumbang',
+      king: 'Sang raja telah jatuh',
+      ogre: 'Ogre tumbang',
+    },
     break: {
       brick: 'Bata runtuh',
       sandstone: 'Batu pasir hancur',
@@ -788,6 +803,12 @@ export default {
       crust: 'Lava membeku',
       freeze: 'Danau membeku',
       snow: 'Menggelinding di salju',
+    },
+    launchBallista: 'Tali balista menghentak',
+    onTarget: 'Tepat sasaran: lepaskan sekarang',
+    ogre: {
+      swat: 'Ogre memukul balik tembakan',
+      shove: 'Ogre mendorong sebuah balok',
     },
   },
   a11y: {

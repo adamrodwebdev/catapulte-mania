@@ -13,6 +13,10 @@ export const TARGET_TYPES = deepFreeze({
   soldier: { w: 26, h: 50, hp: 16, density: 0.0012, score: 500, toughness: 1 },
   knight: { w: 30, h: 54, hp: 45, density: 0.0018, score: 800, toughness: 2.2 },
   king: { w: 32, h: 58, hp: 30, density: 0.0014, score: 1500, toughness: 1.4 },
+  // v5.1 : l'ogre, unité lourde. Il renvoie d'un revers les projectiles légers
+  // et repousse les blocs qui lui tombent dessus (voir PhysicsWorld#ogre…) :
+  // il faut l'explosion, le feu, le givre ou un boulet lourd pour l'abattre.
+  ogre: { w: 46, h: 76, hp: 420, density: 0.0032, score: 2000, toughness: 4 },
 })
 
 /**
@@ -33,6 +37,9 @@ export const PROJECTILE_TYPES = deepFreeze({
   split: { radius: 15, density: 0.009, impact: 1, ignites: false, explodes: false, splits: true },
   // v5.0 : boulet de givre. Il gèle tout ce qui l'entoure à l'impact (voir FROST).
   frost: { radius: 17, density: 0.010, impact: 0.9, ignites: false, explodes: false, splits: false, frost: true },
+  // v5.1 : carreau de baliste. Fin, très dense (masse ≈ 20 : il perce la pierre),
+  // peu sensible au vent ; il traverse la roche des montagnes (`bolt`).
+  bolt: { radius: 9, density: 0.08, impact: 2.2, ignites: false, explodes: false, splits: false, bolt: true },
 })
 
 /**

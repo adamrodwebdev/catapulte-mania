@@ -5,6 +5,9 @@
  * tournées vers la droite puis retournées selon `facing`. Le battement d'ailes
  * suit `flap` (0 → 1, un cycle), fourni par l'entité Flyer.
  */
+import { drawOgre } from './ogre.js'
+import { drawBallista } from './ballista.js'
+
 const TAU = Math.PI * 2
 
 function wingSpan(flap) {
@@ -205,7 +208,44 @@ function frostBall(ctx, s) {
   ctx.globalAlpha = 1
 }
 
+/** Carreau de baliste en vol (orienté selon sa vitesse par le Renderer). */
+function boltProjectile(ctx, s) {
+  const px = s.pixel ?? 1
+  ctx.save()
+  ctx.lineCap = 'round'
+  ctx.strokeStyle = '#7b5532'
+  ctx.lineWidth = 4
+  ctx.beginPath()
+  ctx.moveTo(-34, 0)
+  ctx.lineTo(10, 0)
+  ctx.stroke()
+  ctx.fillStyle = '#8e96a3'
+  ctx.beginPath()
+  ctx.moveTo(8, -5)
+  ctx.lineTo(24, 0)
+  ctx.lineTo(8, 5)
+  ctx.closePath()
+  ctx.fill()
+  ctx.lineWidth = 1.2 * px
+  ctx.strokeStyle = 'rgba(30,20,16,0.9)'
+  ctx.stroke()
+  ctx.fillStyle = '#a8673a'
+  for (const side of [-1, 1]) {
+    ctx.beginPath()
+    ctx.moveTo(-34, 0)
+    ctx.lineTo(-22, 0)
+    ctx.lineTo(-28, side * 7)
+    ctx.lineTo(-38, side * 7)
+    ctx.closePath()
+    ctx.fill()
+  }
+  ctx.restore()
+}
+
 export const CREATURE_PAINTERS = Object.freeze({
+  'target.ogre': drawOgre,
+  'projectile.bolt': boltProjectile,
+  ballista: drawBallista,
   'flyer.crow': crow,
   'flyer.wyvern': wyvern,
   'projectile.frost': frostBall,

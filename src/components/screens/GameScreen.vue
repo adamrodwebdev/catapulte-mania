@@ -29,6 +29,7 @@ import ToggleSwitch from '../ui/ToggleSwitch.vue'
 import SegmentedControl from '../ui/SegmentedControl.vue'
 import TrebuchetPanel from '../game/TrebuchetPanel.vue'
 import { TREBUCHET_UNLOCK } from '../../game/Trebuchet.js'
+import { ballistaUnlocked, BALLISTA_UNLOCK } from '../../game/Ballista.js'
 
 const app = useApp()
 const { state, t } = app
@@ -110,12 +111,21 @@ const trebuchetLesson = computed(() => {
 })
 /** Le trébuchet est débloqué après le niveau 13 (jamais au face-à-face : il tire depuis l'arrière). */
 const engineChoice = computed(() => !isVersus.value && !isDefi.value && !trebuchetLesson.value && completedForEngine.value >= TREBUCHET_UNLOCK)
+/** Baliste (v5.1) : réservée aux profils qui ont presque tout gagné (BALLISTA_UNLOCK). */
+const ballistaReady = computed(() => ballistaUnlocked(completedForEngine.value, state.profile?.stars ?? 0))
 const engine = computed(() => {
   // Défis : engin imposé, le même pour tous.
   if (isDaily.value) return state.match.daily?.engine ?? 'catapult'
   if (isChallenge.value) return state.match.challenge?.engine ?? 'catapult'
-  return trebuchetLesson.value || (engineChoice.value && state.settings.engine === 'trebuchet') ? 'trebuchet' : 'catapult'
+  if (trebuchetLesson.value) return 'trebuchet'
+  if (engineChoice.value && state.settings.engine === 'ballista' && ballistaReady.value) return 'ballista'
+  return engineChoice.value && state.settings.engine === 'trebuchet' ? 'trebuchet' : 'catapult'
 })
+const engineOptions = computed(() => [
+  { value: 'catapult', label: t('game.engines.catapult') },
+  { value: 'trebuchet', label: t('game.engines.trebuchet') },
+  ...(ballistaReady.value ? [{ value: 'ballista', label: t('game.engines.ballista') }] : []),
+])
 const isTrebuchet = computed(() => hud.value?.engine === 'trebuchet')
 /** Visée précise (curseurs) : option ; par défaut, on vise dans la scène et une barre fine suffit. */
 const precise = computed(() => state.settings.preciseAim === true)
@@ -924,7 +934,7 @@ const canvasLabel = computed(() =>
       </div>
       <div v-show="phase === 'playing' && !(isChallenge && challengeStage === 'watch')" :class="['hud-bottom', { 'hud-bottom--compact': !precise }]">
         <TrebuchetPanel v-if="isTrebuchet" :hud="hud" />
-        <AimPanel v-else-if="precise" :angle="hud.angle" :power="hud.power" :disabled="!aiming" :coach="coachAnchor" @aim="aim" @nudge="nudge" />
+        <AimPanel v-else-if="precise" :angle="hud.angle" :power="hud.power" :disabled="!aiming" :coach="coachAnchor" :min-angle="hud.engine === 'ballista' ? 0 : 5" :max-angle="hud.engine === 'ballista' ? 60 : 80" @aim="aim" @nudge="nudge" />
         <p v-else class="aim-readout" data-coach="aim" :aria-label="`${t('game.angle')} ${hud.angle}°, ${t('game.power')} ${hud.power} %`">
           <span>{{ hud.angle }}°</span><span class="aim-readout__sep" aria-hidden="true">·</span><span>{{ hud.power }} %</span>
         </p>
@@ -1041,10 +1051,12 @@ const canvasLabel = computed(() =>
         name="intro-engine"
         :label="t('game.engine')"
         :model-value="engine"
-        :options="[{ value: 'catapult', label: t('game.engines.catapult') }, { value: 'trebuchet', label: t('game.engines.trebuchet') }]"
+        :options="engineOptions"
         @update:model-value="chooseEngine"
       />
       <p v-if="engine === 'trebuchet'" class="intro-engine__hint">{{ t('game.treb.introHint') }}</p>
+      <p v-else-if="engine === 'ballista'" class="intro-engine__hint">{{ t('game.ballistaHint') }}</p>
+      <p v-else-if="engineChoice && !ballistaReady" class="intro-engine__hint intro-engine__hint--locked">{{ t('game.ballistaLocked', { levels: BALLISTA_UNLOCK.levels, stars: BALLISTA_UNLOCK.stars }) }}</p>
       <ul v-if="novelties.length" class="novelties">
         <li v-for="n in novelties" :key="n" class="novelties__item">
           <span class="novelties__tag">{{ t('intro.new') }}</span>

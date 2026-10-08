@@ -1,5 +1,6 @@
 import { WORLD } from '../physics/constants.js'
 import { WindLayer } from './WindLayer.js'
+import { drawLake, drawLava } from '../assets/procedural/liquids.js'
 
 /**
  * Rendu Canvas 2D de la scène.
@@ -86,12 +87,14 @@ export class Renderer {
       ctx.translate(e.x, e.y)
       ctx.rotate(e.angle)
       if (e.kind === 'flyer') ctx.rotate(-e.angle)
+      // Carreau de baliste : toujours pointé dans le sens de sa course.
+      if (e.bolt) ctx.rotate(Math.atan2(e.body.velocity.y, e.body.velocity.x) - e.angle)
       assets.draw(ctx, e.assetKey, {
         w: e.width, h: e.height, vertices: e.localVertices, shape: e.shape, damage: e.damageRatio,
         burning: e.burning > 0, time, seed: e.id, pixel,
         extra:
           e.kind === 'target'
-            ? { hurt: time - e.hurtAt < 600 || e.damageRatio > 0.6, team: e.team, still: animate === false, alert, frozen: e.frozenMs > 0 }
+            ? { hurt: time - e.hurtAt < 600 || e.damageRatio > 0.6, team: e.team, still: animate === false, alert, frozen: e.frozenMs > 0, walking: e.walking && e.frozenMs <= 0, facing: e.facing, swing: (scene.worldTime ?? 0) - (e.swatAt ?? -Infinity) }
             : e.kind === 'flyer'
               ? { flap: animate === false ? 0.25 : e.flap, facing: e.facing, carrying: e.carrying }
               : undefined,
@@ -109,7 +112,9 @@ export class Renderer {
       ctx.save()
       ctx.translate(c.x, c.y)
       if (c.dir === -1) ctx.scale(-1, 1)
-      if (c.kind === 'trebuchet') {
+      if (c.kind === 'ballista') {
+        assets.draw(ctx, 'ballista', { w: 170, h: 120, pixel, time, extra: { angle: c.angle, tension: c.tension, load: c.load, skin: c.skin, still: animate === false } })
+      } else if (c.kind === 'trebuchet') {
         // Repère local de l'engin : la fronde est donnée en coordonnées monde.
         const sling = c.rig.sling ? { x: (c.rig.sling.x - c.x) * c.dir, y: c.rig.sling.y - c.y } : null
         const thetaSpeed = this.#angularSpeed(c, c.rig.theta, time)
@@ -122,6 +127,7 @@ export class Renderer {
     }
 
     if (scene.aim) this.#drawAim(ctx, scene.aim, pixel)
+    if (scene.landing) this.#drawLanding(ctx, scene.landing, time, pixel)
 
     scene.particles.draw(ctx, pixel)
 
@@ -184,97 +190,11 @@ export class Renderer {
     const t = animate ? time / 1000 : 0
     ctx.save()
     for (const z of zones) {
-      const w = z.x1 - z.x0
       if (z.kind === 'lake' || z.kind === 'ice') {
-        const ice = z.kind === 'ice'
-        ctx.fillStyle = this.#zoneGradient(ctx, z.kind, G - 4, G + 48, ice ? ['#e4f4fc', '#b9dcef', '#7fb0cc'] : ['#7fb6d9', '#3f7ea8', '#1d4561'], [0, 0.35, 1])
-        ctx.beginPath()
-        ctx.moveTo(z.x0 - 14, G)
-        ctx.quadraticCurveTo(z.x0, G - 5, z.x0 + 12, G - 4)
-        ctx.lineTo(z.x1 - 12, G - 4)
-        ctx.quadraticCurveTo(z.x1, G - 5, z.x1 + 14, G)
-        ctx.lineTo(z.x1 + 14, G + 50)
-        ctx.lineTo(z.x0 - 14, G + 50)
-        ctx.closePath()
-        ctx.fill()
-        ctx.lineWidth = 2 * pixel
-        ctx.strokeStyle = ice ? 'rgba(255,255,255,0.9)' : 'rgba(220,240,255,0.75)'
-        ctx.beginPath()
-        ctx.moveTo(z.x0 + 10, G - 4)
-        ctx.lineTo(z.x1 - 10, G - 4)
-        ctx.stroke()
-        if (ice) {
-          // Fissures fixes (graine : la position du lac).
-          ctx.strokeStyle = 'rgba(90,140,170,0.55)'
-          ctx.lineWidth = 1.2 * pixel
-          ctx.beginPath()
-          for (let x = z.x0 + 30; x < z.x1 - 20; x += 46 + ((x * 7) % 30)) {
-            ctx.moveTo(x, G - 3)
-            ctx.lineTo(x + 10, G + 6)
-            ctx.lineTo(x + 4, G + 14)
-          }
-          ctx.stroke()
-        } else {
-          // Vaguelettes qui glissent.
-          ctx.strokeStyle = 'rgba(235,248,255,0.5)'
-          ctx.lineWidth = 1.5 * pixel
-          ctx.beginPath()
-          for (let i = 0; i < Math.max(2, Math.floor(w / 40)); i++) {
-            const x = z.x0 + 16 + ((i * 53 + t * 18) % Math.max(20, w - 40))
-            const y = G + 6 + ((i * 17) % 22)
-            ctx.moveTo(x, y)
-            ctx.quadraticCurveTo(x + 7, y - 2.5, x + 14, y)
-          }
-          ctx.stroke()
-          // Roseaux sur les berges.
-          ctx.strokeStyle = '#4f6b3a'
-          ctx.lineWidth = 2 * pixel
-          ctx.beginPath()
-          for (const bx of [z.x0 + 4, z.x0 + 11, z.x1 - 6, z.x1 - 13]) {
-            const sway = Math.sin(t * 1.6 + bx) * 2
-            ctx.moveTo(bx, G - 2)
-            ctx.quadraticCurveTo(bx + sway * 0.5, G - 14, bx + sway, G - 26 - ((bx * 3) % 8))
-          }
-          ctx.stroke()
-        }
+        // Eau et glace réalistes (v5.1, voir liquids.js).
+        drawLake(ctx, z, G, t, pixel, z.kind === 'ice')
       } else if (z.kind === 'lava') {
-        ctx.fillStyle = this.#zoneGradient(ctx, 'lava', G - 6, G + 46, ['#ffe08a', '#ff8a2a', '#c23512', '#3d0c06'], [0, 0.18, 0.55, 1])
-        ctx.beginPath()
-        ctx.moveTo(z.x0 - 10, G)
-        ctx.quadraticCurveTo(z.x0, G - 6, z.x0 + 10, G - 5)
-        ctx.lineTo(z.x1 - 10, G - 5)
-        ctx.quadraticCurveTo(z.x1, G - 6, z.x1 + 10, G)
-        ctx.lineTo(z.x1 + 10, G + 50)
-        ctx.lineTo(z.x0 - 10, G + 50)
-        ctx.closePath()
-        ctx.fill()
-        // Croûtes sombres qui dérivent, veines brillantes qui palpitent.
-        ctx.fillStyle = 'rgba(40,14,8,0.55)'
-        for (let x = z.x0 + 14; x < z.x1 - 20; x += 38 + ((x * 11) % 26)) {
-          const dx = Math.sin(t * 0.6 + x) * 4
-          ctx.beginPath()
-          ctx.ellipse(x + dx, G + 2, 9 + ((x * 3) % 7), 2.6, 0, 0, Math.PI * 2)
-          ctx.fill()
-        }
-        ctx.globalCompositeOperation = 'lighter'
-        ctx.globalAlpha = 0.75 + 0.25 * Math.sin(t * 2.2)
-        ctx.fillStyle = this.#zoneGradient(ctx, 'lavaGlow', G - 70, G, ['rgba(255,120,40,0)', 'rgba(255,120,40,0.28)'], [0, 1])
-        ctx.fillRect(z.x0 - 10, G - 70, w + 20, 70)
-        ctx.globalAlpha = 1
-        ctx.globalCompositeOperation = 'source-over'
-        // Bulles qui crèvent.
-        if (animate) {
-          ctx.fillStyle = '#ffd36b'
-          for (let i = 0; i < Math.max(1, Math.floor(w / 90)); i++) {
-            const phase = (t * 0.9 + i * 0.37) % 1
-            const bx = z.x0 + 20 + ((i * 97 + Math.floor(t * 0.9 + i * 0.37) * 41) % Math.max(10, w - 40))
-            ctx.globalAlpha = 1 - phase
-            ctx.beginPath()
-            ctx.arc(bx, G - 3 - phase * 6, 2 + phase * 4, 0, Math.PI * 2)
-            ctx.fill()
-          }
-          ctx.globalAlpha = 1
-        }
+        drawLava(ctx, z, G, t, pixel, animate)
       } else if (z.kind === 'snow') {
         ctx.fillStyle = this.#zoneGradient(ctx, 'snow', G - 14, G + 10, ['#ffffff', '#cfdeeb'], [0, 1])
         ctx.beginPath()
@@ -379,6 +299,40 @@ export class Renderer {
       Object.assign(c, { w, h, g })
     }
     return c.g
+  }
+
+  /**
+   * Trébuchet (v5.1) : repère du point d'impact si l'on lâchait maintenant.
+   * Une colonne de lumière et une cible au sol qui balaient le terrain pendant
+   * le balancier ; verte et plus vive quand elle est sur le château. Sa largeur
+   * traduit l'incertitude (rafales), plus grande en Difficile.
+   */
+  #drawLanding(ctx, l, time, pixel) {
+    const on = l.onCastle
+    const col = on ? '120,230,120' : '255,246,220'
+    const r = 16 + l.spread
+    ctx.save()
+    // Colonne de lumière.
+    const g = ctx.createLinearGradient(0, l.y - 420, 0, l.y)
+    g.addColorStop(0, `rgba(${col},0)`)
+    g.addColorStop(1, `rgba(${col},${on ? 0.35 : 0.18})`)
+    ctx.fillStyle = g
+    ctx.fillRect(l.x - r * 0.6, l.y - 420, r * 1.2, 420)
+    // Cible au point d'impact (ellipse au sol, qui pulse).
+    const pulse = 1 + 0.12 * Math.sin(time / 90)
+    ctx.lineWidth = 3 * pixel
+    ctx.strokeStyle = `rgba(${col},0.95)`
+    ctx.beginPath()
+    ctx.ellipse(l.x, l.y, r * pulse, r * 0.4 * pulse, 0, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.lineWidth = 2 * pixel
+    ctx.beginPath()
+    ctx.moveTo(l.x, l.y - 10)
+    ctx.lineTo(l.x, l.y + 6)
+    ctx.moveTo(l.x - 8, l.y)
+    ctx.lineTo(l.x + 8, l.y)
+    ctx.stroke()
+    ctx.restore()
   }
 
   /** Flèche de visée : direction = angle, longueur = puissance. */

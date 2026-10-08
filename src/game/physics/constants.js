@@ -58,4 +58,6 @@ export const CATEGORY = deepFreeze({
   DEBRIS: 0x0010,
   /** Créatures volantes (capteurs : elles arrêtent les projectiles sans les faire rebondir). */
   FLYER: 0x0020,
+  /** Roche du décor (v5.1) : les carreaux de baliste la traversent (masque de collision). */
+  TERRAIN: 0x0040,
 })

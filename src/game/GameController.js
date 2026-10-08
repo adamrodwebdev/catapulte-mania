@@ -171,7 +171,7 @@ export class GameController extends EventBus {
 
   #sceneWithAim() {
     const scene = this.session.scene()
-    if (this.session.state === STATE.AIMING && this.session.engine === 'catapult') {
+    if (this.session.state === STATE.AIMING && this.session.engine !== 'trebuchet') {
       const c = this.session.catapult
       scene.aim = { ...c.launchPoint, angle: c.angle, power: c.power, dir: c.dir }
     }

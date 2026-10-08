@@ -34,7 +34,7 @@ const SENTRY_SKIP = new Set([28, 68])
  * trébuchet (au-delà de REACH_RIGHT) : il se poste devant (relevé par
  * scripts/check-levels.mjs --engine trebuchet).
  */
-const GUARDS_FRONT = new Set([66])
+const GUARDS_FRONT = new Set([66, 99])
 const REACH_RIGHT = WORLD.WIDTH - 340
 /** Les terrains commencent au-delà de cette abscisse (la catapulte reste sur la terre ferme). */
 const FIELD_LEFT = 480
@@ -52,6 +52,16 @@ export function plateauFor(rank) {
   if (rank <= 40) return rank % 2 ? 60 + ((rank * 7) % 31) : 0
   if (rank <= 70) return rank % 3 === 0 ? 0 : 80 + ((rank * 11) % 61)
   return 110 + ((rank * 13) % 71)
+}
+
+/** Rondes (v5.1) : les gardes au sol patrouillent dès ce niveau, ceux du château à partir du second. */
+export const PATROL_FROM = 6
+export const PATROL_INSIDE_FROM = 12
+
+/** Ogres (v5.1) : un niveau sur trois à partir du 35, tous les niveaux à partir du 85. */
+export function ogresFor(rank) {
+  if (rank >= 85) return 1
+  return rank >= 35 && rank % 3 === 2 ? 1 : 0
 }
 
 /**
@@ -171,12 +181,15 @@ export function applyCurve(b, rank) {
     extra.push({ kind: 'barrel', x, y: surface - h - BARREL.h / 2 - 1 })
   }
   // Gardes : d'abord à l'abri derrière les murs, puis devant.
+  const ogres = ogresFor(rank)
   for (let i = 0; i < guards; i++) {
-    // Chevaliers en armure parmi les gardes dès le niveau 15 (un sur deux).
-    const type = (rank >= 40 && i === guards - 1) || (rank >= 15 && i % 2 === 1) ? 'knight' : 'soldier'
+    // Chevaliers en armure parmi les gardes dès le niveau 15 (un sur deux) ;
+    // ogres (v5.1) devant les murs, à la place des premiers gardes postés devant.
+    let type = (rank >= 40 && i === guards - 1) || (rank >= 15 && i % 2 === 1) ? 'knight' : 'soldier'
+    if (i % 2 === 1 && Math.floor(i / 2) < ogres) type = 'ogre'
     const t = TARGET_TYPES[type]
     const x = slot(i % 2 === 0 ? 1 : -1, t.w)
-    extra.push({ kind: 'target', type, x, y: surface - t.h / 2 - 1 })
+    extra.push({ kind: 'target', type, x, y: surface - t.h / 2 - 1, patrol: rank >= PATROL_FROM ? (type === 'ogre' ? 40 : 60) : 0 })
   }
   // Barils : devant les murs (un tir bien placé ouvre la brèche), puis derrière.
   for (let i = 0; i < barrels; i++) {
@@ -192,10 +205,16 @@ export function applyCurve(b, rank) {
   for (let i = 0; i < (SENTRY_SKIP.has(rank) ? 0 : Math.min(sentries, roofs.length)); i++) {
     const k = roofs[i]
     const t = TARGET_TYPES.soldier
-    extra.push({ kind: 'target', type: 'soldier', x: k.x, y: k.y - k.h / 2 - t.h / 2 - 1 })
+    extra.push({ kind: 'target', type: 'soldier', x: k.x, y: k.y - k.h / 2 - t.h / 2 - 1, patrol: rank >= 30 ? Math.max(0, Math.min(30, Math.floor(k.w / 2 - t.w / 2 - 8))) : 0 })
+  }
+  // Rondes dans le château (v5.1) : un défenseur sur trois va et vient dans sa pièce.
+  if (rank >= PATROL_INSIDE_FROM) {
+    b.targets.forEach((t, i) => {
+      if (t.type !== 'king' && (i + rank) % 3 === 0) t.patrol = 30
+    })
   }
   for (const e of extra) {
-    if (e.kind === 'target') b.targets.push({ type: e.type, x: Math.round(e.x), y: Math.round(e.y) })
+    if (e.kind === 'target') b.targets.push({ type: e.type, x: Math.round(e.x), y: Math.round(e.y), patrol: e.patrol ?? 0 })
     else b.barrels.push({ x: Math.round(e.x), y: Math.round(e.y) })
   }
 

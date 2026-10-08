@@ -13,7 +13,10 @@ const props = defineProps({
 const { t } = useApp()
 
 const armed = computed(() => props.hud.armed)
-const step = computed(() => (armed.value ? 'release' : props.hud.rewinding ? 'rewind' : props.hud.state === 'aiming' ? 'arm' : 'wait'))
+/** Repère d'impact (v5.1) : où tomberait le tir, et où est le château, sur une barre de 0 à 1. */
+const landing = computed(() => (armed.value ? props.hud.landing : null))
+const onTarget = computed(() => Boolean(landing.value?.on))
+const step = computed(() => (armed.value ? (onTarget.value ? 'now' : 'release') : props.hud.rewinding ? 'rewind' : props.hud.state === 'aiming' ? 'arm' : 'wait'))
 /** Aiguille du cadran : 0° à droite (tir tendu), 90° en haut (tir vertical). */
 const needle = computed(() => {
   const a = Math.max(-20, Math.min(110, props.hud.angle))
@@ -32,6 +35,11 @@ const needle = computed(() => {
     </svg>
     <div class="treb-panel__text">
       <p :class="['treb-panel__step', `treb-panel__step--${step}`]">{{ t(`game.treb.${step}`) }}</p>
+      <!-- Barre de visée : la zone du château, et le point d'impact qui la traverse pendant le balancier. -->
+      <div v-if="landing" class="treb-bar" aria-hidden="true">
+        <span class="treb-bar__castle" :style="{ left: `${landing.castle[0] * 100}%`, width: `${Math.max(2, (landing.castle[1] - landing.castle[0]) * 100)}%` }" />
+        <span :class="['treb-bar__mark', { 'treb-bar__mark--on': onTarget }]" :style="{ left: `${landing.at * 100}%` }" />
+      </div>
       <p class="treb-panel__values">
         <span>{{ t('game.treb.angle') }} <strong>{{ armed ? `${hud.angle}°` : '–' }}</strong></span>
         <span>{{ t('game.treb.speed') }} <strong>{{ armed ? `${hud.power} %` : '–' }}</strong></span>
