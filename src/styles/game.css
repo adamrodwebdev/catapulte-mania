@@ -1123,3 +1123,57 @@
 .hud-bottom--compact .fire-btn {
   margin-bottom: 6px;
 }
+
+/* Étoiles de fin de niveau (v4.5) : elles s'allument l'une après l'autre,
+   avec un petit rebond et un éclat doré. */
+.end__stars .stars__star {
+  animation: star-pop 520ms cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+.end__stars .stars__star:nth-child(2) {
+  animation-delay: 260ms;
+}
+.end__stars .stars__star:nth-child(3) {
+  animation-delay: 520ms;
+}
+.end__stars .stars__star--on {
+  animation-name: star-pop, star-glow;
+  animation-duration: 520ms, 1400ms;
+  animation-timing-function: cubic-bezier(0.2, 1.6, 0.4, 1), ease-out;
+  animation-fill-mode: both, both;
+}
+.end__stars .stars__star--on:nth-child(2) {
+  animation-delay: 260ms, 260ms;
+}
+.end__stars .stars__star--on:nth-child(3) {
+  animation-delay: 520ms, 520ms;
+}
+
+@keyframes star-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.2) rotate(-40deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes star-glow {
+  0%,
+  30% {
+    filter: drop-shadow(0 1px 0 var(--c-ink)) drop-shadow(0 0 14px rgba(255, 210, 90, 0.95));
+  }
+  100% {
+    filter: drop-shadow(0 1px 0 var(--c-ink)) drop-shadow(0 0 0 rgba(255, 210, 90, 0));
+  }
+}
+
+:root[data-motion='reduced'] .end__stars .stars__star {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='full']) .end__stars .stars__star {
+    animation: none;
+  }
+}

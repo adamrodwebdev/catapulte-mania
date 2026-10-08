@@ -211,6 +211,7 @@ export class GameController extends EventBus {
   #bindInput() {
     const cv = this.#canvas
     const down = (e) => {
+      this.session.skipIntro()
       this.#audio.unlock()
       if (this.#paused || this.#replayer) return
       // Trébuchet : tout se joue au clic, dès l'appui (1er : balancier, 2e : lâcher).

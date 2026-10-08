@@ -40,11 +40,14 @@ export const LEVEL_SPECS = [
     },
   },
 
-  // 2. Le grenier : trois étages, un soldat à chaque niveau.
+  // 2. Le grenier : trois étages, un soldat à chaque niveau, et un premier
+  //    baril de poudre au rez-de-chaussée (touchez-le : tout saute).
   {
     shots: 3, wind: 0, ammo: {},
     build(b) {
-      garrison(b, b.tower(1450, { floors: 3, roof: 'straw' }))
+      const rooms = b.tower(1450, { floors: 3, roof: 'straw' })
+      garrison(b, rooms)
+      b.barrel(rooms[0], -30)
     },
   },
 

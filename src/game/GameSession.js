@@ -28,6 +28,11 @@ import { RewardTicket } from '../services/ads/RewardTicket.js'
 export const ASSIST_LEVELS = 3
 
 /** États d'une partie. */
+/** Durée du plan d'ouverture sur le château (ms). */
+export const INTRO_CAM_MS = 1600
+/** Durée du gros plan sur l'impact (ms). */
+export const PUNCH_MS = 1000
+
 export const STATE = Object.freeze({
   SETTLING: 'settling',
   AIMING: 'aiming',
@@ -84,6 +89,11 @@ export class GameSession extends EventBus {
   #windRng
   #baseWind = 0
   #slowMo = 0
+  /** Plan d'ouverture : gros plan sur le château avant de revenir à la visée (ms). */
+  #introCam = 0
+  /** Gros plan bref sur le premier impact d'un tir : { x, y, ms } ou null. */
+  #punch = null
+  #punchUsed = false
   /** Dernier tir offert : déjà utilisé ? verdict de défaite en attente. */
   #continued = false
   /** Suivi des rafales (sous-titres, son). */
@@ -150,6 +160,8 @@ export class GameSession extends EventBus {
     Guard.boolean(slowSwing, 'slowSwing')
     Guard.boolean(infiniteSwing, 'infiniteSwing')
     this.#replay = Guard.boolean(replay, 'replay')
+    // Plan d'ouverture (« voici le château à abattre ») sauf en mouvements réduits et en relecture.
+    this.#introCam = reducedMotion || this.#replay ? 0 : INTRO_CAM_MS
     /** Événement saisonnier (décor seulement). */
     this.season = season === 'halloween' || season === 'winter' ? season : null
     /** Balancier infini : option du joueur, jamais en Difficile (ni donc à deux). */
@@ -416,8 +428,14 @@ export class GameSession extends EventBus {
     this.emit('hud', this.hud)
   }
 
+  /** Le joueur prend la main : fin du plan d'ouverture, retour à la vue d'ensemble. */
+  skipIntro() {
+    this.#introCam = 0
+  }
+
   /** Ajustement relatif (clavier, boutons fins). */
   nudge(dAngle, dPower) {
+    this.skipIntro()
     this.aim(this.catapult.angle + dAngle, this.catapult.power + dPower)
   }
 
@@ -529,6 +547,9 @@ export class GameSession extends EventBus {
    * @param {number} [lead] voir trigger()
    */
   fire(lead = 0) {
+    this.#introCam = 0
+    this.#punch = null
+    this.#punchUsed = false
     const player = this.player
     if (this.armed) {
       if (!this.catapult.release(Number.isFinite(lead) ? lead : 0)) return false
@@ -854,23 +875,56 @@ export class GameSession extends EventBus {
     this.emit('end', { won, result, winner, scores, reason, renown: [...this.#renown], mode: this.#mode.id })
   }
 
+  /** Haut actuel du château (blocs et personnages encore debout), pour cadrer au plus près. */
+  #castleRoof() {
+    let top = Infinity
+    for (const e of this.world.entities()) {
+      if (!e.alive || e.x < 600 || (e.kind !== 'block' && e.kind !== 'target' && e.kind !== 'barrel')) continue
+      top = Math.min(top, e.y - e.height / 2)
+    }
+    return Number.isFinite(top) ? top - 40 : this.focus.top
+  }
+
+  /** Milieu vertical des défenseurs encore en vie (plan d'ouverture). */
+  #defendersCenter() {
+    const alive = this.world.filter((e) => e.kind === 'target' && e.alive)
+    if (!alive.length) return { x: (this.#castleLeft() + this.focus.right) / 2, y: WORLD.GROUND_Y - 150 }
+    const xs = alive.map((e) => e.x)
+    const ys = alive.map((e) => e.y)
+    return { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 }
+  }
+
   #updateCamera(dt) {
     const flying = this.#activeProjectiles()
     const treb = this.#engine === 'trebuchet'
-    if (treb && this.armed) {
+    const cam = this.camera
+    // Gros plans (hors face-à-face, où il y a deux châteaux) : personnages et
+    // blocs environ deux fois plus grands qu'en vue d'ensemble.
+    const solo = this.#mode.id !== 'versus'
+    const close = Math.min(1.05, cam.fitScale * 2)
+    const castle = () => cam.frame(this.#castleLeft() - 160, this.focus.right + 70, 0.95, this.#castleRoof())
+    if (this.#punch && this.#punch.ms > 0 && solo) this.#punch.ms -= dt
+    if (this.#introCam > 0 && solo && (this.#state === STATE.AIMING || this.#state === STATE.SETTLING)) {
+      // Plan d'ouverture : d'abord les défenseurs de près, puis on recule vers la visée.
+      this.#introCam = Math.max(0, this.#introCam - dt)
+      const d = this.#defendersCenter()
+      cam.focusOn(d.x, d.y, close)
+    } else if (treb && this.armed) {
       // Balancier : tout le terrain reste visible (le bras ET le château), pour choisir l'instant du lâcher.
-      this.camera.overview()
-    } else if (this.#state === STATE.FLYING && flying.length && this.camera.follow) {
+      cam.overview()
+    } else if (this.#punch && this.#punch.ms > 0 && solo && cam.follow) {
+      cam.focusOn(this.#punch.x, this.#punch.y, close)
+    } else if (this.#state === STATE.FLYING && flying.length && cam.follow) {
       const dir = this.catapult.dir
       const lead = flying.reduce((a, b) => (b.x * dir > a.x * dir ? b : a))
-      this.camera.track(lead.x, lead.y, { keepGround: true })
-    } else if (treb && this.#state === STATE.FLYING && this.camera.follow) {
-      // Le projectile a frappé : la caméra reste sur le château le temps qu'il s'effondre.
-      this.camera.frame(this.#castleLeft() - 250, this.focus.right + 60, 0.8)
+      cam.track(lead.x, lead.y, { keepGround: true })
+    } else if (solo && (this.#state === STATE.FLYING || this.#state === STATE.ENDED) && cam.follow) {
+      // Effondrement puis fin de partie : au plus près de ce qui reste du château.
+      castle()
     } else {
-      this.camera.overview()
+      cam.overview()
     }
-    this.camera.update(dt)
+    cam.update(dt)
   }
 
   /**
@@ -938,6 +992,11 @@ export class GameSession extends EventBus {
     })
     ev.on('impact', ({ entity, energy, x, y, material }) => {
       if (energy < 25) return
+      // Premier gros choc du tir sur le château : bref gros plan sur l'impact.
+      if (!this.#punchUsed && energy > 120 && entity.kind !== 'projectile' && this.#state === STATE.FLYING && !this.options.reducedMotion) {
+        this.#punchUsed = true
+        this.#punch = { x, y, ms: PUNCH_MS }
+      }
       // Éclats, étincelles, gerbes de terre : la matière réagit au choc.
       if (energy > 60) {
         if (entity.kind === 'projectile') {

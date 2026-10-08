@@ -73,13 +73,37 @@ export class Camera {
 
   /**
    * Cadre une portion du terrain, de `left` à `right` (sol calé en bas),
-   * sans zoomer au-delà de `maxScale`. Sert au trébuchet : gros plan sur le
-   * balancier, puis sur le château pendant l'effondrement.
+   * sans zoomer au-delà de `maxScale`. Sert aux gros plans sur le château
+   * (plan d'ouverture, effondrement, fin de partie).
    */
-  frame(left, right, maxScale = 1.1) {
+  frame(left, right, maxScale = 1.1, top = null) {
     if (!this.follow) return
-    const s = Math.min(this.viewW / Math.max(200, right - left), maxScale)
+    let s = Math.min(this.viewW / Math.max(200, right - left), maxScale)
+    // Si le haut de la zone est donné, il doit rester visible sous le bandeau du haut.
+    if (Number.isFinite(top)) s = Math.min(s, this.#usableH / Math.max(100, WORLD.GROUND_Y + 90 - top + 50))
+    // Jamais plus loin que la vue d'ensemble.
+    s = Math.max(s, this.#fitScale())
     this.#target = { x: (left + right) / 2, y: this.#groundY(s), scale: s }
+  }
+
+  /** Échelle de la vue d'ensemble (toute la zone d'intérêt). */
+  get fitScale() {
+    return this.#fitScale()
+  }
+
+  /**
+   * Gros plan sur un point (impact, défenseurs) : le point est placé au centre
+   * de la zone utile, sans jamais montrer le dessous du sol ni zoomer moins
+   * que la vue d'ensemble.
+   */
+  focusOn(px, py, scale) {
+    if (!this.follow || !Number.isFinite(px) || !Number.isFinite(py)) return
+    const fit = this.#fitScale()
+    const s = clamp(Number.isFinite(scale) ? scale : fit, fit, Math.max(fit, 1.1))
+    const halfW = this.viewW / s / 2
+    const x = clamp(px, this.#focus.left - 100 + halfW, Math.max(this.#focus.left - 100 + halfW, this.#focus.right + 300 - halfW))
+    const y = Math.min(py + (this.insetBottom - this.insetTop) / 2 / s, this.#groundY(s))
+    this.#target = { x, y, scale: s }
   }
 
   /** Suit un point (projectile) avec un zoom modéré. */

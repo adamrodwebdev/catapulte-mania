@@ -29,7 +29,8 @@ test('la difficulté augmente : matériaux et munitions par chapitre', () => {
   assert.ok(mats([11, 12, 13, 14, 15]).has('stone'))
   assert.ok(mats([21, 22, 23]).has('iron'))
   assert.deepEqual(LevelRepository.newAmmo(21), ['bomb'])
-  assert.ok(LevelRepository.novelties(13).includes('barrel'))
+  // Le premier baril de poudre arrive dès le niveau 2 (différenciation, v4.5).
+  assert.ok(LevelRepository.novelties(2).includes('barrel'))
 })
 
 test('l’aide à la trajectoire prédit exactement le vol réel', () => {

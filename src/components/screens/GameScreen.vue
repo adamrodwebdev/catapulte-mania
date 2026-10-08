@@ -425,6 +425,7 @@ const fire = () => {
 function aim(kind, value) {
   const s = controller?.session
   if (!s) return
+  s.skipIntro()
   if (kind === 'angle') s.aim(value, s.catapult.power)
   else s.aim(s.catapult.angle, value / 100)
   coachNotify('aim')
