@@ -37,6 +37,10 @@ export const MATERIALS = deepFreeze({
   ice: { density: 0.005, hp: 160, friction: 0.04, restitution: 0.12, flammable: false, score: 60, sound: 'glass', bearing: 0.15 },
   marble: { density: 0.016, hp: 1500, friction: 0.7, restitution: 0.03, flammable: false, score: 160, sound: 'stone', bearing: 0.6 },
   iron: { density: 0.022, hp: 2900, friction: 0.95, restitution: 0.05, flammable: false, score: 250, sound: 'iron', bearing: 0.8, armor: 0.4 },
+  // v4.6 : roche du décor (plateaux, talus, aiguilles). Fixe et indestructible ; jamais proposée dans l'atelier.
+  rock: { density: 0.02, hp: Infinity, friction: 0.9, restitution: 0.02, flammable: false, score: 0, sound: 'stone', bearing: 1, static: true },
 })
 
 export const MATERIAL_NAMES = Object.freeze(Object.keys(MATERIALS))
+/** Matériaux de construction (atelier de châteaux) : tout sauf la roche du décor. */
+export const BUILD_MATERIALS = Object.freeze(MATERIAL_NAMES.filter((m) => !MATERIALS[m].static))

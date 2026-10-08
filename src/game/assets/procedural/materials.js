@@ -363,6 +363,77 @@ const PAINT = {
     g.lineWidth = 2
     g.strokeRect(-w / 2 + 1, -h / 2 + 1, w - 2, h - 2)
   },
+  // Roche du décor (v4.6) : falaise en strates, fissures, herbe et mousse au sommet.
+  rock(g, w, h, r, s) {
+    g.fillStyle = grainPattern(g, 'stone', { x: r.range(0, 128), y: r.range(0, 128) })
+    g.fillRect(-w / 2, -h / 2, w, h)
+    g.fillStyle = 'rgba(88,66,44,0.38)'
+    g.fillRect(-w / 2, -h / 2, w, h)
+    // Strates légèrement ondulées.
+    for (let y = -h / 2 + 10; y < h / 2; y += r.range(10, 18)) {
+      g.beginPath()
+      g.moveTo(-w / 2, y)
+      for (let x = -w / 2; x <= w / 2; x += 12) g.lineTo(x, y + Math.sin(x / 23 + y) * 1.6)
+      g.lineWidth = 1.2
+      g.strokeStyle = 'rgba(40,30,22,0.35)'
+      g.stroke()
+      g.translate(0, 1.4)
+      g.strokeStyle = 'rgba(255,240,220,0.14)'
+      g.lineWidth = 0.7
+      g.stroke()
+      g.translate(0, -1.4)
+    }
+    // Fissures verticales.
+    g.strokeStyle = 'rgba(25,18,12,0.55)'
+    g.lineWidth = 0.9
+    for (let i = 0; i < Math.max(1, Math.round(w / 70)); i++) {
+      let x = r.range(-w / 2 + 6, w / 2 - 6)
+      let y = r.range(-h / 2, 0)
+      g.beginPath()
+      g.moveTo(x, y)
+      for (let k = 0; k < 4; k++) {
+        x += r.range(-4, 4)
+        y += r.range(6, 14)
+        g.lineTo(x, y)
+      }
+      g.stroke()
+    }
+    // Ombre au pied, lumière en haut.
+    const sh = g.createLinearGradient(0, -h / 2, 0, h / 2)
+    sh.addColorStop(0, 'rgba(255,240,215,0.16)')
+    sh.addColorStop(0.5, 'rgba(0,0,0,0)')
+    sh.addColorStop(1, 'rgba(20,14,8,0.4)')
+    g.fillStyle = sh
+    g.fillRect(-w / 2, -h / 2, w, h)
+    // Herbe et mousse : sur le dessus d'un plateau, le long des pentes d'un talus.
+    g.lineCap = 'round'
+    if (s.shape === 'triangle') {
+      g.beginPath()
+      g.moveTo(-w / 2, h / 2)
+      g.lineTo(0, -h / 2)
+      g.lineTo(w / 2, h / 2)
+      g.lineWidth = 7
+      g.strokeStyle = '#4f7a34'
+      g.stroke()
+      g.lineWidth = 2.5
+      g.strokeStyle = '#6c9a46'
+      g.stroke()
+    } else if (!s.spire) {
+      const grass = g.createLinearGradient(0, -h / 2, 0, -h / 2 + 7)
+      grass.addColorStop(0, '#6c9a46')
+      grass.addColorStop(1, '#3f6328')
+      g.fillStyle = grass
+      g.fillRect(-w / 2, -h / 2, w, 6)
+      g.strokeStyle = '#5d8a3b'
+      g.lineWidth = 0.9
+      for (let x = -w / 2 + 2; x < w / 2; x += r.range(2.5, 5)) {
+        g.beginPath()
+        g.moveTo(x, -h / 2 + 4)
+        g.lineTo(x + r.range(-1.5, 1.5), -h / 2 + 4 + r.range(2, 6))
+        g.stroke()
+      }
+    }
+  },
   ice(g, w, h, r) {
     g.globalAlpha = 0.86
     g.fillStyle = grainPattern(g, 'ice', { x: r.range(0, 128), y: r.range(0, 128) })
@@ -417,7 +488,7 @@ function paintBlock(g, material, s, variant) {
   outlinePath(g, s)
   g.save()
   g.clip()
-  ;(PAINT[material] ?? PAINT.stone)(g, s.w, s.h, r)
+  ;(PAINT[material] ?? PAINT.stone)(g, s.w, s.h, r, s)
   // Volume d'ensemble.
   g.restore()
   outlinePath(g, s)

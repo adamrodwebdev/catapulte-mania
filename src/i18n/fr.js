@@ -886,4 +886,21 @@ export default {
       '6': 'Les trônes',
     },
   },
+  login: {
+    title: 'Coffre du jour',
+    intro: 'Revenez chaque jour : les coffres grossissent jusqu’au 7e jour d’affilée.',
+    day: 'Jour {n}',
+    claim: 'Ouvrir le coffre · {gold}',
+    claimed: 'Coffre ouvert : +{gold} pièces d’or !',
+    tomorrow: 'Prochain coffre demain.',
+    broken: 'Série interrompue : on repart du jour 1.',
+    locked: 'L’horloge de l’appareil est antérieure à votre dernier coffre : revenez plus tard.',
+    later: 'Plus tard',
+    spend: 'Dépenser à l’atelier',
+    badge: 'Coffre du jour disponible',
+  },
+  workshopPrompt: {
+    ready: 'Votre or suffit pour améliorer la catapulte : {name} ({cost} pièces).',
+    go: 'Ouvrir l’atelier',
+  },
 }

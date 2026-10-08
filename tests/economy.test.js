@@ -110,7 +110,7 @@ test('une ancienne sauvegarde (v1) est migrée sans perte', () => {
   assert.equal(slot.completedCount, 1)
   assert.equal(slot.gold, 0)
   assert.equal(slot.starCount, 3)
-  assert.equal(slot.toJSON().version, 8)
+  assert.equal(slot.toJSON().version, 9)
 })
 
 test('sauvegarde v2 : améliorations remboursées, or et étoiles conservés', () => {
@@ -146,7 +146,7 @@ test('v3 → v4 : succès renouvelés remis à zéro, or conservé', () => {
   // Or gagné au barème v3.1 (150 par niveau au plus) : 3 niveaux parfaits.
   const legacy = { ...v3, version: 3, legacyGold: 0, gold: 450, goldEarned: 450 }
   const slot = SaveSlot.fromJSON(0, legacy)
-  assert.equal(slot.toJSON().version, 8)
+  assert.equal(slot.toJSON().version, 9)
   assert.equal(slot.achievementCount, 0)
   assert.equal(slot.gold, 450)
   assert.equal(slot.starCount, 9)

@@ -1069,6 +1069,10 @@ const canvasLabel = computed(() =>
         <button v-if="end.gold && state.rewardedAvailable && doubling !== 'done'" type="button" class="btn btn--reward" :disabled="doubling === 'loading' || doubling === 'failed'" @click="doubleGold">
           <AppIcon name="play" />{{ doubling === 'failed' ? t('ads.unavailable') : t('ads.doubleGold') }}
         </button>
+        <p v-if="state.match.mode === 'story' && state.profile?.affordable" class="end__workshop">
+          <AppIcon name="hammer" :size="20" />{{ t('workshopPrompt.ready', { name: t(`workshop.names.${state.profile.affordable.id}`), cost: state.profile.affordable.cost }) }}
+          <button type="button" class="btn btn--small" @click="app.go('workshop')">{{ t('workshopPrompt.go') }}</button>
+        </p>
         <p v-if="end.unlockedPower" class="end__power">
           <AppIcon name="flame" />{{ t('powers.unlocked', { name: t(`powers.${end.unlockedPower}`) }) }}
         </p>

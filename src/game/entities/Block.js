@@ -29,6 +29,8 @@ export class Block extends Entity {
       slop: 0.03,
       angle: def.angle ?? 0,
       collisionFilter: { category: CATEGORY.BLOCK },
+      // Roche du décor : immobile.
+      isStatic: Boolean(m.static),
     }
     const body =
       shape === 'triangle'
@@ -45,6 +47,8 @@ export class Block extends Entity {
     this.catchChance = m.burn?.spread ?? 0.3
     /** Blindage : part des dégâts de choc subis (le fer encaisse mieux). */
     this.armor = m.armor ?? 1
+    /** Élément du décor (roche) : fixe, indestructible, ne rapporte rien. */
+    this.terrain = Boolean(m.static)
   }
 
   /** La durée de combustion dépend du matériau, pas de la source du feu. */

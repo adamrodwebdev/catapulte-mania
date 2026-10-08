@@ -27,6 +27,8 @@ const ANGLES = [10, 20, 30, 40, 50, 60, 70]
 async function loadGame() {
   const { GameSession } = await import('../src/game/GameSession.js')
   const { LevelRepository } = await import('../src/game/levels/LevelRepository.js')
+  // --demo : contrôle des niveaux dans l'ordre de la démo.
+  if (workerData?.demo) LevelRepository.useDemoOrder(true)
   const { TrajectoryPredictor } = await import('../src/game/TrajectoryPredictor.js')
   const { AIM } = await import('../src/game/Catapult.js')
   const { windageOf } = await import('../src/game/physics/WindField.js')
@@ -201,6 +203,7 @@ if (isMainThread) {
   const ids = parseRange(get('--levels'), 100)
   const difficulty = get('--difficulty') || 'hard'
   const engine = get('--engine') === 'trebuchet' ? 'trebuchet' : 'catapult'
+  const demo = args.includes('--demo')
   const workers = Math.max(1, Math.min(availableParallelism(), ids.length))
   const chunks = Array.from({ length: workers }, (_, w) => ids.filter((_, i) => i % workers === w))
   const t0 = Date.now()
@@ -209,7 +212,7 @@ if (isMainThread) {
       chunks.map(
         (chunk) =>
           new Promise((resolve, reject) => {
-            const w = new Worker(fileURLToPath(import.meta.url), { workerData: { ids: chunk, difficulty, engine } })
+            const w = new Worker(fileURLToPath(import.meta.url), { workerData: { ids: chunk, difficulty, engine, demo } })
             const out = []
             w.on('message', (m) => {
               out.push(m)

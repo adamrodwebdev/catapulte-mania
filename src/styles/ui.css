@@ -412,3 +412,114 @@ kbd {
   padding: var(--space-3) var(--space-5) var(--space-5);
   background: linear-gradient(to bottom, color-mix(in srgb, var(--surface) 0%, transparent), var(--surface) 30%);
 }
+
+/* Coffre du jour (v4.6) */
+.login__intro {
+  margin: 0;
+}
+.login__note {
+  margin: 0;
+  color: var(--text-muted);
+}
+.login__days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-1);
+  margin: var(--space-2) 0;
+  padding: 0;
+  list-style: none;
+}
+.login__day {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: var(--space-1) 2px;
+  border: 2px solid color-mix(in srgb, var(--text) 18%, transparent);
+  border-radius: 10px;
+  font-size: var(--fs-0);
+  opacity: 0.75;
+}
+.login__day--done {
+  opacity: 0.45;
+}
+.login__day--done .login__chest {
+  filter: grayscale(0.8);
+}
+.login__day--today {
+  opacity: 1;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+  animation: chest-bob 1.4s ease-in-out infinite;
+}
+.login__day--big .login__chest svg {
+  width: 40px;
+  height: 35px;
+}
+.login .modal__title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+.login__label {
+  font-weight: 700;
+  font-size: 0.68rem;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.login__gold {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-weight: 700;
+}
+.login__result {
+  margin: 0;
+  font-weight: 700;
+  color: var(--text);
+  font-size: var(--fs-2, 1.15rem);
+}
+@keyframes chest-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+:root[data-motion='reduced'] .login__day--today {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='full']) .login__day--today {
+    animation: none;
+  }
+}
+@media (max-width: 520px) {
+  .login__days {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* Atelier signalé quand une amélioration est à portée de bourse (v4.6) */
+.levels__workshop,
+.end__workshop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.end__workshop {
+  margin: 0;
+  font-weight: 600;
+}
+.levels__chest {
+  justify-self: start;
+  animation: chest-bob 1.4s ease-in-out infinite;
+}
+:root[data-motion='reduced'] .levels__chest {
+  animation: none;
+}

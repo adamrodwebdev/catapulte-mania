@@ -41,7 +41,7 @@ Réglez l'angle et la puissance, calculez la trajectoire, et faites tomber les f
 
 ## 1. Essayer le jeu en 30 secondes (la démo)
 
-La **démo** est un seul fichier, `crush-the-castle-demo.html`, qui contient tout le jeu (les 8 premiers niveaux).
+La **démo** est un seul fichier, `crush-the-castle-demo.html`, qui contient tout le jeu : 10 niveaux choisis pour montrer le meilleur (baril, trébuchet, feu, bombe, mitraille, châteaux de fin de partie) et l’atelier d’améliorations.
 
 1. Téléchargez le fichier.
 2. Double-cliquez dessus : il s'ouvre dans votre navigateur (Chrome, Firefox, Edge ou Safari).
@@ -458,6 +458,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v4.3.0 | Rendu modernisé : particules (fumée douce, feu lumineux, échardes, étincelles, explosions avec onde de choc, confettis), décor plus riche (nuages ombrés, arbres, oiseaux, brume), blocs biseautés |
 | v4.4.0 | Engins et personnages redessinés : bois veiné, fer, cordes et cuir réalistes ; flou du bras, contrepoids qui se balance, fanion ; personnages qui respirent, clignent des yeux et réagissent aux coups |
 | v4.5.0 | Châteaux aux matières réalistes (pierre, brique, grès, marbre, bois, chaume, fer, vitrail, glace) ; personnages animés et attentifs aux tirs ; sang en particules ; le boulet enflammé embrase ce sur quoi il retombe |
+| v4.6.0 | Châteaux plus lointains, sur plateaux rocheux, avec plus de barils et de défenseurs ; coffre d'or quotidien ; démo de 10 niveaux vitrine ; atelier signalé dès qu'une amélioration est abordable |
 | v4.2.0 | Qualité des premières minutes (refus CrazyGames) : premier tir réussi, tutoriel en images, tirer-relâcher, barre de commandes compacte, caméra qui garde l'impact visible, trébuchet dès le niveau 4 |
 | v4.1.1 | Versions portails jouables dans le cadre isolé de CrazyGames (script classique unique), démarrage plus robuste |
 | v4.1.0 | Conformité CrazyGames : vidéos récompensées hors du jeu, langue du portail (anglais à défaut), démarrage en un clic, son coupé par le portail |

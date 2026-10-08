@@ -886,4 +886,21 @@ export default {
       '6': 'Para takhta',
     },
   },
+  login: {
+    title: 'Peti harian',
+    intro: 'Kembalilah setiap hari: peti makin besar hingga hari ke-7 berturut-turut.',
+    day: 'Hari {n}',
+    claim: 'Buka peti · {gold}',
+    claimed: 'Peti dibuka: +{gold} emas!',
+    tomorrow: 'Peti berikutnya besok.',
+    broken: 'Rangkaian terputus: kembali ke hari 1.',
+    locked: 'Jam perangkat lebih awal dari peti terakhir Anda: kembalilah nanti.',
+    later: 'Nanti',
+    spend: 'Belanjakan di bengkel',
+    badge: 'Peti harian tersedia',
+  },
+  workshopPrompt: {
+    ready: 'Emas Anda cukup untuk meningkatkan ketapel: {name} ({cost} emas).',
+    go: 'Buka bengkel',
+  },
 }

@@ -2,6 +2,40 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [4.6.0] – 2026-10-08
+### Courbe de difficulté de la campagne
+- **Distance** : les dix premiers niveaux restent proches, puis le château
+  recule progressivement (jusqu'à environ 520 unités au niveau 100), toujours
+  à portée de la catapulte et du trébuchet.
+- **Décor** : nouvelle roche indestructible. À partir du chapitre 3, des
+  châteaux se dressent sur un plateau rocheux bordé de talus (un défenseur
+  qui en tombe ne se relève pas) ; à partir du chapitre 8, tous. Dès le
+  niveau 57, une aiguille rocheuse derrière certains châteaux porte un baril
+  de poudre à faire tomber sur le donjon.
+- **Garnison** : jusqu'à 4 barils et 4 défenseurs de plus (devant les murs et
+  à l'abri derrière), de plus en plus nombreux au fil des chapitres.
+- Les 100 niveaux restent stables et gagnables en Difficile, à la catapulte
+  comme au trébuchet (contrôle automatique).
+
+### Récompenses de connexion
+- Un coffre d'or par jour sur la carte des niveaux, sur un cycle de 7 jours
+  (40 à 250 pièces) ; un jour manqué ramène au jour 1.
+- Sauvegarde version 9, contrôlée : au plus un coffre par jour depuis la
+  création du profil ; remettre l'horloge en arrière ne donne rien.
+
+### Démo
+- 10 niveaux choisis pour montrer le meilleur du jeu : premier tir, baril,
+  point de rupture, trébuchet, boulet de feu, boulets lestés et barils,
+  bombe et fer, mitraille, puis deux châteaux de fin de partie (plateau,
+  aiguille et baril).
+- **Atelier mis en avant** : dès que l'or suffit pour une amélioration, la
+  carte des niveaux et l'écran de victoire le signalent, avec un accès direct.
+
+### Caméra et finitions (4.5.1)
+- Plan d'ouverture sur les défenseurs, gros plan sur le premier impact,
+  cadrage serré sur les ruines ; étoiles de victoire animées ; premier baril
+  dès le niveau 2.
+
 ## [4.5.0] – 2026-10-07
 ### Châteaux aux matières réalistes
 - Chaque bloc reçoit un appareillage ajusté à sa taille, peint à partir de

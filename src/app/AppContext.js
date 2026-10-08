@@ -18,6 +18,7 @@ import { NoAdService } from '../services/ads/AdService.js'
 import { CloudStorageBackend } from '../services/CloudStorageBackend.js'
 import { GAME, PLAYABLE_LEVELS, IS_PORTAL } from '../config/gameConfig.js'
 import { ValidationError } from '../core/utils/Guard.js'
+import { UpgradeCatalog } from '../game/progression/UpgradeCatalog.js'
 
 const KEY = Symbol('app')
 
@@ -255,7 +256,40 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
       cosmetics: slot.cosmetics,
       daily: dailyView(slot),
       endless: { ...slot.endless, unlocked: slot.completedCount >= ENDLESS.UNLOCK },
+      login: slot.loginStatus(),
+      affordable: affordableUpgrade(slot),
     }
+  }
+
+  /**
+   * Amélioration que le joueur peut s'offrir tout de suite (la moins chère),
+   * pour lui signaler l'atelier. null s'il n'y en a aucune.
+   */
+  function affordableUpgrade(slot) {
+    let best = null
+    for (const u of UpgradeCatalog.upgrades()) {
+      const level = slot.upgrades[u.id] ?? 0
+      const cost = u.nextCost(level)
+      if (cost === null || cost > slot.gold || u.nextStars(level) > slot.starCount) continue
+      if (!best || cost < best.cost) best = { id: u.id, cost }
+    }
+    return best
+  }
+
+  /* ----- Récompenses de connexion ----- */
+
+  /** Ouvre le coffre du jour du profil actif ; renvoie l'or reçu (0 si rien). */
+  async function claimLogin() {
+    if (!activeSlot) return 0
+    const gold = activeSlot.claimLogin()
+    if (!gold) return 0
+    try {
+      await saves.save(activeSlot)
+    } catch {
+      return 0
+    }
+    state.profile = profileView(activeSlot)
+    return gold
   }
 
   /** Défi du jour vu par un profil : série en cours, record du jour, derniers jours. */
@@ -670,6 +704,7 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     setDifficulty,
     recordResult,
     workshop,
+    claimLogin,
     startMatch,
     recordCoop,
     recordDaily,

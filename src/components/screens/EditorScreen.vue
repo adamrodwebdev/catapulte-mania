@@ -4,7 +4,7 @@ import { useApp } from '../../app/AppContext.js'
 import AppIcon from '../ui/AppIcon.vue'
 import ModalPanel from '../ui/ModalPanel.vue'
 import { emptyDesign, placePart, removeAt, CastleCode, PARTS, LIMITS, STORAGE_KEYS } from '../../game/editor/CastleDesign.js'
-import { MATERIAL_NAMES } from '../../game/entities/materials.js'
+import { BUILD_MATERIALS } from '../../game/entities/materials.js'
 
 /**
  * Atelier de châteaux (v4.0) : construire, tester, partager.
@@ -218,7 +218,7 @@ onBeforeUnmount(() => ro?.disconnect())
         </button>
       </div>
       <div v-if="PARTS[tool]?.material" class="editor__materials" role="radiogroup" :aria-label="t('editor.materialLabel')">
-        <button v-for="m in MATERIAL_NAMES" :key="m" type="button" role="radio" :aria-checked="material === m" :class="['swatch', `swatch--${m}`, { 'swatch--on': material === m }]" @click="material = m">
+        <button v-for="m in BUILD_MATERIALS" :key="m" type="button" role="radio" :aria-checked="material === m" :class="['swatch', `swatch--${m}`, { 'swatch--on': material === m }]" @click="material = m">
           {{ t(`editor.materials.${m}`) }}
         </button>
       </div>

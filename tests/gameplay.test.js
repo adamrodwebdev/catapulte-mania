@@ -193,3 +193,35 @@ test('étoiles au nombre de tirs : 3 en un tir (deux pour les grands châteaux)'
     assert.equal(new Set(l.achievements).size, 3, `niveau ${l.id} : succès distincts`)
   }
 })
+
+test('démo : vitrine des meilleures mécaniques, chacune présentée à sa première apparition', async () => {
+  const { DEMO_SHOWCASE } = await import('../src/game/levels/LevelRepository.js')
+  LevelRepository.useDemoOrder(true)
+  try {
+    const tut = (id) => LevelRepository.tutorialFor(id)
+    assert.equal(DEMO_SHOWCASE.length, 10)
+    assert.equal(tut(1), 'aim')
+    assert.equal(tut(4), 'engine:trebuchet', 'le trébuchet au 4e niveau de la démo')
+    assert.equal(tut(5), 'ammo:fire')
+    assert.equal(tut(6), 'ammo:boulder')
+    assert.equal(tut(7), 'ammo:bomb')
+    assert.equal(tut(8), 'ammo:split')
+    assert.ok(LevelRepository.get(2).barrels.length >= 1, 'un baril dès le niveau 2')
+    // Les deux derniers niveaux montrent le décor de fin de partie.
+    assert.ok(LevelRepository.get(10).blocks.some((b) => b.material === 'rock'), 'plateau ou aiguille rocheuse')
+  } finally {
+    LevelRepository.useDemoOrder(false)
+  }
+})
+
+test('courbe de difficulté : châteaux plus loin, plus de décor, de barils et de défenseurs', () => {
+  const castleLeft = (l) => Math.min(...l.blocks.filter((b) => b.material !== 'rock').map((b) => b.x - b.w / 2))
+  const avg = (ids, f) => ids.reduce((s, id) => s + f(LevelRepository.get(id)), 0) / ids.length
+  const early = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  const late = [91, 92, 93, 94, 95, 96, 97, 98, 99, 100]
+  assert.ok(avg(late, castleLeft) > avg(early, castleLeft) + 300, 'plus éloignés')
+  assert.ok(avg(late, (l) => l.barrels.length) > avg(early, (l) => l.barrels.length) + 2, 'plus de barils')
+  assert.ok(avg(late, (l) => l.targets.length) > avg(early, (l) => l.targets.length) + 3, 'plus de défenseurs')
+  assert.ok(late.every((id) => LevelRepository.get(id).blocks.some((b) => b.material === 'rock')), 'décor rocheux en fin de partie')
+  assert.ok(early.every((id) => !LevelRepository.get(id).blocks.some((b) => b.material === 'rock')), 'premiers niveaux au sol')
+})

@@ -1,7 +1,7 @@
 import { StructureBuilder } from './StructureBuilder.js'
 import { LEVEL_SPECS } from './levelSpecs.js'
 import { LEVEL_SPECS_2 } from './levelSpecs2.js'
-import { GAME } from '../../config/gameConfig.js'
+import { GAME, IS_DEMO } from '../../config/gameConfig.js'
 import { Schema, Guard, deepFreeze } from '../../core/utils/Guard.js'
 import { MATERIAL_NAMES } from '../entities/materials.js'
 import { TARGET_TYPES, PROJECTILE_NAMES } from '../entities/catalog.js'
@@ -9,6 +9,7 @@ import { referenceScore, maxScore } from '../score/ScoreRules.js'
 import { achievementsFor } from '../progression/Achievements.js'
 import { PowerRegistry } from '../powers/PowerRegistry.js'
 import { TREBUCHET_UNLOCK } from '../Trebuchet.js'
+import { applyCurve } from './LevelCurve.js'
 
 const coord = Schema.number({ min: -500, max: 4000 })
 const size = Schema.number({ min: 6, max: 600 })
@@ -36,9 +37,11 @@ const levelSchema = Schema.object(
  * @param {number} id
  * @param {number} chapter thème du décor (1 à 10)
  */
-export function buildLevel(spec, id, chapter, seedSalt = 0, { tutorial = null } = {}) {
+export function buildLevel(spec, id, chapter, seedSalt = 0, { tutorial = null, rank = null } = {}) {
   const b = new StructureBuilder()
   spec.build(b)
+  // Campagne : distance, décor et garnison selon le rang du niveau (LevelCurve).
+  if (rank) applyCurve(b, rank)
   const data = levelSchema(
     { shots: spec.shots, wind: spec.wind, ammo: { ...spec.ammo }, blocks: b.blocks, targets: b.targets, barrels: b.barrels },
     `level ${id}`,
@@ -64,16 +67,41 @@ export function buildLevel(spec, id, chapter, seedSalt = 0, { tutorial = null } 
 }
 
 /**
+ * Démo (v4.6) : les niveaux qui montrent le meilleur du jeu, dans l'ordre où on
+ * les joue (numéros dans la campagne). Premier tir, baril, point de rupture,
+ * trébuchet, feu, boulets et barils, bombe et fer, mitraille, puis deux
+ * châteaux de fin de partie (plateau rocheux, aiguille et baril).
+ * Les autres niveaux suivent, verrouillés.
+ */
+export const DEMO_SHOWCASE = Object.freeze([1, 2, 3, 4, 9, 13, 21, 25, 35, 63])
+
+/** Ordre de jeu : numéros de campagne des niveaux 1, 2, 3… */
+function playOrder(demo) {
+  const all = Array.from({ length: GAME.LEVEL_COUNT }, (_, i) => i + 1)
+  return demo ? [...DEMO_SHOWCASE, ...all.filter((id) => !DEMO_SHOWCASE.includes(id))] : all
+}
+
+/**
  * Catalogue des niveaux : construit les 100 niveaux une seule fois, les valide,
  * calcule leurs barèmes puis les gèle (lecture seule).
  */
 export class LevelRepository {
   /** @type {ReadonlyArray<object> | null} */
   static #levels = null
+  /** Ordre « démo » (build de démonstration, ou forcé par les outils de contrôle). */
+  static #demo = IS_DEMO
+
+  /** Outils (scripts/check-levels.mjs) : construire le catalogue dans l'ordre de la démo. */
+  static useDemoOrder(on = true) {
+    LevelRepository.#demo = Boolean(on)
+    LevelRepository.#levels = null
+  }
 
   static #build() {
     const seen = new Set()
-    return [...LEVEL_SPECS, ...LEVEL_SPECS_2].map((spec, i) => {
+    const specs = [...LEVEL_SPECS, ...LEVEL_SPECS_2]
+    return playOrder(LevelRepository.#demo).map((source, i) => {
+      const spec = specs[source - 1]
       const id = i + 1
       // Tutoriel : la visée au niveau 1, puis chaque munition et chaque pouvoir
       // dans le niveau où ils apparaissent pour la première fois.
@@ -83,7 +111,8 @@ export class LevelRepository {
       // Le trébuchet a son propre niveau d'apprentissage, juste après son déblocage.
       const engine = id === TREBUCHET_UNLOCK + 1 ? 'engine:trebuchet' : null
       const tutorial = id === 1 ? 'aim' : id === 2 ? 'drag' : fresh.length ? `ammo:${fresh[0]}` : power ? `power:${power.id}` : engine
-      return buildLevel(spec, id, Math.ceil(id / GAME.LEVELS_PER_CHAPTER), 0, { tutorial })
+      // Le décor (chapitre) et la courbe de difficulté suivent le niveau d'origine.
+      return buildLevel(spec, id, Math.ceil(source / GAME.LEVELS_PER_CHAPTER), 0, { tutorial, rank: source })
     })
   }
 

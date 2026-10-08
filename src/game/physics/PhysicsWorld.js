@@ -417,7 +417,7 @@ export class PhysicsWorld {
 
       // Projectile contre mur porteur : le mur peut céder et entraîner les toits.
       const hitBlock = projectile && (a === projectile ? b : a)
-      if (hitBlock?.kind === 'block' && hitBlock.alive) {
+      if (hitBlock?.kind === 'block' && hitBlock.alive && !hitBlock.terrain) {
         const loads = this.structure.onProjectileHit(hitBlock, energy * (hitBlock.armor ?? 1), Body.getVelocity(projectile.body), n)
         if (loads.length) this.#events.emit('structure:collapse', { entity: hitBlock, loads })
       }

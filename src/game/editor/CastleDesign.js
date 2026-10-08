@@ -1,5 +1,5 @@
 import { Schema, ValidationError, deepFreeze } from '../../core/utils/Guard.js'
-import { MATERIAL_NAMES } from '../entities/materials.js'
+import { MATERIAL_NAMES, BUILD_MATERIALS } from '../entities/materials.js'
 import { TARGET_TYPES } from '../entities/catalog.js'
 import { WORLD } from '../physics/constants.js'
 import { buildLevel } from '../levels/LevelRepository.js'
@@ -214,7 +214,7 @@ export class CastleCode {
       const px = Schema.int({ min: ZONE.left, max: ZONE.right })(x[1], `castle.p.${i}.x`)
       const py = Schema.int({ min: ZONE.top, max: WORLD.GROUND_Y })(x[2], `castle.p.${i}.y`)
       if (Boolean(def.material) !== (x.length === 4)) throw new ValidationError(`castle.p.${i}`, 'material mismatch')
-      const m = def.material ? MATERIAL_NAMES[Schema.int({ min: 0, max: MATERIAL_NAMES.length - 1 })(x[3], `castle.p.${i}.m`)] : null
+      const m = def.material ? BUILD_MATERIALS[Schema.int({ min: 0, max: BUILD_MATERIALS.length - 1 })(x[3], `castle.p.${i}.m`)] : null
       return { kind, x: px, y: py, m }
     })
     const design = { name: d.n, theme: d.th, shots: d.s, wind: d.w / 20, ammo: Object.fromEntries(AMMO.map((x, i) => [x, d.a[i] ?? 0])), parts }

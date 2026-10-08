@@ -577,6 +577,7 @@ export const PAINTERS = Object.freeze({
   'block.sandstone': blockPainter('sandstone'),
   'block.ice': blockPainter('ice'),
   'block.marble': blockPainter('marble'),
+  'block.rock': blockPainter('rock'),
   ...CHARACTER_PAINTERS,
   barrel,
   ...projectiles,

@@ -1,3 +1,8 @@
+<script>
+/** Coffre du jour : une proposition par session (pas à chaque retour sur la carte). */
+let loginShown = false
+</script>
+
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useApp } from '../../app/AppContext.js'
@@ -7,6 +12,7 @@ import StarRow from '../ui/StarRow.vue'
 import ScreenHeader from '../ui/ScreenHeader.vue'
 import StoryPanel from '../ui/StoryPanel.vue'
 import { StoryRepository } from '../../game/story/StoryRepository.js'
+import LoginReward from '../ui/LoginReward.vue'
 
 const app = useApp()
 const { state, t } = app
@@ -28,7 +34,19 @@ onMounted(async () => {
     return
   }
   chapter.value = Math.ceil(Math.min(profile.value.next, GAME.LEVEL_COUNT) / GAME.LEVELS_PER_CHAPTER)
+  // Coffre du jour : proposé une fois par session, s'il attend le joueur et
+  // qu'il a déjà joué (un nouveau joueur va d'abord au premier niveau ; le
+  // bouton « coffre disponible » reste visible).
+  if (profile.value.login?.canClaim && profile.value.completed > 0 && !loginShown) {
+    loginShown = true
+    showLogin.value = true
+  }
 })
+
+/** Coffre du jour (récompense de connexion). */
+const showLogin = ref(false)
+/** Amélioration à portée de bourse : on signale l'atelier. */
+const upgradeHint = computed(() => profile.value?.affordable ?? null)
 
 const achCount = (mask) => (mask & 1) + ((mask >> 1) & 1) + ((mask >> 2) & 1)
 const levelsOf = (c) => Array.from({ length: GAME.LEVELS_PER_CHAPTER }, (_, i) => (c - 1) * GAME.LEVELS_PER_CHAPTER + i + 1)
@@ -84,6 +102,15 @@ function onTabKey(e) {
         <span class="gold-badge gold-badge--small"><AppIcon name="coin" :size="16" />{{ profile.gold.toLocaleString(state.locale) }}</span>
       </button>
     </div>
+    <p v-if="upgradeHint" class="notice levels__workshop">
+      <AppIcon name="hammer" :size="20" />
+      <span>{{ t('workshopPrompt.ready', { name: t(`workshop.names.${upgradeHint.id}`), cost: upgradeHint.cost }) }}</span>
+      <button type="button" class="btn btn--small btn--primary" @click="app.go('workshop')">{{ t('workshopPrompt.go') }}</button>
+    </p>
+    <button v-if="profile.login?.canClaim && !showLogin" type="button" class="btn levels__chest" @click="showLogin = true">
+      <AppIcon name="coin" :size="20" />{{ t('login.badge') }}
+    </button>
+    <LoginReward v-if="showLogin" @close="showLogin = false" />
     <p class="field__desc levels__mode-hint">{{ canFree ? (freeMode ? t('levels.freeHint') : '') : t('levels.freeLocked') }}</p>
 
     <div class="tabs" role="tablist" :aria-label="t('levels.title')" @keydown="onTabKey">

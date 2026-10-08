@@ -886,4 +886,21 @@ export default {
       '6': 'The thrones',
     },
   },
+  login: {
+    title: 'Daily chest',
+    intro: 'Come back every day: chests get bigger up to the 7th day in a row.',
+    day: 'Day {n}',
+    claim: 'Open the chest · {gold}',
+    claimed: 'Chest opened: +{gold} gold!',
+    tomorrow: 'Next chest tomorrow.',
+    broken: 'Streak broken: back to day 1.',
+    locked: 'Your device clock is earlier than your last chest: come back later.',
+    later: 'Later',
+    spend: 'Spend at the workshop',
+    badge: 'Daily chest available',
+  },
+  workshopPrompt: {
+    ready: 'You have enough gold to upgrade your catapult: {name} ({cost} gold).',
+    go: 'Open the workshop',
+  },
 }

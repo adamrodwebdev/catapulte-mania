@@ -8,6 +8,7 @@ import { RewardTicket } from '../services/ads/RewardTicket.js'
 import { DAY_KEY, dayNumber, DailyChallenge } from '../game/daily/DailyChallenge.js'
 import { EndlessRun } from './EndlessRun.js'
 import { eventFor, EVENTS } from '../game/events/Season.js'
+import { emptyLogin, loginStatus, claimLogin, checkLogin, LOGIN_CYCLE } from '../game/progression/LoginRewards.js'
 
 /** Nom de profil : lettres (toutes langues), chiffres, espaces, tirets. */
 export const PROFILE_NAME = /^[\p{L}\p{N}][\p{L}\p{N} _'-]{0,15}$/u
@@ -82,6 +83,13 @@ export const saveSchema = Schema.object({
   daily: DAILY,
   // v8 : siège sans fin (meilleur score, plus de châteaux abattus).
   endless: Schema.object({ best: Schema.int({ min: 0, max: 1e9 }), bestWave: Schema.int({ min: 0, max: 10000 }), sieges: COUNTER }),
+  // v9 : récompenses de connexion (dernier coffre ouvert, jour du cycle, total).
+  login: Schema.object({
+    last: Schema.string({ minLength: 0, maxLength: 10, pattern: /^(?:|\d{4}-\d{2}-\d{2})$/ }),
+    day: Schema.int({ min: 0, max: LOGIN_CYCLE.length }),
+    claims: Schema.int({ min: 0, max: 100000 }),
+    gold: GOLD_INT,
+  }),
 })
 
 /**
@@ -95,6 +103,7 @@ export const saveSchema = Schema.object({
  * v5 → v6 : or des vidéos récompensées, à zéro.
  * v6 → v7 : défi du jour, vide.
  * v7 → v8 : siège sans fin, vide.
+ * v8 → v9 : récompenses de connexion, vides.
  * @param {any} raw
  */
 export function migrateSave(raw) {
@@ -121,6 +130,7 @@ export function migrateSave(raw) {
   if (save && typeof save === 'object' && save.version === 5) save = { ...save, version: 6, bonusGold: 0 }
   if (save && typeof save === 'object' && save.version === 6) save = { ...save, version: 7, daily: { last: '', streak: 0, bestStreak: 0, days: {} } }
   if (save && typeof save === 'object' && save.version === 7) save = { ...save, version: 8, endless: { best: 0, bestWave: 0, sieges: 0 } }
+  if (save && typeof save === 'object' && save.version === 8) save = { ...save, version: 9, login: emptyLogin() }
   return save
 }
 
@@ -163,6 +173,7 @@ export class SaveSlot {
       bonusGold: 0,
       daily: { last: '', streak: 0, bestStreak: 0, days: {} },
       endless: { best: 0, bestWave: 0, sieges: 0 },
+      login: emptyLogin(),
     })
     return new SaveSlot(index, data)
   }
@@ -206,6 +217,9 @@ export class SaveSlot {
     if (daily.last && !DAY_KEY.test(daily.last)) throw new ValidationError('save.daily.last', 'invalid day')
     // Siège sans fin : un score ne peut pas dépasser ce que les châteaux abattus permettent.
     if (data.endless.best > data.endless.bestWave * GAME.MAX_LEVEL_SCORE) throw new ValidationError('save.endless.best', 'impossible score')
+    // Coffres de connexion : au plus un par jour depuis la création du profil.
+    const loginError = checkLogin(data.login, data.createdAt)
+    if (loginError) throw new ValidationError('save.login', loginError)
     return new SaveSlot(index, data)
   }
 
@@ -236,7 +250,7 @@ export class SaveSlot {
     if (data.legacyGold > legacyMaxGoldFor(data.levels)) throw new ValidationError('save.legacyGold', 'more gold than possible')
     // L'or des vidéos ne peut jamais dépasser l'or gagnable en jouant (au plus « doublé »).
     if (data.bonusGold > maxGoldFor(data.levels)) throw new ValidationError('save.bonusGold', 'more bonus than possible')
-    if (data.goldEarned > data.legacyGold + maxGoldFor(data.levels) + data.bonusGold) throw new ValidationError('save.goldEarned', 'more gold than possible')
+    if (data.goldEarned > data.legacyGold + maxGoldFor(data.levels) + data.bonusGold + data.login.gold) throw new ValidationError('save.goldEarned', 'more gold than possible')
   }
 
   get index() {
@@ -422,6 +436,28 @@ export class SaveSlot {
     this.#data.goldEarned += bonus
     this.#data.bonusGold += bonus
     return bonus
+  }
+
+  /* ---------- Récompenses de connexion ---------- */
+
+  /** Coffre du jour : disponible ? quel jour du cycle ? (voir LoginRewards) */
+  loginStatus(now = new Date()) {
+    return { ...loginStatus(this.#data.login, now), claims: this.#data.login.claims }
+  }
+
+  /**
+   * Ouvre le coffre du jour (une fois par jour) et crédite l'or.
+   * @returns {number} or reçu (0 si déjà ouvert ou horloge antérieure au dernier coffre)
+   */
+  claimLogin(now = new Date()) {
+    const r = claimLogin(this.#data.login, now)
+    if (!r) return 0
+    const gold = Math.min(r.gold, GOLD.MAX_BALANCE - this.#data.goldEarned)
+    if (gold <= 0) return 0
+    this.#data.login = { ...r.login, gold: this.#data.login.gold + gold }
+    this.#data.gold += gold
+    this.#data.goldEarned += gold
+    return gold
   }
 
   /** L'or de cette victoire peut-il encore être doublé ? */

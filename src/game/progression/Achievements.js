@@ -27,7 +27,9 @@ const GROUND_Y = 900
 const specials = (l) => Object.values(l.ammo || {}).reduce((a, b) => a + b, 0)
 const perched = (l) => l.targets.filter((t) => t.y < GROUND_Y - 140).length
 const hasKing = (l) => l.targets.some((t) => t.type === 'king') && l.targets.length > 1
-const flammable = (l) => l.blocks.filter((b) => b.material === 'wood' || b.material === 'straw').length / Math.max(1, l.blocks.length)
+/** Blocs du château (la roche du décor ne compte pas). */
+const built = (l) => l.blocks.filter((b) => b.material !== 'rock')
+const flammable = (l) => built(l).filter((b) => b.material === 'wood' || b.material === 'straw').length / Math.max(1, built(l).length)
 
 /** Seuils qui montent avec la progression (id de 1 à 100). */
 export const SCALE = Object.freeze({
@@ -60,8 +62,8 @@ export const ACHIEVEMENTS = deepFreeze({
   carton: { family: 'feat', icon: 'target', eligible: (l) => l.targets.length >= 3, test: (r, l) => r.maxShotKills >= SCALE.carton(l), params: (l) => ({ n: SCALE.carton(l) }) },
   opening: { family: 'feat', icon: 'flame', eligible: (l) => l.targets.length >= 4, test: (r, l) => r.firstShotKills >= SCALE.opening(l), params: (l) => ({ n: SCALE.opening(l) }) },
   clean: { family: 'feat', icon: 'crown', eligible: (l) => l.par >= 2, test: (r, l) => r.maxShotKills >= l.targets.length },
-  demolisher: { family: 'feat', icon: 'fist', eligible: (l) => l.blocks.length >= 8, test: (r, l) => r.blocksDestroyed * 100 >= l.blocks.length * SCALE.demolish(l), params: (l) => ({ n: SCALE.demolish(l) }) },
-  surgeon: { family: 'feat', icon: 'help', eligible: (l) => l.blocks.length >= 14, test: (r, l) => r.blocksDestroyed * 100 <= l.blocks.length * SCALE.surgeon(l), params: (l) => ({ n: SCALE.surgeon(l) }) },
+  demolisher: { family: 'feat', icon: 'fist', eligible: (l) => built(l).length >= 8, test: (r, l) => r.blocksDestroyed * 100 >= built(l).length * SCALE.demolish(l), params: (l) => ({ n: SCALE.demolish(l) }) },
+  surgeon: { family: 'feat', icon: 'help', eligible: (l) => built(l).length >= 14, test: (r, l) => r.blocksDestroyed * 100 <= built(l).length * SCALE.surgeon(l), params: (l) => ({ n: SCALE.surgeon(l) }) },
 
   // --- Thème ---
   powder: { family: 'theme', icon: 'bomb', eligible: (l) => l.barrels.length > 0, test: (r, l) => r.barrelsExploded >= l.barrels.length },
@@ -74,8 +76,8 @@ export const ACHIEVEMENTS = deepFreeze({
 
 /** Les trois familles, dans l'ordre des trois succès d'un niveau. */
 const FAMILIES = Object.freeze(['style', 'feat', 'theme'])
-/** Défis de thème propres au contenu du niveau (barils, roi, feu) : prioritaires. */
-const SPECIFIC = Object.freeze(['powder', 'regicide', 'pyro'])
+/** Défis de thème propres au niveau (roi, feu) : prioritaires. Les barils, désormais fréquents (v4.6), entrent dans le tirage commun. */
+const SPECIFIC = Object.freeze(['regicide', 'pyro'])
 
 /**
  * @typedef {{ shotsUsed: number, shotsLeft: number, specialsUsed: number, powersUsed: number,

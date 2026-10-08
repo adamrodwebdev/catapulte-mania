@@ -7,14 +7,14 @@ export const GAME = deepFreeze({
   LEVEL_COUNT: 100,
   LEVELS_PER_CHAPTER: 10,
   SAVE_SLOTS: 3,
-  SAVE_VERSION: 8,
+  SAVE_VERSION: 9,
   LANGUAGES: ['fr', 'en', 'id'],
   DEFAULT_LANGUAGE: 'fr',
   DIFFICULTIES: ['easy', 'normal', 'hard'],
   /** Score maximum théorique d'un niveau (garde-fou contre les valeurs absurdes). */
   MAX_LEVEL_SCORE: 200000,
   /** Mode démo : seuls les premiers niveaux sont jouables. */
-  DEMO_LEVEL_COUNT: 8,
+  DEMO_LEVEL_COUNT: 10,
 })
 
 /**
