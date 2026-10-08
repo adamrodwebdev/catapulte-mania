@@ -2,6 +2,43 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [5.1.0] – 2026-10-08
+### Lacs et lave réalistes
+- Textures calculées une fois au chargement (bruit fractal, cellules de
+  Voronoï) puis animées : eau en profondeur avec rayons de lumière, vase,
+  reflet du ciel et deux couches de vaguelettes, berges mouillées, roseaux et
+  massettes ; glace laiteuse aux bulles et fissures, reflet qui glisse.
+- Lave : magma qui palpite, croûte de basalte en plaques qui dérive, bords
+  encore rouges, bulles qui gonflent puis crèvent, halo et air qui tremble.
+
+### Rondes et ogres
+- **Rondes** : les gardes au sol patrouillent dès le niveau 6, un défenseur sur
+  trois va et vient dans sa pièce dès le niveau 12, les sentinelles des toits
+  dès le 30. Demi-tour devant un mur, au bord du vide, d'un lac ou de la lave.
+- **Ogre** (dès le niveau 35, puis à chaque niveau à partir du 85) : unité
+  lourde qui renvoie d'un revers de massue les projectiles légers et repousse
+  les blocs qui lui tombent dessus. Bombe, feu, givre, boulet lourd ou
+  carreau de baliste en viennent à bout.
+
+### Trébuchet : le bon moment
+- Pendant le balancier, une cible balaie le terrain à l'endroit où tomberait
+  le tir ; elle passe au vert sur le château, avec un tintement et un
+  sous-titre « Sur la cible ». Le panneau montre la même chose sur une barre
+  (zone du château et point d'impact). Plus floue en Difficile.
+
+### Baliste (arme ultime)
+- Débloquée après 70 niveaux ET 180 étoiles. Carreau de fer rapide et tendu,
+  peu sensible au vent, qui perce tous les murs qu'il brise et traverse la
+  roche des montagnes ; ligne de mire toujours affichée. Les munitions
+  spéciales deviennent des carreaux de feu, de givre, de poudre, etc.
+
+### Contrôles
+- 183 tests ; les 100 niveaux restent stables et gagnables en Difficile à la
+  catapulte et au trébuchet, la démo 10/10, et les niveaux 70 à 100 à la
+  baliste. Les défenseurs en ronde marchent presque sans frottement (ils
+  n'entraînent pas les planchers) et ne retardent pas la fin du tour ; au
+  niveau 99, les gardes hors de portée se postent devant le château.
+
 ## [5.0.0] – 2026-10-08
 ### Terrains et créatures
 - **Lacs** (dès le niveau 4) : un boulet qui touche l'eau ricoche une fois,

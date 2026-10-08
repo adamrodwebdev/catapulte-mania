@@ -8,6 +8,9 @@ defineProps({
   disabled: { type: Boolean, default: false },
   /** Élément mis en valeur par le tutoriel (voir Tutorial.js). */
   coach: { type: String, default: '' },
+  /** Bornes de l'angle (la baliste vise de 0 à 60°). */
+  minAngle: { type: Number, default: 5 },
+  maxAngle: { type: Number, default: 80 },
 })
 const emit = defineEmits(['aim', 'nudge'])
 const { t } = useApp()
@@ -26,7 +29,7 @@ function onRange(kind, e) {
       <button type="button" class="btn btn--step" :disabled="disabled" :aria-label="`${t('game.angle')} −1`" @click="emit('nudge', -1, 0)">
         <AppIcon name="minus" :size="18" />
       </button>
-      <input id="aim-angle" class="range range--aim" type="range" min="5" max="80" step="1" :value="angle" :disabled="disabled" :aria-valuetext="`${angle}°`" @input="onRange('angle', $event)">
+      <input id="aim-angle" class="range range--aim" type="range" :min="minAngle" :max="maxAngle" step="1" :value="angle" :disabled="disabled" :aria-valuetext="`${angle}°`" @input="onRange('angle', $event)">
       <button type="button" class="btn btn--step" :disabled="disabled" :aria-label="`${t('game.angle')} +1`" @click="emit('nudge', 1, 0)">
         <AppIcon name="plus" :size="18" />
       </button>

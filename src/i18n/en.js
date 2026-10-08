@@ -128,7 +128,11 @@ export default {
     unlocksAfter: 'Unlocked after {count} levels',
     aimHint: 'Drag backwards to aim, then fire.',
     engine: 'Siege engine',
-    engines: { catapult: 'Catapult', trebuchet: 'Trebuchet' },
+    engines: {
+      catapult: 'Catapult',
+      trebuchet: 'Trebuchet',
+      ballista: 'Ballista',
+    },
     treb: {
       arm: 'First click: drop the counterweight',
       release: 'Second click: release the sling!',
@@ -139,6 +143,7 @@ export default {
       armBtn: 'Arm',
       releaseBtn: 'Release!',
       introHint: 'Trebuchet: one click starts the swing, a second releases the sling. Release early for a high lob, late for a flat shot. The castle is further away, but the trebuchet hits harder.',
+      now: 'Now! Release!',
     },
     ammo: {
       stone: 'Stone',
@@ -160,6 +165,8 @@ export default {
     aidOn: 'Aiming guide: on',
     aidOff: 'Aiming guide: off',
     aidToggle: 'Aiming guide',
+    ballistaHint: 'Ballista: a fast, flat iron bolt. It barely feels the wind, pierces every wall it breaks and flies straight through mountains. Its sight line is always shown.',
+    ballistaLocked: 'Ultimate weapon: the ballista unlocks after {levels} levels and {stars} stars.',
   },
   powers: {
     falcon: 'Falcon’s Eye',
@@ -215,6 +222,7 @@ export default {
       'terrain:mountain': 'A mountain stands in the way: indestructible, you must lob over it.',
       'flyer:crow': 'Crows: they stop any shot that hits them. Shoot them down or time your shot.',
       'flyer:wyvern': 'A wyvern carries a pot of Greek fire: shoot it down above the castle and the pot sets it ablaze.',
+      'target:ogre': 'An ogre: it swats light shots back with its club and shoves away blocks falling on it. Use explosives, fire, frost or a heavy boulder.',
     },
   },
   ads: {
@@ -613,6 +621,8 @@ export default {
     ach: 'Each level offers three achievements (win without special shots, blow up every barrel, take the king first…). They add up from one game to the next and earn gold.',
     terrainTitle: 'Terrain and creatures',
     terrain: 'Lakes make your shot skip once and then sink it. Lava melts every projectile except frost, which hardens it. Snow keeps your shot rolling and turns it into a snowball. Mountains are indestructible. Crows stop your shots; a wyvern drops Greek fire when shot down. Frost makes blocks brittle, and fire on frozen material releases scalding steam.',
+    enginesTitle: 'Trebuchet timing and the ballista',
+    engines: 'With the trebuchet, a target mark sweeps across the battlefield while the arm swings: release when it turns green over the castle (a bright chime also tells you). The ballista, the ultimate weapon, unlocks after 70 levels and 180 stars: its bolt is precise, very powerful and goes straight through mountains.',
   },
   modes: {
     title: 'More modes',
@@ -754,7 +764,12 @@ export default {
     collapse: 'Load-bearing wall gives way',
     victory: 'Victory fanfare',
     defeat: 'Defeat trumpet',
-    down: { soldier: 'Soldier down', knight: 'Knight down', king: 'The king has fallen' },
+    down: {
+      soldier: 'Soldier down',
+      knight: 'Knight down',
+      king: 'The king has fallen',
+      ogre: 'The ogre is down',
+    },
     break: {
       brick: 'Bricks collapsing',
       sandstone: 'Sandstone crumbling',
@@ -788,6 +803,12 @@ export default {
       crust: 'The lava hardens',
       freeze: 'The lake freezes',
       snow: 'Rolls in the snow',
+    },
+    launchBallista: 'Ballista string snaps',
+    onTarget: 'On target: release now',
+    ogre: {
+      swat: 'The ogre swats the shot away',
+      shove: 'The ogre shoves a block away',
     },
   },
   a11y: {

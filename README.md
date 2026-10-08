@@ -7,6 +7,8 @@ Réglez l'angle et la puissance, calculez la trajectoire, et faites tomber les f
 - 3 difficultés (Facile, Normal, Difficile : un tir et la moitié des munitions spéciales en moins)
 - **Terrains vivants** : lacs (le boulet ricoche une fois puis coule), lave (tout fond, sauf le givre qui la fige), neige (le boulet roule et grossit en boule de neige), montagnes indestructibles, corbeaux qui arrêtent les tirs et vouivres porteuses de feu grégeois
 - **6 munitions** débloquées tôt (feu au niveau 3, rocher au 5, givre au 7, bombe au 10, mitraille au 14) ; le rocher **perce** les murs de pierre ; le **givre** rend les blocs cassants, et le feu sur la glace libère une vapeur brûlante
+- **Rondes et ogres** : des défenseurs qui patrouillent, et des ogres qui renvoient les tirs d'un revers de massue
+- **3 engins** : catapulte, trébuchet (une cible au sol indique le bon moment pour lâcher) et, pour les meilleurs joueurs, la **baliste** (70 niveaux et 180 étoiles) dont le carreau traverse les montagnes
 - 7 pouvoirs spéciaux qui changent la partie (Œil du faucon, Force du Titan, Pierre d'aimant, Météore, Pluie de feu, Colère du ciel, Séisme) : un seul par tour, chaque utilisation coûte des points
 - **Mode libre** : rejouer les niveaux terminés sans limite de tirs ni de munitions
 - **Deux joueurs** sur le même appareil : la campagne à deux en coopération, le duel, le tournoi et le face-à-face, chacun avec ses propres conditions de victoire
@@ -462,6 +464,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v4.5.0 | Châteaux aux matières réalistes (pierre, brique, grès, marbre, bois, chaume, fer, vitrail, glace) ; personnages animés et attentifs aux tirs ; sang en particules ; le boulet enflammé embrase ce sur quoi il retombe |
 | v4.6.0 | Châteaux plus lointains, sur plateaux rocheux, avec plus de barils et de défenseurs ; coffre d'or quotidien ; démo de 10 niveaux vitrine ; atelier signalé dès qu'une amélioration est abordable |
 | v5.0.0 | Terrains (lacs, lave, neige, montagnes), corbeaux et vouivres, boulet de givre et vapeur, percée des murs, 7 pouvoirs repensés, munitions débloquées tôt, chevaliers en armure, aide à la visée réactivable en jeu, cris des soldats |
+| v5.1.0 | Lacs et lave réalistes, rondes des défenseurs, ogres, repère d'impact du trébuchet, baliste (arme ultime) |
 | v4.2.0 | Qualité des premières minutes (refus CrazyGames) : premier tir réussi, tutoriel en images, tirer-relâcher, barre de commandes compacte, caméra qui garde l'impact visible, trébuchet dès le niveau 4 |
 | v4.1.1 | Versions portails jouables dans le cadre isolé de CrazyGames (script classique unique), démarrage plus robuste |
 | v4.1.0 | Conformité CrazyGames : vidéos récompensées hors du jeu, langue du portail (anglais à défaut), démarrage en un clic, son coupé par le portail |

@@ -128,7 +128,11 @@ export default {
     unlocksAfter: 'Débloqué après {count} niveaux',
     aimHint: 'Faites glisser vers l’arrière pour viser, puis tirez.',
     engine: 'Engin',
-    engines: { catapult: 'Catapulte', trebuchet: 'Trébuchet' },
+    engines: {
+      catapult: 'Catapulte',
+      trebuchet: 'Trébuchet',
+      ballista: 'Baliste',
+    },
     treb: {
       arm: '1er clic : libérez le contrepoids',
       release: '2e clic : lâchez la fronde !',
@@ -139,6 +143,7 @@ export default {
       armBtn: 'Armer',
       releaseBtn: 'Lâcher !',
       introHint: 'Trébuchet : un clic lance le balancier, un second lâche la fronde. Lâchez tôt pour un tir en cloche, tard pour un tir tendu. Le château est plus loin, mais le trébuchet frappe plus fort.',
+      now: 'Maintenant ! Lâchez !',
     },
     ammo: {
       stone: 'Pierre',
@@ -160,6 +165,8 @@ export default {
     aidOn: 'Aide à la visée : activée',
     aidOff: 'Aide à la visée : désactivée',
     aidToggle: 'Aide à la visée',
+    ballistaHint: 'Baliste : un carreau de fer rapide et tendu. Il sent à peine le vent, perce tous les murs qu’il brise et traverse les montagnes. Sa ligne de mire est toujours affichée.',
+    ballistaLocked: 'Arme ultime : la baliste se débloque après {levels} niveaux et {stars} étoiles.',
   },
   powers: {
     falcon: 'Œil du faucon',
@@ -215,6 +222,7 @@ export default {
       'terrain:mountain': 'Une montagne barre la route : indestructible, il faut tirer en cloche par-dessus.',
       'flyer:crow': 'Des corbeaux : ils arrêtent tout tir qui les touche. Abattez-les ou choisissez votre moment.',
       'flyer:wyvern': 'Une vouivre porte un pot de feu grégeois : abattez-la au-dessus du château et le pot l’embrase.',
+      'target:ogre': 'Un ogre : il renvoie les tirs légers d’un revers de massue et repousse les blocs qui lui tombent dessus. Prenez les explosifs, le feu, le givre ou un rocher.',
     },
   },
   ads: {
@@ -613,6 +621,8 @@ export default {
     ach: 'Chaque niveau propose trois succès (gagner sans boulet spécial, faire sauter tous les barils, abattre le roi en premier…). Ils se cumulent d’une partie à l’autre et rapportent de l’or.',
     terrainTitle: 'Terrains et créatures',
     terrain: 'Sur un lac, le tir ricoche une fois puis coule. La lave fait fondre tout projectile sauf le givre, qui la fige. Dans la neige, le tir roule et devient une boule de neige. Les montagnes sont indestructibles. Les corbeaux arrêtent vos tirs ; une vouivre abattue lâche son feu grégeois. Le givre rend les blocs cassants, et le feu sur ce qui est gelé libère une vapeur brûlante.',
+    enginesTitle: 'Le bon moment au trébuchet, et la baliste',
+    engines: 'Au trébuchet, une cible balaie le terrain pendant le balancier : lâchez quand elle passe au vert sur le château (un tintement clair vous prévient aussi). La baliste, arme ultime, se débloque après 70 niveaux et 180 étoiles : son carreau est précis, très puissant et traverse les montagnes.',
   },
   modes: {
     title: 'Autres modes',
@@ -754,7 +764,12 @@ export default {
     collapse: 'Le mur porteur cède',
     victory: 'Fanfare de victoire',
     defeat: 'Trompette de défaite',
-    down: { soldier: 'Soldat éliminé', knight: 'Chevalier éliminé', king: 'Le roi est tombé' },
+    down: {
+      soldier: 'Soldat éliminé',
+      knight: 'Chevalier éliminé',
+      king: 'Le roi est tombé',
+      ogre: 'L’ogre est abattu',
+    },
     break: {
       brick: 'Briques effondrées',
       sandstone: 'Grès qui s’effrite',
@@ -788,6 +803,12 @@ export default {
       crust: 'La lave se fige',
       freeze: 'Le lac gèle',
       snow: 'Le tir roule dans la neige',
+    },
+    launchBallista: 'La corde de la baliste claque',
+    onTarget: 'Sur la cible : lâchez maintenant',
+    ogre: {
+      swat: 'L’ogre renvoie le tir',
+      shove: 'L’ogre repousse un bloc',
     },
   },
   a11y: {

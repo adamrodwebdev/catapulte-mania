@@ -33,6 +33,7 @@ export const ASSET_MANIFEST = Object.freeze({
   'target.soldier': { type: 'procedural' },
   'target.knight': { type: 'procedural' },
   'target.king': { type: 'procedural' },
+  'target.ogre': { type: 'procedural' },
   // Éléments de gameplay
   barrel: { type: 'procedural' },
   'projectile.stone': { type: 'procedural' },
@@ -46,6 +47,9 @@ export const ASSET_MANIFEST = Object.freeze({
   'flyer.wyvern': { type: 'procedural' },
   catapult: { type: 'procedural' },
   trebuchet: { type: 'procedural' },
+  // v5.1 : baliste et son carreau.
+  ballista: { type: 'procedural' },
+  'projectile.bolt': { type: 'procedural' },
   // Décor de saison (événements)
   'deco.pumpkin': { type: 'procedural' },
   'deco.snow': { type: 'procedural' },

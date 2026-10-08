@@ -47,6 +47,10 @@ export const BREACH_LIGHT_HP = 300
 /** Masse à partir de laquelle un projectile perce aussi la pierre (rocher : ≈ 29, pierre : ≈ 8). */
 export const BREACH_HEAVY_MASS = 20
 
+/** Rondes (v5.1) : vitesse de marche (px par pas à 60 Hz) et délai entre deux revers de l'ogre (ms). */
+export const PATROL_SPEED = 0.55
+export const OGRE_SWAT_MS = 900
+
 export class PhysicsWorld {
   /** @type {Map<number, import('../entities/Entity.js').Entity>} */
   #entities = new Map()
@@ -188,6 +192,7 @@ export class PhysicsWorld {
     this.#flushSpawns()
     this.#rollSnowballs()
     this.#processSteam()
+    if (this.settled) this.#patrol()
     this.#fireTick += WORLD.STEP_MS
     if (this.#fireTick >= 400) {
       this.#fireTick = 0
@@ -253,7 +258,7 @@ export class PhysicsWorld {
     const blocks = this.filter((e) => e.kind === 'block' && e.alive).map((e) => e.body)
     if (!blocks.length) return
     const d = WORLD.PIN_PROBE
-    for (const t of this.filter((e) => e.kind === 'target' && e.alive)) {
+    for (const t of this.filter((e) => e.kind === 'target' && e.alive && e.type !== 'ogre')) {
       const b = t.body.bounds
       const w = b.max.x - b.min.x
       const h = b.max.y - b.min.y
@@ -272,6 +277,8 @@ export class PhysicsWorld {
   isAtRest(threshold = 0.12) {
     for (const e of this.#entities.values()) {
       if (e.kind === 'projectile') return false
+      // Un défenseur qui fait sa ronde n'empêche pas le tour de se terminer.
+      if (e.walking && e.alive) continue
       if (!e.body.isSleeping && e.speed > threshold) return false
     }
     return this.#pendingExplosions.length === 0
@@ -475,6 +482,10 @@ export class PhysicsWorld {
       const n = pair.collision.normal
       const rel = Math.abs((va.x - vb.x) * n.x + (va.y - vb.y) * n.y)
 
+      // Ogre : il renvoie les projectiles légers et repousse les blocs qui lui tombent dessus.
+      const ogre = a?.type === 'ogre' ? a : b?.type === 'ogre' ? b : null
+      if (ogre && this.#ogreReacts(ogre, ogre === a ? b : a, pair)) continue
+
       // Créature volante : elle stoppe le projectile (capteur, pas de rebond).
       if (a?.kind === 'flyer' || b?.kind === 'flyer') {
         const flyer = a?.kind === 'flyer' ? a : b
@@ -641,6 +652,102 @@ export class PhysicsWorld {
     if (!due.length) return
     this.#steamQueue = this.#steamQueue.filter((s) => s.at > this.#time)
     for (const s of due) this.#steam(s.e)
+  }
+
+  /**
+   * Rondes : chaque défenseur qui patrouille marche à petite vitesse, debout,
+   * et fait demi-tour au bout de sa ronde, devant un mur ou un objet, au bord
+   * du vide, ou au bord d'un lac et de la lave. Gelé, renversé ou en l'air, il s'arrête.
+   */
+  #patrol() {
+    for (const t of this.#entities.values()) {
+      if (t.kind !== 'target' || !t.alive || !(t.patrol > 0)) continue
+      const upright = Math.abs(Math.atan2(Math.sin(t.angle), Math.cos(t.angle))) < 0.25
+      const v = Body.getVelocity(t.body)
+      if (t.frozenMs > 0 || !upright || Math.abs(v.y) > 0.6 || t.burning > 0) {
+        this.#stopWalking(t)
+        continue
+      }
+      const dir = t.facing
+      const halfW = t.width / 2
+      const feet = t.y + t.height / 2
+      const ahead = t.x + dir * (halfW + 7)
+      const out = Math.abs(t.x + dir * 2 - t.home) > t.patrol
+      const wall = this.#blocked(ahead, t.y, t) || this.#blocked(ahead, t.y - t.height * 0.3, t)
+      const floor = feet >= WORLD.GROUND_Y - 3 ? !this.terrain.at(ahead) || this.terrain.at(ahead).kind === 'snow' : this.#blocked(ahead, feet + 6, t)
+      if (out || wall || !floor) {
+        t.facing = -dir
+        Body.setVelocity(t.body, { x: 0, y: v.y })
+        this.#stopWalking(t)
+        continue
+      }
+      const speed = PATROL_SPEED / Math.sqrt(t.toughness ?? 1)
+      Sleeping.set(t.body, false)
+      // En marche, presque sans frottement : le défenseur n'entraîne pas le
+      // plancher sous ses pas (sinon un étage posé sur des piliers glisserait).
+      t.body.friction = 0.01
+      t.body.frictionStatic = 0.05
+      Body.setVelocity(t.body, { x: dir * speed, y: v.y })
+      Body.setAngularVelocity(t.body, 0)
+      t.walking = true
+    }
+  }
+
+  #stopWalking(t) {
+    if (!t.walking) return
+    t.walking = false
+    t.body.friction = 0.9
+    t.body.frictionStatic = 1.5
+  }
+
+  /** Un bloc, un baril ou un autre défenseur occupe-t-il ce point ? */
+  #blocked(x, y, self) {
+    for (const e of this.#entities.values()) {
+      if (e === self || !e.alive || (e.kind !== 'block' && e.kind !== 'barrel' && e.kind !== 'target')) continue
+      const b = e.body.bounds
+      if (x < b.min.x || x > b.max.x || y < b.min.y || y > b.max.y) continue
+      if (Vertices.contains(e.body.vertices, { x, y })) return true
+    }
+    return false
+  }
+
+  /**
+   * L'ogre (v5.1) réagit à ce qui le heurte :
+   *  - un projectile LÉGER (pierre, mitraille ; ni bombe, ni feu, ni givre, ni
+   *    boulet lourd) est renvoyé d'un revers, sans lui faire de mal ;
+   *  - un bloc qui lui tombe dessus est repoussé de côté (il ne meurt pas écrasé).
+   * Gelé, il ne réagit plus. Un revers par OGRE_SWAT_MS.
+   * @returns {boolean} vrai si le contact est entièrement traité ici
+   */
+  #ogreReacts(ogre, other, pair) {
+    if (!ogre.alive || !other || !other.alive || ogre.frozenMs > 0 || this.#time < ogre.swatReady) return false
+    if (other.kind === 'projectile') {
+      if (other.explodes || other.ignites || other.frost || other.diving || other.mass >= BREACH_HEAVY_MASS) return false
+      const v = Body.getVelocity(other.body)
+      const side = Math.sign(other.x - ogre.x) || -1
+      pair.isActive = false
+      Body.setVelocity(other.body, { x: side * Math.max(5, Math.abs(v.x) * 0.75), y: -Math.max(4, Math.abs(v.y) * 0.45) })
+      other.hasImpacted = true
+      this.#swatted(ogre, 'swat', other)
+      return true
+    }
+    if (other.kind === 'block' && !other.terrain && other.y < ogre.y - ogre.height * 0.25 && other.speed > 0.3) {
+      const side = Math.sign(other.x - ogre.x) || 1
+      pair.isActive = false
+      Sleeping.set(other.body, false)
+      Body.setVelocity(other.body, { x: side * Math.max(3, 9 / Math.sqrt(Math.max(1, other.mass / 20))), y: -2.5 })
+      Body.setAngularVelocity(other.body, side * 0.08)
+      this.#swatted(ogre, 'shove', other)
+      return true
+    }
+    return false
+  }
+
+  #swatted(ogre, kind, other) {
+    ogre.swatAt = this.#time
+    ogre.swatReady = this.#time + OGRE_SWAT_MS
+    ogre.facing = Math.sign(other.x - ogre.x) || -1
+    this.#events.emit('ogre', { kind, entity: ogre, other, x: ogre.x, y: ogre.y - ogre.height / 2 })
   }
 
   /** Une créature volante est touchée : elle tombe et stoppe le projectile. */

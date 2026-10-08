@@ -26,7 +26,11 @@ const levelSchema = Schema.object(
       Schema.object({ material: Schema.enum(MATERIAL_NAMES), x: coord, y: coord, w: size, h: size, shape: Schema.enum(['rect', 'triangle']) }),
       { maxLength: 200 },
     ),
-    targets: Schema.array(Schema.object({ type: Schema.enum(Object.keys(TARGET_TYPES)), x: coord, y: coord }), { maxLength: 20 }),
+    targets: Schema.array(
+      // patrol (v5.1) : demi-longueur de la ronde (0 = immobile).
+      Schema.object({ type: Schema.enum(Object.keys(TARGET_TYPES)), x: coord, y: coord, patrol: Schema.optional(Schema.int({ min: 0, max: 200 }), 0) }),
+      { maxLength: 20 },
+    ),
     barrels: Schema.array(Schema.object({ x: coord, y: coord }), { maxLength: 20 }),
     // v5.0 : terrains du sol et créatures volantes.
     zones: Schema.array(Schema.object({ kind: Schema.enum(ZONE_KINDS), x0: coord, x1: coord }), { maxLength: 6 }),

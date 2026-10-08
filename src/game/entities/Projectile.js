@@ -29,7 +29,8 @@ export class Projectile extends Entity {
       friction: 0.4,
       frictionAir: 0.0006,
       restitution: 0.15,
-      collisionFilter: { category: CATEGORY.PROJECTILE },
+      // Carreau de baliste : il ne heurte pas la roche du décor (il la traverse).
+      collisionFilter: { category: CATEGORY.PROJECTILE, mask: t.bolt ? 0xffffffff & ~CATEGORY.TERRAIN : 0xffffffff },
     })
     super({ kind: 'projectile', body, assetKey: `projectile.${type}`, width: radius * 2, height: radius * 2 })
     this.type = type
@@ -37,9 +38,11 @@ export class Projectile extends Entity {
     this.impactFactor = t.impact * (massFactor > 1 ? 1 + (massFactor - 1) * 0.35 : 1)
     this.ignites = Boolean(mods.ignites || t.ignites)
     this.explodes = Boolean(mods.explodes || t.explodes)
-    this.splittable = t.splits
+    this.splittable = Boolean(t.splits || mods.splits)
     /** Boulet de givre : gèle ce qui l'entoure à l'impact (v5.0). */
-    this.frost = Boolean(t.frost)
+    this.frost = Boolean(t.frost || mods.frost)
+    /** Carreau de baliste (v5.1) : traverse la roche des montagnes. */
+    this.bolt = Boolean(t.bolt)
     /** Pouvoirs (v5.0) : Pierre d'aimant (attiré par les défenseurs), Météore (piqué au toucher). */
     this.homing = Boolean(mods.homing)
     this.diveable = Boolean(mods.dive)

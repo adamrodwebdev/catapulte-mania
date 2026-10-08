@@ -30,7 +30,7 @@ const actionSchema = (raw, path) => {
       k,
       d: AT(raw[1], `${path}.d`),
       a: AMMO[Schema.int({ min: 0, max: AMMO.length - 1 })(raw[2], `${path}.a`)],
-      ang: Schema.number({ min: AIM.MIN_ANGLE, max: AIM.MAX_ANGLE })(raw[3], `${path}.ang`),
+      ang: Schema.number({ min: 0, max: AIM.MAX_ANGLE })(raw[3], `${path}.ang`),
       pow: Schema.number({ min: 0, max: 1 })(raw[4], `${path}.pow`),
       l: Schema.int({ min: 0, max: 600 })(raw[5], `${path}.l`),
     }
@@ -53,7 +53,7 @@ const codeSchema = Schema.object(
     v: Schema.enum([2]),
     day: Schema.string({ minLength: 0, maxLength: 10, pattern: /^(?:|\d{4}-\d{2}-\d{2})$/ }),
     l: Schema.int({ min: 1, max: GAME.LEVEL_COUNT }),
-    e: Schema.enum(['catapult', 'trebuchet']),
+    e: Schema.enum(['catapult', 'trebuchet', 'ballista']),
     n: Schema.string({ minLength: 0, maxLength: 16, pattern: /^(?:|[\p{L}\p{N}][\p{L}\p{N} _'-]{0,15})$/u }),
     a: Schema.array((raw) => raw, { maxLength: MAX_ACTIONS }),
   },
@@ -121,7 +121,7 @@ export class ReplayCode {
       if (c.levelId !== data.l || c.engine !== data.e) throw new ValidationError('code', 'does not match the daily challenge')
     }
     // Un seul engin par partie.
-    if (actions.some((x) => (x.k === 'f' && data.e !== 'catapult') || (x.k === 't' && data.e !== 'trebuchet'))) throw new ValidationError('code.a', 'engine mismatch')
+    if (actions.some((x) => (x.k === 'f' && data.e !== 'catapult' && data.e !== 'ballista') || (x.k === 't' && data.e !== 'trebuchet'))) throw new ValidationError('code.a', 'engine mismatch')
     return { day: data.day, levelId: data.l, engine: data.e, name: data.n, actions }
   }
 }

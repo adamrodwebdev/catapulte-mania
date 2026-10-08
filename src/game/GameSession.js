@@ -14,6 +14,7 @@ import { Flyer } from './entities/Flyer.js'
 import { Projectile, PROJECTILE_TYPES } from './entities/Projectile.js'
 import { Catapult, AIM } from './Catapult.js'
 import { Trebuchet, TREBUCHET_X, TREBUCHET_MASS } from './Trebuchet.js'
+import { Ballista } from './Ballista.js'
 import { TrajectoryPredictor } from './TrajectoryPredictor.js'
 import { ParticleSystem } from './effects/ParticleSystem.js'
 import { Camera } from './rendering/Camera.js'
@@ -50,7 +51,7 @@ const IDLE_WIN_MS = 1200
 const FIRE_WAIT_MS = 20000
 const AMMO_ORDER = Object.freeze(['stone', 'fire', 'boulder', 'frost', 'bomb', 'split'])
 /** Engins de siège : catapulte (visée angle + puissance) ou trébuchet (deux clics). */
-export const ENGINES = Object.freeze(['catapult', 'trebuchet'])
+export const ENGINES = Object.freeze(['catapult', 'trebuchet', 'ballista'])
 
 /** Couleurs des fanions des joueurs (modes à deux). */
 const PLAYER_FLAGS = Object.freeze(['#a3322b', '#3d7a3a'])
@@ -123,6 +124,10 @@ export class GameSession extends EventBus {
   #assist = false
   #hintUsed = false
   #freePowerUsed = false
+  /** Point d'impact prévu du trébuchet (cache par pas de simulation). */
+  #landingCache = null
+  /** Le repère d'impact était-il sur le château à l'image précédente ? (signal sonore) */
+  #landingOn = false
   /** Repère sonore du balancier : dernière tranche de 15° annoncée. */
   #tickBand = null
   options = { trajectoryAid: false, reducedMotion: false, blood: true, screams: true }
@@ -181,7 +186,9 @@ export class GameSession extends EventBus {
         catapult:
           this.#engine === 'trebuchet'
             ? new Trebuchet(TREBUCHET_X, { speedFactor: fx.speedFactor, slow: slowSwing, infinite: this.infiniteSwing })
-            : new Catapult(right ? CATAPULT_X.right : CATAPULT_X.left, { dir: right ? -1 : 1, speedFactor: fx.speedFactor }),
+            : this.#engine === 'ballista'
+              ? new Ballista(CATAPULT_X.left, { speedFactor: fx.speedFactor })
+              : new Catapult(right ? CATAPULT_X.right : CATAPULT_X.left, { dir: right ? -1 : 1, speedFactor: fx.speedFactor }),
         score: shared ?? new ScoreKeeper(level, this.#difficulty),
         shotsTotal: shots,
         shotsLeft: shots,
@@ -389,6 +396,7 @@ export class GameSession extends EventBus {
       power: Math.round(this.catapult.power * 100),
       engine: this.#engine,
       armed: this.armed,
+      landing: this.#landingView(),
       rewinding: this.rewinding,
       infiniteSwing: this.infiniteSwing,
       ammo: this.ammo,
@@ -401,22 +409,53 @@ export class GameSession extends EventBus {
     }
   }
 
+  /**
+   * Trébuchet (v5.1) : point d'impact du tir si l'on lâchait la fronde
+   * maintenant (vent du tour compris, rafales à venir non comprises). Le repère
+   * balaie le terrain pendant le balancier : on lâche quand il passe sur la
+   * cible. En Difficile, il est volontairement flou (`spread`).
+   * @returns {{ x: number, y: number, spread: number, onCastle: boolean } | null}
+   */
+  get landing() {
+    if (this.#engine !== 'trebuchet' || !this.armed || this.#replay) return null
+    const key = `${this.world.time}:${this.catapult.simTime}`
+    if (this.#landingCache?.key === key) return this.#landingCache.value
+    const pts = TrajectoryPredictor.predict(this.catapult.launchPoint, this.catapult.velocity, {
+      wind: this.#pendingPower === 'falcon' ? 0 : this.world.wind,
+      obstacles: this.world.filter((e) => e.kind === 'block' || e.kind === 'barrel' || e.kind === 'target'),
+      maxPoints: 220,
+      every: 6,
+    })
+    const last = pts[pts.length - 1]
+    let value = null
+    if (last && last.x > this.catapult.x + 60) {
+      const left = this.#castleLeft()
+      value = { x: last.x, y: last.y, spread: this.#difficulty === 'hard' ? 46 : this.#difficulty === 'normal' ? 14 : 0, onCastle: last.x >= left - 20 && last.x <= this.focus.right }
+    }
+    this.#landingCache = { key, value }
+    return value
+  }
+
   /** Points de l'aide à la trajectoire (ou null si désactivée / hors visée). */
   get trajectory() {
     const falcon = this.#pendingPower === 'falcon'
-    if (!this.options.trajectoryAid && !this.#hint && !falcon) return null
+    // Baliste (v5.1) : sa ligne de mire (début de la trajectoire) reste toujours visible.
+    const sight = this.#engine === 'ballista' && !this.options.trajectoryAid && !this.#hint && !falcon
+    if (!this.options.trajectoryAid && !this.#hint && !falcon && !sight) return null
     // Trébuchet : la courbe montre, en direct, le tir qu'on obtiendrait en lâchant maintenant.
     if (this.#engine === 'trebuchet' ? !this.armed : this.#state !== STATE.AIMING) return null
     const calm = falcon
     const field = this.world.windField
     const start = this.catapult.launchPoint
-    const windage = windageOf({ type: this.player.selectedAmmo, radius: PROJECTILE_TYPES[this.player.selectedAmmo].radius })
+    const projType = this.#engine === 'ballista' ? 'bolt' : this.player.selectedAmmo
+    const windage = windageOf({ type: projType, radius: PROJECTILE_TYPES[projType].radius })
     return TrajectoryPredictor.predict(start, this.catapult.velocity, {
       wind: calm ? 0 : this.world.wind,
       windAccel: calm || !field.dynamic ? null : field.frozen(start.x, this.world.time, windage),
-      obstacles: this.world.filter((e) => e.kind !== 'projectile'),
+      // La baliste tire à travers la roche : la mire l'ignore.
+      obstacles: this.world.filter((e) => e.kind !== 'projectile' && e.kind !== 'flyer' && !(projType === 'bolt' && e.terrain)),
       // Œil du faucon : la courbe entière, jusqu'au point d'impact.
-      maxPoints: falcon ? 400 : this.#engine === 'trebuchet' ? 110 : 60,
+      maxPoints: falcon ? 400 : sight ? 14 : this.#engine === 'trebuchet' ? 110 : 60,
     })
   }
 
@@ -578,6 +617,16 @@ export class GameSession extends EventBus {
     shot.mods.massFactor = (shot.mods.massFactor ?? 1) * (this.#mode.effects.massFactor ?? 1)
     // Trébuchet : projectiles plus lourds (voir TREBUCHET_MASS).
     if (this.#engine === 'trebuchet') shot.mods.massFactor *= TREBUCHET_MASS
+    // Baliste : la munition choisie devient un carreau spécial.
+    const ballista = this.#engine === 'ballista'
+    if (ballista) {
+      if (type === 'fire') shot.mods.ignites = true
+      if (type === 'frost') shot.mods.frost = true
+      if (type === 'bomb') shot.mods.explodes = true
+      if (type === 'split') shot.mods.splits = true
+      if (type === 'boulder') shot.mods.massFactor *= 1.3
+    }
+    const projType = ballista ? 'bolt' : type
     shot.mods.blastFactor = this.#mode.effects.blastFactor ?? 1
     shot.mods.fireFactor = this.#mode.effects.fireFactor ?? 1
     if (shot.windOverride !== null) this.world.wind = shot.windOverride
@@ -604,7 +653,7 @@ export class GameSession extends EventBus {
       const spreads = shot.count === 5 ? [-5, -2.5, 0, 2.5, 5] : shot.count === 3 ? [-2.5, 0, 2.5] : [0]
       const mid = (spreads.length - 1) / 2
       spreads.forEach((deg, i) => {
-        const p = new Projectile(type, start.x - i * 4, start.y + i * 3, shot.mods)
+        const p = new Projectile(projType, start.x - i * 4, start.y + i * 3, shot.mods)
         this.world.add(p)
         const a = (deg * Math.PI) / 180
         const factor = 1 + (i - mid) * 0.02
@@ -613,7 +662,7 @@ export class GameSession extends EventBus {
           y: (v.x * Math.sin(a) + v.y * Math.cos(a)) * factor,
         })
       })
-      this.#feedback({ sound: 'launch', x: this.catapult.x, caption: treb ? 'launchTreb' : 'launch', haptic: 'launch' })
+      this.#feedback({ sound: ballista ? 'bolt' : 'launch', x: this.catapult.x, caption: treb ? 'launchTreb' : ballista ? 'launchBallista' : 'launch', haptic: 'launch' })
       this.emit('hud', this.hud)
     }
     if (this.#engine === 'trebuchet') {
@@ -666,8 +715,16 @@ export class GameSession extends EventBus {
     this.#visualEffects()
     this.#updateCamera(dt)
     if (this.#state === STATE.AIMING || this.#state === STATE.FLYING) this.#watchGusts()
-    if (this.armed) this.#swingTicks()
-    else this.#tickBand = null
+    if (this.armed) {
+      this.#swingTicks()
+      // Le repère d'impact entre sur le château : un « clic » franc et un sous-titre.
+      const on = Boolean(this.landing?.onCastle)
+      if (on && !this.#landingOn) this.#feedback({ sound: 'lock', x: this.catapult.x, intensity: 1, caption: 'onTarget' })
+      this.#landingOn = on
+    } else {
+      this.#tickBand = null
+      this.#landingOn = false
+    }
 
     if (this.#state === STATE.SETTLING && this.#stateT >= SETTLE_MS) {
       this.#setState(STATE.AIMING)
@@ -700,7 +757,9 @@ export class GameSession extends EventBus {
         const mine = p.index === this.#active
         const treb = p.catapult.kind === 'trebuchet'
         return {
-          kind: treb ? 'trebuchet' : 'catapult',
+          kind: p.catapult.kind === 'ballista' ? 'ballista' : treb ? 'trebuchet' : 'catapult',
+          tension: p.catapult.tension ?? 1,
+          angle: p.catapult.angle,
           rig: treb ? p.catapult.rig : null,
           // Trébuchet : le projectile reste dans la fronde jusqu'au lâcher.
           loaded: treb ? p.catapult.phase === 'idle' || p.catapult.phase === 'swing' : true,
@@ -721,6 +780,8 @@ export class GameSession extends EventBus {
       trajectory: this.trajectory,
       theme: this.#level.chapter,
       terrain: this.world.terrain,
+      worldTime: this.world.time,
+      landing: this.landing,
       season: this.season,
       time: this.#time,
       animate: !this.options.reducedMotion,
@@ -959,6 +1020,19 @@ export class GameSession extends EventBus {
     this.#tickBand = band
   }
 
+  /**
+   * Barre de visée du trébuchet : où tomberait le tir (0 = catapulte, 1 = bout du
+   * terrain) et où se trouve le château, pour le panneau de commande.
+   */
+  #landingView() {
+    const l = this.landing
+    if (!l) return null
+    const from = this.catapult.x
+    const to = this.focus.right + 120
+    const f = (x) => Math.max(0, Math.min(1, (x - from) / (to - from)))
+    return { at: Math.round(f(l.x) * 1000) / 1000, castle: [Math.round(f(this.#castleLeft()) * 1000) / 1000, Math.round(f(this.focus.right) * 1000) / 1000], on: l.onCastle }
+  }
+
   /** Bord avant du château (premier bloc debout). */
   #castleLeft() {
     let left = Infinity
@@ -999,7 +1073,7 @@ export class GameSession extends EventBus {
         }
         this.#feedback({ sound: 'down', x: entity.x, caption: `down.${entity.type}`, haptic: 'kill' })
         // Cri du défenseur (réglage « Cris des soldats ») : voix selon le personnage.
-        if (this.options.screams) this.#feedback({ sound: 'scream', x: entity.x, intensity: entity.type === 'knight' ? 1.3 : entity.type === 'king' ? 0.5 : 1, caption: 'scream' })
+        if (this.options.screams) this.#feedback({ sound: 'scream', x: entity.x, intensity: entity.type === 'knight' || entity.type === 'ogre' ? 1.3 : entity.type === 'king' ? 0.5 : 1, caption: 'scream' })
         this.emit('announce', { key: 'a11y.targetDown', params: { left: this.targetsLeft } })
         if (this.targetsLeft === 0 && !this.options.reducedMotion) this.#slowMo = 900
       } else if (entity.kind === 'flyer') {
@@ -1068,6 +1142,13 @@ export class GameSession extends EventBus {
     ev.on('flyer:hit', ({ entity, x, y }) => {
       this.particles.feathers(x, y, entity.type === 'wyvern' ? '#4a6b3a' : '#1f1f29', entity.type === 'wyvern' ? 16 : 12)
       this.#feedback({ sound: 'flyer', x, intensity: 0.8, caption: `flyer.${entity.type}`, haptic: 'kill' })
+    })
+    ev.on('ogre', ({ kind, x, y, other }) => {
+      // Revers de massue : éclats et poussière, gros plan si c'est le tir du joueur.
+      this.particles.impact(other?.x ?? x, other?.y ?? y, 'wood', 400)
+      this.particles.dust(x, y + 20, 4)
+      this.camera.shake(4)
+      this.#feedback({ sound: 'breach', x, intensity: 0.7, caption: `ogre.${kind}`, haptic: 'impact' })
     })
     ev.on('flyer:drop', ({ x }) => {
       this.#feedback({ sound: 'fire', x, intensity: 0.7, caption: 'flyerDrop' })

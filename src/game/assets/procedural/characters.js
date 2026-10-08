@@ -1052,6 +1052,17 @@ function animated(type) {
     const P = still ? null : pose(type, t, seed, { hurt: Boolean(ex.hurt), alert })
     ctx.save()
     ctx.scale(s.w / W, s.h / H)
+    // Ronde (v5.1) : le personnage se tourne dans le sens de la marche et
+    // avance d'un pas balancé (léger rebond, buste qui oscille).
+    if (ex.walking && !still) {
+      if (ex.facing > 0) ctx.scale(-1, 1)
+      const step = t * 9 + seed
+      ctx.translate(0, H / 2)
+      ctx.rotate(Math.sin(step) * 0.05)
+      ctx.translate(0, -H / 2 - Math.abs(Math.sin(step)) * 1.6)
+    } else if (ex.facing > 0 && !still) {
+      ctx.scale(-1, 1)
+    }
     if (P) {
       if (ex.hurt) ctx.translate(Math.sin(t * 55 + seed) * 0.7, 0)
       else {
