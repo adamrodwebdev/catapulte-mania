@@ -38,7 +38,7 @@ export const DIFFICULTY = deepFreeze({
  * facultatif : laissé vide, la ligne n'est pas affichée.
  */
 export const LEGAL = deepFreeze({
-  publisher: 'Adamrodwebtech',
+  publisher: 'AdamRodWebDev',
   contact: 'adamrodwebdev@gmail.com',
 })
 

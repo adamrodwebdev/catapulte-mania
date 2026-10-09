@@ -472,6 +472,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v5.2.0 | Visée professionnelle : module AimInput (pas de 0,5°, mode précision, annulation, clavier accéléré, molette), viseur gradué et repères du tir précédent |
 | v5.3.0 | Commande du trébuchet : module TrebuchetInput (fanion-cible, instant de lâcher calculé, cercle d'approche et décompte sonore, geste unique, note de chaque lâcher, aide en Facile) |
 | v5.4.0 | Trébuchet à deux clics : point d'impact exact, puis jauge cloche ↔ tendu avec la courbe en direct ; balancier fluide (dessin interpolé) |
+| v5.4.1 | Identité AdamRodWebDev : logo du portfolio (hexagone d'or) dans le générique, nom du studio mis à jour partout |
 | v4.2.0 | Qualité des premières minutes (refus CrazyGames) : premier tir réussi, tutoriel en images, tirer-relâcher, barre de commandes compacte, caméra qui garde l'impact visible, trébuchet dès le niveau 4 |
 | v4.1.1 | Versions portails jouables dans le cadre isolé de CrazyGames (script classique unique), démarrage plus robuste |
 | v4.1.0 | Conformité CrazyGames : vidéos récompensées hors du jeu, langue du portail (anglais à défaut), démarrage en un clic, son coupé par le portail |
