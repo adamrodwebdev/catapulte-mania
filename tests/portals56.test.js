@@ -103,7 +103,33 @@ test('GamePix (v5.6.1) : lang lu au démarrage, updateScore sans doublon, update
     s.reportLevel(4)
     s.reportLevel(0)
     s.happytime()
-    assert.deepEqual(calls.slice(1), ['loaded', 'score:10', 'score:25', 'level:4', 'happy'])
-    assert.equal(s.policy.graceLevels, 1, 'pub visible dès le premier niveau terminé')
+    assert.deepEqual(calls.slice(1), ['loaded', 'score:0', 'score:10', 'score:25', 'level:4', 'happy'])
+    assert.equal(s.policy.graceLevels, 0, 'GamePix décide lui-même de la fréquence')
+    assert.equal(s.policy.minIntervalMs, 0)
+  })
+})
+
+test('GamePix (v5.6.2) : loaded() asynchrone, aucune pub avant sa fin, interstitialAd à chaque fin de niveau', async () => {
+  const calls = []
+  let finish
+  const fake = {
+    loading: () => {},
+    loaded: () => new Promise((ok) => (finish = ok)),
+    lang: () => 'en',
+    updateScore: () => {},
+    interstitialAd: async () => (calls.push('inter'), { success: true }),
+  }
+  await withGamePix(fake, async () => {
+    const s = new GamePixAdService()
+    await s.init()
+    s.loadingFinished()
+    assert.equal(s.ready, false)
+    assert.equal(await s.interstitial(), false, 'loaded() pas encore terminé')
+    finish()
+    await new Promise((r) => setTimeout(r, 0))
+    assert.equal(s.ready, true)
+    assert.equal(await s.interstitial(), true)
+    assert.equal(await s.interstitial(), true)
+    assert.deepEqual(calls, ['inter', 'inter'])
   })
 })

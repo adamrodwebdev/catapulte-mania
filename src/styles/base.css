@@ -25,6 +25,20 @@ body,
   height: 100%;
 }
 
+/* Portails (v5.6.2) : le cadre du portail peut interdire le défilement de la
+   page (iframe scrolling="no"). Les écrans longs (atelier, carte, réglages)
+   défilent donc dans #app, qui fait exactement la taille du cadre. */
+html[data-portal],
+html[data-portal] body {
+  overflow: hidden;
+}
+
+html[data-portal] #app {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 body {
   margin: 0;
   background: var(--bg);

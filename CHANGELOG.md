@@ -2,6 +2,14 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [5.6.2] – 2026-10-09
+
+### Corrigé — fenêtre de test GamePix
+- Portails : les écrans longs (carte, modes, atelier, réglages) défilent dans le jeu lui-même. Le cadre de test du portail interdit le défilement de la page (iframe sans défilement) : on ne pouvait plus atteindre le bas des écrans.
+- Atelier de châteaux sur petite hauteur ou écran étroit : barre et palettes sur une ligne chacune, la scène garde toujours de la place (elle disparaissait à 480×320) ; « Tester » et « Partager » restent visibles.
+- GamePix : `interstitialAd` appelé à chaque passage entre deux niveaux (GamePix décide lui-même de montrer une pub ou non) ; aucune pub avant la fin de `GamePix.loaded()`, qui est asynchrone.
+- Vérifié dans un cadre 640×360 sans défilement : vidéo récompensée (`rewardAd`) puis interstitiel (`interstitialAd`) appelés. 1 test de plus (213).
+
 ## [5.6.1] – 2026-10-09
 
 ### Corrigé — liste de contrôle d'intégration GamePix
