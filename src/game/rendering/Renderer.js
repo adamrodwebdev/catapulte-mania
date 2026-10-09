@@ -1,3 +1,4 @@
+import { TREB_TUNING } from '../aim/TrebuchetInput.js'
 import { WORLD } from '../physics/constants.js'
 import { WindLayer } from './WindLayer.js'
 import { drawLake, drawLava } from '../assets/procedural/liquids.js'
@@ -128,8 +129,7 @@ export class Renderer {
 
     // Viseur un peu plus petit sur les écrans bas (téléphone à l'horizontale).
     if (scene.aim) this.#drawAim(ctx, scene.aim, pixel * Math.max(0.72, Math.min(1, camera.viewH / 720)), scene.highContrast)
-    if (scene.trebTarget) this.#drawTrebTarget(ctx, scene.trebTarget, time, pixel, scene.highContrast)
-    if (scene.landing) this.#drawLanding(ctx, scene.landing, time, pixel)
+    if (scene.trebAim) this.#drawTrebAim(ctx, scene.trebAim, time, pixel, scene.highContrast)
 
     scene.particles.draw(ctx, pixel)
 
@@ -304,131 +304,152 @@ export class Renderer {
   }
 
   /**
-   * Trébuchet (v5.1) : repère du point d'impact si l'on lâchait maintenant.
-   * Une colonne de lumière et une cible au sol qui balaient le terrain pendant
-   * le balancier ; verte et plus vive quand elle est sur le château. Sa largeur
-   * traduit l'incertitude (rafales), plus grande en Difficile.
+   * Trébuchet (v5.4) : fanion planté au point d'impact, courbe du tir en
+   * direct pendant la jauge, et cadran de la jauge au-dessus de l'engin
+   * (de la cloche au tir tendu). Tailles en pixels d'écran (`pixel` = 1 / zoom).
    */
-  #drawLanding(ctx, l, time, pixel) {
-    const on = l.onCastle
-    const col = on ? '120,230,120' : '255,246,220'
-    const r = 16 + l.spread
+  #drawTrebAim(ctx, a, time, pixel, highContrast) {
+    const px = Math.max(0.6, pixel)
+    const gold = highContrast ? '#ffd400' : '#e8b62c'
+    const light = highContrast ? '#ffd400' : '#fff6dc'
+    const col = a.reachable ? gold : '#8b8b8b'
     ctx.save()
-    // Colonne de lumière.
-    const g = ctx.createLinearGradient(0, l.y - 420, 0, l.y)
-    g.addColorStop(0, `rgba(${col},0)`)
-    g.addColorStop(1, `rgba(${col},${on ? 0.35 : 0.18})`)
-    ctx.fillStyle = g
-    ctx.fillRect(l.x - r * 0.6, l.y - 420, r * 1.2, 420)
-    // Cible au point d'impact (ellipse au sol, qui pulse).
-    const pulse = 1 + 0.12 * Math.sin(time / 90)
-    ctx.lineWidth = 3 * pixel
-    ctx.strokeStyle = `rgba(${col},0.95)`
-    ctx.beginPath()
-    ctx.ellipse(l.x, l.y, r * pulse, r * 0.4 * pulse, 0, 0, Math.PI * 2)
-    ctx.stroke()
-    ctx.lineWidth = 2 * pixel
-    ctx.beginPath()
-    ctx.moveTo(l.x, l.y - 10)
-    ctx.lineTo(l.x, l.y + 6)
-    ctx.moveTo(l.x - 8, l.y)
-    ctx.lineTo(l.x + 8, l.y)
-    ctx.stroke()
+    ctx.lineCap = 'round'
+    // Courbe du tir : des points de plus en plus fins ; grisée si la cible est hors de portée.
+    if (a.path?.length) {
+      const n = a.path.length
+      for (let i = 0; i < n; i++) {
+        const p = a.path[i]
+        const k = i / n
+        ctx.globalAlpha = a.phase === 'fired' ? 0.45 : 1 - k * 0.45
+        ctx.beginPath()
+        ctx.arc(p.x, p.y, (4.2 - k * 1.6) * px, 0, Math.PI * 2)
+        ctx.fillStyle = a.reachable ? light : '#b9b9b9'
+        ctx.fill()
+        ctx.lineWidth = 1.4 * px
+        ctx.strokeStyle = '#1e1a2b'
+        ctx.stroke()
+      }
+      ctx.globalAlpha = 1
+    }
+    this.#drawFlag(ctx, a.x, a.y, col, px, time, a.reachable)
+    if (a.phase === 'power' || a.phase === 'fired') this.#drawGaugeDial(ctx, a, px, gold, light)
     ctx.restore()
   }
 
-  /**
-   * Cible du trébuchet (v5.3) : un fanion planté au sol, l'impact idéal, et le
-   * cercle d'approche qui se referme sur la cible à l'instant parfait (comme
-   * dans les jeux de rythme). Hors de portée : fanion gris barré.
-   * Tailles en pixels d'écran (`pixel` = 1 / zoom).
-   */
-  #drawTrebTarget(ctx, t, time, pixel, highContrast) {
-    const px = Math.max(0.6, pixel)
-    const gold = highContrast ? '#ffd400' : '#e8b62c'
-    const col = t.reachable ? gold : '#8b8b8b'
+  /** Fanion-cible : anneaux au sol, mât et flamme ; croix rouge si hors de portée. */
+  #drawFlag(ctx, x, y, col, px, time, reachable) {
     const r = 15 * px
-    ctx.save()
-    ctx.lineCap = 'round'
-    // Anneaux au sol (ellipses : la cible est posée sur le terrain).
     ctx.lineWidth = 2.5 * px
     ctx.strokeStyle = 'rgba(30,26,43,0.55)'
     ctx.beginPath()
-    ctx.ellipse(t.x, t.y, r + 2 * px, (r + 2 * px) * 0.42, 0, 0, Math.PI * 2)
+    ctx.ellipse(x, y, r + 2 * px, (r + 2 * px) * 0.42, 0, 0, Math.PI * 2)
     ctx.stroke()
     ctx.strokeStyle = col
     ctx.beginPath()
-    ctx.ellipse(t.x, t.y, r, r * 0.4, 0, 0, Math.PI * 2)
+    ctx.ellipse(x, y, r, r * 0.4, 0, 0, Math.PI * 2)
     ctx.stroke()
     ctx.beginPath()
-    ctx.ellipse(t.x, t.y, r * 0.42, r * 0.17, 0, 0, Math.PI * 2)
+    ctx.ellipse(x, y, r * 0.42, r * 0.17, 0, 0, Math.PI * 2)
     ctx.stroke()
-    // Fanion : mât et flamme, lisibles de loin.
-    const top = t.y - 46 * px
-    ctx.lineWidth = 2.5 * px
+    const top = y - 46 * px
     ctx.strokeStyle = '#4a3420'
     ctx.beginPath()
-    ctx.moveTo(t.x, t.y)
-    ctx.lineTo(t.x, top)
+    ctx.moveTo(x, y)
+    ctx.lineTo(x, top)
     ctx.stroke()
-    const wave = t.armed ? Math.sin(time / 120) * 2 * px : 0
+    const wave = Math.sin(time / 160) * 2 * px
     ctx.fillStyle = col
     ctx.strokeStyle = 'rgba(30,26,43,0.7)'
     ctx.lineWidth = 1.5 * px
     ctx.beginPath()
-    ctx.moveTo(t.x, top)
-    ctx.quadraticCurveTo(t.x + 12 * px, top + 3 * px + wave, t.x + 24 * px, top + 7 * px)
-    ctx.quadraticCurveTo(t.x + 12 * px, top + 11 * px + wave, t.x, top + 15 * px)
+    ctx.moveTo(x, top)
+    ctx.quadraticCurveTo(x + 12 * px, top + 3 * px + wave, x + 24 * px, top + 7 * px)
+    ctx.quadraticCurveTo(x + 12 * px, top + 11 * px + wave, x, top + 15 * px)
     ctx.closePath()
     ctx.fill()
     ctx.stroke()
-    if (!t.reachable) {
-      // Hors de portée : croix sur la cible.
+    if (!reachable) {
       ctx.strokeStyle = '#c0392b'
       ctx.lineWidth = 3 * px
       ctx.beginPath()
-      ctx.moveTo(t.x - 9 * px, t.y - 9 * px)
-      ctx.lineTo(t.x + 9 * px, t.y + 9 * px)
-      ctx.moveTo(t.x + 9 * px, t.y - 9 * px)
-      ctx.lineTo(t.x - 9 * px, t.y + 9 * px)
+      ctx.moveTo(x - 9 * px, y - 9 * px)
+      ctx.lineTo(x + 9 * px, y + 9 * px)
+      ctx.moveTo(x + 9 * px, y - 9 * px)
+      ctx.lineTo(x - 9 * px, y + 9 * px)
       ctx.stroke()
-    } else if (t.ideal && Math.hypot(t.ideal.x - t.x, t.ideal.y - t.y) > 10) {
-      // Impact idéal (le plus proche possible de la cible) : petit losange relié à la cible.
-      const { x, y } = t.ideal
-      ctx.setLineDash([4 * px, 4 * px])
-      ctx.strokeStyle = 'rgba(255,246,220,0.8)'
-      ctx.lineWidth = 1.5 * px
-      ctx.beginPath()
-      ctx.moveTo(t.x, t.y)
-      ctx.lineTo(x, y)
-      ctx.stroke()
-      ctx.setLineDash([])
-      ctx.fillStyle = '#fff6dc'
-      ctx.beginPath()
-      ctx.moveTo(x, y - 5 * px)
-      ctx.lineTo(x + 5 * px, y)
-      ctx.lineTo(x, y + 5 * px)
-      ctx.lineTo(x - 5 * px, y)
-      ctx.closePath()
-      ctx.fill()
     }
-    // Cercle d'approche : il se referme sur la cible à l'instant parfait.
-    if (t.armed && t.reachable && typeof t.approach === 'number') {
-      const late = typeof t.ms === 'number' && t.ms < 0
-      const rr = r + t.approach * 70 * px
-      ctx.lineWidth = (t.window ? 4 : 2.5) * px
-      ctx.strokeStyle = t.window ? gold : late ? 'rgba(192,57,43,0.8)' : 'rgba(255,246,220,0.85)'
+  }
+
+  /**
+   * Cadran de la jauge : un quart de cercle de l'arc le plus tendu à la
+   * cloche, une aiguille qui va et vient, et deux pictogrammes (sans texte,
+   * lisibles dans toutes les langues) : arc haut = cloche, trait plat = tendu.
+   */
+  #drawGaugeDial(ctx, a, px, gold, light) {
+    const { x, y } = a.origin
+    const R = 72 * px
+    const lob = (TREB_TUNING.LOB_ANGLE * Math.PI) / 180
+    const flat = (TREB_TUNING.FLAT_ANGLE * Math.PI) / 180
+    const at = (rad, r) => ({ x: x + Math.cos(rad) * r, y: y - Math.sin(rad) * r })
+    // Fond du cadran.
+    ctx.fillStyle = 'rgba(30,26,43,0.55)'
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    ctx.arc(x, y, R + 10 * px, -lob - 0.08, -flat + 0.08)
+    ctx.closePath()
+    ctx.fill()
+    // Graduation : dégradé de la cloche (bleu) au tendu (rouge).
+    const steps = 24
+    for (let i = 0; i < steps; i++) {
+      const u0 = i / steps
+      const u1 = (i + 1) / steps
+      const r0 = lob + (flat - lob) * u0
+      const r1 = lob + (flat - lob) * u1
+      ctx.strokeStyle = `hsl(${210 - 200 * u0}, 70%, 58%)`
+      ctx.lineWidth = 8 * px
+      ctx.lineCap = 'butt'
       ctx.beginPath()
-      ctx.arc(t.x, t.y - r * 0.4, rr, 0, Math.PI * 2)
+      ctx.arc(x, y, R, -r0, -r1, false)
       ctx.stroke()
-      if (t.window) {
-        ctx.fillStyle = `rgba(232,182,44,${0.18 + 0.1 * Math.sin(time / 60)})`
-        ctx.beginPath()
-        ctx.ellipse(t.x, t.y, r, r * 0.4, 0, 0, Math.PI * 2)
-        ctx.fill()
-      }
     }
-    ctx.restore()
+    ctx.lineCap = 'round'
+    // Aiguille : arc du moment.
+    const rad = (a.angle * Math.PI) / 180
+    const tip = at(rad, R + 6 * px)
+    ctx.strokeStyle = a.phase === 'fired' ? gold : light
+    ctx.lineWidth = 3.5 * px
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    ctx.lineTo(tip.x, tip.y)
+    ctx.stroke()
+    ctx.fillStyle = a.phase === 'fired' ? gold : light
+    ctx.beginPath()
+    ctx.arc(tip.x, tip.y, 6 * px, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = '#1e1a2b'
+    ctx.lineWidth = 1.5 * px
+    ctx.stroke()
+    // Pictogrammes : cloche (arc haut) côté haut, tendu (trait) côté bas.
+    const icon = (rad0, draw) => {
+      const c = at(rad0, R + 26 * px)
+      ctx.save()
+      ctx.translate(c.x, c.y)
+      ctx.strokeStyle = light
+      ctx.lineWidth = 2.5 * px
+      ctx.beginPath()
+      draw()
+      ctx.stroke()
+      ctx.restore()
+    }
+    icon(lob + 0.05, () => {
+      ctx.moveTo(-10 * px, 6 * px)
+      ctx.quadraticCurveTo(0, -18 * px, 10 * px, 6 * px)
+    })
+    icon(flat - 0.08, () => {
+      ctx.moveTo(-10 * px, 2 * px)
+      ctx.quadraticCurveTo(0, -4 * px, 12 * px, 2 * px)
+    })
   }
 
   /**

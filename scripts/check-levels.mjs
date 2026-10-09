@@ -13,8 +13,9 @@
  * chaque cible restante sous plusieurs angles, simule chaque tir et garde
  * le meilleur. S'il réussit, un humain le peut aussi.
  *
- * Avec `--engine trebuchet`, le joueur automatique joue au trébuchet : il
- * choisit l'instant du lâcher (en ms de balancier), le château est plus loin.
+ * Avec `--engine trebuchet`, le joueur automatique joue au trébuchet (v5.4) :
+ * il désigne un point d'impact puis la position de la jauge (cloche ↔ tendu),
+ * comme un joueur ; le château est plus loin.
  *
  * Usage : node scripts/check-levels.mjs [--levels 1-10] [--difficulty hard] [--engine trebuchet]
  */
@@ -49,11 +50,9 @@ function replay(G, level, difficulty, shots, engine = 'catapult') {
     if (ended) break
     s.selectAmmo(shot.ammo)
     if (engine === 'trebuchet') {
-      // Balancier, puis lâcher à l'instant choisi (ms simulées depuis le 1er clic).
-      s.fire()
-      const step = (1000 / 30) * s.catapult.timeScale
-      while (s.armed && s.catapult.simTime + step < shot.release) tick()
-      if (s.armed) s.catapult.releaseAt(shot.release)
+      // 1er clic : point d'impact ; 2e clic : jauge figée à la position choisie.
+      s.placeTrebTarget(shot.tx, shot.ty)
+      s.fire(0, { arc: shot.g })
     } else {
       s.aim(shot.angle, shot.power)
       s.fire()
@@ -114,38 +113,29 @@ function candidates(G, session, engine = 'catapult') {
   return out
 }
 
-/** Instants de lâcher essayés au trébuchet (ms de balancier, pas de 2 ms). */
-const RELEASES = Array.from({ length: 151 }, (_, i) => 600 + i * 2)
+/** Positions de la jauge essayées au trébuchet (0 = cloche, 1 = tendu). */
+const GAUGES = [0, 0.25, 0.5, 0.75, 1]
 
 /**
- * Trébuchet : pour chaque instant de lâcher, point d'impact prévu (aide à la
- * trajectoire, vent du moment compris). Pour chaque point visé, on garde les
- * trois lâchers qui tombent le plus près.
+ * Trébuchet : chaque point visé, sous chaque arc, avec chaque munition — tant
+ * que le tir est à portée (la partie le calcule comme pour le joueur).
  */
 function trebuchetCandidates(G, session, points, ammoTypes) {
-  const out = new Map()
-  const field = session.world.windField
-  const obstacles = session.world.filter((e) => e.kind !== 'projectile')
-  for (const ammo of ammoTypes) {
-    const radius = G.PROJECTILE_TYPES[ammo].radius
-    const windage = G.windageOf({ type: ammo, radius })
-    const hits = []
-    for (const release of RELEASES) {
-      const shot = G.Trebuchet.preview(release, { x: session.catapult.x, loadRadius: radius })
-      const windAccel = field.dynamic ? field.frozen(shot.point.x, session.world.time, windage) : null
-      const pts = G.TrajectoryPredictor.predict(shot.point, shot.velocity, { wind: session.wind, windAccel, obstacles, maxPoints: 600, every: 1 })
-      const hit = pts[pts.length - 1]
-      if (hit && hit.x > 300) hits.push({ release, hit })
-    }
-    for (const p of points) {
-      hits
-        .map((h) => ({ h, d: Math.abs(h.hit.x - p.x) + 0.5 * Math.abs(h.hit.y - p.y) }))
-        .sort((a, b) => a.d - b.d)
-        .slice(0, 3)
-        .forEach(({ h }) => out.set(`${ammo}:${h.release}`, { release: h.release, ammo }))
+  const out = []
+  const keep = session.trebInput.target ? { ...session.trebInput.target } : null
+  for (const p of points) {
+    if (!session.placeTrebTarget(p.x, p.y)) continue
+    const t = session.trebInput.target
+    for (const ammo of ammoTypes) {
+      for (const g of GAUGES) {
+        const shot = session.trebShot(g, ammo)
+        if (shot?.reachable) out.push({ tx: t.x, ty: t.y, g, ammo })
+      }
     }
   }
-  return [...out.values()]
+  if (keep) session.moveTrebTarget(keep.x, keep.y)
+  session.trebInput.reset()
+  return out
 }
 
 async function checkLevel(G, id, difficulty, engine = 'catapult') {

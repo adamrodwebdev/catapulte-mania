@@ -3,190 +3,165 @@ import assert from 'node:assert/strict'
 import { TrebuchetInput, TREB_TUNING as T } from '../src/game/aim/TrebuchetInput.js'
 import { GameSession } from '../src/game/GameSession.js'
 import { LevelRepository } from '../src/game/levels/LevelRepository.js'
+import { TrajectoryPredictor } from '../src/game/TrajectoryPredictor.js'
+import { WORLD } from '../src/game/physics/constants.js'
 
-/** Trébuchet fictif : l'impact avance de 2 unités par ms de balancier, au sol (y = 0). */
-const fake = () => new TrebuchetInput({ landingAt: (t) => ({ x: t * 2, y: 0 }), step: 10 })
+/** Prédiction sans vent ni obstacle (même intégration que la physique). */
+const predict = (start, velocity) => TrajectoryPredictor.predict(start, velocity, { maxPoints: 800, every: 1 })
 
-test('commande du trébuchet : la cible donne l’instant de lâcher exact', () => {
-  const a = fake()
-  const plan = a.setTarget(1500, 0)
-  assert.equal(plan.release, 750)
-  assert.equal(plan.error, 0)
-  assert.equal(plan.reachable, true)
-  assert.deepEqual(plan.landing, { x: 1500, y: 0 })
-  // Une table d'une ligne par pas, sur la fenêtre utile du balancier.
-  assert.equal(a.table[0].t, Math.ceil(T.FROM_MS / 10) * 10)
-  assert.equal(a.table.at(-1).t, Math.floor(T.TO_MS / 10) * 10)
+test('jauge du trébuchet : de la cloche au tir tendu, aller-retour régulier', () => {
+  const a = new TrebuchetInput({ sweepMs: 1000 })
+  assert.equal(TrebuchetInput.angleFor(0), T.LOB_ANGLE)
+  assert.equal(TrebuchetInput.angleFor(1), T.FLAT_ANGLE)
+  a.place(900, 800)
+  assert.equal(a.phase, 'power')
+  assert.equal(a.gauge, 0)
+  for (let i = 0; i < 10; i++) a.tick(50)
+  assert.equal(a.gauge, 0.5)
+  for (let i = 0; i < 10; i++) a.tick(50)
+  assert.equal(a.gauge, 1)
+  for (let i = 0; i < 10; i++) a.tick(50)
+  assert.equal(a.gauge, 0.5, 'elle revient')
+  a.tick(10_000)
+  assert.ok(a.gauge >= 0 && a.gauge <= 1, 'un à-coup (onglet en arrière-plan) ne la fait pas sortir de ses bornes')
+  // Plus lente en Facile et avec l'option « Jauge lente », plus vive en Difficile.
+  assert.ok(TrebuchetInput.sweepFor('easy') > TrebuchetInput.sweepFor('normal'))
+  assert.ok(TrebuchetInput.sweepFor('hard') < TrebuchetInput.sweepFor('normal'))
+  assert.equal(TrebuchetInput.sweepFor('normal', true), TrebuchetInput.sweepFor('normal') * T.SLOW_FACTOR)
 })
 
-test('commande du trébuchet : table construite par morceaux, plan à la fin', () => {
-  let calls = 0
-  const a = new TrebuchetInput({ landingAt: (t) => (calls++, { x: t * 2, y: 0 }), step: 10 })
-  assert.equal(a.setTarget(1500, 0, { lazy: true }), null, 'plan en attente')
-  assert.equal(calls, 0)
-  assert.equal(a.warm(5), false)
-  assert.equal(calls, 5)
-  while (!a.warm(5));
-  assert.equal(a.ready, true)
-  assert.equal(a.plan.release, 750)
-  const n = calls
-  a.setTarget(1400, 0)
-  assert.equal(calls, n, 'déplacer la cible ne recalcule rien')
-  a.invalidate()
-  assert.equal(a.ready, false)
-  assert.equal(a.plan, null)
+test('jauge du trébuchet : nouveau tour = retour au choix de la cible (la dernière reste proposée)', () => {
+  const a = new TrebuchetInput()
+  a.place(900, 800)
+  a.tick(300)
+  a.reset()
+  assert.equal(a.phase, 'target')
+  assert.deepEqual(a.target, { x: 900, y: 800 })
+  a.move(950, 790)
+  assert.equal(a.phase, 'target', 'déplacer la cible ne lance pas la jauge')
+  assert.throws(() => a.move(Number.NaN, 0))
 })
 
-test('commande du trébuchet : cible hors de portée signalée', () => {
-  const a = fake()
-  assert.equal(a.setTarget(5000, 0).reachable, false)
-  assert.equal(a.assisted(1000, 'easy'), null, 'pas d’aide vers une cible hors de portée')
+test('tir du trébuchet : la vitesse calculée mène exactement au point visé, sous chaque arc', () => {
+  const start = { x: 0, y: 700 }
+  for (const target of [{ x: 1500, y: 880 }, { x: 900, y: 600 }, { x: 2200, y: 880 }]) {
+    for (const g of [0, 0.5, 1]) {
+      const angle = TrebuchetInput.angleFor(g)
+      const sol = TrebuchetInput.solve({ start, target, angle, vmax: 60, predict })
+      assert.equal(sol.reachable, true)
+      // La courbe passe par la cible (à moins d'un pixel) : hauteur à l'aplomb de la cible.
+      const pts = [start, ...predict(start, sol.velocity)]
+      let best = Infinity
+      for (let i = 1; i < pts.length; i++) {
+        const p = pts[i - 1]
+        const q = pts[i]
+        if (p.x <= target.x && q.x >= target.x) {
+          best = Math.abs(p.y + ((q.y - p.y) * (target.x - p.x)) / (q.x - p.x) - target.y)
+          break
+        }
+      }
+      assert.ok(best < 1, `cible ${target.x},${target.y} sous ${angle}° : écart ${best}`)
+    }
+  }
 })
 
-test('commande du trébuchet : trois tics réguliers, puis l’instant parfait', () => {
-  const a = fake()
-  a.setTarget(1500, 0)
-  assert.deepEqual(a.cues(500, 560), [])
-  assert.deepEqual(a.cues(560, 700), ['cue', 'cue', 'cue'])
-  assert.deepEqual(a.cues(745, 755), ['now'])
-  assert.deepEqual(a.cues(755, 745), [], 'jamais à rebours')
+test('tir du trébuchet : hors de portée signalé (vitesse plafonnée), arcs différents = vitesses différentes', () => {
+  const start = { x: 0, y: 700 }
+  const far = TrebuchetInput.solve({ start, target: { x: 9000, y: 880 }, angle: 40, vmax: 20, predict })
+  assert.equal(far.reachable, false)
+  assert.equal(far.speed, 20)
+  const lob = TrebuchetInput.solve({ start, target: { x: 1500, y: 880 }, angle: TrebuchetInput.angleFor(0), vmax: 60, predict })
+  const flat = TrebuchetInput.solve({ start, target: { x: 1500, y: 880 }, angle: TrebuchetInput.angleFor(1), vmax: 60, predict })
+  assert.ok(lob.velocity.y < flat.velocity.y, 'la cloche part plus haut')
+  assert.throws(() => TrebuchetInput.solve({ start, target: { x: 1500, y: 880 }, angle: 40, vmax: 20, predict: null }))
 })
 
-test('commande du trébuchet : la note juge l’écart à l’impact idéal', () => {
-  const a = fake()
-  a.setTarget(1500, 0)
-  assert.equal(a.gradeAt(750).id, 'perfect')
-  assert.equal(a.gradeAt(760).id, 'perfect') // 20 unités
-  assert.equal(a.gradeAt(770).id, 'great') // 40
-  assert.equal(a.gradeAt(790).id, 'good') // 80
-  assert.equal(a.gradeAt(810).id, 'miss') // 120
-  a.clearTarget()
-  assert.equal(a.gradeAt(750).id, 'miss')
-})
-
-test('commande du trébuchet : cible inaccessible exactement (derrière un mur), le meilleur lâcher reste « Parfait »', () => {
-  // Au-delà de x = 1200, le tir bute sur un mur.
-  const a = new TrebuchetInput({ landingAt: (t) => ({ x: Math.min(t * 2, 1200), y: 0 }), step: 10 })
-  const plan = a.setTarget(1260, 0)
-  assert.equal(plan.landing.x, 1200)
-  assert.equal(plan.reachable, true)
-  assert.equal(a.gradeAt(plan.release).id, 'perfect')
-})
-
-test('commande du trébuchet : le cercle d’approche se referme à l’instant parfait', () => {
-  const a = fake()
-  a.setTarget(1500, 0)
-  assert.equal(a.timing(400).approach, 1)
-  assert.ok(Math.abs(a.timing(750 - T.APPROACH_MS / 2).approach - 0.5) < 1e-9)
-  const now = a.timing(750)
-  assert.equal(now.approach, 0)
-  assert.equal(now.ms, 0)
-  assert.equal(now.window, true)
-  assert.equal(a.timing(600).window, false)
-})
-
-test('commande du trébuchet : aide au lâcher en Facile seulement', () => {
-  const a = fake()
-  a.setTarget(1500, 0)
-  assert.equal(a.assisted(735, 'easy'), 750)
-  assert.equal(a.assisted(735, 'normal'), null)
-  assert.equal(a.assisted(735, 'hard'), null)
-  assert.equal(a.assisted(700, 'easy'), null, 'trop loin : pas de correction')
-})
-
-test('commande du trébuchet : geste — appui bref, second appui, maintien, glissé', () => {
-  const a = fake()
-  // Appui bref : le relâcher arme.
-  assert.equal(a.press(10, 10, 0, { armed: false, aiming: true }), null)
-  assert.equal(a.hold(100), null)
-  assert.equal(a.unpress(120, { armed: false }), 'arm')
-  // Armé : un nouvel appui lâche tout de suite.
-  assert.equal(a.press(10, 10, 500, { armed: true, aiming: false }), 'release')
-  assert.equal(a.unpress(520, { armed: false }), null)
-  // Geste unique : maintenu, il arme ; au relâcher, la fronde part.
-  a.press(10, 10, 1000, { armed: false, aiming: true })
-  assert.equal(a.hold(1000 + T.HOLD_MS), 'arm')
-  assert.equal(a.hold(1000 + T.HOLD_MS + 50), null, 'une seule fois')
-  assert.equal(a.drag(80, 10), false, 'armé : on ne déplace plus la cible')
-  assert.equal(a.unpress(1600, { armed: true }), 'release')
-  // Glissé : on place la cible, ni armement ni lâcher.
-  a.press(10, 10, 2000, { armed: false, aiming: true })
-  assert.equal(a.drag(15, 12), false)
+test('geste du trébuchet : un clic ou un glissé', () => {
+  const a = new TrebuchetInput()
+  a.press(10, 10)
+  assert.equal(a.drag(14, 12), false)
+  assert.equal(a.unpress(), 'tap')
+  a.press(10, 10)
   assert.equal(a.drag(10 + T.DRAG_PX, 10), true)
-  assert.equal(a.hold(2000 + T.HOLD_MS * 3), null)
-  assert.equal(a.unpress(2600, { armed: false }), null)
+  assert.equal(a.unpress(), 'drag')
+  assert.equal(a.unpress(), null)
   assert.equal(a.pressing, false)
 })
 
-const session = (difficulty, id = 10) =>
-  new GameSession(LevelRepository.get(id), { difficulty, completedLevels: 30, reducedMotion: true, engine: 'trebuchet' })
+const session = (difficulty, id = 10, extra = {}) =>
+  new GameSession(LevelRepository.get(id), { difficulty, completedLevels: 30, reducedMotion: true, engine: 'trebuchet', ...extra })
 
 function untilAiming(s) {
   for (let i = 0; i < 400 && s.state !== 'aiming'; i++) s.update(33)
-  // La table des lâchers se construit quelques lignes par image.
-  for (let i = 0; i < 60 && !s.trebInput.ready; i++) s.update(16)
 }
 
-test('trébuchet en partie : cible par défaut sur un défenseur, déplaçable, plan atteignable', () => {
-  const s = session('normal')
-  for (let i = 0; i < 400 && s.state !== 'aiming'; i++) s.update(33)
-  assert.equal(s.trebInput.ready, false, 'pas de gros calcul d’un coup en début de tour')
-  assert.equal(s.scene().trebTarget.reachable, true, 'pendant le calcul, la cible n’est pas déclarée hors de portée')
-  untilAiming(s)
-  const ti = s.trebInput
-  assert.ok(ti?.target, 'une cible dès le début du tour')
-  assert.ok(ti.plan?.reachable)
-  const view = s.scene().trebTarget
-  assert.equal(view.x, ti.target.x)
-  assert.equal(view.armed, false)
-  assert.equal(typeof s.hud.landing.target, 'number', 'la barre montre la cible avant le balancier')
-  const plan = s.setTrebTarget(ti.target.x - 120, ti.target.y)
-  assert.ok(plan && plan.release > 0)
-  assert.equal(ti.target.x, view.x - 120)
-  assert.throws(() => s.setTrebTarget(Number.NaN, 0), 'données vérifiées')
-  s.destroy()
-})
-
-/** Arme, avance jusqu'à `before` ms simulées de l'instant parfait, puis lâche. */
-function releaseNear(s, before) {
-  const plan = s.trebInput.plan
-  const grades = []
-  s.on('timing', (g) => grades.push(g))
-  assert.equal(s.trigger(), 'armed')
-  const cues = []
-  s.on('feedback', (f) => f.sound && cues.push(f.sound))
-  while (s.armed && s.catapult.simTime < plan.release - before - 20) s.update(4)
-  while (s.armed && s.catapult.simTime < plan.release - before) s.update(1)
-  assert.equal(s.trigger(), 'released')
-  for (let i = 0; i < 20 && !grades.length; i++) s.update(16)
-  return { grades, cues, plan }
+/** Point du sol dégagé devant le château. */
+function openGround(s) {
+  const left = Math.min(...s.world.filter((e) => e.kind === 'block').map((b) => b.x - b.width / 2))
+  return { x: left - 140, y: WORLD.GROUND_Y }
 }
 
-test('trébuchet en partie : trois tics avant le lâcher, puis la note', () => {
+/** Abscisse du premier contact du projectile avec le sol. */
+function landing(s) {
+  for (let i = 0; i < 3000; i++) {
+    s.update(16)
+    const p = s.world.filter((e) => e.kind === 'projectile')[0]
+    if (p && p.y >= WORLD.GROUND_Y - p.radius - 1.5) return p.x
+  }
+  return null
+}
+
+for (const g of [0.1, 0.5, 0.9]) {
+  test(`trébuchet en partie : le projectile percute là où le joueur a touché (jauge ${g})`, () => {
+    const s = session('normal')
+    untilAiming(s)
+    const pt = openGround(s)
+    assert.equal(s.placeTrebTarget(pt.x, pt.y), true)
+    assert.equal(s.trebPhase, 'power')
+    assert.equal(s.fire(0, { arc: g }), true)
+    const x = landing(s)
+    assert.ok(x !== null && Math.abs(x - pt.x) < 12, `impact ${x} pour une cible en ${pt.x}`)
+    s.destroy()
+  })
+}
+
+test('trébuchet en partie : cible par défaut, bornée devant l’engin et jamais sous le sol', () => {
   const s = session('normal')
   untilAiming(s)
-  const { grades, cues } = releaseNear(s, 0)
-  assert.ok(cues.filter((c) => c === 'tick').length >= 3, `tics : ${cues}`)
-  assert.equal(grades.length, 1)
-  assert.ok(['perfect', 'great'].includes(grades[0].grade), `note : ${grades[0].grade}`)
+  const first = s.world.filter((e) => e.kind === 'target' && e.alive).sort((a, b) => a.x - b.x)[0]
+  assert.ok(Math.abs(s.trebInput.target.x - first.x) < 1e-9, 'le défenseur le plus proche')
+  s.moveTrebTarget(s.catapult.x - 400, WORLD.GROUND_Y + 300)
+  assert.ok(s.trebInput.target.x > s.catapult.x + 100)
+  assert.ok(s.trebInput.target.y <= WORLD.GROUND_Y)
+  assert.throws(() => s.placeTrebTarget(Number.NaN, 0), 'données vérifiées')
+  assert.throws(() => s.fire(0, { arc: 3 }))
   s.destroy()
 })
 
-test('trébuchet en partie : en Facile, un lâcher un peu tôt se cale sur l’instant parfait', () => {
-  const s = session('easy')
+test('trébuchet en partie : pas de tir sans cible ; la cible du joueur est gardée au tour suivant', () => {
+  const s = session('normal')
   untilAiming(s)
-  const { grades } = releaseNear(s, 18)
-  assert.equal(grades[0].grade, 'perfect')
-  assert.equal(grades[0].error, 0, 'lâché exactement à l’instant parfait')
+  const pt = openGround(s)
+  s.placeTrebTarget(pt.x, pt.y)
+  s.fire(0, { arc: 0.5 })
+  for (let i = 0; i < 1500 && s.state !== 'aiming'; i++) s.update(16)
+  assert.equal(s.trebPhase, 'target')
+  assert.ok(Math.abs(s.trebInput.target.x - pt.x) < 1e-9)
+  s.trebInput.clear()
+  assert.equal(s.fire(0, { arc: 0.5 }), false)
   s.destroy()
 })
 
-test('trébuchet en partie : Difficile, ni cercle ni impact idéal', () => {
-  const s = session('hard')
+test('trébuchet en partie : le panneau suit les deux étapes', () => {
+  const s = session('normal')
   untilAiming(s)
-  assert.equal(s.scene().trebTarget.ideal, null)
-  s.trigger()
+  assert.equal(s.hud.trebPhase, 'target')
+  assert.equal(typeof s.hud.trebBar.target, 'number')
+  s.trigger(0)
   s.update(16)
-  assert.equal(s.scene().trebTarget.approach, null)
+  assert.equal(s.hud.trebPhase, 'power')
+  assert.equal(typeof s.hud.angle, 'number')
+  s.trigger(0)
+  assert.equal(typeof s.hud.power, 'number', 'puissance du tir programmé')
   s.destroy()
 })

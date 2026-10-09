@@ -1,53 +1,45 @@
 import { Guard, deepFreeze } from '../../core/utils/Guard.js'
+import { clamp } from '../../core/utils/math.js'
 
 /**
- * Commande du trébuchet (v5.3) : geste, cible et chronométrage du lâcher.
+ * Commande du trébuchet (v5.4) : deux clics, aucun chronométrage.
  *
- * Module pur (aucun accès au DOM ni au moteur) : le point d'impact d'un lâcher
- * lui est fourni par une fonction (`landingAt`), ce qui le rend testable seul.
+ *  1er clic : le joueur touche EXACTEMENT le point où le projectile doit
+ *             percuter (un fanion s'y plante) ;
+ *  2e clic  : une jauge oscille entre « tir en cloche » et « tir tendu » ; le
+ *             clic la fige. La courbe du tir s'affiche en direct pendant
+ *             l'oscillation : on voit si l'arc passe au-dessus du rempart.
  *
- * Inspirations : la jauge de swing des jeux de golf (un geste, un instant
- * juste, une note), le cercle d'approche des jeux de rythme (il se referme
- * exactement au bon moment), les repères sonores qui comptent les temps.
+ * Le trébuchet tire alors tout seul : le balancier part et la fronde s'ouvre
+ * à l'instant où elle a l'angle choisi ; la vitesse est celle qui mène
+ * exactement au point visé (contrepoids « ajusté »), sans dépasser ce que
+ * l'engin peut donner sous cet angle. Seules les rafales à venir (Difficile)
+ * peuvent encore dévier le tir.
  *
- * Principes :
- *  - PRÉCIS : on vise un POINT (la cible au sol) ; le module calcule,
- *    pas de simulation par pas de simulation, l'instant de lâcher qui y mène,
- *    et note chaque lâcher d'après l'écart à l'impact idéal ;
- *  - CONCIS : appuyer libère le contrepoids, relâcher lâche la fronde (un seul
- *    geste) ; les deux clics d'avant restent possibles ;
- *  - FLUIDE et RAPIDE : la cible se place d'un glissé, l'instant idéal est
- *    calculé une fois par tour (table des lâchers, construite par morceaux
- *    pour ne jamais figer l'image), puis lu à chaque image ;
- *  - AGRÉABLE : trois tics réguliers puis une note claire au moment parfait,
- *    une note après chaque tir ; en Facile, un lâcher à quelques ms près se
- *    cale sur l'instant parfait.
+ * Module pur (aucun accès au DOM ni au moteur) : la prédiction de vol lui est
+ * fournie par une fonction, ce qui le rend testable seul.
+ *
+ * Inspirations : la visée en deux temps des jeux de golf (direction, puis
+ * jauge de puissance), le choix de l'arc des jeux d'artillerie (Worms,
+ * Angry Birds Space pour la courbe en direct).
  */
 export const TREB_TUNING = deepFreeze({
-  /** Lâchers étudiés (ms simulées depuis le contrepoids), pas de la table. */
-  FROM_MS: 480,
-  TO_MS: 1000,
-  /** Maintien au-delà duquel l'appui devient « geste unique » (relâcher = lâcher la fronde). */
-  HOLD_MS: 180,
-  /** Au-delà, l'appui est un glissé : on déplace la cible au lieu d'armer. */
+  /** Angles de départ aux deux bouts de la jauge (degrés). */
+  LOB_ANGLE: 66,
+  FLAT_ANGLE: 10,
+  /** Durée d'un aller de la jauge (ms réelles) selon la difficulté. */
+  SWEEP_MS: deepFreeze({ easy: 1700, normal: 1350, hard: 1000 }),
+  /** Option « Jauge lente » : allers plus longs. */
+  SLOW_FACTOR: 1.5,
+  /** Au-delà, l'appui est un glissé : on déplace la cible au lieu de valider. */
   DRAG_PX: 12,
-  /** Notes d'après l'écart entre l'impact et l'impact idéal (unités du monde). */
-  GRADES: [
-    { id: 'perfect', within: 22 },
-    { id: 'great', within: 50 },
-    { id: 'good', within: 100 },
-  ],
-  /** Cible trop loin de tout lâcher possible : hors de portée. */
-  UNREACHABLE: 140,
-  /** Repères sonores avant l'instant parfait (ms simulées). */
-  CUES_MS: [-180, -120, -60],
-  /** Durée simulée du cercle d'approche (il se referme en autant de ms avant l'instant parfait). */
-  APPROACH_MS: 240,
   /** Pas de la cible au clavier (unités du monde ; Maj : pas fin). */
   NUDGE: 20,
   NUDGE_FINE: 4,
-  /** Aide au lâcher (ms simulées) selon la difficulté. */
-  ASSIST_MS: deepFreeze({ easy: 26, normal: 0, hard: 0 }),
+  /** Vitesse minimale d'un tir (unités Matter). */
+  MIN_SPEED: 3,
+  /** Itérations de la recherche de vitesse (précision bien inférieure au pixel). */
+  SOLVE_STEPS: 22,
 })
 
 const T = TREB_TUNING
@@ -55,176 +47,127 @@ const T = TREB_TUNING
 export class TrebuchetInput {
   /** Cible au sol (unités du monde), ou null. */
   target = null
-  /** Plan pour la cible : { release, landing, error } ou null. */
-  plan = null
-  #landingAt
-  #step
-  /** Table des lâchers, construite par morceaux (voir warm). */
-  #rows = []
-  #nextK = 0
-  #done = false
+  /** 'target' : on choisit le point d'impact ; 'power' : la jauge oscille. */
+  phase = 'target'
+  #sweep
+  #t = 0
   /** Geste en cours. */
   #press = null
 
-  /**
-   * @param {{ landingAt: (releaseMs: number) => ({ x: number, y: number } | null), step: number }} opts
-   *   landingAt : point d'impact d'un lâcher à cet instant ; step : pas de simulation du balancier (ms)
-   */
-  constructor({ landingAt, step }) {
-    this.#landingAt = Guard.func(landingAt, 'landingAt')
-    this.#step = Guard.number(step, 'step', { min: 1, max: 50 })
-    this.invalidate()
+  /** @param {{ sweepMs?: number }} [opts] durée d'un aller de la jauge */
+  constructor({ sweepMs = T.SWEEP_MS.normal } = {}) {
+    this.setSweep(sweepMs)
   }
 
-  /* ---------- Cible et instant idéal ---------- */
-
-  /**
-   * Le décor a changé (vent du tour, château abîmé) : la table sera recalculée,
-   * par morceaux (warm) ou d'un coup à la première lecture.
-   */
-  invalidate() {
-    this.#rows = []
-    this.#nextK = Math.ceil(T.FROM_MS / this.#step)
-    this.#done = false
-    this.plan = null
+  /** Durée d'un aller de la jauge (difficulté, option « Jauge lente »). */
+  setSweep(ms) {
+    this.#sweep = Guard.number(ms, 'sweep', { min: 200, max: 10000 })
   }
 
-  /** La table est-elle complète (et le plan à jour) ? */
-  get ready() {
-    return this.#done
+  /** Durée d'un aller selon la difficulté et l'option d'accessibilité. */
+  static sweepFor(difficulty, slow = false) {
+    const base = T.SWEEP_MS[difficulty] ?? T.SWEEP_MS.normal
+    return slow ? base * T.SLOW_FACTOR : base
   }
 
-  /**
-   * Avance le calcul de la table de quelques lignes (une image à la fois, pour
-   * ne jamais figer l'écran en début de tour).
-   * @param {number} rows lignes à calculer au plus
-   * @returns {boolean} vrai si la table est complète
-   */
-  warm(rows) {
-    if (this.#done) return true
-    const k1 = Math.floor(T.TO_MS / this.#step)
-    for (let n = 0; n < rows && this.#nextK <= k1; n++, this.#nextK++) {
-      const t = this.#nextK * this.#step
-      const p = this.#landingAt(t)
-      if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) this.#rows.push({ t, x: p.x, y: p.y })
-    }
-    if (this.#nextK > k1) {
-      this.#done = true
-      if (this.target) this.plan = this.#bestFor(this.target)
-    }
-    return this.#done
+  /* ---------- Cible ---------- */
+
+  /** 1er clic : plante la cible et lance la jauge (elle part du tir en cloche). */
+  place(x, y) {
+    this.move(x, y)
+    this.phase = 'power'
+    this.#t = 0
   }
 
-  /** Table des lâchers : un impact par pas de simulation de la fenêtre utile (complétée si besoin). */
-  get table() {
-    if (!this.#done) this.warm(Infinity)
-    return this.#rows
-  }
-
-  /**
-   * Place la cible et calcule l'instant de lâcher qui y mène.
-   * @param {{ lazy?: boolean }} [opts] lazy : ne pas forcer le calcul de la table (le plan viendra avec warm)
-   * @returns {{ release: number, landing: { x: number, y: number }, error: number, reachable: boolean } | null}
-   */
-  setTarget(x, y, { lazy = false } = {}) {
+  /** Déplace la cible sans toucher à la jauge (glissé, flèches). */
+  move(x, y) {
     Guard.number(x, 'target x')
     Guard.number(y, 'target y')
     this.target = { x, y }
-    this.plan = lazy && !this.#done ? null : this.#bestFor(this.target)
-    return this.plan
   }
 
-  clearTarget() {
+  /** Nouveau tour : on revient au choix de la cible (la dernière reste proposée). */
+  reset() {
+    this.phase = 'target'
+    this.#t = 0
+    this.#press = null
+  }
+
+  clear() {
     this.target = null
-    this.plan = null
+    this.reset()
   }
 
-  #bestFor(target) {
-    let best = null
-    for (const r of this.table) {
-      // L'écart horizontal pèse double : c'est lui que l'œil juge au sol.
-      const err = Math.hypot((r.x - target.x) * 1, (r.y - target.y) * 0.5)
-      if (!best || err < best.error) best = { release: r.t, landing: { x: r.x, y: r.y }, error: err }
+  /* ---------- Jauge ---------- */
+
+  /** Fait osciller la jauge (ms réelles). */
+  tick(dtMs) {
+    if (this.phase !== 'power') return
+    this.#t = (this.#t + Math.max(0, Math.min(dtMs, 100))) % (2 * this.#sweep)
+  }
+
+  /** Position de la jauge : 0 = cloche, 1 = tendu (aller-retour régulier). */
+  get gauge() {
+    const u = this.#t / this.#sweep
+    return Math.round((u <= 1 ? u : 2 - u) * 1000) / 1000
+  }
+
+  /** Angle de départ pour une position de jauge (degrés). */
+  static angleFor(g) {
+    const k = clamp(Guard.number(g, 'gauge'), 0, 1)
+    return T.LOB_ANGLE + (T.FLAT_ANGLE - T.LOB_ANGLE) * k
+  }
+
+  /**
+   * Vitesse de départ qui mène exactement à la cible, sous un angle donné.
+   * La courbe est obtenue par `predict` (même intégration que la physique,
+   * vent du moment compris) ; la vitesse est cherchée par dichotomie.
+   *
+   * @param {{ start: {x:number,y:number}, target: {x:number,y:number}, angle: number, dir?: 1|-1, vmax: number,
+   *   predict: (start: {x:number,y:number}, velocity: {x:number,y:number}) => {x:number,y:number}[] }} q
+   * @returns {{ velocity: {x:number,y:number}, speed: number, reachable: boolean }}
+   */
+  static solve({ start, target, angle, dir = 1, vmax, predict }) {
+    Guard.func(predict, 'predict')
+    Guard.number(vmax, 'vmax', { min: T.MIN_SPEED, max: 200 })
+    const a = (Guard.number(angle, 'angle', { min: 0, max: 89 }) * Math.PI) / 180
+    const vel = (v) => ({ x: Math.cos(a) * v * dir, y: -Math.sin(a) * v })
+    // Hauteur de la trajectoire à l'aplomb de la cible : sous un angle donné,
+    // plus on lance vite, plus la courbe passe haut (à la montée comme à la
+    // descente). On cherche la vitesse qui la fait passer par la cible.
+    const want = (target.x - start.x) * dir
+    const heightAt = (v) => {
+      const pts = predict(start, vel(v))
+      let prev = start
+      for (const p of pts) {
+        const a0 = (prev.x - start.x) * dir
+        const a1 = (p.x - start.x) * dir
+        if (a0 <= want && a1 >= want) {
+          const k = a1 === a0 ? 1 : (want - a0) / (a1 - a0)
+          return prev.y + (p.y - prev.y) * k
+        }
+        prev = p
+      }
+      // Retombé avant d'arriver à la cible : trop faible.
+      return Infinity
     }
-    if (!best) return null
-    return { ...best, reachable: best.error <= T.UNREACHABLE }
-  }
-
-  /* ---------- Pendant le balancier ---------- */
-
-  /**
-   * Où en est-on par rapport à l'instant parfait ?
-   * @param {number} simMs temps de balancier
-   * @returns {{ ms: number, approach: number, window: boolean } | null}
-   *   ms : temps restant avant l'instant parfait (négatif s'il est passé) ;
-   *   approach : 1 → 0, rayon relatif du cercle d'approche ; window : dans la note « Bien »
-   */
-  timing(simMs) {
-    if (!this.plan) return null
-    const ms = this.plan.release - simMs
-    const approach = Math.max(0, Math.min(1, ms / T.APPROACH_MS))
-    return { ms, approach, window: this.gradeAt(simMs).id !== 'miss' }
-  }
-
-  /**
-   * Repères sonores franchis entre deux instants : 'cue' (tic) ou 'now' (instant parfait).
-   * @returns {('cue'|'now')[]}
-   */
-  cues(prevSim, simMs) {
-    if (!this.plan || !(simMs > prevSim)) return []
-    const out = []
-    for (const c of T.CUES_MS) {
-      const at = this.plan.release + c
-      if (prevSim < at && simMs >= at) out.push('cue')
+    if (heightAt(vmax) > target.y) return { velocity: vel(vmax), speed: vmax, reachable: false }
+    let lo = T.MIN_SPEED
+    let hi = vmax
+    for (let i = 0; i < T.SOLVE_STEPS; i++) {
+      const mid = (lo + hi) / 2
+      if (heightAt(mid) > target.y) lo = mid
+      else hi = mid
     }
-    if (prevSim < this.plan.release && simMs >= this.plan.release) out.push('now')
-    return out
-  }
-
-  /**
-   * Note d'un lâcher : d'après l'écart entre son impact et l'impact IDÉAL (le
-   * meilleur possible pour cette cible). Une cible derrière un mur reste donc
-   * notable « Parfait » : on juge le geste, pas la position de la cible.
-   * @returns {{ id: 'perfect'|'great'|'good'|'miss', error: number }}
-   */
-  gradeAt(releaseMs) {
-    const ideal = this.plan?.landing
-    if (!this.target || !ideal) return { id: 'miss', error: Infinity }
-    // Instant le plus proche de la table (même pas que la simulation).
-    let row = null
-    for (const r of this.table) if (!row || Math.abs(r.t - releaseMs) < Math.abs(row.t - releaseMs)) row = r
-    if (!row || Math.abs(row.t - releaseMs) > this.#step) return { id: 'miss', error: Infinity }
-    const error = Math.hypot(row.x - ideal.x, (row.y - ideal.y) * 0.5)
-    const g = T.GRADES.find((x) => error <= x.within)
-    return { id: g ? g.id : 'miss', error }
-  }
-
-  /**
-   * Aide au lâcher (Facile) : un lâcher à quelques ms de l'instant parfait s'y cale.
-   * @param {number} releaseMs instant demandé
-   * @param {string} difficulty
-   * @returns {number | null} instant à utiliser, ou null s'il n'y a rien à corriger
-   */
-  assisted(releaseMs, difficulty) {
-    const w = T.ASSIST_MS[difficulty] ?? 0
-    if (!w || !this.plan?.reachable) return null
-    return Math.abs(releaseMs - this.plan.release) <= w ? this.plan.release : null
+    const speed = Math.round(((lo + hi) / 2) * 1e6) / 1e6
+    return { velocity: vel(speed), speed, reachable: true }
   }
 
   /* ---------- Geste ---------- */
 
-  /**
-   * Appui (doigt, souris, Espace).
-   * @param {{ armed: boolean, aiming: boolean }} state
-   * @returns {'release' | null} 'release' : lâcher tout de suite (second clic)
-   */
-  press(x, y, t, { armed, aiming }) {
-    if (armed) {
-      this.#press = null
-      return 'release'
-    }
-    this.#press = aiming ? { x, y, t, moved: false, held: false } : null
-    return null
+  /** Appui (doigt, souris). */
+  press(x, y) {
+    this.#press = { x, y, moved: false }
   }
 
   /**
@@ -233,35 +176,20 @@ export class TrebuchetInput {
    */
   drag(x, y) {
     const p = this.#press
-    if (!p || p.held) return false
+    if (!p) return false
     if (!p.moved && Math.hypot(x - p.x, y - p.y) >= T.DRAG_PX) p.moved = true
     return p.moved
   }
 
   /**
-   * Image par image pendant l'appui : maintenu assez longtemps sans bouger,
-   * l'appui libère le contrepoids (geste unique).
-   * @returns {'arm' | null}
-   */
-  hold(t) {
-    const p = this.#press
-    if (!p || p.moved || p.held || t - p.t < T.HOLD_MS) return null
-    p.held = true
-    return 'arm'
-  }
-
-  /**
    * Fin d'appui.
-   * @param {{ armed: boolean }} state
-   * @returns {'arm' | 'release' | null}
-   *   'release' : geste unique, la fronde part au relâcher ; 'arm' : appui bref (premier clic)
+   * @returns {'tap' | 'drag' | null} tap : un clic (cible, puis jauge) ; drag : glissé terminé
    */
-  unpress(t, { armed }) {
+  unpress() {
     const p = this.#press
     this.#press = null
-    if (!p || p.moved) return null
-    if (p.held) return armed ? 'release' : null
-    return armed ? null : 'arm'
+    if (!p) return null
+    return p.moved ? 'drag' : 'tap'
   }
 
   get pressing() {

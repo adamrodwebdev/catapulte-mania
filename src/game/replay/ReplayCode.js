@@ -44,6 +44,18 @@ const actionSchema = (raw, path) => {
       l: Schema.int({ min: 0, max: 3000 })(raw[4], `${path}.l`),
     }
   }
+  // v5.4 : trébuchet à deux clics — point d'impact (tx, ty) et position de la jauge (g).
+  if (k === 't' && raw.length === 7) {
+    return {
+      k,
+      d: AT(raw[1], `${path}.d`),
+      a: AMMO[Schema.int({ min: 0, max: AMMO.length - 1 })(raw[2], `${path}.a`)],
+      tx: Schema.number({ min: -5000, max: 10000 })(raw[3], `${path}.tx`),
+      ty: Schema.number({ min: -5000, max: 5000 })(raw[4], `${path}.ty`),
+      g: Schema.number({ min: 0, max: 1 })(raw[5], `${path}.g`),
+      l: Schema.int({ min: 0, max: 3000 })(raw[6], `${path}.l`),
+    }
+  }
   if (k === 'x' && raw.length === 2) return { k, d: STEPS(raw[1], `${path}.d`) }
   throw new ValidationError(path, 'unknown action')
 }
@@ -84,6 +96,7 @@ export class ReplayCode {
   static encode({ day = '', levelId, engine, name = '', log }) {
     const a = log.map((x) => {
       if (x.k === 'f') return ['f', x.d, AMMO.indexOf(x.a), exact(x.ang), exact(x.pow), x.l]
+      if (x.k === 't' && x.g !== undefined) return ['t', x.d, AMMO.indexOf(x.a), exact(x.tx), exact(x.ty), exact(x.g), x.l]
       if (x.k === 't') return ['t', x.d, AMMO.indexOf(x.a), exact(x.r), x.l]
       if (x.k === 'x') return ['x', x.d]
       throw new ValidationError('log', `action ${x.k} cannot be shared`)

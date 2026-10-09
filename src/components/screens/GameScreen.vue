@@ -98,9 +98,7 @@ function newTourney() {
 /** Bandeau « Au tour de… » (modes à deux). */
 const turnBanner = ref(null)
 let turnTimer = null
-/** Note du dernier lâcher au trébuchet (v5.3) : { grade, key } pendant un instant. */
-const timingBadge = ref(null)
-let timingTimer = null
+
 const aiming = computed(() => phase.value === 'playing' && hud.value?.state === 'aiming')
 
 /* ---------- Engin : catapulte ou trébuchet ---------- */
@@ -306,9 +304,8 @@ async function startLevel({ rebuild = false } = {}) {
     else if (result === 'armed') {
       coachNotify('arm')
       coachNotify('fire', ammo)
-    } else if (result === 'released') coachNotify('release')
+    } else if (result === 'aimed') coachNotify('target')
   })
-  controller.on('timing', ({ grade }) => showTiming(grade))
   controller.on('hud', (h) => (hud.value = h))
   controller.on('caption', (c) => {
     app.caption(c.key, c.side)
@@ -392,16 +389,6 @@ function destroyController() {
   controller = null
 }
 
-const GRADES = Object.freeze(['perfect', 'great', 'good', 'miss'])
-function showTiming(grade) {
-  if (!GRADES.includes(grade)) return
-  clearTimeout(timingTimer)
-  // Nouvelle clé à chaque lâcher : l'animation repart même si la note est la même.
-  timingBadge.value = { grade, key: Date.now() }
-  app.announce(t(`game.treb.grade.${grade}`))
-  timingTimer = setTimeout(() => (timingBadge.value = null), 1400)
-}
-
 function showTurn(name) {
   clearTimeout(turnTimer)
   turnBanner.value = t('game.turnOf', { name })
@@ -441,14 +428,13 @@ onMounted(() => {
   startLevel()
 })
 onBeforeUnmount(() => {
-  clearTimeout(timingTimer)
   window.removeEventListener('keydown', onKey)
   window.removeEventListener('keyup', onKeyUp)
   hudObs?.disconnect()
   destroyController()
 })
 watch(
-  () => [state.settings.trajectoryAid, state.settings.screenShake, state.settings.blood, state.settings.screams, state.settings.motion, state.systemReducedMotion, state.settings.slowSwing, state.settings.infiniteSwing],
+  () => [state.settings.trajectoryAid, state.settings.screenShake, state.settings.blood, state.settings.screams, state.settings.motion, state.systemReducedMotion, state.settings.slowSwing],
   () => {
     controller?.applySettings({ ...state.settings }, app.reducedMotion())
     if (coach && controller) controller.session.options.trajectoryAid = true
@@ -859,8 +845,6 @@ const ARROWS = Object.freeze({ ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 
 function onKeyUp(e) {
   const arrow = ARROWS[e.code]
   if (arrow) controller?.aimKey(arrow, false)
-  // Trébuchet (v5.3) : Espace maintenue puis relâchée = la fronde part au relâcher.
-  if ((e.code === 'Space' || e.code === 'Enter') && isTrebuchet.value) controller?.trebKey(false)
 }
 function onKey(e) {
   if (e.target instanceof HTMLElement && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) && e.target.type !== 'range') return
@@ -890,9 +874,7 @@ function onKey(e) {
     case 'Space':
     case 'Enter':
       if (e.target instanceof HTMLButtonElement) return
-      if (isTrebuchet.value) {
-        if (!e.repeat && phase.value === 'playing') controller?.trebKey(true)
-      } else fire()
+      if (!e.repeat) fire()
       break
     // Pas d'Échap : sur les portails, cette touche sert au navigateur (sortie du plein écran).
     case 'KeyP':
@@ -941,7 +923,6 @@ const canvasLabel = computed(() =>
     <template v-if="hud">
       <GameHud :hud="hud" :title="matchTitle" :subtitle="matchSubtitle" :coach="coachAnchor" @pause="pause" @powers="showPowers = !showPowers" />
       <p v-if="turnBanner" class="turn-banner" aria-hidden="true">{{ turnBanner }}</p>
-      <p v-if="timingBadge" :key="timingBadge.key" :class="['timing-badge', `timing-badge--${timingBadge.grade}`]" aria-hidden="true">{{ t(`game.treb.grade.${timingBadge.grade}`) }}</p>
 
       <PowersMenu
         v-if="showPowers && phase === 'playing'"
@@ -979,13 +960,13 @@ const canvasLabel = computed(() =>
         </button>
         <button
           type="button"
-          :class="['fire-btn', { 'fire-btn--split': hud.canActivate, 'fire-btn--release': hud.armed, 'coach-focus': coachAnchor === 'fire' }]"
+          :class="['fire-btn', { 'fire-btn--split': hud.canActivate, 'fire-btn--release': hud.trebPhase === 'power', 'coach-focus': coachAnchor === 'fire' }]"
           data-coach="fire"
-          :disabled="!aiming && !hud.canActivate && !hud.armed"
+          :disabled="(!aiming || hud.armed) && !hud.canActivate"
           @click="fire"
         >
           <AppIcon :name="hud.canActivate ? (hud.activateKind === 'dive' ? 'meteor' : 'volley') : 'target'" :size="28" />
-          <span>{{ hud.canActivate ? (hud.activateKind === 'dive' ? t('game.dive') : t('game.split')) : hud.armed ? t('game.treb.releaseBtn') : isTrebuchet ? t('game.treb.armBtn') : t('game.fire') }}</span>
+          <span>{{ hud.canActivate ? (hud.activateKind === 'dive' ? t('game.dive') : t('game.split')) : isTrebuchet ? (hud.trebPhase === 'power' ? t('game.treb.fireBtn') : t('game.treb.targetBtn')) : t('game.fire') }}</span>
         </button>
       </div>
       <CoachBubble v-if="coachStep && phase === 'playing'" :tool="coachTool" :step="coachStep" :progress="coachProgress" @skip="stopCoach" />
