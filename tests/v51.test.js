@@ -123,20 +123,3 @@ test('baliste en partie : munition spéciale = carreau spécial, mire toujours v
   s.destroy()
 })
 
-test('trébuchet : le repère d’impact suit le balancier et signale la cible', () => {
-  const s = new GameSession(LevelRepository.get(10), { difficulty: 'normal', completedLevels: 9, reducedMotion: true, engine: 'trebuchet' })
-  for (let i = 0; i < 200 && s.state !== 'aiming'; i++) s.update(33)
-  assert.equal(s.landing, null, 'rien avant le balancier')
-  s.trigger()
-  const xs = []
-  let on = false
-  for (let i = 0; i < 300 && s.armed; i++) {
-    s.update(16)
-    const l = s.landing
-    if (l) xs.push(l.x)
-    if (l?.onCastle) on = true
-  }
-  assert.ok(xs.length > 10, 'repère affiché pendant le balancier')
-  assert.ok(on, 'il passe sur le château')
-  s.destroy()
-})

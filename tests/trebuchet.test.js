@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { Trebuchet, TREBUCHET_X, TREBUCHET_UNLOCK, SWING_SCALE } from '../src/game/Trebuchet.js'
+import { Trebuchet, TREBUCHET_X, TREBUCHET_UNLOCK, SWING_SPEED } from '../src/game/Trebuchet.js'
 import { GameSession } from '../src/game/GameSession.js'
 import { LevelRepository } from '../src/game/levels/LevelRepository.js'
 import { tutorialSteps, TutorialCoach } from '../src/game/tutorial/Tutorial.js'
@@ -89,26 +89,31 @@ test('trébuchet : le lâcher tient compte du temps écoulé depuis la dernière
   assert.ok(ang(sb) < ang(sa))
 })
 
-test('ralenti variable : montée rapide, fenêtre de tir lente ; balancier lent = fenêtre plus longue', () => {
-  const real = (slow) => {
-    const t = new Trebuchet(TREBUCHET_X, { slow })
-    t.arm(() => {})
-    let ms = 0
-    let windowStart = null
-    while (t.simTime < 880 && ms < 20000) {
-      t.update(4)
-      ms += 4
-      if (windowStart === null && t.simTime >= 640) windowStart = ms
-    }
-    return { windup: windowStart, window: ms - windowStart }
+test('balancier fluide (v5.4) : vitesse constante, et le bras dessiné avance à chaque image', () => {
+  const t = new Trebuchet()
+  t.arm(() => {})
+  assert.equal(t.timeScale, SWING_SPEED)
+  let prev = t.rig.theta
+  let still = 0
+  for (let i = 0; i < 40 && t.armed; i++) {
+    t.update(16.7)
+    if (Math.abs(t.rig.theta - prev) < 1e-9) still++
+    prev = t.rig.theta
   }
-  const n = real(false)
-  const s = real(true)
-  assert.ok(n.windup < 1300, `montée ${n.windup} ms`)
-  assert.ok(n.window > 950 && n.window < 1300, `fenêtre normale ${n.window} ms`)
-  assert.ok(s.window > n.window * 1.35, `fenêtre lente ${s.window} ms`)
-  assert.ok(Math.abs(s.windup - n.windup) < 120, 'la montée ne ralentit pas')
-  assert.equal(SWING_SCALE.slow.windup, SWING_SCALE.normal.windup)
+  assert.equal(still, 0, 'aucune image figée : le dessin est interpolé entre deux pas')
+})
+
+test('lâcher programmé (v5.4) : la fronde part d’elle-même sous l’angle voulu', () => {
+  for (const angle of [60, 40, 15]) {
+    const release = Trebuchet.releaseFor(angle)
+    const t = new Trebuchet()
+    let shot = null
+    t.arm((s) => (shot = s))
+    t.scheduleRelease(release)
+    for (let i = 0; i < 400 && !shot; i++) t.update(16)
+    const got = (Math.atan2(-shot.velocity.y, shot.velocity.x) * 180) / Math.PI
+    assert.ok(Math.abs(got - angle) < 4, `${angle}° demandé, ${got.toFixed(1)}° obtenu`)
+  }
 })
 
 test('balancier infini : sans second clic, le bras revient et recommence, à l’identique', () => {
@@ -129,37 +134,34 @@ test('balancier infini : sans second clic, le bras revient et recommence, à l�
   assert.ok(Math.abs(shot.velocity.x - ref.velocity.x) < 1e-9 && Math.abs(shot.velocity.y - ref.velocity.y) < 1e-9)
 })
 
-test('balancier infini : refusé en Difficile (et donc à deux)', () => {
-  const easy = session({ infiniteSwing: true })
-  assert.equal(easy.infiniteSwing, true)
-  assert.equal(easy.catapult.infinite, true)
-  const hard = session({ infiniteSwing: true, difficulty: 'hard' })
-  assert.equal(hard.infiniteSwing, false)
-  assert.equal(hard.catapult.infinite, false)
-})
-
-test('partie au trébuchet : 1er appui = balancier (tir engagé), 2e = lâcher', () => {
+test('partie au trébuchet (v5.4) : 1er appui = point d’impact (la jauge part), 2e = tir', () => {
   const s = session()
   untilAiming(s)
   assert.equal(s.engine, 'trebuchet')
+  assert.equal(s.trebPhase, 'target')
+  assert.ok(s.trebInput.target, 'une cible proposée')
   const shots = s.shotsLeft
+  assert.equal(s.trigger(0), 'aimed')
+  assert.equal(s.trebPhase, 'power')
+  assert.equal(s.shotsLeft, shots, 'viser ne coûte rien')
+  for (let i = 0; i < 20; i++) s.update(16)
+  assert.ok(s.trebGauge > 0, 'la jauge oscille')
   assert.equal(s.trigger(0), 'armed')
   assert.equal(s.shotsLeft, shots - 1)
   assert.equal(s.armed, true)
-  assert.equal(s.hud.armed, true)
+  assert.equal(s.trigger(0), false, 'pendant le balancier, rien à faire : le lâcher est programmé')
   assert.equal(s.world.filter((e) => e.kind === 'projectile').length, 0, 'le projectile reste dans la fronde')
-  for (let i = 0; i < 40; i++) s.update(16)
-  assert.equal(s.trigger(0), 'released')
+  for (let i = 0; i < 200 && s.armed; i++) s.update(16)
   assert.equal(s.armed, false)
   assert.equal(s.world.filter((e) => e.kind === 'projectile').length, 1)
-  assert.equal(s.shotsLeft, shots - 1, 'le lâcher ne coûte pas un second tir')
 })
 
 test("partie au trébuchet : le tour ne se termine pas tant que la fronde n'a pas lâché", () => {
   const s = session()
   untilAiming(s)
   s.trigger(0)
-  for (let i = 0; i < 30; i++) s.update(16)
+  s.trigger(0)
+  for (let i = 0; i < 10; i++) s.update(16)
   assert.equal(s.state, 'flying')
   assert.equal(s.armed, true)
 })
@@ -180,14 +182,21 @@ test('face-à-face : toujours à la catapulte ; engin inconnu refusé', () => {
   assert.throws(() => session({ slowSwing: 'oui' }))
 })
 
-test('aide à la trajectoire au trébuchet : visible seulement pendant le balancier', () => {
-  const s = session({ trajectoryAid: true })
-  untilAiming(s)
-  assert.equal(s.trajectory, null)
-  s.trigger(0)
-  for (let i = 0; i < 60; i++) s.update(16)
-  const pts = s.trajectory
-  assert.ok(Array.isArray(pts) && pts.length > 1)
+test('courbe du trébuchet (v5.4) : en direct pendant la jauge ; sans l’aide, seulement le début', () => {
+  const full = session({ trajectoryAid: true })
+  untilAiming(full)
+  assert.equal(full.scene().trebAim.path, null, 'pas de courbe avant de viser')
+  full.trigger(0)
+  full.update(16)
+  const a = full.scene().trebAim
+  assert.equal(a.phase, 'power')
+  assert.ok(a.path.length > 3)
+  assert.equal(full.trajectory, null, 'la courbe du trébuchet passe par trebAim')
+  const hint = session({ trajectoryAid: false })
+  untilAiming(hint)
+  hint.trigger(0)
+  hint.update(16)
+  assert.ok(hint.scene().trebAim.path.length < a.path.length)
 })
 
 test("le trébuchet se débloque après le niveau 3 ; le 4 est son niveau d'apprentissage (v4.2 : montré tôt)", () => {
@@ -195,12 +204,12 @@ test("le trébuchet se débloque après le niveau 3 ; le 4 est son niveau d'appr
   assert.equal(LevelRepository.tutorialFor(4), 'engine:trebuchet')
   assert.ok(LevelRepository.novelties(4).includes('engine:trebuchet'))
   const steps = tutorialSteps('engine:trebuchet')
-  assert.deepEqual(steps.map((x) => x.until), ['arm', 'release', 'turn', 'arm'])
+  assert.deepEqual(steps.map((x) => x.until), ['target', 'arm', 'turn', 'arm'])
   const coach = new TutorialCoach('engine:trebuchet')
   coach.notify('fire')
-  assert.equal(coach.step.id, 'arm')
+  assert.equal(coach.step.id, 'target')
+  coach.notify('target')
   coach.notify('arm')
-  coach.notify('release')
   assert.equal(coach.step.id, 'watch')
 })
 
@@ -223,6 +232,7 @@ test("trébuchet : un clic pendant la remise en batterie n'est jamais perdu", ()
   s.trigger(0)
   for (let i = 0; i < 2000 && s.state !== 'aiming'; i++) s.update(16)
   assert.equal(s.state, 'aiming')
+  assert.equal(s.trigger(0), 'aimed')
   assert.equal(s.trigger(0), 'armed')
 })
 
@@ -230,8 +240,8 @@ test('trébuchet : projectiles plus lourds que ceux de la catapulte', () => {
   const s = session()
   untilAiming(s)
   s.trigger(0)
-  for (let i = 0; i < 40; i++) s.update(16)
   s.trigger(0)
+  for (let i = 0; i < 200 && s.armed; i++) s.update(16)
   const p = s.world.filter((e) => e.kind === 'projectile')[0]
   const c = new GameSession(LevelRepository.get(20), { difficulty: 'normal', completedLevels: 30, reducedMotion: true })
   untilAiming(c)

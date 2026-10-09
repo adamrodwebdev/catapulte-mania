@@ -31,9 +31,11 @@ function play(level, engine, shots) {
       s.aim(shot.angle, shot.power)
       s.trigger(0)
     } else {
+      // v5.4 : 1er appui = cible proposée validée, la jauge oscille ; 2e appui = tir.
+      if (shot.dx) s.nudgeTrebTarget(shot.dx)
       s.trigger(0)
-      while (s.armed && s.catapult.simTime < shot.release) frame()
-      s.trigger(7)
+      for (let i = 0; i < shot.gaugeFrames; i++) frame()
+      s.trigger(0)
     }
     for (let i = 0; i < 2000 && s.state !== 'aiming' && !ended; i++) frame()
   }
@@ -82,9 +84,9 @@ for (const engine of ['catapult', 'trebuchet']) {
             { wait: 12, ammo: 'stone', angle: 55, power: 0.78 },
           ]
         : [
-            { wait: 5, ammo: 'stone', release: 700 },
-            { wait: 9, ammo: 'stone', release: 760 },
-            { wait: 2, ammo: 'stone', release: 730 },
+            { wait: 5, ammo: 'stone', gaugeFrames: 23 },
+            { wait: 9, ammo: 'stone', gaugeFrames: 61, dx: -40 },
+            { wait: 2, ammo: 'stone', gaugeFrames: 7, dx: 60 },
           ]
     const original = play(level, engine, shots)
     const log = original.session.log
@@ -97,6 +99,22 @@ for (const engine of ['catapult', 'trebuchet']) {
     assert.equal(again.session.targetsLeft, original.session.targetsLeft)
   })
 }
+
+test('« Bats mon tir » : un lien de trébuchet d’avant la v5.4 (instant de lâcher) se rejoue encore', () => {
+  const enc = (o) => Buffer.from(JSON.stringify(o)).toString('base64url')
+  const code = enc({ v: 2, day: '', l: 20, e: 'trebuchet', n: '', a: [['t', 60, 0, 730, 70]] })
+  const r = replay(code)
+  assert.ok(r.session.log.some((x) => x.k === 't'), 'le tir a été rejoué')
+  assert.ok(r.session.world.filter((e) => e.kind === 'projectile').length > 0 || r.ended || r.session.state === 'aiming')
+})
+
+test('code de défi : trébuchet v5.4 — cible et jauge validées', () => {
+  const enc = (o) => Buffer.from(JSON.stringify(o)).toString('base64url')
+  const base = { v: 2, day: '', l: 20, e: 'trebuchet', n: '', a: [['t', 60, 0, 1200, 880, 0.4, 70]] }
+  assert.equal(ReplayCode.decode(enc(base)).actions[0].g, 0.4)
+  assert.throws(() => ReplayCode.decode(enc({ ...base, a: [['t', 60, 0, 1200, 880, 1.4, 70]] })))
+  assert.throws(() => ReplayCode.decode(enc({ ...base, a: [['t', 60, 0, 'x', 880, 0.4, 70]] })))
+})
 
 test('code de défi : données non fiables refusées (format, pouvoirs, engin, défi du jour)', () => {
   assert.throws(() => ReplayCode.decode(''))

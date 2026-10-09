@@ -8,7 +8,7 @@ Réglez l'angle et la puissance, calculez la trajectoire, et faites tomber les f
 - **Terrains vivants** : lacs (le boulet ricoche une fois puis coule), lave (tout fond, sauf le givre qui la fige), neige (le boulet roule et grossit en boule de neige), montagnes indestructibles, corbeaux qui arrêtent les tirs et vouivres porteuses de feu grégeois
 - **6 munitions** débloquées tôt (feu au niveau 3, rocher au 5, givre au 7, bombe au 10, mitraille au 14) ; le rocher **perce** les murs de pierre ; le **givre** rend les blocs cassants, et le feu sur la glace libère une vapeur brûlante
 - **Rondes et ogres** : des défenseurs qui patrouillent, et des ogres qui renvoient les tirs d'un revers de massue
-- **3 engins** : catapulte, trébuchet (on plante un fanion-cible, un cercle et trois tics annoncent l'instant parfait, chaque lâcher est noté) et, pour les meilleurs joueurs, la **baliste** (70 niveaux et 180 étoiles) dont le carreau traverse les montagnes
+- **3 engins** : catapulte, trébuchet (deux clics : on touche le point d'impact, puis on fige la jauge entre tir en cloche et tir tendu) et, pour les meilleurs joueurs, la **baliste** (70 niveaux et 180 étoiles) dont le carreau traverse les montagnes
 - 7 pouvoirs spéciaux qui changent la partie (Œil du faucon, Force du Titan, Pierre d'aimant, Météore, Pluie de feu, Colère du ciel, Séisme) : un seul par tour, chaque utilisation coûte des points
 - **Mode libre** : rejouer les niveaux terminés sans limite de tirs ni de munitions
 - **Deux joueurs** sur le même appareil : la campagne à deux en coopération, le duel, le tournoi et le face-à-face, chacun avec ses propres conditions de victoire
@@ -66,8 +66,8 @@ On peut l'envoyer par e-mail, le mettre sur une clé USB ou l'héberger sur n'im
 | Choisir un projectile | Cliquer sur un projectile en bas | Touches 1 à 5 |
 | Diviser la mitraille en vol | Bouton « Diviser » | Espace |
 | Pause | Bouton ⏸ en haut à gauche | P ou Échap |
-| **Trébuchet** : placer la cible | Glisser le doigt sur le terrain | Flèches ← → (avec Maj : petits pas) |
-| **Trébuchet** : lancer le balancier, puis lâcher | Toucher la scène deux fois (ou « Armer », puis « Lâcher ! »), ou garder le doigt posé et le lever au bon moment | Espace ou Entrée deux fois, ou maintenue puis relâchée |
+| **Trébuchet** : 1. choisir le point d'impact | Toucher exactement l'endroit visé (glisser pour l'ajuster), ou bouton « Viser ici » | Flèches ← → pour déplacer le point (Maj : petits pas), Espace ou Entrée pour valider |
+| **Trébuchet** : 2. choisir l'arc et tirer | Toucher à nouveau quand la jauge (cloche ↔ tendu) convient, ou bouton « Tirer ! » | Espace ou Entrée |
 
 **Autres modes (v4.0) :**
 - **Siège sans fin** : des châteaux qui s'enchaînent, de plus en plus durs ; chaque château abattu rapporte des tirs, le siège s'arrête quand un château résiste.
@@ -78,7 +78,7 @@ On peut l'envoyer par e-mail, le mettre sur une clé USB ou l'héberger sur n'im
 
 **Le trébuchet (v3.7) :** débloqué après le niveau 3 (le niveau 4 l'enseigne), il se choisit ensuite avant chaque niveau, à la place de la catapulte (sauf au face-à-face). Il ne se vise pas : **il se joue uniquement au clic**. Le premier clic libère le contrepoids, le bras se met à tourner ; le second lâche la fronde. Lâcher tôt donne un tir en cloche (trop tôt : le projectile part en arrière), lâcher tard un tir tendu (trop tard : dans le sol). Il tire de plus loin que la catapulte, mais frappe plus fort (ses pierres sont une fois et demie plus lourdes), et la caméra suit le projectile jusqu'au château puis reste sur l'effondrement. La physique est réelle : le bras obéit à son contrepoids, le projectile est une masse au bout d'une corde, et il part avec la vitesse qu'il avait au moment du lâcher.
 
-**Viser au trébuchet (v5.3) :** un fanion doré marque la cible (au début de chaque tour, le défenseur le plus proche) ; glissez sur le terrain pour le déplacer. Le jeu calcule l'instant exact où lâcher pour toucher ce point. Pendant le balancier, un cercle se referme sur le fanion et trois tics comptent les temps : lâchez sur le quatrième. Chaque lâcher reçoit une note : Parfait, Très bien, Bien ou Raté. En Facile, un lâcher presque parfait est corrigé ; en Difficile, il n'y a plus que les tics pour vous guider.
+**Viser au trébuchet (v5.4) :** touchez exactement l'endroit où le projectile doit percuter : un fanion s'y plante. Une jauge se met alors à osciller entre **tir en cloche** et **tir tendu**, et la courbe du tir suit en direct : on voit si l'arc passe au-dessus du rempart ou s'il frappe le mur de face. Touchez une seconde fois pour figer la jauge : le trébuchet tire tout seul, et le projectile arrive pile sur le fanion (en Difficile, les rafales de vent peuvent encore le dévier). Sans l'aide à la trajectoire, seul le début de la courbe est montré.
 
 **Astuce :** certains châteaux ont un point faible (un pied en verre, un étage en paille, une poudrière…). Trouvez-le et tout s'écroule.
 
@@ -218,7 +218,7 @@ Tout se règle dans **Réglages** (et une partie directement depuis la pause) :
 
 - **Aide à la visée** : affiche la trajectoire prévue du projectile en pointillés.
 - **Puissance au début du tour** : 100 % par défaut (ou 75 %, 50 %, ou « Garder » la dernière visée).
-- **Balancier lent** (trébuchet) : la fenêtre de tir dure plus longtemps, l'instant du lâcher est plus facile à choisir. **Balancier infini** (sauf en Difficile) : sans second clic, le bras revient et recommence. Un **tic sonore** de plus en plus aigu suit l'angle du tir pendant le balancier : on peut lâcher à l'oreille. Avec l'aide à la visée, la trajectoire du tir « si je lâchais maintenant » s'affiche en direct.
+- **Jauge lente** (trébuchet) : la jauge cloche ↔ tendu oscille plus lentement, l'arc est plus facile à choisir. Un **tic sonore** de plus en plus aigu suit l'angle de la fronde pendant le balancier.
 - **Tutoriels guidés** et **récit** (la Chronique) : activables ou non.
 - **Musique** : volume séparé des effets sonores (0 % pour la couper). Ses moments intenses sont aussi sous-titrés.
 - **Sous-titres des sons** (malentendants) : chaque bruit important est écrit à l'écran avec sa direction, par exemple `◀ [Bois brisé]`.
@@ -372,7 +372,7 @@ src/
 │   ├── physics/            Monde physique (Matter.js)
 │   ├── entities/           Entity → Block, Projectile, Target, Barrel
 │   ├── levels/             Les 100 niveaux (plans réutilisables), les arènes du face-à-face, les châteaux de duel
-│   ├── aim/                AimInput → la visée au geste et au clavier ; TrebuchetInput → cible, instant de lâcher et note du trébuchet (modules purs, testés)
+│   ├── aim/                AimInput → la visée au geste et au clavier ; TrebuchetInput → point d'impact, jauge et calcul du tir du trébuchet (modules purs, testés)
 │   ├── powers/             Power → les 7 pouvoirs, PowerRegistry
 │   ├── score/              ScoreKeeper, règles de score et d'étoiles
 │   ├── rendering/          Renderer, Camera
@@ -471,6 +471,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v5.1.0 | Lacs et lave réalistes, rondes des défenseurs, ogres, repère d'impact du trébuchet, baliste (arme ultime) |
 | v5.2.0 | Visée professionnelle : module AimInput (pas de 0,5°, mode précision, annulation, clavier accéléré, molette), viseur gradué et repères du tir précédent |
 | v5.3.0 | Commande du trébuchet : module TrebuchetInput (fanion-cible, instant de lâcher calculé, cercle d'approche et décompte sonore, geste unique, note de chaque lâcher, aide en Facile) |
+| v5.4.0 | Trébuchet à deux clics : point d'impact exact, puis jauge cloche ↔ tendu avec la courbe en direct ; balancier fluide (dessin interpolé) |
 | v4.2.0 | Qualité des premières minutes (refus CrazyGames) : premier tir réussi, tutoriel en images, tirer-relâcher, barre de commandes compacte, caméra qui garde l'impact visible, trébuchet dès le niveau 4 |
 | v4.1.1 | Versions portails jouables dans le cadre isolé de CrazyGames (script classique unique), démarrage plus robuste |
 | v4.1.0 | Conformité CrazyGames : vidéos récompensées hors du jeu, langue du portail (anglais à défaut), démarrage en un clic, son coupé par le portail |

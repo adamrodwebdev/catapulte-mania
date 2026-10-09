@@ -12,7 +12,7 @@ import { deepFreeze, Guard } from '../../core/utils/Guard.js'
  *  - 'power:<id>'   : le pouvoir <id> est activé
  *  - 'fire' / 'fire:<t>' : un tir (de la munition <t>) part
  *  - 'turn'         : le tir est terminé, la main revient au joueur
- *  - 'arm' / 'release' : trébuchet, balancier lancé / fronde lâchée
+ *  - 'target' / 'arm' : trébuchet, point d'impact choisi / tir lancé (jauge figée)
  *
  * `anchor` désigne l'élément de l'interface à mettre en valeur
  * (attribut `data-coach` du même nom).
@@ -29,10 +29,10 @@ const IMMEDIATE = new Set(['quake', 'lightning'])
 export function tutorialSteps(tool) {
   Guard.string(tool, 'tutorial tool', { pattern: /^(?:aim|drag|ammo:[a-z]+|power:[a-z]+|engine:trebuchet)$/ })
   if (tool === 'engine:trebuchet') {
-    // Le trébuchet : 1er clic pour lancer le balancier, 2e clic pour lâcher.
+    // Le trébuchet (v5.4) : 1er clic = point d'impact, 2e clic = arc (jauge).
     return deepFreeze([
-      { id: 'arm', anchor: 'fire', until: 'arm' },
-      { id: 'release', anchor: 'fire', until: 'release' },
+      { id: 'target', anchor: null, until: 'target' },
+      { id: 'power', anchor: 'fire', until: 'arm' },
       { id: 'watch', anchor: null, until: 'turn' },
       { id: 'done', anchor: null, until: 'arm' },
     ])

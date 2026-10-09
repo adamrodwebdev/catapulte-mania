@@ -23,6 +23,7 @@ const DEFINITIONS = Object.freeze({
   // Accessibilité : balancier du trébuchet encore plus lent (lâcher plus facile).
   slowSwing: { validate: Schema.boolean(), fallback: false },
   // Balancier infini du trébuchet (sauf en Difficile) : tout le temps de choisir son tir.
+  // Balancier infini : sans objet depuis la v5.4 (lâcher programmé) ; gardé pour relire les anciens réglages.
   infiniteSwing: { validate: Schema.boolean(), fallback: false },
   // Portails : sous-titres de bruitages proposés dans les options, pas imposés (image dégagée).
   captions: { validate: Schema.boolean(), fallback: !IS_PORTAL },

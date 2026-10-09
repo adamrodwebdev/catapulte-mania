@@ -2,6 +2,42 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [5.4.0] – 2026-10-09
+### Trébuchet à deux clics (module `src/game/aim/TrebuchetInput.js` réécrit)
+Le chronométrage du lâcher laissait trop peu de temps pour viser. Le trébuchet
+se joue désormais en deux clics, sans aucun réflexe à avoir :
+1. **Point d'impact** : on touche exactement l'endroit où le projectile doit
+   percuter (un fanion s'y plante ; glisser l'ajuste, ← → au clavier).
+2. **Arc** : une jauge oscille entre **tir en cloche** et **tir tendu** ; la
+   courbe du tir suit en direct et s'arrête au premier obstacle (on voit si
+   l'arc passe le rempart). Un second clic fige la jauge.
+
+Le trébuchet tire alors tout seul : la fronde s'ouvre quand elle a l'angle
+choisi, avec la vitesse calculée pour arriver **pile sur le point touché**
+(écart mesuré : quelques pixels), dans la limite de la puissance de l'engin
+(fanion gris barré si la cible est hors de portée). En Difficile, les rafales
+de vent à venir peuvent encore dévier le tir ; un tir en cloche, plus long, y
+est plus exposé.
+- Jauge plus lente en Facile, plus vive en Difficile ; l'option « Balancier
+  lent » devient « Jauge lente ». Sans l'aide à la trajectoire, seul le début
+  de la courbe est montré.
+- Cadran de la jauge au-dessus de l'engin, avec des pictogrammes (arc haut =
+  cloche, trait = tendu) lisibles dans toutes les langues ; panneau en deux
+  étapes (« 1. Touchez le point d'impact », « 2. Touchez pour fixer l'arc »),
+  angle et puissance du tir.
+- Tutoriel du niveau 4, aide, textes du clavier et histoire mis à jour (FR, EN, ID).
+- Liens « Bats mon tir » : le point d'impact et la position de la jauge sont
+  enregistrés, et le tir est recalculé à l'identique (jamais une vitesse
+  fournie par le lien) ; les liens d'avant la v5.4 se rejouent encore.
+
+### Balancier fluide
+- Le bras tournait par à-coups : au ralenti, la simulation n'avançait qu'une
+  image sur deux ou trois. Le balancier tourne maintenant à vitesse constante
+  et son dessin est **interpolé** entre deux pas de simulation : il avance à
+  chaque image, quelle que soit la fréquence de l'écran.
+- Supprimés : décompte sonore, note du lâcher et balancier infini (sans objet
+  sans chronométrage).
+
 ## [5.3.0] – 2026-10-08
 ### Commande du trébuchet (nouveau module `src/game/aim/TrebuchetInput.js`)
 Même démarche que la visée de la v5.2, appliquée au trébuchet. Inspirée de la

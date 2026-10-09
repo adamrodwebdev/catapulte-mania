@@ -60,7 +60,11 @@ export class ReplayPlayer {
       else {
         s.selectAmmo(next.a)
         if (next.k === 'f') s.aim(next.ang, next.pow)
-        s.fire()
+        if (next.k === 't' && next.g !== undefined) {
+          // v5.4 : point d'impact puis jauge, comme le joueur.
+          s.placeTrebTarget(next.tx, next.ty)
+          s.fire(0, { arc: next.g })
+        } else s.fire()
         this.#current = next
       }
     } else if (s.state === STATE.AIMING && !next) {

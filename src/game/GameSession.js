@@ -13,7 +13,7 @@ import { Barrel } from './entities/Barrel.js'
 import { Flyer } from './entities/Flyer.js'
 import { Projectile, PROJECTILE_TYPES } from './entities/Projectile.js'
 import { Catapult, AIM } from './Catapult.js'
-import { Trebuchet, TREBUCHET_X, TREBUCHET_MASS, TREBUCHET_STEP } from './Trebuchet.js'
+import { Trebuchet, TREBUCHET_X, TREBUCHET_MASS, TREBUCHET_TOP_SPEED } from './Trebuchet.js'
 import { TrebuchetInput } from './aim/TrebuchetInput.js'
 import { Ballista } from './Ballista.js'
 import { TrajectoryPredictor } from './TrajectoryPredictor.js'
@@ -57,8 +57,8 @@ export const ENGINES = Object.freeze(['catapult', 'trebuchet', 'ballista'])
 /** Couleurs des fanions des joueurs (modes à deux). */
 const PLAYER_FLAGS = Object.freeze(['#a3322b', '#3d7a3a'])
 
-/** Trébuchet : lignes de la table des lâchers calculées par image (≈ 15 images par tour). */
-const TREB_WARM_ROWS = 3
+/** Trébuchet : sans aide à la trajectoire, seul le début de la courbe est montré pendant la jauge. */
+const TREB_PATH_HINT = 0.45
 
 /**
  * Une partie (un niveau joué) : orchestre la physique, la ou les catapultes,
@@ -130,9 +130,7 @@ export class GameSession extends EventBus {
   #hintUsed = false
   #freePowerUsed = false
   /** Point d'impact prévu du trébuchet (cache par pas de simulation). */
-  #landingCache = null
   /** Le repère d'impact était-il sur le château à l'image précédente ? (signal sonore) */
-  #landingOn = false
   /** Tir suivi pour tracer sa trajectoire (repère fantôme du tir suivant). */
   #tracked = null
   /** Repère sonore du balancier : dernière tranche de 15° annoncée. */
@@ -177,8 +175,8 @@ export class GameSession extends EventBus {
     this.#introCam = reducedMotion || this.#replay ? 0 : INTRO_CAM_MS
     /** Événement saisonnier (décor seulement). */
     this.season = season === 'halloween' || season === 'winter' ? season : null
-    /** Balancier infini : option du joueur, jamais en Difficile (ni donc à deux). */
-    this.infiniteSwing = infiniteSwing && this.#difficulty !== 'hard'
+    /** Balancier infini : sans objet depuis la v5.4 (le lâcher est programmé), gardé pour les réglages. */
+    this.infiniteSwing = false
 
     // Un état par joueur : catapulte (et sa visée), score, tirs, munitions.
     // Campagne à deux : un seul score commun aux deux joueurs.
@@ -192,7 +190,7 @@ export class GameSession extends EventBus {
         // `catapult` désigne l'engin du joueur, catapulte ou trébuchet.
         catapult:
           this.#engine === 'trebuchet'
-            ? new Trebuchet(TREBUCHET_X, { speedFactor: fx.speedFactor, slow: slowSwing, infinite: this.infiniteSwing })
+            ? new Trebuchet(TREBUCHET_X, { speedFactor: fx.speedFactor })
             : this.#engine === 'ballista'
               ? new Ballista(CATAPULT_X.left, { speedFactor: fx.speedFactor })
               : new Catapult(right ? CATAPULT_X.right : CATAPULT_X.left, { dir: right ? -1 : 1, speedFactor: fx.speedFactor }),
@@ -227,8 +225,8 @@ export class GameSession extends EventBus {
     for (const f of level.flyers ?? []) this.world.add(new Flyer(f))
     this.#applyStartPower()
     this.#loadEngine()
-    // Trébuchet (v5.3) : cible au sol et chronométrage du lâcher (voir aim/TrebuchetInput.js).
-    this.trebInput = this.#engine === 'trebuchet' ? new TrebuchetInput({ landingAt: (t) => this.#landingFor(t), step: TREBUCHET_STEP }) : null
+    // Trébuchet (v5.4) : 1er clic = point d'impact, 2e clic = arc (voir aim/TrebuchetInput.js).
+    this.trebInput = this.#engine === 'trebuchet' ? new TrebuchetInput({ sweepMs: TrebuchetInput.sweepFor(this.#difficulty, slowSwing) }) : null
     this.#bindWorldEvents()
     this.#rollWind()
     // Niveau 1 : premier tir déjà réglé ; niveaux 2 et 3 : le joueur vise, la trajectoire le guide.
@@ -402,13 +400,13 @@ export class GameSession extends EventBus {
       wind: Math.round(this.world.wind * 100) / 100,
       ...this.#windView(),
       // Valeurs exactes de la visée (pas de 0,5° et 0,5 %, v5.2).
-      angle: Math.round(this.catapult.angle * 2) / 2,
-      power: Math.round(this.catapult.power * 200) / 2,
+      angle: this.#engine === 'trebuchet' ? this.#trebHud().angle : Math.round(this.catapult.angle * 2) / 2,
+      power: this.#engine === 'trebuchet' ? this.#trebHud().power : Math.round(this.catapult.power * 200) / 2,
       engine: this.#engine,
       armed: this.armed,
-      landing: this.#landingView(),
+      trebPhase: this.trebPhase,
+      trebBar: this.#trebBar(),
       rewinding: this.rewinding,
-      infiniteSwing: this.infiniteSwing,
       ammo: this.ammo,
       powers: this.powers,
       canActivate: this.#activeProjectiles().some((p) => p.canActivate),
@@ -419,96 +417,144 @@ export class GameSession extends EventBus {
     }
   }
 
-  /**
-   * Trébuchet (v5.1) : point d'impact du tir si l'on lâchait la fronde
-   * maintenant (vent du tour compris, rafales à venir non comprises). Le repère
-   * balaie le terrain pendant le balancier : on lâche quand il passe sur la
-   * cible. En Difficile, il est volontairement flou (`spread`).
-   * @returns {{ x: number, y: number, spread: number, onCastle: boolean } | null}
-   */
-  get landing() {
-    if (this.#engine !== 'trebuchet' || !this.armed || this.#replay) return null
-    const key = `${this.world.time}:${this.catapult.simTime}`
-    if (this.#landingCache?.key === key) return this.#landingCache.value
-    const pts = TrajectoryPredictor.predict(this.catapult.launchPoint, this.catapult.velocity, {
-      wind: this.#pendingPower === 'falcon' ? 0 : this.world.wind,
-      obstacles: this.world.filter((e) => e.kind === 'block' || e.kind === 'barrel' || e.kind === 'target'),
-      maxPoints: 220,
-      every: 6,
-    })
-    const last = pts[pts.length - 1]
-    let value = null
-    if (last && last.x > this.catapult.x + 60) {
-      const left = this.#castleLeft()
-      value = { x: last.x, y: last.y, spread: this.#difficulty === 'hard' ? 46 : this.#difficulty === 'normal' ? 14 : 0, onCastle: last.x >= left - 20 && last.x <= this.focus.right }
-    }
-    this.#landingCache = { key, value }
-    return value
-  }
+  /* ---------- Trébuchet (v5.4) ---------- */
 
-  /**
-   * Trébuchet : point d'impact d'un lâcher à l'instant `releaseMs` (vent du
-   * tour, décor actuel). Sert à la table des lâchers de TrebuchetInput.
-   */
-  #landingFor(releaseMs) {
-    const c = this.catapult
-    const shot = Trebuchet.preview(releaseMs, { x: c.x, dir: c.dir, speedFactor: c.speedFactor, loadRadius: PROJECTILE_TYPES[this.player.selectedAmmo].radius })
-    if (!shot) return null
-    const pts = TrajectoryPredictor.predict(shot.point, shot.velocity, {
-      wind: this.#pendingPower === 'falcon' ? 0 : this.world.wind,
-      obstacles: this.#trebObstacles ?? [],
-      maxPoints: 220,
-      every: 6,
-    })
-    const last = pts[pts.length - 1]
-    return last && last.x > c.x + 60 ? { x: last.x, y: last.y } : null
-  }
-
-  /** Obstacles figés au moment du calcul de la table (évite de les relire 60 fois). */
-  #trebObstacles = null
   /** La cible a été choisie par le joueur (sinon : le défenseur le plus proche). */
   #userTarget = false
-  /** La table a été préparée pour ce tour (sinon rien à réchauffer : relecture). */
-  #refreshed = false
+  /** Tir programmé (après le 2e clic) : sa courbe reste affichée jusqu'au lâcher. */
+  #trebLocked = null
 
   /**
-   * Le joueur place la cible du trébuchet (glissé sur le terrain).
-   * @returns {object | null} le plan (instant idéal, impact, écart)
+   * Prédiction du vol pour le trébuchet : vent du moment, rafale du moment
+   * figée (Difficile) ; les rafales à venir restent imprévisibles.
    */
-  setTrebTarget(x, y) {
-    if (!this.trebInput || this.#state !== STATE.AIMING || this.armed) return null
-    Guard.number(x, 'target x', { min: -2000, max: 6000 })
-    Guard.number(y, 'target y', { min: -2000, max: 2000 })
-    this.#userTarget = true
-    // La table des lâchers est déjà calculée pour ce tour : déplacer la cible ne coûte qu'une lecture.
-    const plan = this.trebInput.setTarget(x, Math.min(y, WORLD.GROUND_Y))
-    this.emit('hud', this.hud)
-    return plan
+  #trebPredict(ammo, { obstacles = [], maxPoints = 600, every = 1 } = {}) {
+    const field = this.world.windField
+    const calm = this.#pendingPower === 'falcon'
+    const windage = windageOf({ type: ammo, radius: PROJECTILE_TYPES[ammo].radius })
+    const time = this.world.time
+    return (start, velocity) =>
+      TrajectoryPredictor.predict(start, velocity, {
+        wind: calm ? 0 : this.world.wind,
+        windAccel: calm || !field.dynamic ? null : field.frozen(start.x, time, windage),
+        obstacles,
+        maxPoints,
+        every,
+      })
   }
 
-  /** Clavier : décale la cible du trébuchet de `dx` unités du monde. */
+  /**
+   * Tir du trébuchet pour une position de jauge (0 = cloche, 1 = tendu) :
+   * instant de lâcher (la fronde part sous l'angle voulu), point de départ, et
+   * vitesse qui mène exactement à la cible — sans dépasser la vitesse de
+   * pointe de l'engin.
+   * @returns {{ gauge: number, angle: number, release: number, point: {x:number,y:number}, velocity: {x:number,y:number}, speed: number, reachable: boolean } | null}
+   */
+  trebShot(gauge, ammo = this.player.selectedAmmo) {
+    const ti = this.trebInput
+    if (!ti?.target) return null
+    Guard.number(gauge, 'gauge', { min: 0, max: 1 })
+    const c = this.catapult
+    const angle = TrebuchetInput.angleFor(gauge)
+    const loadRadius = PROJECTILE_TYPES[ammo].radius
+    const release = Trebuchet.releaseFor(angle, { loadRadius })
+    const natural = Trebuchet.preview(release, { x: c.x, dir: c.dir, speedFactor: c.speedFactor, loadRadius })
+    if (!natural) return null
+    // Au sol, c'est le bas du boulet qui touche : son centre vise un rayon plus haut.
+    const aim = { x: ti.target.x, y: Math.min(ti.target.y, WORLD.GROUND_Y - loadRadius) }
+    // Le contrepoids est « ajusté » : jusqu'à la vitesse de pointe de l'engin, sous tous les angles.
+    const vmax = TREBUCHET_TOP_SPEED * c.speedFactor
+    const sol = TrebuchetInput.solve({ start: natural.point, target: aim, angle, dir: c.dir, vmax, predict: this.#trebPredict(ammo) })
+    return { gauge, angle, release, point: natural.point, ...sol }
+  }
+
+  /** Angle (°) et puissance (%) du trébuchet pour le panneau : arc de la jauge, puis tir programmé. */
+  #trebHud() {
+    const locked = this.#trebLocked
+    if (locked) return { angle: Math.round(locked.angle), power: Math.round((locked.speed / (TREBUCHET_TOP_SPEED * this.catapult.speedFactor)) * 100) }
+    if (this.trebPhase === 'power') return { angle: Math.round(TrebuchetInput.angleFor(this.trebInput.gauge)), power: null }
+    return { angle: null, power: null }
+  }
+
+  /** Étape du trébuchet : 'target' (point d'impact), 'power' (jauge), ou null. */
+  get trebPhase() {
+    return this.trebInput && this.#state === STATE.AIMING && !this.catapult.busy ? this.trebInput.phase : null
+  }
+
+  /** Position de la jauge (0 = cloche, 1 = tendu). */
+  get trebGauge() {
+    return this.trebInput ? this.trebInput.gauge : null
+  }
+
+  #canTarget() {
+    return Boolean(this.trebInput) && this.#state === STATE.AIMING && !this.catapult.busy
+  }
+
+  /** Cible ramenée sur le terrain, devant l'engin et jamais sous le sol. */
+  #clampTarget(x, y) {
+    Guard.number(x, 'target x', { min: -5000, max: 10000 })
+    Guard.number(y, 'target y', { min: -5000, max: 5000 })
+    const c = this.catapult
+    const near = c.x + 160 * c.dir
+    const fx = c.dir === 1 ? Math.min(Math.max(x, near), WORLD.WIDTH + 150) : Math.max(Math.min(x, near), -150)
+    return { x: fx, y: Math.min(Math.max(y, -1200), WORLD.GROUND_Y) }
+  }
+
+  /**
+   * 1er clic : le point d'impact (exactement là où le joueur a touché) ; la jauge part.
+   * @returns {boolean}
+   */
+  placeTrebTarget(x, y) {
+    if (!this.#canTarget()) return false
+    const t = this.#clampTarget(x, y)
+    this.trebInput.place(t.x, t.y)
+    this.#userTarget = true
+    this.emit('hud', this.hud)
+    return true
+  }
+
+  /** Glissé ou flèches : déplace la cible (la jauge, si elle tourne, continue). */
+  moveTrebTarget(x, y) {
+    if (!this.#canTarget()) return false
+    const t = this.#clampTarget(x, y)
+    this.trebInput.move(t.x, t.y)
+    this.#userTarget = true
+    this.emit('hud', this.hud)
+    return true
+  }
+
+  /** Clavier : décale la cible de `dx` unités du monde. */
   nudgeTrebTarget(dx) {
     const t = this.trebInput?.target
-    if (!t) return null
+    if (!t) return false
     Guard.number(dx, 'dx', { min: -500, max: 500 })
-    return this.setTrebTarget(Math.max(this.catapult.x + 80, t.x + dx), t.y)
+    return this.moveTrebTarget(t.x + dx * this.catapult.dir, t.y)
   }
 
-  /** Recalcule la table des lâchers (début de tour, munition, cible) et la cible par défaut. */
-  #refreshTrebTable() {
-    if (!this.trebInput || this.#replay) return
-    this.#refreshed = true
-    this.#trebObstacles = this.world.filter((e) => e.alive && (e.kind === 'block' || e.kind === 'barrel' || e.kind === 'target'))
-    this.trebInput.invalidate()
-    const t = this.trebInput.target
+  /** Espace / bouton : valide la cible proposée et lance la jauge. */
+  startTrebGauge() {
+    const t = this.trebInput?.target
+    if (!t || !this.#canTarget()) return false
+    this.trebInput.place(t.x, t.y)
+    this.emit('hud', this.hud)
+    return true
+  }
+
+  /** Nouveau tour : retour au choix de la cible ; cible proposée sur le défenseur le plus proche. */
+  #newTrebTurn() {
+    const ti = this.trebInput
+    if (!ti) return
+    ti.reset()
+    this.#trebLocked = null
+    const t = ti.target
     const stillThere = t && (this.#userTarget || this.world.filter((e) => e.kind === 'target' && e.alive && Math.hypot(e.x - t.x, e.y - t.y) < 30).length)
-    if (!stillThere) {
-      this.#userTarget = false
-      // Cible par défaut : le défenseur le plus proche du trébuchet.
-      const first = this.world.filter((e) => e.kind === 'target' && e.alive).sort((a, b) => a.x - b.x)[0]
-      if (first) this.trebInput.setTarget(first.x, first.y, { lazy: true })
-      else this.trebInput.clearTarget()
-    }
+    if (stillThere) return
+    this.#userTarget = false
+    const first = this.world.filter((e) => e.kind === 'target' && e.alive).sort((a, b) => (a.x - b.x) * this.catapult.dir)[0]
+    if (first) {
+      const p = this.#clampTarget(first.x, first.y)
+      ti.move(p.x, p.y)
+    } else ti.clear()
   }
 
   /** Points de l'aide à la trajectoire (ou null si désactivée / hors visée). */
@@ -517,8 +563,8 @@ export class GameSession extends EventBus {
     // Baliste (v5.1) : sa ligne de mire (début de la trajectoire) reste toujours visible.
     const sight = this.#engine === 'ballista' && !this.options.trajectoryAid && !this.#hint && !falcon
     if (!this.options.trajectoryAid && !this.#hint && !falcon && !sight) return null
-    // Trébuchet : la courbe montre, en direct, le tir qu'on obtiendrait en lâchant maintenant.
-    if (this.#engine === 'trebuchet' ? !this.armed : this.#state !== STATE.AIMING) return null
+    // Trébuchet (v5.4) : sa courbe est dessinée avec la jauge (voir trebAim).
+    if (this.#engine === 'trebuchet' || this.#state !== STATE.AIMING) return null
     const calm = falcon
     const field = this.world.windField
     const start = this.catapult.launchPoint
@@ -563,7 +609,6 @@ export class GameSession extends EventBus {
     if (type !== 'stone' && !(this.player.ammo[type] > 0)) return false
     this.player.selectedAmmo = type
     this.#loadEngine()
-    if (this.#state === STATE.AIMING) this.#refreshTrebTable()
     this.emit('hud', this.hud)
     return true
   }
@@ -608,7 +653,12 @@ export class GameSession extends EventBus {
   replayLaunch(rec = {}) {
     const pending = this.#pendingLaunch
     if (!this.#replay || !pending) return false
-    if (this.#engine === 'trebuchet') {
+    if (this.#engine === 'trebuchet' && pending.plan) {
+      // v5.4 : le tir a été recalculé au même instant du monde, à partir des gestes enregistrés.
+      this.catapult.forceRelease()
+      pending.launch(pending.plan.point, pending.plan.velocity)
+    } else if (this.#engine === 'trebuchet') {
+      // Défis enregistrés avant la v5.4 : instant de lâcher noté.
       const release = Guard.number(rec.release, 'release', { min: 0, max: 5000 })
       const c = this.catapult
       const shot = Trebuchet.preview(release, { x: c.x, dir: c.dir, speedFactor: c.speedFactor, loadRadius: PROJECTILE_TYPES[pending.type].radius })
@@ -628,9 +678,11 @@ export class GameSession extends EventBus {
    * @returns {'fired' | 'armed' | 'released' | 'split' | false}
    */
   trigger(lead = 0) {
-    if (this.armed) return this.fire(lead) ? 'released' : false
+    if (this.armed) return false
     if (this.#state === STATE.FLYING && this.#activeProjectiles().some((p) => p.canActivate)) return this.activate() ? 'split' : false
     if (this.#state !== STATE.AIMING) return false
+    // Trébuchet : valider le point d'impact lance la jauge ; le clic suivant tire.
+    if (this.trebPhase === 'target') return this.startTrebGauge() ? 'aimed' : false
     if (!this.fire(lead)) return false
     return this.#engine === 'trebuchet' ? 'armed' : 'fired'
   }
@@ -664,28 +716,25 @@ export class GameSession extends EventBus {
   }
 
   /**
-   * Tire ! Au trébuchet : premier appel = libère le contrepoids (le tir est
-   * engagé), second appel = lâche la fronde.
-   * @param {number} [lead] voir trigger()
+   * Tire ! Au trébuchet (v5.4) : le balancier part et la fronde s'ouvrira
+   * d'elle-même sous l'arc choisi (jauge, ou `arc` imposé : relecture, tests).
+   * @param {number} [_lead] sans objet depuis la v5.4 (gardé pour la signature de trigger())
+   * @param {{ arc?: number }} [opts]
    */
-  fire(lead = 0) {
+  fire(_lead = 0, { arc } = {}) {
     this.#introCam = 0
     this.#punch = null
     this.#punchUsed = false
     const player = this.player
-    // Trébuchet armé avant la fin du calcul de la table : on la termine (décompte, note et aide en dépendent).
-    if (this.#refreshed && this.trebInput && !this.trebInput.ready) this.trebInput.warm(Infinity)
-    if (this.armed) {
-      const c = this.catapult
-      const l = Number.isFinite(lead) ? lead : 0
-      // Facile : un lâcher à quelques ms de l'instant parfait s'y cale (rejouable : l'instant exact est noté).
-      const snap = this.trebInput?.assisted(c.simTime + l * c.timeScale, this.#difficulty)
-      const ok = snap !== null && snap !== undefined && snap >= c.simTime ? c.releaseAt(snap) : c.release(l)
-      if (!ok) return false
-      this.emit('hud', this.hud)
-      return true
-    }
+    // Trébuchet : le lâcher est programmé, rien à faire pendant le balancier.
+    if (this.armed) return false
     if (this.#state !== STATE.AIMING || player.shotsLeft === 0 || this.catapult.busy) return false
+    // Trébuchet : il faut un point d'impact, et la position de la jauge (ou l'arc imposé).
+    const gauge = this.#engine === 'trebuchet' ? (arc ?? this.trebInput?.gauge) : null
+    if (this.#engine === 'trebuchet') {
+      if (!this.trebInput?.target) return false
+      Guard.number(gauge, 'arc', { min: 0, max: 1 })
+    }
     // Trébuchet encore en remise en batterie : on la termine, le clic n'est jamais perdu.
     if (this.#engine === 'trebuchet' && !this.catapult.ready) this.catapult.reload()
     let type = player.selectedAmmo
@@ -713,6 +762,14 @@ export class GameSession extends EventBus {
     shot.mods.blastFactor = this.#mode.effects.blastFactor ?? 1
     shot.mods.fireFactor = this.#mode.effects.fireFactor ?? 1
     if (shot.windOverride !== null) this.world.wind = shot.windOverride
+    // Trébuchet : tir calculé maintenant (vent du moment), rejouable à l'identique.
+    const plan = this.#engine === 'trebuchet' ? this.trebShot(gauge, type) : null
+    if (plan) {
+      const tg = this.trebInput.target
+      plan.path = this.#trebPath(plan, type, 1)
+      plan.target = { ...tg }
+      this.#trebLocked = plan
+    }
     if (player.shotsLeft !== null) player.shotsLeft--
     this.#shooter = this.#active
     // L'indice ne vaut que pour un tir.
@@ -720,7 +777,7 @@ export class GameSession extends EventBus {
     const treb = this.#engine === 'trebuchet'
     // v5.0 : pas ABSOLU du geste (depuis le début de la partie). Des créatures
     // volent pendant la visée : un tir doit partir au même instant du monde.
-    const entry = treb ? { k: 't', d: this.steps, a: type } : { k: 'f', d: this.steps, a: type, ang: this.catapult.angle, pow: this.catapult.power }
+    const entry = treb ? { k: 't', d: this.steps, a: type, tx: plan.target.x, ty: plan.target.y, g: plan.gauge } : { k: 'f', d: this.steps, a: type, ang: this.catapult.angle, pow: this.catapult.power }
     this.#log.push(entry)
     this.#fireStep = this.steps
     this.score.startShot(type)
@@ -730,15 +787,7 @@ export class GameSession extends EventBus {
       this.#loadedAmmo = null
       this.#pendingLaunch = null
       entry.l = this.steps - this.#fireStep
-      if (treb) {
-        entry.r = this.catapult.simTime
-        // Note du lâcher (v5.3) : écart entre l'impact prévu et la cible.
-        if (this.trebInput?.target && !this.#replay) {
-          const g = this.trebInput.gradeAt(entry.r)
-          this.emit('timing', { grade: g.id, error: Number.isFinite(g.error) ? Math.round(g.error) : null })
-          this.#feedback({ sound: g.id === 'perfect' ? 'star' : null, x: this.catapult.x, caption: `timing.${g.id}` })
-        }
-      }
+      this.#trebLocked = null
       this.#spawnStep = this.steps
       // Éventail : trois (Salve) ou cinq (Pluie de feu) projectiles.
       const spreads = shot.count === 5 ? [-5, -2.5, 0, 2.5, 5] : shot.count === 3 ? [-2.5, 0, 2.5] : [0]
@@ -761,17 +810,19 @@ export class GameSession extends EventBus {
       this.emit('hud', this.hud)
     }
     if (this.#engine === 'trebuchet') {
-      // Le contrepoids tombe : le tir est engagé, il partira au lâcher (2e clic).
+      // Le contrepoids tombe ; la fronde s'ouvrira d'elle-même sous l'arc choisi,
+      // avec la vitesse calculée pour atteindre le point visé.
       this.catapult.setLoadRadius(PROJECTILE_TYPES[type].radius)
       this.#loadedAmmo = type
-      this.catapult.arm(({ point, velocity }) => (this.#replay ? null : launch(point, velocity)))
+      this.catapult.arm(() => (this.#replay ? null : launch(plan.point, plan.velocity)))
+      this.catapult.scheduleRelease(plan.release)
       this.#feedback({ sound: 'creak', x: this.catapult.x, intensity: 1, caption: 'swing' })
       this.emit('announce', { key: 'a11y.swing' })
     } else {
       this.catapult.fire(() => (this.#replay ? null : launch(this.catapult.launchPoint, this.catapult.velocity)))
     }
     // Relecture : le lancement attend le pas enregistré (ReplayPlayer → replayLaunch).
-    if (this.#replay) this.#pendingLaunch = { launch, type }
+    if (this.#replay) this.#pendingLaunch = { launch, type, plan }
     if (type !== 'stone' && player.ammo[type] === 0) player.selectedAmmo = 'stone'
     this.emit('hud', this.hud)
     return true
@@ -803,7 +854,6 @@ export class GameSession extends EventBus {
     const timeScale = this.#slowMo > 0 ? 0.35 : 1
     this.#slowMo = Math.max(0, this.#slowMo - dt)
     if (this.#state !== STATE.ENDED || this.#stateT < 4000) this.world.step(dt, timeScale)
-    const prevSim = this.armed ? this.catapult.simTime : null
     this.catapult.update(dt)
     // La fumée et les flammes dérivent avec le vent du moment.
     this.particles.wind = this.world.windField.sample(this.catapult.x, this.world.time).value
@@ -813,23 +863,10 @@ export class GameSession extends EventBus {
     this.#updateCamera(dt)
     if (this.#state === STATE.AIMING || this.#state === STATE.FLYING) this.#watchGusts()
     if (this.armed) {
-      const plan = this.trebInput?.plan
-      if (plan?.reachable && prevSim !== null && !this.#replay) {
-        // Compte à rebours vers l'instant parfait : trois tics, puis une note claire.
-        for (const cue of this.trebInput.cues(prevSim, this.catapult.simTime)) {
-          if (cue === 'cue') this.#feedback({ sound: 'tick', x: this.catapult.x, intensity: 1.1 })
-          else this.#feedback({ sound: 'lock', x: this.catapult.x, intensity: 1, caption: 'onTarget', haptic: 'tick' })
-        }
-      } else {
-        this.#swingTicks()
-        // Sans cible : le repère d'impact entre sur le château, un « clic » franc et un sous-titre.
-        const on = Boolean(this.landing?.onCastle)
-        if (on && !this.#landingOn) this.#feedback({ sound: 'lock', x: this.catapult.x, intensity: 1, caption: 'onTarget' })
-        this.#landingOn = on
-      }
+      // Repère sonore : un tic de plus en plus aigu suit l'angle de la fronde.
+      this.#swingTicks()
     } else {
       this.#tickBand = null
-      this.#landingOn = false
     }
 
     if (this.#state === STATE.SETTLING && this.#stateT >= SETTLE_MS) {
@@ -837,10 +874,8 @@ export class GameSession extends EventBus {
       this.emit('announce', { key: 'a11y.levelStart', params: { targets: this.targetsLeft, shots: this.player.shotsLeft ?? '∞' } })
       if (this.players.length > 1) this.emit('turn', { player: this.#active, name: this.player.name })
     } else if (this.#state === STATE.AIMING) {
-      // Trébuchet : la table des lâchers se construit quelques lignes par image (aucun à-coup).
-      if (this.trebInput && !this.armed && !this.trebInput.ready && this.#refreshed) {
-        if (this.trebInput.warm(TREB_WARM_ROWS)) this.emit('hud', this.hud)
-      }
+      // Trébuchet : la jauge oscille (temps réel ; la position figée au clic est enregistrée).
+      if (this.trebPhase === 'power') this.trebInput.tick(dt)
       // Victoire sans tir : le feu ou un pouvoir (séisme) a éliminé les dernières
       // cibles pendant la visée. On laisse 1,2 s pour voir la chute, puis on conclut.
       this.#idleWinT = this.#mode.evaluate(this)?.won ? this.#idleWinT + dt : 0
@@ -891,8 +926,7 @@ export class GameSession extends EventBus {
       theme: this.#level.chapter,
       terrain: this.world.terrain,
       worldTime: this.world.time,
-      landing: this.landing,
-      trebTarget: this.#trebView(),
+      trebAim: this.#trebView(),
       season: this.season,
       time: this.#time,
       animate: !this.options.reducedMotion,
@@ -938,7 +972,7 @@ export class GameSession extends EventBus {
     this.#stateT = 0
     if (s === STATE.AIMING) {
       this.#aimStep = this.steps
-      this.#refreshTrebTable()
+      this.#newTrebTurn()
     }
     this.emit('hud', this.hud)
   }
@@ -1135,24 +1169,16 @@ export class GameSession extends EventBus {
   }
 
   /**
-   * Barre de visée du trébuchet : où tomberait le tir (0 = catapulte, 1 = bout du
-   * terrain) et où se trouve le château, pour le panneau de commande.
+   * Barre du panneau du trébuchet : où est la cible (0 = engin, 1 = bout du
+   * terrain) et où se trouve le château.
    */
-  #landingView() {
-    const l = this.landing
+  #trebBar() {
     const tg = this.trebInput?.target
-    // En visée, la barre montre déjà la cible ; pendant le balancier, l'impact la parcourt.
-    if (!l && !(tg && this.#state === STATE.AIMING && !this.#replay)) return null
+    if (!tg) return null
     const from = this.catapult.x
     const to = this.focus.right + 120
-    const f = (x) => Math.max(0, Math.min(1, (x - from) / (to - from)))
-    const timing = l ? this.trebInput?.timing(this.catapult.simTime) : null
-    return {
-      at: l ? Math.round(f(l.x) * 1000) / 1000 : null,
-      castle: [Math.round(f(this.#castleLeft()) * 1000) / 1000, Math.round(f(this.focus.right) * 1000) / 1000],
-      on: l ? (tg ? Boolean(timing?.window) : l.onCastle) : false,
-      target: tg ? Math.round(f(tg.x) * 1000) / 1000 : null,
-    }
+    const f = (x) => Math.round(Math.max(0, Math.min(1, (x - from) / (to - from))) * 1000) / 1000
+    return { target: f(tg.x), castle: [f(this.#castleLeft()), f(this.focus.right)] }
   }
 
   /** Trace la course du tir en cours (un point tous les 3 rafraîchissements), jusqu'au premier choc. */
@@ -1169,24 +1195,43 @@ export class GameSession extends EventBus {
     return this.player.lastShot ?? null
   }
 
-  /** Cible du trébuchet et cercle d'approche, pour le dessin. */
+  /**
+   * Courbe d'un tir du trébuchet pour le dessin : elle s'arrête au premier
+   * obstacle (on voit si l'arc passe au-dessus du rempart).
+   */
+  #trebPath(shot, ammo, share) {
+    const obstacles = this.world.filter((e) => e.kind !== 'projectile' && e.kind !== 'flyer')
+    const pts = this.#trebPredict(ammo, { obstacles, maxPoints: 200, every: 3 })(shot.point, shot.velocity)
+    return share >= 1 ? pts : pts.slice(0, Math.max(2, Math.ceil(pts.length * share)))
+  }
+
+  /** Cible, jauge et courbe du trébuchet, pour le dessin (image par image). */
   #trebView() {
     const ti = this.trebInput
-    if (!ti?.target || (this.#state !== STATE.AIMING && !this.armed)) return null
-    const timing = this.armed ? ti.timing(this.catapult.simTime) : null
-    // Difficile : ni cercle d'approche ni impact idéal, seuls les tics comptent les temps.
-    const hard = this.#difficulty === 'hard'
-    return {
-      x: ti.target.x,
-      y: ti.target.y,
-      // Table en cours de calcul : la cible n'est pas encore jugée hors de portée.
-      reachable: ti.ready ? Boolean(ti.plan?.reachable) : true,
-      ideal: hard ? null : (ti.plan?.landing ?? null),
-      approach: hard ? null : (timing?.approach ?? null),
-      ms: timing?.ms ?? null,
-      window: Boolean(timing?.window),
-      armed: this.armed,
+    if (!ti?.target) return null
+    const locked = this.#trebLocked
+    if (locked && (this.armed || this.#pendingLaunch)) {
+      return { x: locked.target.x, y: locked.target.y, phase: 'fired', gauge: locked.gauge, angle: locked.angle, reachable: locked.reachable, path: locked.path, origin: this.#dialOrigin() }
     }
+    const phase = this.trebPhase
+    if (!phase) return null
+    const view = { x: ti.target.x, y: ti.target.y, phase, gauge: null, angle: null, reachable: true, path: null, origin: this.#dialOrigin() }
+    if (phase === 'power') {
+      const shot = this.trebShot(ti.gauge)
+      if (shot) {
+        view.gauge = shot.gauge
+        view.angle = shot.angle
+        view.reachable = shot.reachable
+        view.path = this.#trebPath(shot, this.player.selectedAmmo, this.options.trajectoryAid || this.#hint ? 1 : TREB_PATH_HINT)
+      }
+    }
+    return view
+  }
+
+  /** Centre du cadran de la jauge : au-dessus du trébuchet. */
+  #dialOrigin() {
+    const c = this.catapult
+    return { x: c.x + 60 * c.dir, y: WORLD.GROUND_Y - 330 }
   }
 
   /** Bord avant du château (premier bloc debout). */

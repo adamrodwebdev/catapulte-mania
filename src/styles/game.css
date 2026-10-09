@@ -939,10 +939,6 @@
   font-weight: 700;
 }
 
-.treb-panel__step--release {
-  color: var(--danger);
-}
-
 .treb-panel__values {
   display: flex;
   flex-wrap: wrap;
@@ -1240,15 +1236,6 @@
   background: color-mix(in srgb, var(--success, #3d8a3a) 55%, transparent);
   border-radius: 4px;
 }
-.treb-bar__mark {
-  position: absolute;
-  top: -2px;
-  bottom: -2px;
-  width: 4px;
-  margin-left: -2px;
-  background: var(--text);
-  border-radius: 2px;
-}
 .treb-bar__target {
   position: absolute;
   top: 1px;
@@ -1258,16 +1245,13 @@
   border: 2px solid #d9a521;
   border-radius: 50%;
 }
-.treb-bar__mark--on {
-  background: #2f9e3a;
-  box-shadow: 0 0 0 3px rgba(80, 200, 90, 0.45);
-}
-.treb-panel__step--now {
-  color: #2f9e3a;
+
+.treb-panel__step--power {
+  color: #b5761a;
   font-weight: 800;
 }
 @media (prefers-reduced-motion: no-preference) {
-  .treb-panel__step--now {
+  .treb-panel__step--power {
     animation: treb-now 0.5s ease-in-out infinite alternate;
   }
 }

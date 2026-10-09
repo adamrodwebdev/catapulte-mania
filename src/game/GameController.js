@@ -6,7 +6,7 @@ import { Renderer } from './rendering/Renderer.js'
 import { WORLD } from './physics/constants.js'
 import { ReplayPlayer } from './replay/ReplayPlayer.js'
 import { AimInput } from './aim/AimInput.js'
-import { TREB_TUNING } from './aim/TrebuchetInput.js'
+import { TREB_TUNING, TrebuchetInput } from './aim/TrebuchetInput.js'
 import { BALLISTA_AIM } from './Ballista.js'
 import { AIM } from './aim.js'
 
@@ -54,7 +54,7 @@ export class GameController extends EventBus {
   #aim = null
   /** Pointeurs posés (un second doigt = mode précision). */
   #pointers = new Set()
-  /** Trébuchet (v5.3) : appui en cours (doigt, souris ou Espace), voir aim/TrebuchetInput.js. */
+  /** Trébuchet (v5.4) : appui en cours (doigt ou souris), voir aim/TrebuchetInput.js. */
   #trebPress = null
 
   /**
@@ -87,7 +87,6 @@ export class GameController extends EventBus {
       continueOffer,
       engine,
       slowSwing: settings.slowSwing === true,
-      infiniteSwing: settings.infiniteSwing === true,
       replay: Array.isArray(replay),
       season,
     }, mode)
@@ -104,7 +103,6 @@ export class GameController extends EventBus {
     this.session.on('turn', (e) => this.emit('turn', e))
     this.session.on('offer', (e) => this.emit('offer', e))
     this.session.on('feedback', (f) => this.#feedback(f))
-    this.session.on('timing', (g) => this.emit('timing', g))
   }
 
   /** Place occupée par le HUD (px CSS), mesurée par l'interface. */
@@ -126,13 +124,8 @@ export class GameController extends EventBus {
     this.session.options.blood = settings.blood
     this.session.options.screams = settings.screams !== false
     this.session.options.startPower = settings.startPower
-    if (this.session.engine === 'trebuchet') {
-      this.session.infiniteSwing = settings.infiniteSwing === true && this.session.difficulty !== 'hard'
-      for (const p of this.session.players) {
-        p.catapult.setSlow(settings.slowSwing === true)
-        p.catapult.setInfinite(this.session.infiniteSwing)
-      }
-    }
+    // Trébuchet : l'option « Jauge lente » allonge l'aller de la jauge.
+    this.session.trebInput?.setSweep(TrebuchetInput.sweepFor(this.session.difficulty, settings.slowSwing === true))
     this.session.camera.follow = !reducedMotion
     this.session.particles.density = reducedMotion ? 0.35 : 1
   }
@@ -173,8 +166,9 @@ export class GameController extends EventBus {
       this.#renderer.render(this.#sceneWithAim())
       this.#hudTimer += dt
       // En vol (et en visée quand le vent souffle en rafales), le HUD suit en continu.
-      const live = this.session.state === STATE.FLYING || (this.session.state === STATE.AIMING && this.session.world.windField.dynamic)
-      if (this.#hudTimer > (this.session.armed ? 50 : 180) && live) {
+      // Trébuchet : l'angle de la jauge suit aussi dans le panneau.
+      const live = this.session.state === STATE.FLYING || (this.session.state === STATE.AIMING && (this.session.world.windField.dynamic || this.session.trebPhase === 'power'))
+      if (this.#hudTimer > (this.session.armed || this.session.trebPhase === 'power' ? 60 : 180) && live) {
         this.#hudTimer = 0
         this.emit('hud', this.session.hud)
       }
@@ -237,13 +231,20 @@ export class GameController extends EventBus {
       this.session.skipIntro()
       this.#audio.unlock()
       if (this.#paused || this.#replayer) return
-      // Trébuchet (v5.3) : glisser place la cible ; appui bref = balancier, second appui = lâcher ;
-      // appui maintenu = balancier, et la fronde part au relâcher (geste unique).
+      // Trébuchet (v5.4) : 1er clic = point d'impact, 2e clic = arc (la jauge) ; glisser déplace la cible.
       if (this.session.engine === 'trebuchet') {
         if (e.pointerType === 'mouse' && e.button !== 0) return
         if (this.#trebPress) return
+        // En vol : un appui divise la mitraille ou fait plonger le faucon.
+        if (this.session.state !== STATE.AIMING) {
+          this.trigger()
+          return
+        }
+        if (!this.session.trebPhase) return
         const p = this.#local(e)
-        if (this.#trebDown(p.x, p.y, e.pointerId)) cv.setPointerCapture?.(e.pointerId)
+        this.session.trebInput.press(p.x, p.y)
+        this.#trebPress = { id: e.pointerId }
+        cv.setPointerCapture?.(e.pointerId)
         return
       }
       this.#pointers.add(e.pointerId)
@@ -273,7 +274,7 @@ export class GameController extends EventBus {
     }
     const up = (e) => {
       if (this.#trebPress) {
-        if (this.#trebPress.id === e.pointerId) this.#trebUp()
+        if (this.#trebPress.id === e.pointerId) this.#trebUp(this.#local(e))
         return
       }
       this.#pointers.delete(e.pointerId)
@@ -307,9 +308,9 @@ export class GameController extends EventBus {
     }
     const cancel = (e) => {
       if (this.#trebPress && (!e || e.pointerId === this.#trebPress.id)) {
-        // Appui interrompu (appel, geste système) : on n'arme ni ne lâche rien.
+        // Appui interrompu (appel, geste système) : rien n'est validé.
         this.#trebPress = null
-        this.session.trebInput?.unpress(performance.now(), { armed: true })
+        this.session.trebInput?.unpress()
       }
       this.#pointers.delete(e?.pointerId)
       if (this.#drag && (!e || e.pointerId === this.#drag.id)) {
@@ -336,65 +337,33 @@ export class GameController extends EventBus {
     return { x: e.clientX - r.left, y: e.clientY - r.top }
   }
 
-  /* ---------- Trébuchet (v5.3) ---------- */
+  /* ---------- Trébuchet (v5.4) ---------- */
 
-  /**
-   * Début d'appui au trébuchet.
-   * @returns {boolean} vrai si l'appui est suivi (glissé de cible ou geste unique)
-   */
-  #trebDown(x, y, id) {
-    const s = this.session
-    // En vol : un appui divise la mitraille ou fait plonger le faucon.
-    if (s.state !== STATE.AIMING) {
-      this.trigger()
-      return false
-    }
-    const r = s.trebInput.press(x, y, performance.now(), { armed: s.armed, aiming: !s.armed })
-    if (r === 'release') {
-      this.trigger()
-      return false
-    }
-    this.#trebPress = { id }
-    return true
-  }
-
-  #trebUp() {
+  /** Fin d'appui : un clic plante la cible (puis tire) ; un glissé l'a déplacée. */
+  #trebUp(p) {
     this.#trebPress = null
     const s = this.session
-    const r = s.trebInput.unpress(performance.now(), { armed: s.armed })
-    if (r) this.trigger()
-    else if (s.trebInput.target) this.emit('announce', { key: 'a11y.trebTarget', params: { m: Math.round((s.trebInput.target.x - s.catapult.x) / 10) } })
-  }
-
-  /** Le glissé place la cible sur le terrain (point du monde sous le doigt, jamais sous le sol). */
-  #placeTrebTarget(sx, sy) {
-    const w = this.session.camera.screenToWorld(sx, sy)
-    const plan = this.session.setTrebTarget(w.x, Math.min(w.y, WORLD.GROUND_Y))
-    if (plan) this.emit('aimed')
-  }
-
-  /** Image par image : un appui maintenu sans bouger libère le contrepoids. */
-  #tickTreb() {
-    if (!this.#trebPress) return
-    if (this.session.state !== STATE.AIMING) {
-      this.#trebPress = null
+    const r = s.trebInput.unpress()
+    const phase = s.trebPhase
+    if (!r || !phase) return
+    if (r === 'tap' && phase === 'power') {
+      // 2e clic : la jauge est figée, le trébuchet tire.
+      this.trigger()
       return
     }
-    if (this.session.trebInput.hold(performance.now()) === 'arm') this.trigger()
+    // 1er clic (exactement là où l'on a touché), ou glissé terminé : la jauge part.
+    const w = s.camera.screenToWorld(p.x, p.y)
+    const ok = r === 'tap' ? s.placeTrebTarget(w.x, w.y) : phase === 'target' ? s.startTrebGauge() : false
+    if (!ok) return
+    this.#aimTick()
+    this.emit('trigger', { result: 'aimed', ammo: s.selectedAmmo })
+    this.emit('announce', { key: 'a11y.trebTarget', params: { m: Math.round(Math.abs(s.trebInput.target.x - s.catapult.x) / 10) } })
   }
 
-  /**
-   * Espace / Entrée au trébuchet : même geste qu'au doigt (bref = balancier
-   * puis lâcher ; maintenu = la fronde part au relâcher).
-   * @param {boolean} down
-   */
-  trebKey(down) {
-    if (this.#paused || this.#replayer || this.session.engine !== 'trebuchet') return
-    this.session.skipIntro()
-    this.#audio.unlock()
-    if (down) {
-      if (!this.#trebPress) this.#trebDown(0, 0, 'key')
-    } else if (this.#trebPress?.id === 'key') this.#trebUp()
+  /** Le glissé place la cible sur le terrain (point du monde sous le doigt). */
+  #placeTrebTarget(sx, sy) {
+    const w = this.session.camera.screenToWorld(sx, sy)
+    if (this.session.moveTrebTarget(w.x, w.y)) this.emit('aimed')
   }
 
   /**
@@ -404,8 +373,8 @@ export class GameController extends EventBus {
   trebNudge(dir, fine = false) {
     if (this.#paused || this.#replayer || this.session.engine !== 'trebuchet') return
     this.session.skipIntro()
-    const plan = this.session.nudgeTrebTarget(Math.sign(dir) * (fine ? TREB_TUNING.NUDGE_FINE : TREB_TUNING.NUDGE))
-    if (plan) {
+    const ok = this.session.nudgeTrebTarget(Math.sign(dir) * (fine ? TREB_TUNING.NUDGE_FINE : TREB_TUNING.NUDGE))
+    if (ok) {
       this.emit('aimed')
       this.#aimTick()
     }
@@ -420,8 +389,7 @@ export class GameController extends EventBus {
 
   /** Image par image : touches maintenues et lissage de la visée affichée. */
   #tickAim(dt) {
-    if (this.#replayer) return
-    if (this.session.engine === 'trebuchet') return this.#tickTreb()
+    if (this.#replayer || this.session.engine === 'trebuchet') return
     if (!this.#drag && !this.#aim.keysHeld) this.#syncAim()
     const r = this.#aim.tick(dt)
     if (r.ticks) this.#aimTick()
