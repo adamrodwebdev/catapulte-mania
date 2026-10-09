@@ -6,6 +6,9 @@
 export const SDK_URLS = Object.freeze({
   crazygames: 'https://sdk.crazygames.com/crazygames-sdk-v3.js',
   poki: 'https://game-cdn.poki.com/scripts/v2/poki-sdk.js',
+  gamedistribution: 'https://html5.api.gamedistribution.com/main.min.js',
+  gamepix: 'https://integration.gamepix.com/sdk/v3/gamepix.sdk.js',
+  y8: 'https://cdn.y8.com/minimal-sdk/2-0/y8.min.js',
 })
 
 const loading = new Map()

@@ -323,6 +323,22 @@ Le code du verrou se trouve dans `netlify/gate/AccessGate.js` (logique, testée)
 
 Tout autre hébergeur de fichiers statiques convient (GitHub Pages, Cloudflare Pages, OVH…) : il suffit d'envoyer le contenu du dossier `dist/`.
 
+### Publier sur les cinq portails retenus (v5.6)
+
+Une seule commande prépare tout l'envoi pour **itch.io, Newgrounds, GameDistribution, GamePix et Y8** :
+
+```
+npm run release:portals
+```
+
+Le dossier `release/` contient alors un sous-dossier par portail : le jeu en `.zip` (prêt à téléverser), les images aux formats demandés, des captures d'écran et un fichier `LISTING.md` (textes de la fiche à copier-coller et marche à suivre, étape par étape).
+
+GameDistribution et Y8 donnent un identifiant de jeu **après** la création de la fiche dans leur tableau de bord. Relancez alors la commande avec ces identifiants pour activer la publicité :
+
+```
+npm run release:portals -- --gd-id <id GameDistribution> --y8-game <Game ID Y8> --y8-app <App ID Y8>
+```
+
 ### Publier sur un portail de jeux (CrazyGames, Poki)
 
 Le guide complet (portails, Microsoft Store, Google Play, App Store) est dans [`docs/BOUTIQUES.md`](docs/BOUTIQUES.md).
@@ -474,6 +490,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v5.4.0 | Trébuchet à deux clics : point d'impact exact, puis jauge cloche ↔ tendu avec la courbe en direct ; balancier fluide (dessin interpolé) |
 | v5.4.1 | Identité AdamRodWebDev : logo du portfolio (hexagone d'or) dans le générique, nom du studio mis à jour partout |
 | v5.5.0 | Interface mobile : plus aucun bouton sur la scène (colonne de commandes à droite à l'horizontale, plateau en bas à la verticale et sur tablette) |
+| v5.6.0 | Cinq portails non exclusifs (GameDistribution, itch.io, GamePix, Y8, Newgrounds) : kits intégrés, paquets d'envoi et fiches (`npm run release:portals`) |
 | v4.2.0 | Qualité des premières minutes (refus CrazyGames) : premier tir réussi, tutoriel en images, tirer-relâcher, barre de commandes compacte, caméra qui garde l'impact visible, trébuchet dès le niveau 4 |
 | v4.1.1 | Versions portails jouables dans le cadre isolé de CrazyGames (script classique unique), démarrage plus robuste |
 | v4.1.0 | Conformité CrazyGames : vidéos récompensées hors du jeu, langue du portail (anglais à défaut), démarrage en un clic, son coupé par le portail |
