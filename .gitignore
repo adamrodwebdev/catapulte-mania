@@ -12,3 +12,8 @@ coverage/
 .netlify/
 dist-crazygames/
 dist-poki/
+release/
+dist-gamedistribution/
+dist-gamepix/
+dist-y8/
+dist-standalone/
