@@ -2,6 +2,48 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [5.6.2] – 2026-10-09
+
+### Corrigé — fenêtre de test GamePix
+- Portails : les écrans longs (carte, modes, atelier, réglages) défilent dans le jeu lui-même. Le cadre de test du portail interdit le défilement de la page (iframe sans défilement) : on ne pouvait plus atteindre le bas des écrans.
+- Atelier de châteaux sur petite hauteur ou écran étroit : barre et palettes sur une ligne chacune, la scène garde toujours de la place (elle disparaissait à 480×320) ; « Tester » et « Partager » restent visibles.
+- GamePix : `interstitialAd` appelé à chaque passage entre deux niveaux (GamePix décide lui-même de montrer une pub ou non) ; aucune pub avant la fin de `GamePix.loaded()`, qui est asynchrone.
+- Vérifié dans un cadre 640×360 sans défilement : vidéo récompensée (`rewardAd`) puis interstitiel (`interstitialAd`) appelés. 1 test de plus (213).
+
+## [5.6.1] – 2026-10-09
+
+### Corrigé — liste de contrôle d'intégration GamePix
+- `GamePix.updateScore` : envoyé à chaque changement de score (sans doublon) et à la fin d'un niveau réussi.
+- `GamePix.updateLevel` : envoyé quand un niveau est réussi.
+- `GamePix.lang` : lu une fois au démarrage, même si le joueur a déjà choisi sa langue.
+- `GamePix.happyMoment` : aussi déclenché par un record ou un premier passage dans la campagne.
+- Premier interstitiel dès le premier niveau terminé (puis au plus un toutes les 90 s) pour que la validation GamePix le voie.
+- 1 test de plus (212 au total).
+
+## [5.6.0] – 2026-10-09
+### Cinq portails non exclusifs
+CrazyGames mis de côté, le jeu est prêt pour cinq portails qui n'exigent
+aucune exclusivité : GameDistribution, itch.io, GamePix, Y8 et Newgrounds.
+- **Kits des portails** (adaptateurs du service de publicité, chargés
+  seulement dans le build du portail) :
+  - GameDistribution : interstitiels entre les niveaux, vidéos récompensées
+    (préchargement, récompense sur `SDK_REWARDED_WATCH_COMPLETE`), pause et
+    son coupé sur `SDK_GAME_PAUSE` ;
+  - GamePix : `loaded()` avant tout appel, interstitiels, vidéos récompensées,
+    moments forts, langue du joueur, stockage du portail ; SDK en premier
+    script de la page (règle GamePix) ;
+  - Y8 : pauses « next » et vidéos « reward » (récompense sur `adViewed`).
+  GameDistribution et Y8 demandent les identifiants de leur tableau de bord
+  (variables `CTC_GAME_ID`, `CTC_APP_ID`) ; sans eux, aucun script tiers.
+- **itch.io et Newgrounds** : build sans kit ni publicité, avec la politique de
+  sécurité stricte de notre site.
+- **`npm run release:portals`** : un dossier par portail avec le zip du jeu
+  (`index.html` à la racine, sans les fichiers propres à notre site), les
+  images aux formats demandés, 5 captures et la fiche (`LISTING.md`) :
+  marche à suivre, description, commandes, tags.
+- Visuels (`docs/store/portals/`) : citadelle de marbre à l'éclipse ; versions
+  sans texte pour GamePix.
+
 ## [5.5.0] – 2026-10-09
 ### Interface mobile : plus aucun bouton sur le terrain de jeu
 Sur téléphone et tablette, les commandes flottaient au-dessus de la scène et

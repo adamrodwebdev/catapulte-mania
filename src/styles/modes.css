@@ -1260,3 +1260,101 @@
     padding-inline: var(--space-2);
   }
 }
+
+/* Petite hauteur (cadre d'un portail, téléphone à l'horizontale), v5.6.2 :
+   la scène garde toujours de la place. Barre du haut et palettes tiennent
+   chacune sur une ligne, qui défile à l'horizontale si besoin ; le titre
+   (déjà annoncé aux lecteurs d'écran) s'efface pour laisser les actions
+   « Tester » et « Partager » visibles. */
+@media (max-height: 520px), (max-width: 600px) {
+  .editor {
+    grid-template-rows: auto minmax(8rem, 1fr) auto;
+  }
+  .editor__bar,
+  .editor__tools,
+  .editor__palette,
+  .editor__materials,
+  .editor__actions {
+    flex-wrap: nowrap;
+  }
+  .editor__bar,
+  .editor__palette,
+  .editor__materials {
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+  .editor__bar {
+    padding-block: var(--space-1);
+  }
+  .editor__bar > *,
+  .editor__actions .btn,
+  .tool,
+  .swatch {
+    flex-shrink: 0;
+  }
+  .editor__title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .editor__count {
+    white-space: nowrap;
+    font-size: 0.75rem;
+  }
+  .editor__actions .btn {
+    min-height: 2.25rem;
+    padding-block: 0;
+    font-size: var(--fs-0);
+  }
+  .editor__tools {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-1) var(--space-2);
+    padding-block: var(--space-1) max(var(--space-1), env(safe-area-inset-bottom));
+  }
+  .editor__palette,
+  .editor__materials {
+    grid-column: 1;
+    padding-bottom: 2px;
+  }
+  .editor__tools > .btn {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .tool,
+  .swatch {
+    min-height: 2.25rem;
+    padding-block: 0;
+  }
+  .editor__message {
+    top: 3rem;
+  }
+}
+
+@media (max-width: 560px) {
+  /* Très étroit : le compteur de pièces est masqué à l'écran (il reste annoncé aux lecteurs d'écran). */
+  .editor__count {
+    position: absolute;
+    top: auto;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+}
+
+@media (max-width: 600px) and (min-height: 521px) {
+  /* Téléphone en portrait : la hauteur ne manque pas, les actions passent sur deux lignes plutôt que de défiler. */
+  .editor__bar,
+  .editor__actions {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+  .editor__bar > .editor__actions {
+    flex-shrink: 1;
+    min-width: 0;
+  }
+}

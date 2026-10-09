@@ -61,6 +61,12 @@ export class AdService extends EventBus {
   /** Moment fort (record, série) : célébration propre au portail. */
   happytime() {}
 
+  /** Score courant du joueur, à chaque changement (statistiques du portail, v5.6.1). */
+  reportScore(score) {} // eslint-disable-line no-unused-vars
+
+  /** Niveau qui vient d'être réussi (statistiques du portail, v5.6.1). */
+  reportLevel(level) {} // eslint-disable-line no-unused-vars
+
   /** Progression globale du joueur, de 0 à 100 (statistiques du portail). */
   reportProgress(percent) {} // eslint-disable-line no-unused-vars
 

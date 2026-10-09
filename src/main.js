@@ -17,6 +17,10 @@ import './styles/modes.css'
 import './styles/studio.css'
 import './styles/mobile.css'
 
+// Portails (v5.6.2) : le jeu est souvent intégré dans un cadre sans défilement
+// (iframe scrolling="no") ; les écrans défilent alors dans #app (voir base.css).
+if (IS_PORTAL) document.documentElement.dataset.portal = 'on'
+
 // Portails : le SDK s'initialise d'abord (sauvegarde synchronisée). Notre site : rien à charger.
 createAdService()
   .then((ads) =>
