@@ -15,6 +15,7 @@ import './styles/screens.css'
 import './styles/game.css'
 import './styles/modes.css'
 import './styles/studio.css'
+import './styles/mobile.css'
 
 // Portails : le SDK s'initialise d'abord (sauvegarde synchronisée). Notre site : rien à charger.
 createAdService()

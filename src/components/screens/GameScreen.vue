@@ -401,9 +401,28 @@ const root = ref(null)
 let hudObs = null
 function measureInsets() {
   if (!controller || !root.value) return
-  const top = root.value.querySelector('.hud-top')?.getBoundingClientRect()
-  const bottom = root.value.querySelector('.hud-bottom')?.getBoundingClientRect()
-  const h = root.value.clientHeight
+  const el = root.value
+  const top = el.querySelector('.hud-top')?.getBoundingClientRect()
+  const bottom = el.querySelector('.hud-bottom')?.getBoundingClientRect()
+  const h = el.clientHeight
+  // Téléphone (v5.5, voir mobile.css) : les commandes sont rangées dans des
+  // bandeaux et la scène n'occupe que l'espace restant — aucun bouton dessus.
+  const dock = getComputedStyle(el).getPropertyValue('--hud-dock').trim()
+  if (dock === 'rail' || dock === 'tray') {
+    const visible = (r) => r && r.width > 0 && r.height > 0
+    const box = el.getBoundingClientRect()
+    const dockTop = visible(top) ? Math.max(0, top.bottom - box.top) : 0
+    const dockBottom = dock === 'tray' && visible(bottom) ? Math.max(0, box.bottom - bottom.top) : 0
+    const dockRight = dock === 'rail' && visible(bottom) ? Math.max(0, box.right - bottom.left) : 0
+    el.style.setProperty('--dock-top', `${Math.round(dockTop)}px`)
+    el.style.setProperty('--dock-bottom', `${Math.round(dockBottom)}px`)
+    el.style.setProperty('--dock-right', `${Math.round(dockRight)}px`)
+    el.style.setProperty('--hud-top-h', `${Math.round(dockTop)}px`)
+    el.style.setProperty('--hud-bottom-h', `${Math.round(dockBottom)}px`)
+    controller.setInsets(0, 0)
+    return
+  }
+  for (const v of ['--dock-top', '--dock-bottom', '--dock-right']) el.style.removeProperty(v)
   // Barre compacte : les boutons se posent sur la terre du premier plan, la scène garde la hauteur.
   const compact = root.value.querySelector('.hud-bottom--compact')
   // (Plafonné : sur deux lignes — trébuchet en portrait — le panneau ne doit pas masquer le château.)

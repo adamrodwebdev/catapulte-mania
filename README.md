@@ -19,7 +19,7 @@ Réglez l'angle et la puissance, calculez la trajectoire, et faites tomber les f
 - **Atelier** : de l'or gagné en jouant pour améliorer sa catapulte et changer son apparence
 - Français, English, Bahasa Indonesia
 - Thème clair, thème sombre et mode contraste élevé
-- Jouable sur téléphone, tablette et ordinateur, à la souris, au doigt ou au clavier
+- Jouable sur téléphone, tablette et ordinateur, à la souris, au doigt ou au clavier ; sur téléphone et tablette, les commandes sont rangées autour de la scène, jamais dessus
 - Pensé pour les personnes malvoyantes et malentendantes
 - Fonctionne hors connexion après la première visite
 - Aucun serveur, aucun compte, aucune donnée envoyée sur Internet
@@ -473,6 +473,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v5.3.0 | Commande du trébuchet : module TrebuchetInput (fanion-cible, instant de lâcher calculé, cercle d'approche et décompte sonore, geste unique, note de chaque lâcher, aide en Facile) |
 | v5.4.0 | Trébuchet à deux clics : point d'impact exact, puis jauge cloche ↔ tendu avec la courbe en direct ; balancier fluide (dessin interpolé) |
 | v5.4.1 | Identité AdamRodWebDev : logo du portfolio (hexagone d'or) dans le générique, nom du studio mis à jour partout |
+| v5.5.0 | Interface mobile : plus aucun bouton sur la scène (colonne de commandes à droite à l'horizontale, plateau en bas à la verticale et sur tablette) |
 | v4.2.0 | Qualité des premières minutes (refus CrazyGames) : premier tir réussi, tutoriel en images, tirer-relâcher, barre de commandes compacte, caméra qui garde l'impact visible, trébuchet dès le niveau 4 |
 | v4.1.1 | Versions portails jouables dans le cadre isolé de CrazyGames (script classique unique), démarrage plus robuste |
 | v4.1.0 | Conformité CrazyGames : vidéos récompensées hors du jeu, langue du portail (anglais à défaut), démarrage en un clic, son coupé par le portail |

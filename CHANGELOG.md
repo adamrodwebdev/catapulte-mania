@@ -2,6 +2,25 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [5.5.0] – 2026-10-09
+### Interface mobile : plus aucun bouton sur le terrain de jeu
+Sur téléphone et tablette, les commandes flottaient au-dessus de la scène et
+la masquaient. Elles sont maintenant rangées dans des bandeaux dédiés, et la
+scène n'occupe que l'espace qui reste (nouvelle feuille `src/styles/mobile.css`) :
+- **Téléphone à l'horizontale** : bandeau fin en haut (pause, cibles, tirs,
+  vent, pouvoirs ; l'étape du trébuchet ou l'angle de la catapulte à la place
+  du titre) et **colonne de commandes à droite** (munitions en liste, aide à
+  la visée, bouton de tir) : toute la hauteur va à la scène.
+- **Téléphone à la verticale et tablettes** : bandeau fin en haut, **plateau
+  en bas** (munitions sur une ligne, aide, tir, et le panneau du trébuchet),
+  sous la scène.
+- Boutons plus petits mais toujours faciles à toucher (40 px au moins), noms
+  des munitions remplacés par leur icône, étiquettes des statistiques masquées
+  (lues par les lecteurs d'écran).
+- La caméra cadre la scène dans l'espace libre ; les gestes (viser, placer la
+  cible du trébuchet) gardent leur précision.
+- Ordinateur : interface inchangée.
+
 ## [5.4.1] – 2026-10-09
 ### Identité AdamRodWebDev
 - Le générique d'ouverture adopte le logo du portfolio : l'hexagone d'or sur
