@@ -23,5 +23,8 @@ Couvertures conformes à leurs règles : **seulement le titre** (pas de slogan, 
 | `crazygames/cover-1920x1080.png` | Paysage 16:9 |
 | `crazygames/cover-800x1200.png` | Portrait 2:3 |
 | `crazygames/cover-800x800.png` | Carré 1:1 |
-| `crazygames/preview-landscape-1920x1080.mp4` | Vidéo d'aperçu paysage (16,6 s, sans son, commence par la couverture) |
+| `crazygames/preview-landscape-1920x1080.mp4` | Vidéo d'aperçu paysage (16,4 s, sans son, commence par la couverture) |
 | `crazygames/preview-portrait-1080x1620.mp4` | Vidéo d'aperçu portrait 2:3 (mêmes images, fond flouté) |
+| `crazygames/FICHE.md` | Textes du formulaire prêts à coller : catégorie, tags, description, commandes, lien des visuels |
+
+Couvertures et vidéos refaites en v5.5 (citadelle de marbre à l'éclipse, trébuchet à deux clics, baliste, lave, glace).
