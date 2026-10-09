@@ -744,7 +744,7 @@ export default {
     contact: 'Contact :',
   },
   studio: {
-    label: 'Adamrodwebtech présente Catapulte Mania',
+    label: 'AdamRodWebDev présente Catapulte Mania',
     presents: 'présente',
   },
   captions: {

@@ -2,6 +2,16 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [5.4.1] – 2026-10-09
+### Identité AdamRodWebDev
+- Le générique d'ouverture adopte le logo du portfolio : l'hexagone d'or sur
+  fond noir avec son « A », qui se trace puis tourne d'un sixième de tour, un
+  éclat d'or qui parcourt le contour, puis « AdamRod**WebDev** » (WebDev en
+  or) et « présente ». Toujours 2,6 s, passable d'un clic, image fixe en
+  mouvement réduit, aucune requête réseau.
+- Le studio s'appelle désormais AdamRodWebDev partout : générique, éditeur
+  (page de confidentialité, écran d'aide), métadonnées de la page.
+
 ## [5.4.0] – 2026-10-09
 ### Trébuchet à deux clics (module `src/game/aim/TrebuchetInput.js` réécrit)
 Le chronométrage du lâcher laissait trop peu de temps pour viser. Le trébuchet
