@@ -12,13 +12,21 @@ Ce guide liste ce qui est **déjà prêt dans le code** et ce qui demande **vos 
 | Page de confidentialité à indiquer dans les fiches | `privacy.html` à la racine du site |
 | Boutique d'achats intégrés : point de branchement préparé, désactivé | `src/services/StoreService.js` |
 
-## 1. Portails web (priorité)
+## 1. Portails web (v5.6 : cinq portails non exclusifs)
 
-1. **CrazyGames** : créer un compte développeur, téléverser le dossier `dist-crazygames` (zip), renseigner la fiche avec `docs/store/`. Tester d'abord dans leur outil de test (QA) : publicités, sauvegarde, lien « Bats mon tir ».
-2. **Poki** : soumission sur dossier (sélection à l'entrée), avec `dist-poki`. Vérifier dans leur inspecteur que `shareableURL` renvoie bien les liens de défi.
-3. **itch.io** : téléverser un zip de `dist` (version sans publicité) en « HTML ». Vous choisissez la part reversée à itch.io (10 % par défaut).
+CrazyGames est mis de côté pour l'instant. Les cinq portails retenus n'exigent **aucune exclusivité** : ils ne se gênent pas entre eux et n'empêchent pas un retour sur CrazyGames plus tard.
 
-Classements CrazyGames : réservés aux jeux invités, avec une clé de chiffrement. Le jeu a déjà ses records locaux (défi du jour, siège sans fin) ; on branchera les classements quand CrazyGames aura invité le jeu.
+| Portail | Kit (SDK) | Ce qu'il faut de votre côté |
+|---|---|---|
+| **GameDistribution** | oui (pubs entre niveaux, vidéos récompensées) | créer le jeu, récupérer son **gameId**, activer « Rewarded ads » |
+| **itch.io** | non | rien : téléverser le zip |
+| **GamePix** | oui (pubs, vidéos, stockage, langue) | compte développeur, suivre les onglets du formulaire |
+| **Y8** | oui (pauses publicitaires, vidéos) | créer le jeu, récupérer **Game ID** et **App ID** |
+| **Newgrounds** | non | rien : téléverser le zip, vote des joueurs ensuite |
+
+Tout se prépare d'une commande : `npm run release:portals` (dossier `release/`, un sous-dossier par portail : le zip du jeu, les images aux bons formats, 5 captures, la fiche `LISTING.md` avec la marche à suivre). Avec les identifiants : `npm run release:portals -- --gd-id <gameId> --y8-game <Game ID> --y8-app <App ID>`.
+
+Écartés : **Poki** (exclusivité web de cinq ans par défaut, sinon forfait unique sans partage des revenus), **GameMonetize** (doublon du réseau GameDistribution), **Playgama** (diffuse aussi sur Discord et YouTube Playables), **Game Jolt** (audience faible), **Kongregate** (soumissions fermées). Les builds CrazyGames et Poki restent disponibles (`npm run build:crazygames`, `npm run build:poki`).
 
 ## 2. Microsoft Store (PC)
 
