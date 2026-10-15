@@ -28,6 +28,9 @@ export function buildCsp({ scriptSrc = ["'self'"], styleSrc = ["'self'"], target
 export const PORTAL_SDK_ORIGINS = Object.freeze({
   crazygames: 'https://sdk.crazygames.com',
   poki: 'https://game-cdn.poki.com',
+  gamedistribution: 'https://html5.api.gamedistribution.com',
+  gamepix: 'https://integration.gamepix.com',
+  y8: 'https://cdn.y8.com',
 })
 
 /**
@@ -40,6 +43,8 @@ export const PORTAL_SDK_ORIGINS = Object.freeze({
  * @param {string} target 'crazygames' | 'poki'
  */
 export function buildPortalCsp(target) {
+  // Portails sans SDK (itch.io, Newgrounds) : aucune régie, la politique stricte de notre site.
+  if (target === 'standalone') return buildCsp()
   const sdk = PORTAL_SDK_ORIGINS[target]
   if (!sdk) throw new Error(`unknown target "${target}"`)
   return [

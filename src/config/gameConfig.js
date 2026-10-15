@@ -53,9 +53,20 @@ export const IS_DEMO = typeof __DEMO__ !== 'undefined' && __DEMO__ === true
 export const ADS_ENABLED = typeof __ADS__ === 'undefined' || __ADS__ !== false
 export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'
 /**
- * Plateforme visée par ce build (v3.5) : 'web' (notre site, sans publicité),
- * 'crazygames' ou 'poki' (portails, avec leur SDK). Constante remplacée au build.
+ * Plateforme visée par ce build (v3.5, v5.6) : 'web' (notre site, sans publicité),
+ * un portail avec son SDK ('crazygames', 'poki', 'gamedistribution', 'gamepix',
+ * 'y8'), ou 'standalone' (portails sans SDK : itch.io, Newgrounds). Constante
+ * remplacée au build.
  */
-export const TARGET = typeof __TARGET__ !== 'undefined' && ['web', 'crazygames', 'poki'].includes(__TARGET__) ? __TARGET__ : 'web'
+export const TARGETS = Object.freeze(['web', 'crazygames', 'poki', 'gamedistribution', 'gamepix', 'y8', 'standalone'])
+export const TARGET = typeof __TARGET__ !== 'undefined' && TARGETS.includes(__TARGET__) ? __TARGET__ : 'web'
+/**
+ * Identifiants donnés par le tableau de bord du portail (GameDistribution : gameId ;
+ * Y8 : gameId et appId), injectés au build (variables CTC_GAME_ID, CTC_APP_ID).
+ */
+export const PORTAL_IDS = deepFreeze({
+  gameId: typeof __PORTAL_GAME_ID__ === 'string' ? __PORTAL_GAME_ID__ : '',
+  appId: typeof __PORTAL_APP_ID__ === 'string' ? __PORTAL_APP_ID__ : '',
+})
 export const IS_PORTAL = TARGET !== 'web' && !IS_DEMO
 export const PLAYABLE_LEVELS = IS_DEMO ? GAME.DEMO_LEVEL_COUNT : GAME.LEVEL_COUNT

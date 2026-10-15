@@ -5,6 +5,9 @@
  * - `npm run build:demo`        → démo autonome en UN SEUL fichier HTML (dist-demo/index.html)
  * - `npm run build:crazygames`  → version CrazyGames, avec son SDK (dist-crazygames/)
  * - `npm run build:poki`        → version Poki, avec son SDK (dist-poki/)
+ * - `npm run build:gamedistribution`, `build:gamepix`, `build:y8` → portails avec SDK
+ * - `npm run build:standalone`  → portails sans SDK (itch.io, Newgrounds)
+ * - `npm run release:portals`   → les cinq paquets prêts à envoyer (release/)
  *
  * Sécurité : une Content-Security-Policy stricte est injectée uniquement au build
  * (le serveur de dev de Vite a besoin de styles injectés à la volée).
@@ -18,7 +21,7 @@ import { buildServiceWorker, PUBLIC_PRECACHE } from './build/sw.js'
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
 const LANGS = ['fr', 'en', 'id']
-const PORTALS = ['crazygames', 'poki']
+const PORTALS = ['crazygames', 'poki', 'gamedistribution', 'gamepix', 'y8', 'standalone']
 
 /** Injecte la CSP dans index.html au moment du build. */
 function cspPlugin(target) {
@@ -148,12 +151,16 @@ function serviceWorkerPlugin() {
  * venant du serveur sans en-têtes CORS : on livre donc un script classique
  * unique (sans découpage) et des polices intégrées au CSS.
  */
-function portalScriptPlugin() {
+function portalScriptPlugin(target) {
   return {
     name: 'ctc-portal-script',
     apply: 'build',
     enforce: 'post',
     transformIndexHtml(html) {
+      // GamePix : son SDK doit être le premier script de <head>.
+      if (target === 'gamepix') html = html.replace('<head>', '<head>\n    <script src="https://integration.gamepix.com/sdk/v3/gamepix.sdk.js"></script>')
+      // Les portails référencent le jeu eux-mêmes : pas de manifeste d'application.
+      html = html.replace(/<link rel="manifest"[^>]*>\n?/, '')
       return html
         .replace(/<script type="module" crossorigin src=/g, '<script defer src=')
         .replace(/<link rel="stylesheet" crossorigin href=/g, '<link rel="stylesheet" href=')
@@ -180,7 +187,7 @@ export default defineConfig(({ mode }) => {
       siteUrlPlugin(siteUrl),
       cspPlugin(target),
       // Portails : ni service worker ni fichiers SEO (ils servent et référencent le jeu eux-mêmes).
-      ...(isDemo ? [singleFilePlugin()] : target === 'web' ? [seoFilesPlugin(siteUrl), serviceWorkerPlugin()] : [portalScriptPlugin()]),
+      ...(isDemo ? [singleFilePlugin()] : target === 'web' ? [seoFilesPlugin(siteUrl), serviceWorkerPlugin()] : [portalScriptPlugin(target)]),
     ],
     define: {
       __DEMO__: JSON.stringify(isDemo),
@@ -188,6 +195,9 @@ export default defineConfig(({ mode }) => {
       __APP_VERSION__: JSON.stringify(pkg.version),
       // CTC_ADS=off : build sans publicité (période de test d'un portail).
       __ADS__: JSON.stringify(process.env.CTC_ADS !== 'off'),
+      // Identifiants du portail (tableau de bord GameDistribution / Y8), si fournis.
+      __PORTAL_GAME_ID__: JSON.stringify(/^[\w-]{0,64}$/.test(process.env.CTC_GAME_ID || '') ? process.env.CTC_GAME_ID || '' : ''),
+      __PORTAL_APP_ID__: JSON.stringify(/^[\w-]{0,64}$/.test(process.env.CTC_APP_ID || '') ? process.env.CTC_APP_ID || '' : ''),
     },
     build: {
       outDir: isDemo ? 'dist-demo' : target === 'web' ? 'dist' : `dist-${target}`,

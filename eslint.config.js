@@ -25,14 +25,14 @@ const browserGlobals = Object.fromEntries(
 )
 
 export default [
-  { ignores: ['dist/**', 'dist-demo/**', 'dist-crazygames/**', 'dist-poki/**', 'node_modules/**', 'coverage/**', '.scratch/**', 'src/game/story/portraits.data.js'] },
+  { ignores: ['dist/**', 'dist-demo/**', 'dist-crazygames/**', 'dist-poki/**', 'dist-gamedistribution/**', 'dist-gamepix/**', 'dist-y8/**', 'dist-standalone/**', 'release/**', 'node_modules/**', 'coverage/**', '.scratch/**', 'src/game/story/portraits.data.js'] },
   recommended,
   {
     files: ['**/*.{js,mjs}'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
-      globals: { ...browserGlobals, __DEMO__: 'readonly', __APP_VERSION__: 'readonly', __TARGET__: 'readonly', __ADS__: 'readonly', process: 'readonly' },
+      globals: { ...browserGlobals, __DEMO__: 'readonly', __APP_VERSION__: 'readonly', __TARGET__: 'readonly', __ADS__: 'readonly', __PORTAL_GAME_ID__: 'readonly', __PORTAL_APP_ID__: 'readonly', process: 'readonly' },
     },
     rules: {
       'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
