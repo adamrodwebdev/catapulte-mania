@@ -1,4 +1,5 @@
 import Matter from 'matter-js'
+import { UnitDirector } from '../ai/UnitDirector.js'
 import { WindField, WIND_PROFILES, windageOf } from './WindField.js'
 import { WORLD, CATEGORY } from './constants.js'
 import { Projectile } from '../entities/Projectile.js'
@@ -47,8 +48,7 @@ export const BREACH_LIGHT_HP = 300
 /** Masse à partir de laquelle un projectile perce aussi la pierre (rocher : ≈ 29, pierre : ≈ 8). */
 export const BREACH_HEAVY_MASS = 20
 
-/** Rondes (v5.1) : vitesse de marche (px par pas à 60 Hz) et délai entre deux revers de l'ogre (ms). */
-export const PATROL_SPEED = 0.55
+/** Délai entre deux revers de l'ogre (ms). La marche des défenseurs : voir ../ai/. */
 export const OGRE_SWAT_MS = 900
 
 export class PhysicsWorld {
@@ -86,6 +86,33 @@ export class PhysicsWorld {
     this.#rng = new SeededRandom(seed)
     /** Champ de vent (base du tour, altitude, rafales). */
     this.windField = new WindField(windProfile, seed)
+    /** Navigation et comportements des défenseurs (v5.8). */
+    this.units = new UnitDirector({
+      entities: () => this.#entities.values(),
+      time: () => this.#time,
+      hazards: () => this.terrain.list.filter((z) => z.kind === 'lake' || z.kind === 'lava' || z.kind === 'ice'),
+      hazardsVersion: () => this.terrain.version,
+      groundY: WORLD.GROUND_Y,
+      width: WORLD.WIDTH,
+      blockedAt: (x, y, self, withTargets = true) => this.#blocked(x, y, self, withTargets),
+      heat: (e, ms) => this.#heat(e, ms),
+      emit: (name, data) => this.#events.emit(name, data),
+      armed: () => this.#armed,
+      left: () => Math.min(-300, this.leftLimit - 100),
+      // Pont jeté par les pillards (v5.8) : une planche fixe, au ras du sol,
+      // sur laquelle on marche sans toucher l'eau ni la lave. Elle casse sous les tirs.
+      spawnBridge: (x0, x1) =>
+        this.#spawns.push(() => {
+          const w = Math.min(600, Math.max(40, x1 - x0))
+          const bridge = new Block({ material: 'wood', x: (x0 + x1) / 2, y: WORLD.GROUND_Y + 2, w, h: 10 })
+          Body.setStatic(bridge.body, true)
+          // Cordes et planches : un bon tir le rompt (les pillards dessus tombent à l'eau).
+          bridge.maxHp = bridge.hp = 80
+          bridge.construct = true
+          bridge.assetKey = 'construct.bridge'
+          this.add(bridge)
+        }),
+    })
     this.engine = Engine.create({ enableSleeping: true, positionIterations: 8, velocityIterations: 6 })
     this.engine.gravity.y = WORLD.GRAVITY
     this.engine.gravity.scale = WORLD.GRAVITY_SCALE
@@ -192,7 +219,8 @@ export class PhysicsWorld {
     this.#flushSpawns()
     this.#rollSnowballs()
     this.#processSteam()
-    if (this.settled) this.#patrol()
+    // Défenseurs (v5.8) : navigation, esquives, réparations (voir ../ai/UnitDirector.js).
+    if (this.settled) this.units.step()
     this.#fireTick += WORLD.STEP_MS
     if (this.#fireTick >= 400) {
       this.#fireTick = 0
@@ -241,7 +269,7 @@ export class PhysicsWorld {
   /** Cible renversée trop longtemps : hors de combat. */
   #checkKnockouts(dtMs) {
     for (const t of this.#entities.values()) {
-      if (t.kind !== 'target' || !t.alive) continue
+      if (t.kind !== 'target' || !t.alive || t.climbing) continue
       const tilt = Math.abs(Math.atan2(Math.sin(t.angle), Math.cos(t.angle)))
       t.downMs = tilt > WORLD.KNOCKOUT_ANGLE ? (t.downMs || 0) + dtMs : 0
       if (t.downMs >= WORLD.KNOCKOUT_MS) t.kill('knockout')
@@ -258,7 +286,8 @@ export class PhysicsWorld {
     const blocks = this.filter((e) => e.kind === 'block' && e.alive).map((e) => e.body)
     if (!blocks.length) return
     const d = WORLD.PIN_PROBE
-    for (const t of this.filter((e) => e.kind === 'target' && e.alive && e.type !== 'ogre')) {
+    // À l'échelle (v5.8), un défenseur longe la roche : il n'y est pas coincé.
+    for (const t of this.filter((e) => e.kind === 'target' && e.alive && e.type !== 'ogre' && !e.climbing)) {
       const b = t.body.bounds
       const w = b.max.x - b.min.x
       const h = b.max.y - b.min.y
@@ -314,6 +343,7 @@ export class PhysicsWorld {
    */
   explode(x, y, { radius, power, damage, source = null }) {
     this.#events.emit('explosion', { x, y, radius, source })
+    this.units.onBlast(x, y, radius)
     for (const e of this.queryRadius(x, y, radius + 30)) {
       if (e === source) continue
       const dx = e.x - x
@@ -485,6 +515,9 @@ export class PhysicsWorld {
       // Ogre : il renvoie les projectiles légers et repousse les blocs qui lui tombent dessus.
       const ogre = a?.type === 'ogre' ? a : b?.type === 'ogre' ? b : null
       if (ogre && this.#ogreReacts(ogre, ogre === a ? b : a, pair)) continue
+      // Pavoisier (v5.8) : son pavois arrête les tirs tendus qui le frappent de face.
+      const shield = a?.shield ? a : b?.shield ? b : null
+      if (shield && this.#shieldReacts(shield, shield === a ? b : a, pair)) continue
 
       // Créature volante : elle stoppe le projectile (capteur, pas de rebond).
       if (a?.kind === 'flyer' || b?.kind === 'flyer') {
@@ -654,56 +687,10 @@ export class PhysicsWorld {
     for (const s of due) this.#steam(s.e)
   }
 
-  /**
-   * Rondes : chaque défenseur qui patrouille marche à petite vitesse, debout,
-   * et fait demi-tour au bout de sa ronde, devant un mur ou un objet, au bord
-   * du vide, ou au bord d'un lac et de la lave. Gelé, renversé ou en l'air, il s'arrête.
-   */
-  #patrol() {
-    for (const t of this.#entities.values()) {
-      if (t.kind !== 'target' || !t.alive || !(t.patrol > 0)) continue
-      const upright = Math.abs(Math.atan2(Math.sin(t.angle), Math.cos(t.angle))) < 0.25
-      const v = Body.getVelocity(t.body)
-      if (t.frozenMs > 0 || !upright || Math.abs(v.y) > 0.6 || t.burning > 0) {
-        this.#stopWalking(t)
-        continue
-      }
-      const dir = t.facing
-      const halfW = t.width / 2
-      const feet = t.y + t.height / 2
-      const ahead = t.x + dir * (halfW + 7)
-      const out = Math.abs(t.x + dir * 2 - t.home) > t.patrol
-      const wall = this.#blocked(ahead, t.y, t) || this.#blocked(ahead, t.y - t.height * 0.3, t)
-      const floor = feet >= WORLD.GROUND_Y - 3 ? !this.terrain.at(ahead) || this.terrain.at(ahead).kind === 'snow' : this.#blocked(ahead, feet + 6, t)
-      if (out || wall || !floor) {
-        t.facing = -dir
-        Body.setVelocity(t.body, { x: 0, y: v.y })
-        this.#stopWalking(t)
-        continue
-      }
-      const speed = PATROL_SPEED / Math.sqrt(t.toughness ?? 1)
-      Sleeping.set(t.body, false)
-      // En marche, presque sans frottement : le défenseur n'entraîne pas le
-      // plancher sous ses pas (sinon un étage posé sur des piliers glisserait).
-      t.body.friction = 0.01
-      t.body.frictionStatic = 0.05
-      Body.setVelocity(t.body, { x: dir * speed, y: v.y })
-      Body.setAngularVelocity(t.body, 0)
-      t.walking = true
-    }
-  }
-
-  #stopWalking(t) {
-    if (!t.walking) return
-    t.walking = false
-    t.body.friction = 0.9
-    t.body.frictionStatic = 1.5
-  }
-
-  /** Un bloc, un baril ou un autre défenseur occupe-t-il ce point ? */
-  #blocked(x, y, self) {
+  /** Un bloc, un baril ou (au choix) un autre défenseur occupe-t-il ce point ? */
+  #blocked(x, y, self, withTargets = true) {
     for (const e of this.#entities.values()) {
-      if (e === self || !e.alive || (e.kind !== 'block' && e.kind !== 'barrel' && e.kind !== 'target')) continue
+      if (e === self || !e.alive || (e.kind !== 'block' && e.kind !== 'barrel' && (e.kind !== 'target' || !withTargets))) continue
       const b = e.body.bounds
       if (x < b.min.x || x > b.max.x || y < b.min.y || y > b.max.y) continue
       if (Vertices.contains(e.body.vertices, { x, y })) return true
@@ -741,6 +728,28 @@ export class PhysicsWorld {
       return true
     }
     return false
+  }
+
+  /**
+   * Pavois (v5.8) : un projectile léger (pierre, mitraille) qui frappe le
+   * pavoisier DE FACE et de biais (moins de 50° sous l'horizontale) ricoche
+   * sur le pavois. Un tir plongeant, un tir dans le dos, un boulet lourd, la
+   * poudre, le feu ou le givre passent : il faut le prendre par le haut.
+   * @returns {boolean} vrai si le choc est entièrement traité ici
+   */
+  #shieldReacts(bearer, other, pair) {
+    if (!bearer.alive || bearer.frozenMs > 0 || other?.kind !== 'projectile' || !other.alive) return false
+    if (other.explodes || other.ignites || other.frost || other.diving || other.mass >= BREACH_HEAVY_MASS) return false
+    const v = Body.getVelocity(other.body)
+    const front = bearer.facing || -1
+    const fromFront = Math.sign(other.x - bearer.x) === front && Math.sign(v.x) === -front
+    const flat = Math.abs(v.y) < Math.abs(v.x) * Math.tan((50 * Math.PI) / 180)
+    if (!fromFront || !flat) return false
+    pair.isActive = false
+    Body.setVelocity(other.body, { x: front * Math.max(2, Math.abs(v.x) * 0.3), y: -Math.max(1.5, Math.abs(v.y) * 0.3) })
+    other.hasImpacted = true
+    this.#events.emit('unit', { kind: 'shieldBlock', entity: bearer, x: bearer.x + front * bearer.width * 0.5, y: bearer.y - bearer.height * 0.15 })
+    return true
   }
 
   #swatted(ogre, kind, other) {
@@ -1000,6 +1009,7 @@ export class PhysicsWorld {
           this.structure.onRemoved(e)
           this.#wakeAround(e.x, e.y, Math.max(e.width, e.height) + 80)
         }
+        if (e.kind === 'target') this.units.onDown(e)
         if (e.kind === 'barrel') {
           this.#pendingExplosions.push({ at: this.#time + 110, x: e.x, y: e.y, spec: { ...e.explosion, source: e } })
         }

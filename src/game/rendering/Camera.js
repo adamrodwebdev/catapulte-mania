@@ -6,7 +6,15 @@ import { WORLD } from '../physics/constants.js'
  * - Mode « vue d'ensemble » : la catapulte ET le château sont visibles.
  * - Mode « suivi » : léger zoom qui accompagne le projectile en vol.
  * Les tremblements d'écran sont désactivables (accessibilité).
+ *
+ * v5.7 : tremblement « à traumatisme », comme dans les jeux d'action : chaque
+ * choc ajoute du traumatisme (0..1), l'amplitude suit son carré (les petits
+ * chocs restent discrets, les gros secouent vraiment) et le mouvement suit un
+ * bruit lisse (plus de vibration mécanique), avec un léger roulis.
  */
+/** Vitesse de zoom maximale (facteur e par seconde : ≈ ×1,8 par seconde). */
+const ZOOM_RATE = 0.6
+const smooth = (t, s) => (Math.sin(t * 0.031 + s) + Math.sin(t * 0.057 + s * 2.3) * 0.6 + Math.sin(t * 0.093 + s * 4.1) * 0.3) / 1.9
 export class Camera {
   viewW = 1
   viewH = 1
@@ -15,7 +23,7 @@ export class Camera {
   scale = 0.5
   #target = { x: WORLD.WIDTH / 2, y: 600, scale: 0.5 }
   #focus = { left: 0, right: WORLD.WIDTH, top: 200 }
-  #shake = 0
+  #trauma = 0
   #shakeT = 0
   follow = true
   shakeEnabled = true
@@ -128,32 +136,68 @@ export class Camera {
     this.#target = { x, y, scale: s }
   }
 
+  /** @param {number} intensity force du choc (≈ 4 léger, 12 explosion, 18 maximum) */
   shake(intensity) {
     if (!this.shakeEnabled) return
-    this.#shake = Math.min(18, this.#shake + intensity)
+    this.#trauma = Math.min(1, this.#trauma + intensity / 16)
   }
 
+  /** Traumatisme courant (0..1), pour les tests et les effets qui en dépendent. */
+  get trauma() {
+    return this.#trauma
+  }
+
+  /**
+   * Rapproche la caméra de sa cible. Confort (v5.8) : le zoom est interpolé
+   * en échelle logarithmique (même ressenti en zoomant qu'en dézoomant), plus
+   * lentement que le déplacement, et sa vitesse est bornée : jamais de
+   * « plongée » brusque qui donne le mal des transports.
+   */
   update(dtMs) {
     const k = 1 - Math.pow(0.0025, dtMs / 1000)
     this.x = lerp(this.x, this.#target.x, k)
     this.y = lerp(this.y, this.#target.y, k)
-    this.scale = lerp(this.scale, this.#target.scale, k)
+    const kz = 1 - Math.pow(0.02, dtMs / 1000)
+    const want = Math.log(this.#target.scale / this.scale) * kz
+    const maxStep = ZOOM_RATE * (dtMs / 1000)
+    this.scale *= Math.exp(clamp(want, -maxStep, maxStep))
     this.#shakeT += dtMs
-    this.#shake = Math.max(0, this.#shake - dtMs * 0.03)
+    this.#trauma = Math.max(0, this.#trauma - dtMs * 0.0017)
   }
 
+  /** Décalage (px écran) et roulis (rad) du tremblement. */
   get offset() {
-    if (this.#shake <= 0) return { x: 0, y: 0 }
-    return { x: Math.sin(this.#shakeT * 0.09) * this.#shake, y: Math.cos(this.#shakeT * 0.11) * this.#shake * 0.6 }
+    if (this.#trauma <= 0) return { x: 0, y: 0, roll: 0 }
+    const k = this.#trauma * this.#trauma
+    const amp = k * Math.min(26, Math.max(10, this.viewH * 0.03))
+    const t = this.#shakeT
+    return { x: smooth(t, 1.3) * amp, y: smooth(t, 7.9) * amp * 0.8, roll: smooth(t, 4.2) * k * 0.018 }
   }
 
-  /** Applique la transformation monde → écran au contexte. */
+  /**
+   * Applique la transformation monde → écran au contexte. Les plans lointains
+   * (parallaxe < 1) tremblent moins : ils sont loin du choc.
+   */
   apply(ctx, dpr, parallax = 1) {
     const o = this.offset
+    const depth = Math.min(1, parallax)
+    const tx = this.viewW / 2 - this.x * this.scale * parallax + o.x * depth
+    const ty = this.viewH / 2 - this.y * this.scale + o.y * depth
+    const roll = o.roll * depth
+    if (!roll) {
+      ctx.setTransform(dpr * this.scale, 0, 0, dpr * this.scale, dpr * tx, dpr * ty)
+      return
+    }
+    // Rotation autour du centre de l'écran.
+    const cos = Math.cos(roll)
+    const sin = Math.sin(roll)
+    const cx = this.viewW / 2
+    const cy = this.viewH / 2
+    const s = this.scale
     ctx.setTransform(
-      dpr * this.scale, 0, 0, dpr * this.scale,
-      dpr * (this.viewW / 2 - this.x * this.scale * parallax + o.x),
-      dpr * (this.viewH / 2 - this.y * this.scale + o.y),
+      dpr * s * cos, dpr * s * sin, -dpr * s * sin, dpr * s * cos,
+      dpr * (cos * (tx - cx) - sin * (ty - cy) + cx),
+      dpr * (sin * (tx - cx) + cos * (ty - cy) + cy),
     )
   }
 

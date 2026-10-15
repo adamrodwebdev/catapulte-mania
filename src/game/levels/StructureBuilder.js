@@ -124,6 +124,16 @@ export class StructureBuilder {
     return this
   }
 
+  /**
+   * Veilleur de nuit (v5.8) : un soldat qui monte la garde, torche à la main.
+   * S'il tombe, sa torche met le feu au bois et à la poudre autour de lui.
+   */
+  watchman(room, dx = 0) {
+    this.target(room, 'soldier', dx)
+    this.targets[this.targets.length - 1].torch = true
+    return this
+  }
+
   /** Place un baril de poudre dans une pièce. */
   barrel(room, dx = 0) {
     this.barrels.push({ x: room.x + dx, y: room.floorY - 22 })

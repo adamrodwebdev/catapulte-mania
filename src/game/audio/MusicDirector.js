@@ -16,6 +16,11 @@ import { SeededRandom } from '../../core/utils/SeededRandom.js'
  *                  explosion, dernière cible).
  * Les couches entrent et sortent progressivement : jamais de coupure brutale.
  *
+ * v5.7 : luth au timbre plus riche (onde harmonique et attaque de plectre),
+ * tambours de guerre graves dès l'action, chœur d'hommes au paroxysme (et dès
+ * l'action dans le dernier chapitre), harpe qui ouvre les phrases au calme.
+ * La musique passe dans la réverbération commune (voir AudioService).
+ *
  * Les morceaux sont des grilles d'accords modales (dorien, éolien) ; les
  * mélodies sont tirées d'un générateur à graine fixe : chaque morceau sonne
  * toujours de la même façon, mais sans boucle audible de quelques secondes.
@@ -58,6 +63,8 @@ export class MusicDirector {
   #pulse = 0
   #pulseUntil = 0
   #drone = null
+  /** @type {PeriodicWave | null | undefined} onde du luth (créée à la demande) */
+  #lute = undefined
   /** @type {(level: number) => void} */
   onClimax = () => {}
 
@@ -207,6 +214,21 @@ export class MusicDirector {
     // Basse (action) : fondamentale sur les temps.
     if (lvl >= 2 && inBar % 2 === 0) this.#bass(t, hz(chord[0] - 12), eighth * 1.6)
 
+    // Harpe (calme) : un arpège montant ouvre chaque phrase de quatre mesures.
+    if (lvl <= 1 && bar % 4 === 0 && inBar === 0) {
+      for (const [i, idx] of [0, 1, 2, 0].entries()) this.#harp(t + i * eighth * 0.5, hz(chord[idx] + 12 * (i === 3 ? 2 : 1)), 0.05)
+    }
+
+    // Tambours de guerre (action) : la marche du siège, plus pressante au paroxysme.
+    if (lvl >= 2) {
+      const war = lvl === 2 ? [0] : [0, 3, 4]
+      if (war.includes(inBar)) this.#warDrum(t, inBar === 0 ? 1 : 0.7)
+    }
+
+    // Chœur : au paroxysme, et dès l'action au dernier chapitre. Tenu toute la mesure.
+    const choirFrom = this.#pieceId === 'finale' ? 2 : 3
+    if (lvl >= choirFrom && inBar === 0) this.#choir(t, [hz(chord[0] - 12), hz(chord[1] - 12), hz(chord[2] - 12)], eighth * 8, 0.035)
+
     // Tambourin.
     if (lvl >= 1) {
       const hits = lvl === 1 ? [0, 4] : lvl === 2 ? [0, 3, 4, 6] : [0, 2, 3, 4, 6, 7]
@@ -309,15 +331,82 @@ export class MusicDirector {
     return { gain, oscs }
   }
 
+  /** Onde du luth : harmoniques pairs et impairs qui décroissent, un peu nasale. */
+  #luteWave() {
+    if (this.#lute !== undefined) return this.#lute
+    this.#lute = null
+    if (!this.#ctx.createPeriodicWave) return null
+    const n = 14
+    const real = new Float32Array(n)
+    const imag = new Float32Array(n)
+    for (let h = 1; h < n; h++) imag[h] = (1 / h) * (h % 2 ? 1 : 0.6) * (h === 3 ? 1.4 : 1)
+    this.#lute = this.#ctx.createPeriodicWave(real, imag)
+    return this.#lute
+  }
+
   #pluck(t, freq, peak) {
-    const g = this.#env(t, 0.004, 0, 0.55, peak)
+    const g = this.#env(t, 0.003, 0, 0.7, peak)
     const lp = this.#ctx.createBiquadFilter()
     lp.type = 'lowpass'
-    lp.frequency.setValueAtTime(freq * 6, t)
-    lp.frequency.exponentialRampToValueAtTime(freq * 1.5, t + 0.4)
+    lp.Q.value = 2
+    lp.frequency.setValueAtTime(freq * 8, t)
+    lp.frequency.exponentialRampToValueAtTime(freq * 1.6, t + 0.35)
     lp.connect(g)
-    this.#osc('triangle', freq, t, 0.6, lp)
-    this.#osc('sawtooth', freq * 1.002, t, 0.6, lp)
+    const wave = this.#luteWave()
+    if (wave) {
+      const o = this.#osc('sine', freq, t, 0.75, lp)
+      o.setPeriodicWave(wave)
+      // Deux cordes par chœur, très légèrement désaccordées.
+      const o2 = this.#osc('sine', freq * 1.003, t, 0.75, lp)
+      o2.setPeriodicWave(wave)
+    } else {
+      this.#osc('triangle', freq, t, 0.6, lp)
+      this.#osc('sawtooth', freq * 1.002, t, 0.6, lp)
+    }
+    // Attaque du plectre.
+    this.#noise(t, 0.015, freq * 4, 'bandpass', peak * 0.5)
+  }
+
+  /** Harpe : note claire et longue (arpèges qui ouvrent les phrases au calme). */
+  #harp(t, freq, peak) {
+    const g = this.#env(t, 0.002, 0, 1.4, peak)
+    this.#osc('triangle', freq, t, 1.45, g)
+    this.#osc('sine', freq * 2, t, 0.8, this.#env(t, 0.002, 0, 0.6, peak * 0.25))
+  }
+
+  /** Tambour de guerre : grosse caisse grave, peau qui claque, salle qui résonne. */
+  #warDrum(t, k) {
+    const g = this.#env(t, 0.003, 0, 0.6, 0.32 * k)
+    const o = this.#osc('sine', 95, t, 0.65, g)
+    o.frequency.exponentialRampToValueAtTime(42, t + 0.45)
+    this.#noise(t, 0.12, 380, 'lowpass', 0.22 * k)
+    this.#noise(t, 0.04, 1800, 'bandpass', 0.06 * k)
+  }
+
+  /**
+   * Chœur d'hommes (« aah ») : trois voix par note, dents de scie désaccordées,
+   * passées dans les formants de la voyelle ; attaque et chute lentes.
+   */
+  #choir(t, freqs, dur, peak) {
+    const ctx = this.#ctx
+    const g = this.#env(t, 0.35, Math.max(0, dur - 0.5), 0.6, peak)
+    const sum = ctx.createGain()
+    sum.gain.value = 1
+    for (const [f, q, amp] of [[700, 5, 1], [1150, 6, 0.6], [2500, 8, 0.25]]) {
+      const bp = ctx.createBiquadFilter()
+      bp.type = 'bandpass'
+      bp.frequency.value = f
+      bp.Q.value = q
+      const a = ctx.createGain()
+      a.gain.value = amp
+      sum.connect(bp).connect(a).connect(g)
+    }
+    for (const freq of freqs) {
+      for (const d of [-9, 0, 8]) {
+        const o = this.#osc('sawtooth', freq, t, dur + 0.7, sum)
+        if (o.detune) o.detune.value = d
+      }
+    }
   }
 
   #flute(t, freq, dur, peak) {

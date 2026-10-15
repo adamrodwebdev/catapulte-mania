@@ -25,18 +25,19 @@
   display: block;
 }
 
-/* Panneaux translucides communs du HUD */
+/* Panneaux de verre communs du HUD (v6) : la scène se devine derrière. */
 .hud-top,
 .hud-bottom,
 .powers-menu {
   position: absolute;
   z-index: 10;
   color: var(--text);
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  border: 2px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(6px);
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-l);
+  box-shadow: var(--inner-hi), var(--elev-2);
 }
 
 /* ---------- Bandeau haut ---------- */
@@ -47,7 +48,13 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
+  /* Le bouton pause, rond, s'emboîte dans l'arrondi du bandeau. */
+  padding: var(--space-1) var(--space-4) var(--space-1) var(--space-1);
+  border-radius: var(--radius-xl);
+}
+
+.hud-top:where(:has(.hud-top__powers)) {
+  padding-right: var(--space-1);
 }
 
 .hud-top__level {
@@ -60,6 +67,7 @@
   font-family: var(--font-display);
   font-weight: 700;
   font-size: var(--fs-2);
+  letter-spacing: 0.02em;
   white-space: nowrap;
 }
 
@@ -73,7 +81,8 @@
 
 .hud-stats {
   display: flex;
-  gap: var(--space-4);
+  align-items: center;
+  gap: var(--space-3);
   margin: 0 0 0 auto;
 }
 
@@ -83,10 +92,17 @@
   line-height: 1.1;
 }
 
+/* Séparateurs d'un pixel entre les statistiques. */
+.hud-stat + .hud-stat {
+  padding-left: var(--space-3);
+  border-left: 1px solid var(--hairline);
+}
+
 .hud-stat dt {
-  font-size: 0.7rem;
+  font-size: 0.64rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.12em;
   color: var(--text-muted);
 }
 
@@ -105,24 +121,36 @@
 .hud-stat__value--score {
   color: var(--accent-text);
   font-size: var(--fs-2);
+  font-weight: 800;
+}
+
+/* Thème sombre : le score se lit en or dégradé, comme le titre du jeu. */
+:root[data-theme='dark']:not([data-contrast='high']) .hud-stat__value--score {
+  background: var(--title-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .shots {
   display: inline-flex;
-  gap: 3px;
+  gap: 4px;
 }
 
+/* Tirs restants : des perles d'or ; les tirs joués restent en creux. */
 .shots__dot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--text);
-  border: 2px solid var(--text);
+  background: var(--grad-gold);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--c-gold-deep) 85%, transparent),
+    0 0 6px color-mix(in srgb, var(--c-gold) 45%, transparent);
 }
 
 .shots__dot--used {
   background: transparent;
-  opacity: 0.45;
+  box-shadow: inset 0 0 0 1.5px var(--hairline-strong);
 }
 
 .shots__text {
@@ -137,10 +165,9 @@
   transform: scaleX(-1);
 }
 
+/* Le bouton des pouvoirs est une action principale (btn--primary) en pastille. */
 .hud-top__powers {
-  background: var(--accent);
-  color: var(--c-ink);
-  border-color: var(--c-ink);
+  border-radius: var(--radius-pill);
 }
 
 /* ---------- Menu des pouvoirs ---------- */
@@ -151,9 +178,19 @@
   width: min(24rem, calc(100% - 1rem));
   max-height: calc(100dvh - 9rem);
   overflow: auto;
-  padding: var(--space-3);
-  background: var(--surface);
-  animation: fade-in calc(0.15s * var(--speed)) ease-out;
+  padding: var(--space-4);
+  background: var(--glass-strong);
+  box-shadow: var(--inner-hi), var(--elev-3);
+  transform-origin: top right;
+  animation: menu-in var(--dur-3) var(--ease-spring);
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    translate: 0 -6px;
+    scale: 0.97;
+  }
 }
 
 .powers-menu__head {
@@ -191,24 +228,52 @@
   text-align: left;
   color: inherit;
   font: inherit;
-  background: var(--surface-2);
-  border: 2px solid var(--border);
+  background: var(--glass-tint);
+  border: 1px solid var(--hairline);
   border-radius: var(--radius);
   cursor: pointer;
+  transition:
+    border-color var(--dur-2) var(--ease-out),
+    background-color var(--dur-2) var(--ease-out),
+    transform var(--dur-1) var(--ease-out);
 }
 
-.power-btn:hover:not(:disabled) {
-  border-color: var(--action);
+/* Pastille d'icône, comme les cartes de pouvoirs de l'écran des niveaux. */
+.power-btn > .icon {
+  width: 36px;
+  height: 36px;
+  padding: 7px;
+  box-sizing: border-box;
+  border-radius: var(--radius-s);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent-text);
+}
+
+@media (hover: hover) {
+  .power-btn:hover:not(:disabled) {
+    border-color: var(--hairline-strong);
+    background: color-mix(in srgb, var(--action) 10%, var(--glass-tint));
+  }
+}
+
+.power-btn:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.power-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
 }
 
 .power-btn:disabled {
-  opacity: 0.55;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .power-btn--armed {
   border-color: var(--accent);
-  box-shadow: inset 0 0 0 2px var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  box-shadow: inset 0 0 0 1px var(--accent), var(--gold-glow);
 }
 
 .power-btn__text {
@@ -276,10 +341,10 @@
   min-height: var(--hud-size);
 }
 
-/* Munitions */
+/* Munitions (v6) : des touches de verre ; la munition choisie s'allume d'or. */
 .ammo {
   display: flex;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
 .ammo__item {
@@ -293,29 +358,58 @@
   color: inherit;
   font: inherit;
   font-size: 0.72rem;
-  background: var(--surface-2);
-  border: 2px solid var(--border);
+  background: var(--glass-tint);
+  border: 1px solid var(--hairline);
   border-radius: var(--radius);
   cursor: pointer;
+  transition:
+    background-color var(--dur-2) var(--ease-out),
+    border-color var(--dur-2) var(--ease-out),
+    box-shadow var(--dur-2) var(--ease-out),
+    transform var(--dur-2) var(--ease-spring);
+}
+
+@media (hover: hover) {
+  .ammo__item:hover:not(:disabled) {
+    border-color: var(--hairline-strong);
+    transform: translateY(-1px);
+  }
+}
+
+.ammo__item:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.ammo__item:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
 }
 
 .ammo__item:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
 .ammo__item--on {
-  border-color: var(--accent);
-  box-shadow: inset 0 0 0 2px var(--accent);
-  background: color-mix(in srgb, var(--accent) 18%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--accent) 85%, transparent);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.3),
+    0 0 16px color-mix(in srgb, var(--accent) 38%, transparent);
 }
 
 .ammo__icon {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  border: 2px solid var(--c-ink);
+  border: 1.5px solid color-mix(in srgb, var(--c-ink) 85%, transparent);
   background: radial-gradient(circle at 35% 30%, #b9b3a6, #6f6a60 70%);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 0.3);
+  transition: scale var(--dur-2) var(--ease-spring);
+}
+
+.ammo__item--on .ammo__icon {
+  scale: 1.12;
 }
 
 .ammo__item--boulder .ammo__icon {
@@ -347,25 +441,39 @@
 }
 
 .ammo__name {
-  font-weight: 600;
+  font-weight: 650;
   white-space: nowrap;
 }
 
 .ammo__count {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
+  color: var(--text-muted);
+}
+
+.ammo__item--on .ammo__count {
+  color: var(--accent-text);
 }
 
 .ammo__key {
   position: absolute;
-  top: -8px;
-  right: -6px;
-  font-size: 0.65rem;
+  top: -7px;
+  right: -5px;
+  min-width: 1.05rem;
   padding: 0 4px;
+  font-size: 0.6rem;
+  line-height: 1rem;
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--glass-strong);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-pill);
+  opacity: 1;
 }
 
-/* Bouton de tir */
+/* Bouton de tir (v6) : un sceau de cire rouge, bombé, qui s'enfonce sous le doigt. */
 .fire-btn {
+  position: relative;
   display: grid;
   justify-items: center;
   align-content: center;
@@ -373,32 +481,62 @@
   width: 5.5rem;
   height: 5.5rem;
   border-radius: 50%;
-  border: 3px solid var(--c-ink);
-  background: var(--danger);
-  color: #fff;
+  border: 1px solid rgb(255 255 255 / 0.28);
+  background: var(--grad-fire);
+  color: var(--on-fire);
   font-family: var(--font-display);
   font-weight: 700;
   font-size: var(--fs-0);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.35);
   cursor: pointer;
-  box-shadow: 0 5px 0 var(--c-ink);
-  transition: transform calc(0.08s * var(--speed));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    inset 0 -10px 18px rgb(0 0 0 / 0.22),
+    0 0 0 4px color-mix(in srgb, var(--c-madder) 24%, transparent),
+    var(--elev-2);
+  transition:
+    transform var(--dur-2) var(--ease-spring),
+    box-shadow var(--dur-2) var(--ease-out),
+    filter var(--dur-2) var(--ease-out);
+}
+
+@media (hover: hover) {
+  .fire-btn:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
 }
 
 .fire-btn:active:not(:disabled) {
-  transform: translateY(4px);
-  box-shadow: 0 1px 0 var(--c-ink);
+  transform: scale(0.94);
+  box-shadow:
+    inset 0 3px 8px rgb(0 0 0 / 0.32),
+    0 0 0 6px color-mix(in srgb, var(--c-madder) 32%, transparent),
+    var(--elev-1);
+}
+
+.fire-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ring), var(--elev-2);
 }
 
 .fire-btn:disabled {
   opacity: 0.5;
+  filter: saturate(0.5);
   cursor: not-allowed;
 }
 
-.fire-btn--split {
-  background: var(--accent);
+/* Fragmentation, plongeon, relâche du trébuchet : l'or appelle le geste. */
+.fire-btn--split,
+.fire-btn--release {
+  background: var(--grad-gold);
   color: var(--c-ink);
+  text-shadow: 0 1px 0 rgb(255 255 255 / 0.35);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.55),
+    0 0 0 4px color-mix(in srgb, var(--c-gold) 30%, transparent),
+    var(--gold-glow);
   animation: pulse calc(0.8s * var(--speed)) ease-in-out infinite alternate;
 }
 
@@ -408,20 +546,37 @@
   }
 }
 
+:root[data-contrast='high'] .fire-btn {
+  background: var(--surface);
+  color: var(--text);
+  border: 3px solid var(--danger);
+  box-shadow: none;
+  text-shadow: none;
+}
+
+:root[data-contrast='high'] .fire-btn--split,
+:root[data-contrast='high'] .fire-btn--release {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* Astuce de visée : en bas, près du sol, hors de la zone de tir. */
 .game__hint {
   position: absolute;
   z-index: 5;
   left: 50%;
-  bottom: calc(var(--hud-bottom-h, 7rem) + var(--space-2));
+  bottom: calc(var(--hud-controls-h, var(--hud-bottom-h, 7rem)) + var(--space-2));
   transform: translateX(-50%);
   max-width: min(28rem, 90%);
   padding: var(--space-2) var(--space-4);
   text-align: center;
   font-weight: 600;
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  border: 2px dashed var(--accent);
-  border-radius: var(--radius);
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  border: 1px solid color-mix(in srgb, var(--accent) 65%, transparent);
+  border-radius: var(--radius-l);
+  box-shadow: var(--inner-hi), var(--elev-2);
   pointer-events: none;
 }
 
@@ -432,7 +587,7 @@
   position: absolute;
   z-index: 15;
   left: 50%;
-  bottom: calc(var(--hud-bottom-h, 7rem) + var(--space-2));
+  bottom: calc(var(--hud-controls-h, var(--hud-bottom-h, 7rem)) + var(--space-2));
   transform: translateX(-50%);
   max-width: min(32rem, 70%);
   list-style: none;
@@ -444,21 +599,33 @@
   pointer-events: none;
 }
 
+/* Des pastilles sombres et floutées, lisibles sur n'importe quel ciel. */
 .captions__item {
   display: inline-flex;
   gap: var(--space-2);
   align-items: center;
-  padding: 2px var(--space-3);
+  padding: 3px var(--space-3);
   font-size: calc(var(--fs-1) * var(--ui-scale));
   font-weight: 600;
-  color: #fff;
-  background: rgb(0 0 0 / 0.78);
-  border-radius: 4px;
-  animation: fade-in calc(0.15s * var(--speed)) ease-out;
+  color: var(--on-scrim);
+  background: var(--scrim);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid color-mix(in srgb, var(--on-scrim) 14%, transparent);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--elev-1);
+  animation: caption-in var(--dur-2) var(--ease-out);
+}
+
+@keyframes caption-in {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
 }
 
 .captions__dir {
-  color: var(--c-gold);
+  color: var(--c-gold-light);
 }
 
 /* ---------- Écrans de fin / intro ---------- */
@@ -554,9 +721,12 @@
     padding: var(--space-3);
     text-align: center;
     font-size: var(--fs-0);
-    background: color-mix(in srgb, var(--surface) 92%, transparent);
-    border: 2px solid var(--border);
-    border-radius: var(--radius);
+    background: var(--glass-strong);
+    -webkit-backdrop-filter: var(--blur);
+    backdrop-filter: var(--blur);
+    border: 1px solid var(--hairline-strong);
+    border-radius: var(--radius-pill);
+    box-shadow: var(--inner-hi), var(--elev-1);
     pointer-events: none;
   }
 }
@@ -768,27 +938,54 @@
   /* En haut à gauche, dans le ciel : ne masque ni le château ni les commandes. */
   left: var(--space-4);
   top: calc(var(--hud-top-h, 4rem) + var(--space-3));
-  width: min(26rem, calc(100% - 2 * var(--space-4)));
-  padding: var(--space-3) var(--space-4);
-  background: var(--surface);
+  width: min(22rem, calc(100% - 2 * var(--space-4)));
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
   color: var(--text);
-  border: 2px solid var(--accent);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-l);
+  box-shadow: var(--inner-hi), var(--elev-2);
+  animation: coach-in var(--dur-3) var(--ease-spring);
+}
+/* Liseré d'or à gauche : la voix du maître d'armes. */
+.coach::before {
+  content: '';
+  position: absolute;
+  inset: var(--space-3) auto var(--space-3) 0;
+  width: 3px;
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+  background: var(--grad-gold);
+}
+@keyframes coach-in {
+  from {
+    opacity: 0;
+    translate: 0 -6px;
+    scale: 0.98;
+  }
 }
 .coach__head {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   margin: 0 0 var(--space-1);
-  font-size: var(--fs-0);
+  font-size: 0.7rem;
   font-weight: 700;
   color: var(--accent-text);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.1em;
 }
 .coach__title {
   flex: 1;
+}
+.coach__progress {
+  padding: 0 6px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
 }
 .coach__text {
   margin: 0;
@@ -796,6 +993,7 @@
   line-height: 1.4;
 }
 .coach__skip {
+  position: relative;
   display: block;
   margin: var(--space-2) 0 0 auto;
   min-height: var(--hud-size);
@@ -806,8 +1004,18 @@
   color: var(--action);
   background: none;
   border: 0;
-  text-decoration: underline;
+  border-radius: var(--radius-pill);
   cursor: pointer;
+  transition: background-color var(--dur-2) var(--ease-out);
+}
+@media (hover: hover) {
+  .coach__skip:hover {
+    background: color-mix(in srgb, var(--action) 12%, transparent);
+  }
+}
+.coach__skip:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
 }
 .coach-focus {
   position: relative;
@@ -845,13 +1053,6 @@
   }
 }
 
-/* Bulle de tutoriel compacte (v4.2) : une phrase, l'image fait le reste. */
-.coach {
-  width: min(22rem, calc(100% - 2 * var(--space-4)));
-  padding: var(--space-2) var(--space-3);
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-}
-
 /* Vent (v3.6) : la couleur suit la force ; « rafale » clignote doucement. */
 .hud-stat--wind-strong .hud-stat__value {
   color: var(--accent-text);
@@ -871,9 +1072,9 @@
   left: 50%;
   translate: -50% 2px;
   padding: 0 0.35em;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--danger);
-  color: #fff;
+  color: var(--on-danger);
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -953,9 +1154,7 @@
 }
 
 .fire-btn--release {
-  background: var(--accent);
-  color: var(--c-ink);
-  animation: pulse calc(0.5s * var(--speed)) ease-in-out infinite alternate;
+  animation-duration: calc(0.5s * var(--speed));
 }
 
 .intro-engine {
@@ -1022,26 +1221,29 @@
   padding: 0;
   background: none;
   border: 0;
+  border-radius: 0;
   box-shadow: none;
+  -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
+.hud-bottom--compact .ammo,
+.hud-bottom--compact .treb-panel {
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-l);
+  box-shadow: var(--inner-hi), var(--elev-2);
+}
 .hud-bottom--compact .ammo {
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  border: 2px solid var(--border);
-  border-radius: var(--radius);
   padding: var(--space-1);
-  box-shadow: var(--shadow);
 }
 .hud-bottom--compact .fire-btn {
   width: 4.6rem;
   height: 4.6rem;
 }
-.hud-bottom--compact .trebuchet-panel,
 .hud-bottom--compact .treb-panel {
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  border: 2px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-1) var(--space-3);
 }
 /* Écran étroit (téléphone en portrait) : le panneau du trébuchet passe sur sa
    propre ligne au lieu de déborder à gauche de l'écran (v5.3). */
@@ -1059,15 +1261,19 @@
   margin: 0;
   align-self: center;
   display: inline-flex;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-3);
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.25rem;
+  padding: 0 var(--space-3);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--text);
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  border: 2px solid var(--border);
-  border-radius: 999px;
-  box-shadow: var(--shadow);
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--inner-hi), var(--elev-1);
 }
 .aim-readout__sep {
   opacity: 0.5;
@@ -1118,24 +1324,26 @@
 }
 
 /* Bandeau haut allégé pendant la partie : le titre du chapitre passe en infobulle. */
-.game .hud-top {
-  padding: var(--space-1) var(--space-3);
-  background: color-mix(in srgb, var(--surface) 78%, transparent);
-}
 .game .hud-top__chapter {
   display: none;
 }
 
 /* Bulle de tutoriel : « Passer » en haut à droite, la bulle ne fait que la consigne. */
-.coach {
+.coach:has(> .coach__skip) {
   padding-right: 5.5rem;
 }
-.coach .coach__skip {
+.coach > .coach__skip {
   position: absolute;
   top: var(--space-1);
-  right: var(--space-2);
+  right: var(--space-1);
   margin: 0;
-  min-height: 2rem;
+  min-height: 2.25rem;
+}
+/* Cible tactile de 44 px autour du petit bouton. */
+.coach > .coach__skip::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
 }
 .hud-bottom--compact .fire-btn {
   margin-bottom: 6px;
@@ -1198,15 +1406,13 @@
 /* ---------- Aide à la visée (v5.0) : bouton et carte d'explication ---------- */
 .aid-btn {
   align-self: end;
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  border: 2px solid var(--border);
-  color: var(--text-muted, var(--text));
-  box-shadow: var(--shadow);
+  color: var(--text-muted);
 }
 .aid-btn--on {
-  border-color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 85%, transparent);
   color: var(--accent-text);
-  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
+  background: color-mix(in srgb, var(--accent) 24%, var(--glass));
+  box-shadow: var(--inner-hi), 0 0 16px color-mix(in srgb, var(--accent) 38%, transparent);
 }
 .assist-tip__actions {
   display: flex;
@@ -1225,7 +1431,7 @@
   position: relative;
   height: 12px;
   margin: 4px 0;
-  border-radius: 6px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--text) 14%, transparent);
   overflow: hidden;
 }
@@ -1242,12 +1448,13 @@
   bottom: 1px;
   width: 10px;
   margin-left: -5px;
-  border: 2px solid #d9a521;
+  border: 2px solid var(--accent);
   border-radius: 50%;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 60%, transparent);
 }
 
 .treb-panel__step--power {
-  color: #b5761a;
+  color: var(--accent-text);
   font-weight: 800;
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -1259,4 +1466,132 @@
   to {
     transform: scale(1.08);
   }
+}
+
+/* ---------- État de l'engin et seau d'eau (v5.8) ---------- */
+.hud-stat--engine .hud-stat__value {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.engine-hp {
+  position: relative;
+  display: inline-block;
+  width: clamp(2.6rem, 6vw, 4.4rem);
+  height: 0.5rem;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text) 16%, transparent);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.3);
+  overflow: hidden;
+}
+.engine-hp__bar {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  transform-origin: left center;
+  transform: scaleX(var(--hp, 1));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--success) 65%, var(--c-limestone)), var(--success));
+  transition: transform var(--dur-3) var(--ease-out);
+}
+.hud-stat--alarm .engine-hp__bar {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--danger) 65%, var(--c-limestone)), var(--danger));
+}
+:root[data-contrast='high'] .engine-hp {
+  border: 1px solid var(--border);
+}
+.engine-hp__value {
+  font-variant-numeric: tabular-nums;
+  min-width: 1.6em;
+}
+.engine-state {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  color: var(--c-limestone);
+  background: var(--c-ink);
+  border: 1px solid var(--hairline-strong);
+  box-shadow: var(--elev-1);
+}
+.engine-state--fire {
+  background: var(--danger);
+}
+.engine-state--frost {
+  background: var(--c-woad);
+}
+.engine-state--crack {
+  background: color-mix(in srgb, var(--c-ink) 70%, var(--c-gold));
+}
+.engine-state--rust {
+  background: color-mix(in srgb, var(--c-madder) 60%, var(--c-gold));
+}
+.engine-state__lvl {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  min-width: 0.9rem;
+  border-radius: 999px;
+  font-size: 0.6rem;
+  line-height: 0.9rem;
+  text-align: center;
+  color: var(--c-ink);
+  background: var(--c-gold);
+}
+.hud-stat--alarm dt {
+  color: var(--danger);
+}
+
+.bucket-btn {
+  position: relative;
+}
+.bucket-btn__count {
+  position: absolute;
+  right: -6px;
+  top: -6px;
+  min-width: 1.15rem;
+  padding: 0 4px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  line-height: 1.15rem;
+  font-weight: 700;
+  color: var(--c-ink);
+  background: var(--grad-gold);
+  border: 1px solid color-mix(in srgb, var(--c-gold-deep) 80%, transparent);
+  box-shadow: var(--elev-1);
+}
+.bucket-btn:disabled {
+  opacity: 0.55;
+}
+.bucket-btn--urgent {
+  border-color: var(--danger);
+  color: var(--text);
+  background: color-mix(in srgb, var(--danger) 24%, var(--glass));
+  animation: bucket-call calc(var(--speed, 1) * 900ms) ease-in-out infinite;
+}
+@keyframes bucket-call {
+  0%,
+  100% {
+    box-shadow: var(--inner-hi), var(--elev-1), 0 0 0 0 color-mix(in srgb, var(--danger) 60%, transparent);
+  }
+  50% {
+    box-shadow: var(--inner-hi), var(--elev-1), 0 0 0 9px color-mix(in srgb, var(--danger) 0%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bucket-btn--urgent {
+    animation: none;
+    outline: 3px solid var(--danger);
+    outline-offset: 2px;
+  }
+}
+.end__engine {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin: 0;
+  color: var(--danger);
+  font-weight: 700;
 }

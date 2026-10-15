@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useApp } from '../../app/AppContext.js'
 import AppIcon from '../ui/AppIcon.vue'
 import LanguagePicker from '../ui/LanguagePicker.vue'
@@ -13,6 +13,29 @@ const app = useApp()
 const { state, t } = app
 
 onMounted(() => app.refreshSlots())
+
+/**
+ * Parallaxe de l'illustration (v6) : sur ordinateur, les plans suivent un peu
+ * le pointeur (variables --px / --py, de -1 à 1). Rien au toucher ni en
+ * mouvement réduit ; une image par rafraîchissement au plus.
+ */
+const root = ref(null)
+let frame = 0
+function onPointer(e) {
+  if (e.pointerType !== 'mouse' || app.reducedMotion() || frame) return
+  frame = requestAnimationFrame(() => {
+    frame = 0
+    const el = root.value
+    if (!el) return
+    el.style.setProperty('--px', ((e.clientX / innerWidth) * 2 - 1).toFixed(3))
+    el.style.setProperty('--py', ((e.clientY / innerHeight) * 2 - 1).toFixed(3))
+  })
+}
+onMounted(() => addEventListener('pointermove', onPointer, { passive: true }))
+onBeforeUnmount(() => {
+  removeEventListener('pointermove', onPointer)
+  cancelAnimationFrame(frame)
+})
 
 const lastProfile = computed(() => {
   const idx = app.services.saves.lastSlot
@@ -57,11 +80,11 @@ function open(screen) {
 </script>
 
 <template>
-  <main class="home">
+  <main ref="root" class="home">
     <SiegeLandscape class="home__scene" />
     <div class="home__content">
       <header class="home__heading">
-        <h1 class="home__title">Catapulte&nbsp;Mania</h1>
+        <h1 class="home__title">Catapulte Mania</h1>
         <p class="home__tagline">{{ t('app.tagline') }}</p>
         <p v-if="season && !IS_DEMO" class="home__event">{{ t(`season.${season}`) }}</p>
         <p v-if="IS_DEMO" class="home__demo">{{ t('demo.banner', { count: PLAYABLE_LEVELS }) }}</p>

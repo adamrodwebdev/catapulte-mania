@@ -24,7 +24,8 @@ function siege() {
     <ScreenHeader :title="t('modes.title')" @back="app.go('home')" />
     <div class="modes-grid">
       <section class="panel mode-card" aria-labelledby="mode-endless">
-        <h2 id="mode-endless" class="panel__title"><AppIcon name="infinity" :size="22" />{{ t('endless.title') }}</h2>
+        <div class="mode-card__art mode-card__art--siege" aria-hidden="true"><AppIcon name="infinity" :size="32" /></div>
+        <h2 id="mode-endless" class="panel__title">{{ t('endless.title') }}</h2>
         <p>{{ t('endless.desc') }}</p>
         <p v-if="endless && (endless.best || endless.bestWave)" class="mode-card__meta">{{ t('endless.record2', { count: endless.bestWave, score: endless.best.toLocaleString(state.locale) }) }}</p>
         <p v-if="state.profile && !endless?.unlocked" class="mode-card__meta"><AppIcon name="lock" :size="16" />{{ t('endless.locked', { count: ENDLESS.UNLOCK }) }}</p>
@@ -33,12 +34,14 @@ function siege() {
         </button>
       </section>
       <section class="panel mode-card" aria-labelledby="mode-editor">
-        <h2 id="mode-editor" class="panel__title"><AppIcon name="hammer" :size="22" />{{ t('editor.title') }}</h2>
+        <div class="mode-card__art mode-card__art--editor" aria-hidden="true"><AppIcon name="hammer" :size="32" /></div>
+        <h2 id="mode-editor" class="panel__title">{{ t('editor.title') }}</h2>
         <p>{{ t('editor.desc') }}</p>
         <button type="button" class="btn btn--primary" @click="app.go('editor')">{{ t('editor.open') }}</button>
       </section>
       <section class="panel mode-card" aria-labelledby="mode-duo">
-        <h2 id="mode-duo" class="panel__title"><AppIcon name="users" :size="22" />{{ t('menu.twoPlayers') }}</h2>
+        <div class="mode-card__art mode-card__art--duo" aria-hidden="true"><AppIcon name="users" :size="32" /></div>
+        <h2 id="mode-duo" class="panel__title">{{ t('menu.twoPlayers') }}</h2>
         <p>{{ t('modes.duoDesc') }}</p>
         <button type="button" class="btn btn--primary" @click="app.go('multiplayer')">{{ t('modes.duoOpen') }}</button>
       </section>

@@ -41,10 +41,10 @@
     min-height: 0;
     gap: var(--space-2);
     padding: max(2px, env(safe-area-inset-top)) var(--space-2) 2px max(var(--space-2), env(safe-area-inset-left));
-    border-width: 0 0 2px;
+    border-width: 0 0 1px;
     border-radius: 0;
     box-shadow: none;
-    background: color-mix(in srgb, var(--surface) 96%, transparent);
+    background: var(--glass-strong);
   }
   .hud-top .btn--icon,
   .hud-top__powers {
@@ -64,6 +64,10 @@
   .hud-stats {
     gap: var(--space-3);
   }
+  .hud-stat + .hud-stat {
+    padding-left: 0;
+    border-left: 0;
+  }
   .hud-stat__value--score {
     font-size: var(--fs-1);
   }
@@ -82,10 +86,10 @@
     justify-content: flex-start;
     gap: 6px;
     padding: max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) 6px;
-    border-width: 0 0 0 2px;
+    border-width: 0 0 0 1px;
     border-radius: 0;
     box-shadow: none;
-    background: color-mix(in srgb, var(--surface) 96%, transparent);
+    background: var(--glass-strong);
     backdrop-filter: none;
   }
   .hud-bottom .ammo,
@@ -138,7 +142,6 @@
     height: 4.1rem;
     margin: 0;
     font-size: 0.6rem;
-    box-shadow: 0 3px 0 var(--c-ink);
   }
   .fire-btn .app-icon,
   .fire-btn svg {
@@ -251,10 +254,10 @@
     right: 0;
     gap: var(--space-2);
     padding: max(4px, env(safe-area-inset-top)) var(--space-2) 4px;
-    border-width: 0 0 2px;
+    border-width: 0 0 1px;
     border-radius: 0;
     box-shadow: none;
-    background: color-mix(in srgb, var(--surface) 96%, transparent);
+    background: var(--glass-strong);
   }
   .hud-top .btn--icon,
   .hud-top__powers {
@@ -280,6 +283,10 @@
     gap: var(--space-2);
     margin: 0;
   }
+  .hud-stat + .hud-stat {
+    padding-left: 0;
+    border-left: 0;
+  }
   .hud-stat__value {
     font-size: 0.85rem;
   }
@@ -301,10 +308,10 @@
     justify-content: flex-end;
     gap: 6px;
     padding: 6px max(8px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
-    border-width: 2px 0 0;
+    border-width: 1px 0 0;
     border-radius: 0;
     box-shadow: none;
-    background: color-mix(in srgb, var(--surface) 96%, transparent);
+    background: var(--glass-strong);
     backdrop-filter: none;
   }
   .hud-bottom .ammo,
@@ -340,7 +347,6 @@
     height: 3.9rem;
     margin: 0;
     font-size: 0.6rem;
-    box-shadow: 0 3px 0 var(--c-ink);
   }
   .aim-readout {
     order: -1;
@@ -398,5 +404,23 @@
     order: 0;
     flex: 0 1 26rem;
     margin-right: auto;
+  }
+}
+
+/* ---------- État de l'engin (v5.8) : compact sur petit écran ---------- */
+@media (max-width: 520px), (max-height: 480px) {
+  .engine-hp {
+    width: 1.9rem;
+  }
+  .engine-state {
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+  .engine-state .icon {
+    width: 11px;
+    height: 11px;
+  }
+  .hud-stat--wind .hud-stat__value {
+    white-space: nowrap;
   }
 }

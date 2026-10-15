@@ -53,6 +53,11 @@ export class ReplayPlayer {
     if (this.done) return
     this.#ticks++
     const s = this.#session
+    // Seau d'eau (v5.8) : jeté au pas enregistré, quel que soit le moment du tour.
+    while (this.#queue[0]?.k === 'w' && s.steps >= this.#queue[0].d) {
+      this.#queue.shift()
+      s.useBucket()
+    }
     const next = this.#queue[0]
     if (s.state === STATE.AIMING && next && (next.k === 'f' || next.k === 't' || next.k === 'p') && s.steps >= next.d) {
       this.#queue.shift()

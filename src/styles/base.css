@@ -41,13 +41,32 @@ html[data-portal] #app {
 
 body {
   margin: 0;
-  background: var(--bg);
+  background: var(--bg-grad, var(--bg)) var(--bg) fixed;
   color: var(--text);
   font-family: var(--font-body);
   font-size: var(--fs-1);
   line-height: 1.5;
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Chiffres alignés partout (scores, compteurs, jauges). */
+:where(dd, output, .hud-stat__value, .gold-badge, time) {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--text);
+}
+
+/* Barres de défilement fines, aux couleurs du thème. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text) 30%, transparent) transparent;
 }
 
 h1,
@@ -58,10 +77,24 @@ h3 {
   line-height: 1.15;
   margin: 0;
   letter-spacing: 0.02em;
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
 }
 
 p {
   margin: 0;
+}
+
+/* Petite étiquette en capitales espacées (en-têtes de section, statistiques). */
+.eyebrow {
+  font-size: var(--fs-0);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 button,
@@ -77,7 +110,7 @@ button {
 
 :focus-visible {
   outline: 3px solid var(--focus);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 
 .visually-hidden {

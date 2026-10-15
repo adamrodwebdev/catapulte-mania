@@ -79,6 +79,8 @@ export class ParticleSystem {
    * @type {((x: number, y: number) => boolean) | null}
    */
   surfaceAt = null
+  /** Largeur de la vue (px écran), fournie par le Renderer : borne la largeur des titres. */
+  viewWidth = 0
 
   get count() {
     return this.#items.length
@@ -214,13 +216,23 @@ export class ParticleSystem {
     this.#spawn({ kind: 'ring', x, y, vx: 0, vy: 0, max: 380, size })
   }
 
-  /** Flammes au-dessus d'une entité en feu (appelé à chaque image). */
-  flame(x, y, w) {
+  /**
+   * Flammes au-dessus d'une entité en feu (appelé à chaque image).
+   * `scale` : taille des flammes (l'engin du joueur en feu, v5.8, brûle plus gros).
+   */
+  flame(x, y, w, scale = 1) {
     const r = this.#rng
     if (r.next() > 0.6 * this.density) return
-    this.#spawn({ kind: 'flame', x: x + r.range(-w / 2, w / 2), y, vx: r.range(-0.3, 0.3), vy: r.range(-1.8, -0.9), max: r.range(380, 720), size: r.range(7, 14) })
-    if (r.next() < 0.18) this.#spawn({ kind: 'smoke', x: x + r.range(-w / 3, w / 3), y: y - 10, vx: r.range(-0.3, 0.3), vy: r.range(-1.1, -0.6), max: r.range(900, 1500), size: r.range(8, 14), grow: 0.5, rgb: '70,62,60', opacity: 0.4 })
+    this.#spawn({ kind: 'flame', x: x + r.range(-w / 2, w / 2), y, vx: r.range(-0.3, 0.3), vy: r.range(-1.8, -0.9) * Math.sqrt(scale), max: r.range(380, 720), size: r.range(7, 14) * scale })
+    if (r.next() < 0.18 * scale) this.#spawn({ kind: 'smoke', x: x + r.range(-w / 3, w / 3), y: y - 10 * scale, vx: r.range(-0.3, 0.3), vy: r.range(-1.1, -0.6), max: r.range(900, 1500), size: r.range(8, 14) * scale, grow: 0.5, rgb: '70,62,60', opacity: 0.4 })
     if (r.next() < 0.12) this.#spawn({ kind: 'ember', x: x + r.range(-w / 2, w / 2), y, vx: r.range(-0.6, 0.6), vy: r.range(-2.4, -1.2), max: r.range(700, 1200), size: r.range(1.4, 2.4), color: '#ffb347' })
+  }
+
+  /** Escarbille d'une torche (v5.8) : une petite braise qui monte et s'éteint. */
+  spark(x, y) {
+    const r = this.#rng
+    if (r.next() > this.density) return
+    this.#spawn({ kind: 'ember', x: x + r.range(-2, 2), y, vx: r.range(-0.3, 0.3), vy: r.range(-1.3, -0.6), max: r.range(500, 900), size: r.range(0.9, 1.6), color: '#ffb347' })
   }
 
   /**
@@ -316,6 +328,17 @@ export class ParticleSystem {
   /** Texte flottant (points gagnés) : apparaît en grossissant, puis monte et s'efface. */
   text(x, y, text, color = '#f6d98a') {
     this.#spawn({ kind: 'text', x, y, vx: 0, vy: -0.9, max: 1200, size: 28, color, text: String(text) })
+  }
+
+  /**
+   * Annonce d'enchaînement (« Doublé ! ») : grand titre doré qui claque en
+   * grossissant, puis monte et s'efface. `tier` 1..3 : de plus en plus grand.
+   * Une seule à la fois : la nouvelle remplace la précédente.
+   */
+  callout(x, y, text, tier = 1) {
+    this.#items = this.#items.filter((p) => p.kind !== 'callout')
+    this.#spawn({ kind: 'callout', x, y, vx: 0, vy: -0.35, max: 1500, size: 44 + tier * 10, tier, text: String(text) })
+    this.#glints(x, y, 6 + tier * 3)
   }
 
   clear() {
@@ -535,6 +558,7 @@ export class ParticleSystem {
       }
     }
     ctx.globalCompositeOperation = 'source-over'
+    for (const p of this.#items) if (p.kind === 'callout') this.#drawCallout(ctx, p, pixel)
     for (const p of this.#items) {
       if (p.kind !== 'text') continue
       const t = p.life / p.max
@@ -551,6 +575,38 @@ export class ParticleSystem {
     }
     ctx.restore()
     ctx.globalAlpha = 1
+  }
+
+  /**
+   * Titre d'enchaînement : taille constante à l'écran (`pixel`), rebond
+   * élastique à l'apparition, dégradé or et contour encre, léger penché.
+   */
+  #drawCallout(ctx, p, pixel) {
+    const t = p.life / p.max
+    // Rebond « ease-out back » : dépasse sa taille puis se pose (220 ms).
+    const u = Math.min(1, p.life / 220) - 1
+    const pop = 0.3 + 0.7 * (1 + 2.70158 * u * u * u + 1.70158 * u * u)
+    const size = p.size * pop * Math.max(1, pixel)
+    ctx.save()
+    ctx.translate(p.x, p.y)
+    ctx.rotate(-0.06)
+    ctx.globalAlpha = t > 0.75 ? (1 - t) / 0.25 : 1
+    ctx.font = `700 ${Math.round(size)}px Cinzel, Georgia, serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.lineJoin = 'round'
+    ctx.lineWidth = size * 0.2
+    ctx.strokeStyle = '#1e1a2b'
+    // Jamais plus large que 80 % de l'écran (langues aux mots longs, téléphone en portrait).
+    const maxW = this.viewWidth > 0 ? this.viewWidth * 0.8 * pixel : 1e6
+    ctx.strokeText(p.text, 0, 0, maxW)
+    const g = ctx.createLinearGradient(0, -size / 2, 0, size / 2)
+    g.addColorStop(0, '#fff3c4')
+    g.addColorStop(0.5, p.tier >= 3 ? '#ffb347' : '#f2c94c')
+    g.addColorStop(1, p.tier >= 3 ? '#d4552b' : '#c98f1e')
+    ctx.fillStyle = g
+    ctx.fillText(p.text, 0, 0, maxW)
+    ctx.restore()
   }
 
   /* ---------- Terrains, givre et vapeur (v5.0) ---------- */

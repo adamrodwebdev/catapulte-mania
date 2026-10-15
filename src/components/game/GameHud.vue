@@ -25,6 +25,20 @@ const windKmh = computed(() => props.hud.windKmh ?? Math.round(Math.abs(windNow.
 const gusting = computed(() => props.hud.windDynamic && props.hud.gust > 0.35 && windKmh.value > 0)
 const hasPowers = computed(() => props.hud.powersEnabled !== false && props.hud.powers.some((p) => p.unlocked))
 const duo = computed(() => props.hud.players.length > 1)
+
+/* ---------- État de l'engin (v5.8) ---------- */
+const STATE_ICON = Object.freeze({ fire: 'flame', frost: 'snowflake', crack: 'crack', rust: 'rust' })
+const cond = computed(() => props.hud.condition)
+const hpRatio = computed(() => (cond.value ? Math.max(0, Math.min(1, cond.value.hp / cond.value.maxHp)) : 1))
+/** Alerte : engin en feu ou à moins d'un tiers de ses points de vie. */
+const engineAlarm = computed(() => Boolean(cond.value && (cond.value.states.some((s) => s.id === 'fire') || hpRatio.value < 0.34)))
+const stateLabel = (s) => t(`game.condition.${s.id}`, { level: s.level })
+const engineText = computed(() => {
+  const c = cond.value
+  if (!c) return ''
+  const states = c.states.map(stateLabel).join(', ')
+  return `${t('game.engineHpValue', { hp: c.hp, max: c.maxHp })}${states ? `, ${states}` : ''}`
+})
 const infinite = computed(() => props.hud.shotsTotal === null)
 </script>
 
@@ -71,6 +85,19 @@ const infinite = computed(() => props.hud.shotsTotal === null)
           </template>
         </dd>
       </div>
+      <div v-if="cond?.show && !duo" :class="['hud-stat hud-stat--engine', { 'hud-stat--alarm': engineAlarm }]">
+        <dt>{{ t('game.engineHp') }}</dt>
+        <dd class="hud-stat__value">
+          <span class="engine-hp" role="meter" :aria-label="t('game.engineHp')" aria-valuemin="0" :aria-valuemax="cond.maxHp" :aria-valuenow="cond.hp" :aria-valuetext="engineText">
+            <span class="engine-hp__bar" :style="{ '--hp': hpRatio }" />
+          </span>
+          <span class="engine-hp__value" aria-hidden="true">{{ cond.hp }}</span>
+          <span v-for="s in cond.states" :key="s.id" :class="['engine-state', `engine-state--${s.id}`]" :title="stateLabel(s)">
+            <AppIcon :name="STATE_ICON[s.id]" :size="14" />
+            <span v-if="s.level > 1" class="engine-state__lvl" aria-hidden="true">{{ s.level }}</span>
+          </span>
+        </dd>
+      </div>
       <div :class="['hud-stat hud-stat--wind', `hud-stat--wind-${hud.windLevel || 'calm'}`, { 'hud-stat--gust': gusting }]">
         <dt>{{ hud.windDynamic && windKmh > 0 ? t('game.windGusty') : t('game.wind') }}</dt>
         <dd class="hud-stat__value">
@@ -85,7 +112,7 @@ const infinite = computed(() => props.hud.shotsTotal === null)
       </div>
     </dl>
 
-    <button v-if="hasPowers" type="button" :class="['btn hud-top__powers', { 'coach-focus': coach === 'powers' }]" data-coach="powers" @click="emit('powers')">
+    <button v-if="hasPowers" type="button" :class="['btn btn--primary hud-top__powers', { 'coach-focus': coach === 'powers' }]" data-coach="powers" @click="emit('powers')">
       <AppIcon name="flame" :size="20" />
       <span>{{ t('game.powersTitle') }}</span>
     </button>

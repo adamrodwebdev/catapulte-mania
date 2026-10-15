@@ -7,6 +7,7 @@ import { SaveManager } from '../services/SaveManager.js'
 import { AudioService } from '../game/audio/AudioService.js'
 import { HapticService } from '../game/audio/HapticService.js'
 import { MusicDirector } from '../game/audio/MusicDirector.js'
+import { AmbienceDirector } from '../game/audio/AmbienceDirector.js'
 import { LevelRepository } from '../game/levels/LevelRepository.js'
 import { starsFor } from '../game/score/ScoreRules.js'
 import { PowerRegistry } from '../game/powers/PowerRegistry.js'
@@ -84,6 +85,7 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
   const audio = new AudioService()
   const haptics = new HapticService()
   const music = new MusicDirector(audio)
+  const ambience = new AmbienceDirector(audio)
 
   const state = reactive({
     screen: 'home',
@@ -123,7 +125,7 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
   /** @type {import('../domain/SaveSlot.js').SaveSlot | null} */
   let activeSlot = null
 
-  const services = markRaw({ storage, settings, i18n, saves, audio, haptics, music, ads })
+  const services = markRaw({ storage, settings, i18n, saves, audio, haptics, music, ambience, ads })
 
   /* ----- Publicités (portails) : son coupé et commandes bloquées pendant la vidéo ----- */
   ads.on('pause', () => {
@@ -668,6 +670,10 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     () => state.screen,
     (screen) => {
       if (screen === 'game') return
+      // Les menus n'ont que la musique : l'ambiance appartient au champ de bataille.
+      ambience.stop()
+      audio.stopLoops()
+      audio.duckAmbience(false)
       music.setIntensity(0)
       music.duck(false)
       music.play('menu')

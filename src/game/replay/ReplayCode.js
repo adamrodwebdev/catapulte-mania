@@ -57,6 +57,8 @@ const actionSchema = (raw, path) => {
     }
   }
   if (k === 'x' && raw.length === 2) return { k, d: STEPS(raw[1], `${path}.d`) }
+  // v5.8 : seau d'eau jeté sur l'engin en feu (pas absolu, comme un tir).
+  if (k === 'w' && raw.length === 2) return { k, d: AT(raw[1], `${path}.d`) }
   throw new ValidationError(path, 'unknown action')
 }
 
@@ -99,6 +101,7 @@ export class ReplayCode {
       if (x.k === 't' && x.g !== undefined) return ['t', x.d, AMMO.indexOf(x.a), exact(x.tx), exact(x.ty), exact(x.g), x.l]
       if (x.k === 't') return ['t', x.d, AMMO.indexOf(x.a), exact(x.r), x.l]
       if (x.k === 'x') return ['x', x.d]
+      if (x.k === 'w') return ['w', x.d]
       throw new ValidationError('log', `action ${x.k} cannot be shared`)
     })
     const data = { v: 2, day, l: levelId, e: engine, n: PROFILE_NAME.test(name) ? name : '', a }

@@ -8,7 +8,8 @@ import { deepFreeze } from '../../core/utils/Guard.js'
  * La renommée départage le duel, désigne le meilleur joueur de la campagne à
  * deux et, au face-à-face, mesure ce qui reste de chaque château.
  */
-export const RENOWN = deepFreeze({ soldier: 1, knight: 2, king: 4 })
+// v5.8 : les défenseurs à capacité valent plus (le porte-étendard est un chef).
+export const RENOWN = deepFreeze({ soldier: 1, knight: 2, king: 4, scout: 2, shieldbearer: 2, engineer: 2, bannerman: 3 })
 export const COUP_DE_GRACE = 2
 
 /** Renommée d'un défenseur (0 pour tout le reste). */

@@ -2,6 +2,245 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [5.9.0] – 2026-10-15
+### Interface 2026 : « Verre & Or »
+L'identité ne change pas (or héraldique, bleu guède, capitales Cinzel) ; la
+matière, si :
+- **Jetons de design refaits** (`tokens.css`) : panneaux de verre fumé qui
+  laissent deviner la scène (flou d'arrière-plan), liserés lumineux d'un pixel,
+  ombres douces en couches, rayons plus généreux, actions principales en or
+  dégradé, entrées « à ressort » (courbe `linear()`), échelle typographique
+  fluide. Trois thèmes : clair, sombre et contraste élevé (sans transparence
+  ni flou).
+- **Accueil** : titre en or dégradé traversé d'un reflet, menu de verre aux
+  entrées échelonnées, diorama en plans (brume, fenêtres éclairées, torche à
+  la porte, étoiles qui scintillent, nuages qui dérivent) et légère parallaxe
+  qui suit le pointeur.
+- **Campagne** : statistiques en pastilles, chapitres en cartes illustrées
+  (ciel, crêtes, soleil ou lune de chaque chapitre, progression et étoiles),
+  écus en émail, le prochain niveau en or qui appelle.
+- **En jeu** : bandeau de verre où le bouton pause s'emboîte dans l'arrondi,
+  statistiques séparées d'un liseré, tirs restants en perles d'or ; munitions
+  en touches de verre, la munition choisie s'allume d'or ; **bouton de tir en
+  sceau de cire** bombé qui s'enfonce sous le doigt ; bulles du tutoriel,
+  sous-titres, astuces et menu des pouvoirs en verre.
+- **Fenêtres** : verre dépoli et liseré de couleur en tête ; la barre
+  d'actions collante ne prend sa matière que lorsque du contenu défile
+  dessous (le texte ne transparaît plus, une fenêtre courte reste d'un seul
+  tenant).
+- **Autres écrans** : modes de jeu illustrés (siège de nuit, plan
+  d'architecte, duel aux couleurs des joueurs), atelier, préparation à deux
+  (tuiles de format), succès (insigne en pointillés à faire, en or une fois
+  gagné), éditeur de châteaux (barres de verre, outils en pastilles,
+  matériaux à pastille de couleur), aide en colonnes sans trous, coffre du jour.
+- La sélection se signale partout par l'or ; un bouton principal désactivé
+  devient du verre neutre au lieu d'un or terni.
+- Toujours pensé pour le téléphone d'abord : aucun défilement horizontal de
+  320 à 1920 px, cibles tactiles de 44 px, bandeaux de commandes (v5.5) en
+  verre presque opaque ; animations coupées en mouvement réduit.
+
+### Corrigé
+- **Pillard collé à la montagne (niveau 32)** : quand un tir renversait
+  l'échelle pendant l'escalade, le grimpeur restait accroché au flanc,
+  immobile pour toujours (il gardait le frottement « à l'arrêt » pris au pied
+  de l'échelle, et aucune corniche n'était sous ses pieds). Il bascule
+  maintenant loin de la paroi et tombe : d'en haut, la chute le met hors de
+  combat ; près du pied, il se relève, rebâtit et repart. Un pillard resté de
+  travers, ou hors de toute corniche, glisse jusqu'à un appui et se relève.
+- **Ogres pillards (niveaux 95, 98 et 100)** : trop larges pour se tenir au
+  pied prévu de l'échelle (à 18 px du bord), ils s'arrêtaient à quelques
+  pixels et n'atteignaient jamais l'engin. Le pied de l'ouvrage tient compte
+  de la largeur de chacun.
+- **Pont rompu** : un pillard arrivé sur la berge après la rupture du pont
+  attendait pour toujours (une portée ne se bâtissait qu'une fois). Il
+  rebâtit maintenant le pont, comme une échelle renversée.
+- **Échelles qui traversaient la roche** (16 échelles sur 11 niveaux) :
+  l'itinéraire suit l'enveloppe du relief (pointes, coins des talus, obstacles
+  bas) avec une garde ; le grimpeur suit exactement l'échelle dessinée, et un
+  tir qui la renverse fait toujours tomber ceux qui y sont.
+- Vérifié sur les 31 niveaux à pillards, en Normal et en Difficile : sans
+  tir, chaque pillard atteint l'engin ; échelle renversée en hauteur, le
+  grimpeur tombe ; au pied, il repart ; aucun ne reste coincé.
+- Les sous-titres et l'astuce de visée chevauchaient le haut de la barre de
+  munitions : ils se placent au-dessus du bord réel des commandes.
+- Sur téléphone, une règle plus ancienne l'emportait sur la feuille mobile et
+  le bandeau du haut ignorait les marges de sécurité de l'écran (encoche).
+
+## [5.8.0] – 2026-10-15
+### Confort : fini le zoom d'ouverture
+- Le plan d'ouverture (zoom sur les défenseurs puis recul) donnait le mal des
+  transports : supprimé. La partie s'ouvre directement sur la vue d'ensemble.
+- Tous les zooms de la caméra sont adoucis : interpolés en échelle
+  logarithmique, plus lents que le déplacement et à vitesse bornée ; le gros
+  plan sur le premier impact est moins serré (×1,4 au lieu de ×2).
+
+### Navigation des défenseurs (nouveau dossier `src/game/ai/`)
+L'ancienne ronde (un aller-retour aveugle) est remplacée par une vraie navigation :
+- `NavGraph` : graphe des « corniches » où l'on tient debout (sol, planchers
+  entre deux murs, chemins de ronde, dessus des dalles), recalculé quand la
+  structure bouge ; marches franchissables et petites descentes sans danger,
+  jamais de chute mortelle.
+- `Pathfinder` : A* (tas binaire) et exploration à budget (Dijkstra).
+- `Steering` : accélération et freinage progressifs, arrivée en douceur, on
+  attend qu'un camarade passe, on ne franchit jamais le bord.
+- `Perception` : les défenseurs observent le projectile en vol, en déduisent
+  sa course (pesanteur et vent compris) et devinent où il va tomber.
+- `UnitBrain` : comportements par priorité, propres à chaque type (panique en
+  feu, esquive, mise à l'abri, fuite devant le feu, réparation, garde, ronde
+  avec des haltes et des regards au loin).
+- `UnitDirector` : orchestre le tout à chaque pas de simulation. Tout est
+  déterministe (graines par défenseur) : les liens « Bats mon tir » rejouent
+  exactement la même partie.
+
+### Quatre nouveaux défenseurs
+- **Éclaireur** (capuche verte, arc) : il voit venir le tir et court à l'abri.
+  Visez large (poudre, feu, mitraille) ou piégez-le dans une pièce.
+- **Pavoisier** (grand pavois) : arrête les tirs tendus qui le frappent de face.
+  Tir en cloche, trébuchet, ou le toit qui lui tombe dessus.
+- **Porte-étendard** (bannière qui flotte) : ses voisins, dans le cercle d'or,
+  encaissent bien mieux. Abattez-le d'abord.
+- **Sapeur** (tablier et marteau) : entre deux tirs, il va réparer le bloc le
+  plus abîmé qu'il peut atteindre. Finissez le travail d'un coup.
+- **Veilleurs de nuit** (chapitres 4 et 10) : rondes et sentinelles portent
+  une torche (flamme animée, halo qui éclaire les murs, escarbilles). Quand
+  l'un d'eux tombe, sa torche met le feu au bois et à la poudre autour de lui.
+- Les défenseurs ordinaires réagissent aussi : surpris à découvert, ils
+  s'écartent d'un pas pressé du point de chute.
+- Animations : course penchée en avant, coups de marteau, bannière et pavois,
+  flamme de torche ; sons (marteau, ricochet sur le pavois), sous-titres et
+  fiches « Nouveau » en français, anglais et indonésien.
+
+### Pillards, état de l'engin et seaux d'eau
+- **Pillards** : dès le premier tir, certains défenseurs courent attaquer
+  votre engin, mais seulement pendant le vol de vos tirs (la pression reste
+  au tour par tour). Un panneau « ! » rouge les signale. Douves, lave et
+  montagnes ne les arrêtent plus : ils jettent des ponts et dressent des
+  échelles (voir plus bas). Arrivés à l'engin, ils frappent quelques coups,
+  puis vos servants les repoussent (jamais de pillard intouchable collé à
+  l'engin).
+  - torche (feu) : présentée au niveau 17, avec les premiers seaux d'eau ;
+  - saboteur au marteau (dégâts bruts) : niveau 36 ;
+  - pot de givre (bras gelé) : niveau 71, en hiver ;
+  - l'ogre qui charge (massue) : niveau 95 ;
+  - deux torches à la fois aux finales 40 et 90, et tout à la fois au 100.
+- **État de l'engin** (nouveau module `src/domain/EngineCondition.js`) :
+  points de vie (130 en Facile, 100 en Normal, 80 en Difficile) et avaries :
+  - **feu** : l'intensité (1 à 3) monte tant qu'il reste de quoi brûler ; plus
+    elle est forte, plus l'engin perd vite ses points de vie ; il finit par
+    s'éteindre seul ; la pluie de l'orage l'affaiblit ;
+  - **givre** : le bras raidi ne tire plus qu'à 70 % jusqu'au dégel ; le
+    givre et le feu s'annulent ;
+  - **dégâts bruts** : fissuré (puissance × 0,9), puis disloqué (× 0,78) ;
+  - **rouille** : chaque seau d'eau, et la pluie de l'orage, ajoute une
+    couche (−4 % de puissance, +12 % de dégâts subis) : l'eau a un prix.
+  - Plus de points de vie : l'engin est détruit, la partie est perdue.
+- **Seaux d'eau** (2 par niveau à torches, 1 en Difficile) : un bouton qui
+  s'agite quand l'engin brûle (touche B), utilisable en visée comme en vol ;
+  enregistrés dans les liens « Bats mon tir », rejoués à l'identique.
+- Affichage : barre de vie au-dessus de l'engin et pastilles d'avaries
+  (forme et couleur), jauge « Engin » dans le bandeau, flammes qui grossissent
+  avec l'intensité, croûte de givre et stalactites, fissures et planche qui
+  pend, taches de rouille ; sous-titres, annonces pour les lecteurs d'écran,
+  sons, et la raison de la défaite à l'écran de fin. Trébuchet et baliste
+  ont les mêmes avaries.
+
+### Ponts et échelles
+- Devant un lac, la lave ou la glace (jusqu'à 420 px), les pillards jettent un
+  **pont de planches** (4 s de travail) ; devant une montagne ou au bord d'un
+  plateau (jusqu'à 520 px de haut), ils dressent une **échelle** (3 s) et
+  grimpent. La navigation A* compte chaque ouvrage comme un détour : un
+  pillard ne bâtit que si cela lui fait gagner du chemin.
+- Pendant le travail, il est immobile et ses coups de marteau s'entendent
+  (sous-titres « Les pillards jettent un pont », « Un pillard dresse une
+  échelle »).
+- **Contre-jeu** : un tir brise le pont, et ceux qui sont dessus tombent à
+  l'eau ou dans la lave ; un tir renverse l'échelle, avec ceux qui y
+  grimpent. Les ouvrages ne rapportent aucun point : seuls les pillards
+  comptent.
+- Présentés seuls, avec leur fiche « Nouveau » : l'échelle au niveau 32, le
+  pont au niveau 34.
+
+### Niveaux plus retors
+- Chaque défenseur est présenté seul, là où l'échec ne coûte rien, puis revient
+  et se combine aux autres, avant un retournement : éclaireur (niveau 9, puis
+  enfermé dans le château dès le 27), pavoisier (19, puis deux dès le 61),
+  sapeur (26, puis à l'intérieur dès le 71), porte-étendard (33, puis chaque
+  fin de chapitre), veilleurs (première nuit, niveau 31).
+- **Fini le baril à la porte** : `check:levels` a montré que la plupart des
+  tirs gagnants commençaient par l'explosion d'un baril posé au pied des
+  murs ; chaque niveau se résolvait de la même façon. Dès le niveau 19, la
+  porte est tenue par un pavoisier et les barils sont rangés derrière le
+  château : il faut un long tir en cloche, précis, pour les atteindre. Les
+  poudrières dessinées par les niveaux restent (et le baril qui lance les
+  dominos de fer du niveau 85).
+- Niveaux 33 et 35 : un veilleur posté sur la paille, un autre devant la
+  cave à poudre. Les abattre ouvre une autre solution.
+- `npm run check:levels` mesure désormais la « tolérance » de chaque niveau
+  (part des premiers tirs essayés qui gagnent d'un coup) ; le joueur
+  automatique prend 1,5 s pour viser, attend le dégel et jette un seau d'eau
+  quand l'engin brûle, comme un humain.
+- Résultat mesuré en Difficile : les 100 niveaux restent gagnables, et la
+  tolérance médiane des premiers tirs passe de 8 % à 2,8 % (moyenne : de 22 %
+  à 13 %) ; le joueur automatique a besoin de plus d'un tir sur 22 niveaux
+  (16 auparavant).
+
+### Corrigé
+- Les défenseurs suivaient un chemin périmé quand la structure bougeait
+  (les corniches sont renumérotées à chaque reconstruction du graphe) : le
+  chemin est désormais recalculé.
+
+## [5.7.0] – 2026-10-15
+### Graphismes : profondeur et lumière
+- **Décor en quatre plans** qui défilent à des vitesses différentes : chaînes
+  lointaines noyées dans la brume (avec neiges éternelles en montagne et en
+  hiver), collines, plan intermédiaire (haies, bosquets, sapins ou feuillus
+  selon le climat) et **camp de siège** aux tentes rayées derrière l'engin.
+  Plus un plan est loin, plus il prend la couleur du ciel.
+- **Ciel** en trois temps, **rayons de soleil** discrets qui tournent
+  lentement (par temps clair), astre au bord adouci, **lune** en croissant
+  avec ses mers et son halo, étoiles qui scintillent.
+- **Lumière des feux** : tout ce qui brûle, et le boulet enflammé, éclaire ce
+  qui l'entoure (halo qui vacille), bien plus fort la nuit.
+- **Étalonnage** : lumière chaude qui descend du soleil le jour, voile froid
+  la nuit.
+- **Poussières d'ambiance** : pollen au soleil, sable dans le désert, lucioles
+  la nuit, braises au dernier chapitre (coupées en mouvement réduit et en
+  contraste élevé).
+
+### Ressenti des tirs
+- **Tremblement « à traumatisme »** : l'amplitude suit le carré de l'intensité
+  (petits chocs discrets, gros chocs qui secouent), mouvement lisse avec un
+  léger roulis ; les plans lointains tremblent moins.
+- **Arrêt sur image** de 40 à 90 ms sur les explosions, les percées et les
+  très gros impacts : le choc « pèse ». Jamais en mouvement réduit.
+- **Enchaînements** : deux défenseurs abattus à moins de 1,5 s pendant le même
+  tir font un **Doublé !**, puis **Triplé !**, puis **Carnage !** : grand titre
+  doré dans la scène, cloches qui montent, sous-titre (FR, EN, ID).
+
+### Son et musique
+- **Mixage de studio** : compresseur sur les effets, limiteur de sortie,
+  **réverbération commune** (salle de pierre générée par le code) pour les
+  effets, la musique et l'ambiance.
+- **Effets refaits en couches** (attaque, corps, queue, gravats) et qui
+  varient légèrement à chaque fois : bois qui craque et résonne, pierre et
+  cailloux, métal qui sonne, explosion avec souffle et retombées, chute des
+  défenseurs, nouvelle **fanfare de victoire** (trompettes et timbales) et cor
+  de défaite. Nouveaux sons : souffle du tir, gravats, enchaînement.
+- **Sifflement du boulet** en vol, qui suit sa vitesse et sa position.
+- **Cloche à chaque étoile** de l'écran de fin, au rythme de leur apparition.
+- **Ambiance de chaque chapitre** (nouveau module `AmbienceDirector`) : vent
+  qui respire, oiseaux, grillons et chouette la nuit, grenouilles et corneilles
+  dans les marais, faucon dans le désert et la montagne, vent qui hurle en
+  hiver, pluie et tonnerre lointain, crépitement des braseros. Atténuée en
+  pause, coupée dans les menus, réglée par le volume des effets.
+- **Musique** : luth au timbre plus riche (onde harmonique, plectre), harpe
+  qui ouvre les phrases au calme, tambours de guerre dès l'action, chœur
+  d'hommes au paroxysme (dès l'action au dernier chapitre).
+
+### Corrigé
+- L'introduction du niveau 2 affichait « powers.undefined » au lieu du titre
+  du tutoriel.
+
 ## [5.6.2] – 2026-10-09
 
 ### Corrigé — fenêtre de test GamePix
