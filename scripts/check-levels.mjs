@@ -17,6 +17,12 @@
  * il désigne un point d'impact puis la position de la jauge (cloche ↔ tendu),
  * comme un joueur ; le château est plus loin.
  *
+ * v5.8 : le joueur automatique attend 1,5 s avant chaque tir, comme un
+ * humain qui vise (les rondes bougent, les sapeurs réparent). Et chaque niveau
+ * reçoit une note de difficulté : la part des premiers tirs essayés qui
+ * gagnent d'un coup (« tolérance ») — plus elle est basse, plus le niveau
+ * demande de trouver LE bon tir.
+ *
  * Usage : node scripts/check-levels.mjs [--levels 1-10] [--difficulty hard] [--engine trebuchet]
  */
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads'
@@ -24,6 +30,8 @@ import { availableParallelism } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
 const ANGLES = [10, 20, 30, 40, 50, 60, 70]
+/** Temps de visée avant chaque tir (pas de 1/30 s) : 1,5 s. */
+const AIM_WAIT_TICKS = 45
 
 async function loadGame() {
   const { GameSession } = await import('../src/game/GameSession.js')
@@ -43,11 +51,18 @@ function replay(G, level, difficulty, shots, engine = 'catapult') {
   const s = new G.GameSession(level, { difficulty, completedLevels: 0, reducedMotion: true, engine })
   let ended = null
   s.on('end', (e) => (ended = e))
-  const tick = () => s.update(1000 / 30)
+  // Comme un joueur (v5.8) : un seau d'eau dès que l'engin prend feu.
+  const tick = () => {
+    s.update(1000 / 30)
+    if (s.condition.fireLevel > 0) s.useBucket()
+  }
   let guard = 0
   while (s.state !== 'aiming' && guard++ < 200) tick()
   for (const shot of shots) {
     if (ended) break
+    for (let i = 0; i < AIM_WAIT_TICKS && !ended; i++) tick()
+    // Bras gelé par un pillard : on attend le dégel, comme un joueur.
+    for (let i = 0; i < 400 && s.condition.frozen && !ended; i++) tick()
     s.selectAmmo(shot.ammo)
     if (engine === 'trebuchet') {
       // 1er clic : point d'impact ; 2e clic : jauge figée à la position choisie.
@@ -157,6 +172,9 @@ async function checkLevel(G, id, difficulty, engine = 'catapult') {
   const history = []
   let solved = false
   let lastScore = 0
+  // Tolérance : part des premiers tirs essayés qui gagnent d'un coup.
+  let tried = 0
+  let oneShot = 0
   for (let turn = 0; turn < 12; turn++) {
     const { session, ended } = replay(G, level, difficulty, history, engine)
     if (ended) {
@@ -172,13 +190,18 @@ async function checkLevel(G, id, difficulty, engine = 'catapult') {
       const value = (level.targets.length - left) * 100000 + r.session.score.current
       if (!best || value > best.value) best = { cand, value, won: r.ended?.won }
       r.session.destroy()
+      if (turn === 0) {
+        tried++
+        if (r.ended?.won) oneShot++
+        continue
+      }
       if (best.won) break
     }
     session.destroy()
     if (!best) break
     history.push(best.cand)
   }
-  return { id, stable, destroyedAtRest: destroyed, solved, shotsUsed: history.length, score: lastScore, plan: history }
+  return { id, stable, destroyedAtRest: destroyed, solved, shotsUsed: history.length, score: lastScore, plan: history, tolerance: tried ? oneShot / tried : 0 }
 }
 
 function parseRange(arg, max) {
@@ -207,7 +230,7 @@ if (isMainThread) {
             w.on('message', (m) => {
               out.push(m)
               const mark = m.stable && m.solved ? 'OK ' : 'KO '
-              console.log(`${mark} niveau ${String(m.id).padStart(2)}  stable=${m.stable}  résolu=${m.solved} en ${m.shotsUsed} tir(s)  score=${m.score}`)
+              console.log(`${mark} niveau ${String(m.id).padStart(2)}  stable=${m.stable}  résolu=${m.solved} en ${m.shotsUsed} tir(s)  tolérance=${(m.tolerance * 100).toFixed(1)} %  score=${m.score}`)
             })
             w.on('error', reject)
             w.on('exit', () => resolve(out))
@@ -218,6 +241,10 @@ if (isMainThread) {
     .flat()
     .sort((a, b) => a.id - b.id)
   const bad = results.filter((r) => !r.stable || !r.solved)
+  const tol = results.map((r) => r.tolerance).sort((a, b) => a - b)
+  const median = tol.length ? tol[Math.floor(tol.length / 2)] : 0
+  const mean = tol.reduce((a, b) => a + b, 0) / Math.max(1, tol.length)
+  console.log(`\ntolérance des premiers tirs : médiane ${(median * 100).toFixed(1)} %, moyenne ${(mean * 100).toFixed(1)} %`)
   console.log(`\n${results.length - bad.length}/${results.length} niveaux valides (difficulté ${difficulty}${engine === 'trebuchet' ? ', trébuchet' : ''}) en ${((Date.now() - t0) / 1000).toFixed(0)} s`)
   if (process.env.CHECK_REPORT) {
     const { writeFileSync } = await import('node:fs')

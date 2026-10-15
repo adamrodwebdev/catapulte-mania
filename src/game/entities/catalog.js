@@ -17,6 +17,17 @@ export const TARGET_TYPES = deepFreeze({
   // et repousse les blocs qui lui tombent dessus (voir PhysicsWorld#ogre…) :
   // il faut l'explosion, le feu, le givre ou un boulet lourd pour l'abattre.
   ogre: { w: 46, h: 76, hp: 420, density: 0.0032, score: 2000, toughness: 4 },
+  // v5.8 : quatre défenseurs aux capacités propres (voir ../ai/UnitBrain.js).
+  // L'éclaireur voit venir le tir et court se mettre à l'abri : visez large
+  // (poudre, feu, mitraille) ou piégez-le dans une pièce fermée.
+  scout: { w: 24, h: 46, hp: 12, density: 0.0011, score: 700, toughness: 0.9 },
+  // Le pavoisier arrête de son pavois les tirs tendus qui le frappent de face :
+  // prenez-le par le haut (tir en cloche, trébuchet), ou faites-lui tomber le toit dessus.
+  shieldbearer: { w: 32, h: 52, hp: 30, density: 0.0016, score: 900, toughness: 1.6 },
+  // Le porte-étendard galvanise ses voisins (ils encaissent bien mieux) : abattez-le d'abord.
+  bannerman: { w: 28, h: 54, hp: 20, density: 0.0013, score: 1000, toughness: 1.2 },
+  // Le sapeur répare entre deux tirs le bloc le plus abîmé qu'il peut atteindre.
+  engineer: { w: 28, h: 48, hp: 18, density: 0.0013, score: 800, toughness: 1.1 },
 })
 
 /**

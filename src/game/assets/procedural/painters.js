@@ -13,10 +13,12 @@ import { SeededRandom } from '../../../core/utils/SeededRandom.js'
 import { WORLD } from '../../physics/constants.js'
 import { catapult, trebuchet } from './engines.js'
 import { CHARACTER_PAINTERS } from './characters.js'
+import { TROOP_PAINTERS } from './troops.js'
 import { drawBlockBody, drawBarrelBody } from './materials.js'
 
 export { CATAPULT_GEOMETRY, CATAPULT_SKINS } from './engines.js'
 import { CREATURE_PAINTERS } from './creatures.js'
+import { celestial, distant, hasSunRays, near, skyGradient, stars, sunPosition, sunRays } from './scenery.js'
 
 const INK = '#1e1a2b'
 const TAU = Math.PI * 2
@@ -285,40 +287,19 @@ function snowcap(ctx) {
 
 /* ---------- Décor ---------- */
 
-/** Ciel (repère écran) : dégradé, astre, nuages qui dérivent. */
+/**
+ * Ciel (repère écran) : dégradé en trois temps, rayons de soleil, astre,
+ * étoiles qui scintillent, nuages qui dérivent (v5.7, voir scenery.js).
+ */
 function sky(ctx, s) {
   const { theme = 1, viewW, viewH, time = 0, animate = true, wind = 0 } = s.extra
   const th = THEMES[theme]
-  const g = ctx.createLinearGradient(0, 0, 0, viewH)
-  g.addColorStop(0, th.skyTop)
-  g.addColorStop(1, th.skyBottom)
-  ctx.fillStyle = g
+  ctx.fillStyle = skyGradient(ctx, th, theme, viewH)
   ctx.fillRect(0, 0, viewW, viewH)
-  const sx = viewW * (theme === 3 ? 0.78 : 0.82)
-  const sy = viewH * (theme === 3 ? 0.42 : 0.18)
-  const sr = Math.max(18, viewH * 0.06)
-  const halo = ctx.createRadialGradient(sx, sy, sr * 0.5, sx, sy, sr * 4)
-  halo.addColorStop(0, th.sun + 'aa')
-  halo.addColorStop(1, th.sun + '00')
-  ctx.fillStyle = halo
-  ctx.fillRect(sx - sr * 4, sy - sr * 4, sr * 8, sr * 8)
-  ctx.beginPath()
-  ctx.arc(sx, sy, sr, 0, TAU)
-  ctx.fillStyle = th.sun
-  ctx.fill()
-  if (th.night) {
-    const r = new SeededRandom(4)
-    ctx.fillStyle = '#ffffff'
-    for (let i = 0; i < 70; i++) {
-      ctx.globalAlpha = r.range(0.3, 0.9)
-      ctx.fillRect(r.range(0, viewW), r.range(0, viewH * 0.6), 1.5, 1.5)
-    }
-    ctx.globalAlpha = 1
-    ctx.beginPath()
-    ctx.arc(sx + sr * 0.35, sy - sr * 0.15, sr * 0.85, 0, TAU)
-    ctx.fillStyle = th.skyTop
-    ctx.fill()
-  }
+  const sun = sunPosition(theme, viewW, viewH)
+  if (th.night) stars(ctx, viewW, viewH, time, animate)
+  if (hasSunRays(th)) sunRays(ctx, th, sun, viewW, viewH, animate ? time : 0)
+  celestial(ctx, th, sun, th.skyTop)
   weather(ctx, th, viewW, viewH, animate ? time : 0)
   // Brume claire à l'horizon : profondeur atmosphérique.
   const haze = ctx.createLinearGradient(0, viewH * 0.45, 0, viewH)
@@ -567,6 +548,46 @@ function ground(ctx, s) {
   ctx.stroke()
 }
 
+/**
+ * Pont jeté par les pillards (v5.8) : planches à claire-voie liées par des
+ * cordes, rambarde de corde qui ploie, piquets aux deux bouts. Il se fendille
+ * avec les dégâts (il cède vite).
+ */
+function bridge(ctx, s) {
+  const { w, h } = s
+  const px = s.pixel ?? 1
+  const x0 = -w / 2
+  // Planches.
+  for (let x = x0; x < w / 2 - 2; x += 13) {
+    ctx.beginPath()
+    roundRect(ctx, x, -h / 2, 11, h, 2)
+    ctx.fillStyle = (Math.round(x / 13) % 2 ? '#8a6238' : '#9b7044')
+    ctx.fill()
+    outline(ctx, s, 1.1)
+  }
+  // Cordes de liaison et rambarde.
+  ctx.strokeStyle = '#d9c08a'
+  ctx.lineWidth = 1.6 * px
+  ctx.beginPath()
+  ctx.moveTo(x0, -h / 2 + 2)
+  ctx.lineTo(w / 2, -h / 2 + 2)
+  ctx.stroke()
+  for (const side of [-1, 1]) {
+    ctx.fillStyle = '#5e4128'
+    ctx.beginPath()
+    roundRect(ctx, side * (w / 2 - 4) - 3, -h / 2 - 30, 6, 32, 2)
+    ctx.fill()
+    outline(ctx, s, 1.2)
+  }
+  ctx.beginPath()
+  ctx.moveTo(x0 + 4, -h / 2 - 27)
+  ctx.quadraticCurveTo(0, -h / 2 - 8, w / 2 - 4, -h / 2 - 27)
+  ctx.lineWidth = 2 * px
+  ctx.strokeStyle = '#c9ad78'
+  ctx.stroke()
+  cracks(ctx, s)
+}
+
 /** Registre clé → fonction de dessin. */
 export const PAINTERS = Object.freeze({
   'block.straw': blockPainter('straw'),
@@ -580,6 +601,7 @@ export const PAINTERS = Object.freeze({
   'block.marble': blockPainter('marble'),
   'block.rock': blockPainter('rock'),
   ...CHARACTER_PAINTERS,
+  ...TROOP_PAINTERS,
   barrel,
   ...projectiles,
   ...CREATURE_PAINTERS,
@@ -587,7 +609,10 @@ export const PAINTERS = Object.freeze({
   trebuchet,
   'deco.pumpkin': pumpkin,
   'deco.snow': snowcap,
+  'construct.bridge': bridge,
   'scene.sky': sky,
+  'scene.distant': (ctx, st) => distant(ctx, { ...st, extra: { th: THEMES[st.extra?.theme ?? 1] } }),
   'scene.far': far,
+  'scene.near': (ctx, st) => near(ctx, { ...st, extra: { th: THEMES[st.extra?.theme ?? 1], versus: st.extra?.versus } }),
   'scene.ground': ground,
 })

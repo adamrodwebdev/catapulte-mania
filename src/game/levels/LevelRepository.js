@@ -14,6 +14,7 @@ import { ZONE_KINDS } from '../physics/Terrain.js'
 import { FLYER_NAMES } from '../entities/Flyer.js'
 
 const coord = Schema.number({ min: -500, max: 4000 })
+const WORLD_GROUND = 900
 const size = Schema.number({ min: 6, max: 600 })
 
 /** Schéma d'un niveau construit : protège contre une erreur de saisie dans levelSpecs.js. */
@@ -28,7 +29,16 @@ const levelSchema = Schema.object(
     ),
     targets: Schema.array(
       // patrol (v5.1) : demi-longueur de la ronde (0 = immobile).
-      Schema.object({ type: Schema.enum(Object.keys(TARGET_TYPES)), x: coord, y: coord, patrol: Schema.optional(Schema.int({ min: 0, max: 200 }), 0) }),
+      // torch (v5.8) : veilleur de nuit, sa torche met le feu là où il tombe.
+      // raid (v5.8) : pillard qui court attaquer l'engin du joueur.
+      Schema.object({
+        type: Schema.enum(Object.keys(TARGET_TYPES)),
+        x: coord,
+        y: coord,
+        patrol: Schema.optional(Schema.int({ min: 0, max: 200 }), 0),
+        torch: Schema.optional(Schema.boolean(), false),
+        raid: Schema.optional(Schema.nullable(Schema.enum(['fire', 'frost', 'blow', 'smash'])), null),
+      }),
       { maxLength: 20 },
     ),
     barrels: Schema.array(Schema.object({ x: coord, y: coord }), { maxLength: 20 }),
@@ -87,10 +97,28 @@ export function buildLevel(spec, id, chapter, seedSalt = 0, { tutorial = null, r
   level.star2 = Math.min(data.shots, level.par + Math.max(1, Math.floor((data.shots - level.par) / 2)))
   // Outil présenté par un tutoriel guidé (voir LevelRepository.tutorialFor).
   level.tutorial = tutorial
+  // Seaux d'eau (v5.8) : deux par niveau où un pillard porte une torche (un en Difficile).
+  level.buckets = Guard.int(spec.buckets ?? (data.targets.some((t) => t.raid === 'fire') ? 2 : 0), `level ${id} buckets`, { min: 0, max: 5 })
   level.achievements = achievementsFor(level)
   level.reference = referenceScore(level)
   level.maxScore = maxScore(level)
   return deepFreeze(level)
+}
+
+/**
+ * Ouvrages que les pillards devront bâtir dans ce niveau (v5.8) : échelle pour
+ * une montagne ou un plateau, pont pour des douves au ras du sol.
+ * @returns {('build:ladder' | 'build:bridge')[]}
+ */
+function worksOf(level) {
+  if (!level.targets.some((t) => t.raid)) return []
+  const plateau = level.blocks.some((b) => b.material === 'rock' && b.shape === 'rect' && b.y < WORLD_GROUND - 20)
+  const mountain = level.blocks.some((b) => b.material === 'rock' && b.shape === 'triangle' && b.h >= 150 && b.x < 1100)
+  const moat = level.zones.some((z) => z.kind === 'lake' || z.kind === 'lava' || z.kind === 'ice')
+  const out = []
+  if (plateau || mountain) out.push('build:ladder')
+  if (moat && !plateau) out.push('build:bridge')
+  return out
 }
 
 /**
@@ -183,6 +211,11 @@ export class LevelRepository {
     for (const l of LevelRepository.all().slice(0, id - 1)) {
       l.blocks.forEach((b) => seen.add(`material:${b.material}`))
       l.targets.forEach((t) => seen.add(`target:${t.type}`))
+      // Veilleurs de nuit (les pillards à la torche ont leur propre fiche).
+      if (l.targets.some((t) => t.torch && !t.raid)) seen.add('torch')
+      l.targets.forEach((t) => t.raid && seen.add(`raid:${t.raid}`))
+      if (l.buckets) seen.add('buckets')
+      for (const w of worksOf(l)) seen.add(w)
       if (l.barrels.length) seen.add('barrel')
       l.zones.forEach((z) => seen.add(`terrain:${z.kind}`))
       l.flyers.forEach((f) => seen.add(`flyer:${f.type}`))
@@ -192,6 +225,10 @@ export class LevelRepository {
     const now = new Set()
     level.blocks.forEach((b) => now.add(`material:${b.material}`))
     level.targets.forEach((t) => now.add(`target:${t.type}`))
+    if (level.targets.some((t) => t.torch && !t.raid)) now.add('torch')
+    level.targets.forEach((t) => t.raid && now.add(`raid:${t.raid}`))
+    if (level.buckets) now.add('buckets')
+    for (const w of worksOf(level)) now.add(w)
     if (level.barrels.length) now.add('barrel')
     level.zones.forEach((z) => now.add(`terrain:${z.kind}`))
     level.flyers.forEach((f) => now.add(`flyer:${f.type}`))

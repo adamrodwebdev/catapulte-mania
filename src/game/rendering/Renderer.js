@@ -2,11 +2,40 @@ import { TREB_TUNING } from '../aim/TrebuchetInput.js'
 import { WORLD } from '../physics/constants.js'
 import { WindLayer } from './WindLayer.js'
 import { drawLake, drawLava } from '../assets/procedural/liquids.js'
+import { THEMES } from '../assets/procedural/painters.js'
+import { hasSunRays, moteKind, motes, sunPosition } from '../assets/procedural/scenery.js'
+
+/** Emprise du bâti de chaque engin (repère local, avant le miroir) : là où se voient les avaries. */
+const ENGINE_FRAME = Object.freeze({
+  catapult: { x0: -84, x1: 84, y0: -100 },
+  trebuchet: { x0: -125, x1: 130, y0: -160 },
+  ballista: { x0: -70, x1: 70, y0: -80 },
+})
+
+/** Halo lumineux doux (mis en cache par couleur) : feux, lucioles, braises. */
+const glows = new Map()
+function glow(rgb) {
+  let c = glows.get(rgb)
+  if (!c) {
+    c = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(128, 128) : Object.assign(document.createElement('canvas'), { width: 128, height: 128 })
+    const g = c.getContext('2d')
+    const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64)
+    grad.addColorStop(0, `rgba(${rgb},1)`)
+    grad.addColorStop(0.3, `rgba(${rgb},0.45)`)
+    grad.addColorStop(1, `rgba(${rgb},0)`)
+    g.fillStyle = grad
+    g.fillRect(0, 0, 128, 128)
+    glows.set(rgb, c)
+  }
+  return c
+}
 
 /**
  * Rendu Canvas 2D de la scène.
- * Ordre de dessin : ciel → lointain (parallaxe) → sol → structures → cibles →
- * projectiles → vent → catapulte → particules → aide à la trajectoire.
+ * Ordre de dessin : ciel → chaînes lointaines (parallaxe 0,2) → collines (0,45)
+ * → haies et camp (0,75) → sol → structures → cibles → projectiles → vent →
+ * catapulte → lumière des feux → particules → aide à la trajectoire →
+ * lumière de la scène, poussières d'ambiance et vignette (repère écran).
  * Toute la partie graphique passe par l'AssetRegistry.
  */
 export class Renderer {
@@ -59,8 +88,13 @@ export class Renderer {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
     assets.draw(ctx, 'scene.sky', { w: camera.viewW, h: camera.viewH, extra: { theme, viewW: camera.viewW, viewH: camera.viewH, time, animate, wind: scene.wind?.field.base ?? 0 } })
 
+    // Plans du décor : plus ils sont loin, moins ils défilent (v5.7).
+    camera.apply(ctx, this.dpr, 0.2)
+    assets.draw(ctx, 'scene.distant', { w: WORLD.WIDTH, h: 600, pixel, extra: { theme } })
     camera.apply(ctx, this.dpr, 0.45)
     assets.draw(ctx, 'scene.far', { w: WORLD.WIDTH, h: 400, pixel, extra: { theme, castle: !scene.versus } })
+    camera.apply(ctx, this.dpr, 0.75)
+    assets.draw(ctx, 'scene.near', { w: WORLD.WIDTH, h: 200, pixel, extra: { theme, versus: Boolean(scene.versus) } })
 
     camera.apply(ctx, this.dpr)
     assets.draw(ctx, 'scene.ground', { w: WORLD.WIDTH, h: 200, pixel, extra: { theme } })
@@ -81,9 +115,16 @@ export class Renderer {
     const order = { block: 0, barrel: 1, target: 2, projectile: 3, flyer: 4 }
     const list = [...scene.entities].sort((a, b) => order[a.kind] - order[b.kind])
     this.#drawShadows(ctx, list.filter((e) => e.kind !== 'flyer'), scene.catapults || [])
+    this.#drawAuras(ctx, list, time, animate, pixel)
     // Un projectile en vol : les défenseurs lèvent les yeux (animation seulement).
     const alert = list.some((e) => e.kind === 'projectile' && !e.hasImpacted && e.alive !== false)
+    let worksDrawn = false
     for (const e of list) {
+      // Échelles des pillards (v5.8) : devant la roche, derrière les défenseurs qui y grimpent.
+      if (!worksDrawn && e.kind !== 'block' && e.kind !== 'barrel') {
+        this.#drawWorks(ctx, scene.works, time, pixel)
+        worksDrawn = true
+      }
       ctx.save()
       ctx.translate(e.x, e.y)
       ctx.rotate(e.angle)
@@ -95,7 +136,7 @@ export class Renderer {
         burning: e.burning > 0, time, seed: e.id, pixel,
         extra:
           e.kind === 'target'
-            ? { hurt: time - e.hurtAt < 600 || e.damageRatio > 0.6, team: e.team, still: animate === false, alert, frozen: e.frozenMs > 0, walking: e.walking && e.frozenMs <= 0, facing: e.facing, swing: (scene.worldTime ?? 0) - (e.swatAt ?? -Infinity) }
+            ? { hurt: time - e.hurtAt < 600 || e.damageRatio > 0.6, team: e.team, still: animate === false, alert, frozen: e.frozenMs > 0, walking: e.walking && e.frozenMs <= 0, facing: e.facing, swing: (scene.worldTime ?? 0) - (e.swatAt ?? -Infinity), torch: e.torch, sprinting: e.sprinting && e.walking, working: e.working, aura: e.aura > 1, raid: e.raid, climbing: Boolean(e.climbing) }
             : e.kind === 'flyer'
               ? { flap: animate === false ? 0.25 : e.flap, facing: e.facing, carrying: e.carrying }
               : undefined,
@@ -105,6 +146,7 @@ export class Renderer {
       ctx.restore()
     }
 
+    if (!worksDrawn) this.#drawWorks(ctx, scene.works, time, pixel)
     // Vent : traînées, manche à air, fanion du château.
     if (scene.wind) this.#wind.draw(ctx, scene.wind, pixel)
 
@@ -124,21 +166,405 @@ export class Renderer {
         const armSpeed = this.#angularSpeed(c, c.armAngle, time)
         assets.draw(ctx, 'catapult', { w: 180, h: 140, pixel, time, extra: { armAngle: c.armAngle, load: c.load, loadRadius: c.loadRadius, registry: assets, skin: c.skin, flag: c.flag, armSpeed, still: animate === false } })
       }
+      if (c.condition) this.#drawWear(ctx, c, time, animate, pixel)
       ctx.restore()
     }
+    // Bornes visibles du monde : la barre de l'engin reste toujours à l'écran.
+    const view = { left: camera.screenToWorld(0, 0).x, right: camera.screenToWorld(camera.viewW, 0).x }
+    for (const c of scene.catapults || []) if (c.condition?.show) this.#drawEngineBar(ctx, c, pixel, scene.highContrast, view)
+    this.#drawRaiders(ctx, list, time, animate, pixel)
 
     // Viseur un peu plus petit sur les écrans bas (téléphone à l'horizontale).
     if (scene.aim) this.#drawAim(ctx, scene.aim, pixel * Math.max(0.72, Math.min(1, camera.viewH / 720)), scene.highContrast)
     if (scene.trebAim) this.#drawTrebAim(ctx, scene.trebAim, time, pixel, scene.highContrast)
 
+    this.#drawFireLight(ctx, list, theme, time, animate, scene.catapults || [])
+    scene.particles.viewWidth = camera.viewW
     scene.particles.draw(ctx, pixel)
 
     if (scene.trajectory && scene.trajectory.length) this.#drawTrajectory(ctx, scene.trajectory, pixel, scene.highContrast)
 
-    // Vignette légère : resserre le regard sur la scène (en coordonnées écran).
+    // Lumière de la scène et poussières d'ambiance (en coordonnées écran).
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
+    this.#drawGrade(ctx, camera, theme)
+    if (animate !== false && !scene.highContrast) {
+      const kind = moteKind(theme, THEMES[theme] ?? THEMES[1])
+      if (kind) motes(ctx, kind, camera.viewW, camera.viewH, time, camera.x * camera.scale, glow)
+    }
+    // Vignette légère : resserre le regard sur la scène.
     ctx.fillStyle = this.#vignette(ctx, camera.viewW, camera.viewH)
     ctx.fillRect(0, 0, camera.viewW, camera.viewH)
+  }
+
+  /**
+   * Lumière des feux (v5.7) : chaque objet qui brûle, chaque boulet enflammé
+   * éclaire ce qui l'entoure (halo additif qui vacille). Bien plus marqué la
+   * nuit, où les incendies deviennent les vraies sources de lumière.
+   */
+  #drawFireLight(ctx, list, theme, time, animate, engines = []) {
+    const night = THEMES[theme]?.night
+    const strength = night ? 0.75 : 0.32
+    let any = false
+    // L'engin en feu (v5.8) : la lueur grandit avec l'intensité.
+    for (const c of engines) {
+      const heat = c.condition?.heat ?? 0
+      if (heat <= 0) continue
+      if (!any) {
+        ctx.save()
+        ctx.globalCompositeOperation = 'lighter'
+        any = true
+      }
+      const f = animate === false ? 1 : 0.85 + 0.15 * Math.sin(time / 61) * Math.sin(time / 29)
+      const r = (110 + heat * 55) * f
+      ctx.globalAlpha = Math.min(0.9, strength * (0.6 + heat * 0.25)) * f
+      ctx.drawImage(glow('255,130,40'), c.x - r, c.y - 60 - r * 0.85, r * 2, r * 2)
+    }
+    for (const e of list) {
+      const torch = e.kind === 'target' && e.torch && e.alive !== false && !(e.frozenMs > 0)
+      const hot = e.alive !== false && (e.burning > 0 || (e.kind === 'projectile' && ((e.ignites && !e.hasImpacted) || e.heatMs > 0)))
+      if (!hot && !torch) continue
+      if (!any) {
+        ctx.save()
+        ctx.globalCompositeOperation = 'lighter'
+        any = true
+      }
+      if (torch && !hot) {
+        // Torche d'un veilleur : un halo chaud qui vacille, qui éclaire les murs autour.
+        const tip = e.torchTip
+        const f = animate === false ? 1 : 0.88 + 0.12 * Math.sin(time / 53 + e.id * 2.3) * Math.sin(time / 31 + e.id)
+        const r = (night ? 120 : 60) * f
+        ctx.globalAlpha = (night ? 0.6 : 0.22) * f
+        ctx.drawImage(glow('255,150,60'), tip.x - r, tip.y - r, r * 2, r * 2)
+        continue
+      }
+      const flicker = animate === false ? 1 : 0.85 + 0.15 * Math.sin(time / 70 + e.id * 1.7) * Math.sin(time / 37 + e.id)
+      const r = (110 + Math.max(e.width ?? 0, e.height ?? 0) * 1.4) * flicker
+      ctx.globalAlpha = strength * flicker
+      ctx.drawImage(glow('255,140,50'), e.x - r, e.y - r * 0.85, r * 2, r * 2)
+    }
+    if (any) ctx.restore()
+  }
+
+  /**
+   * Avaries visibles sur l'engin (v5.8), dans son repère : croûte de givre et
+   * stalactites, fissures et éclats de bois, taches de rouille. (Le feu, lui,
+   * vient des particules et de la lueur.)
+   */
+  #drawWear(ctx, c, time, animate, pixel) {
+    const w = c.condition
+    const f = ENGINE_FRAME[c.kind] ?? ENGINE_FRAME.catapult
+    const px = Math.max(1, pixel)
+    ctx.save()
+    if (w.rust > 0) {
+      // Rouille : des taches orangées sur les ferrures, plus nombreuses à chaque couche.
+      for (let i = 0; i < w.rust * 7; i++) {
+        const x = f.x0 + ((i * 53) % 100) / 100 * (f.x1 - f.x0)
+        const y = f.y0 * 0.15 + ((i * 37) % 100) / 100 * f.y0 * 0.8
+        const r = (5 + ((i * 7) % 5)) * 1.2
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r)
+        g.addColorStop(0, 'rgba(150,70,25,0.75)')
+        g.addColorStop(1, 'rgba(150,70,25,0)')
+        ctx.fillStyle = g
+        ctx.fillRect(x - r, y - r, r * 2, r * 2)
+      }
+    }
+    if (w.crack > 0) {
+      // Fissures : traits brisés sombres ; disloqué, une planche pend.
+      ctx.strokeStyle = 'rgba(25,15,10,0.85)'
+      ctx.lineWidth = 2 * px
+      ctx.lineJoin = 'round'
+      const n = w.crack === 1 ? 3 : 6
+      for (let i = 0; i < n; i++) {
+        let x = f.x0 + ((i * 41 + 13) % 100) / 100 * (f.x1 - f.x0)
+        let y = f.y0 * (0.25 + ((i * 29) % 50) / 100)
+        ctx.beginPath()
+        ctx.moveTo(x, y)
+        for (let k = 0; k < 4; k++) {
+          x += (((i + k) * 17) % 13) - 6
+          y += 7 + ((i * k) % 5)
+          ctx.lineTo(x, y)
+        }
+        ctx.stroke()
+      }
+      if (w.crack >= 2) {
+        ctx.save()
+        ctx.translate(f.x0 * 0.4, f.y0 * 0.45)
+        ctx.rotate(0.9)
+        ctx.fillStyle = '#7a5530'
+        ctx.fillRect(-4, 0, 8, 46)
+        ctx.strokeStyle = '#1e1a2b'
+        ctx.lineWidth = 1.4 * px
+        ctx.strokeRect(-4, 0, 8, 46)
+        ctx.restore()
+      }
+    }
+    if (w.frozen) {
+      // Givre : voile bleuté, liseré blanc, stalactites, reflets qui scintillent.
+      ctx.globalAlpha = 0.38
+      ctx.fillStyle = '#bfe6ff'
+      ctx.beginPath()
+      ctx.roundRect?.(f.x0, f.y0, f.x1 - f.x0, -f.y0, 12)
+      if (!ctx.roundRect) ctx.rect(f.x0, f.y0, f.x1 - f.x0, -f.y0)
+      ctx.fill()
+      ctx.globalAlpha = 0.9
+      ctx.lineWidth = 2.2 * px
+      ctx.strokeStyle = '#eaf8ff'
+      ctx.stroke()
+      ctx.fillStyle = '#e6f6ff'
+      for (let x = f.x0 + 10; x < f.x1 - 6; x += 19) {
+        const h = 9 + ((x * 7) % 8)
+        ctx.beginPath()
+        ctx.moveTo(x - 4, f.y0 * 0.45)
+        ctx.lineTo(x + 4, f.y0 * 0.45)
+        ctx.lineTo(x, f.y0 * 0.45 + h)
+        ctx.closePath()
+        ctx.fill()
+      }
+      ctx.globalAlpha = animate === false ? 0.8 : 0.5 + 0.5 * Math.sin(time / 260)
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(f.x0 * 0.5, f.y0 * 0.7, 10, 1.6 * px)
+      ctx.fillRect(f.x0 * 0.5 + 4, f.y0 * 0.7 - 4, 1.6 * px, 10)
+    }
+    ctx.restore()
+  }
+
+  /**
+   * Points de vie de l'engin (v5.8) : barre au-dessus de lui, couleur qui
+   * passe du vert au rouge, et une pastille par avarie (forme et couleur : la
+   * couleur n'est jamais seule à porter l'information). Taille fixe à l'écran.
+   */
+  #drawEngineBar(ctx, c, pixel, highContrast, view) {
+    const w = c.condition
+    const f = ENGINE_FRAME[c.kind] ?? ENGINE_FRAME.catapult
+    const px = Math.max(0.6, pixel)
+    const bw = 110 * px
+    const bh = 10 * px
+    // Place des pastilles à droite (quatre au plus) : la barre ne sort jamais de l'écran.
+    const tail = 4 * 22 * px + 10 * px
+    const x = Math.max(view.left + 8 * px, Math.min(view.right - bw - tail, c.x - bw / 2))
+    const y = c.y + f.y0 - 34 * px
+    const ratio = Math.max(0, Math.min(1, w.hp))
+    ctx.save()
+    ctx.fillStyle = 'rgba(30,26,43,0.82)'
+    ctx.beginPath()
+    ctx.roundRect?.(x - 3 * px, y - 3 * px, bw + 6 * px, bh + 6 * px, 6 * px)
+    if (!ctx.roundRect) ctx.rect(x - 3 * px, y - 3 * px, bw + 6 * px, bh + 6 * px)
+    ctx.fill()
+    ctx.fillStyle = highContrast ? '#ffd400' : ratio > 0.6 ? '#6fcf5b' : ratio > 0.3 ? '#f2c94c' : '#e2553b'
+    ctx.fillRect(x, y, bw * ratio, bh)
+    // Graduations tous les quarts : on lit vite « encore trois quarts ».
+    ctx.fillStyle = 'rgba(30,26,43,0.6)'
+    for (let k = 1; k < 4; k++) ctx.fillRect(x + (bw * k) / 4 - 0.5 * px, y, 1 * px, bh)
+    // Pastilles d'avaries.
+    const pips = []
+    if (w.heat > 0) pips.push('fire')
+    if (w.frozen) pips.push('frost')
+    if (w.crack) pips.push('crack')
+    if (w.rust) pips.push('rust')
+    pips.forEach((kind, i) => this.#pip(ctx, x + bw + (14 + i * 22) * px, y + bh / 2, 9 * px, kind, w))
+    ctx.restore()
+  }
+
+  #pip(ctx, x, y, r, kind, w) {
+    const fill = { fire: '#e8742c', frost: '#7fc8f0', crack: '#8a6a4a', rust: '#a8552a' }[kind]
+    ctx.fillStyle = 'rgba(30,26,43,0.85)'
+    ctx.beginPath()
+    ctx.arc(x, y, r + r * 0.25, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = fill
+    ctx.beginPath()
+    ctx.arc(x, y, r, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = '#fff6dc'
+    ctx.fillStyle = '#fff6dc'
+    ctx.lineWidth = r * 0.22
+    ctx.lineCap = 'round'
+    ctx.beginPath()
+    if (kind === 'fire') {
+      // Flamme : plus haute avec l'intensité.
+      const h = r * (0.5 + 0.18 * Math.min(3, Math.ceil(w.heat)))
+      ctx.moveTo(x - r * 0.4, y + r * 0.45)
+      ctx.quadraticCurveTo(x - r * 0.5, y - h * 0.3, x, y - h)
+      ctx.quadraticCurveTo(x + r * 0.5, y - h * 0.3, x + r * 0.4, y + r * 0.45)
+      ctx.closePath()
+      ctx.fill()
+    } else if (kind === 'frost') {
+      for (let a = 0; a < 3; a++) {
+        const t = (a * Math.PI) / 3
+        ctx.moveTo(x - Math.cos(t) * r * 0.6, y - Math.sin(t) * r * 0.6)
+        ctx.lineTo(x + Math.cos(t) * r * 0.6, y + Math.sin(t) * r * 0.6)
+      }
+      ctx.stroke()
+    } else if (kind === 'crack') {
+      ctx.moveTo(x - r * 0.15, y - r * 0.6)
+      ctx.lineTo(x + r * 0.2, y - r * 0.1)
+      ctx.lineTo(x - r * 0.2, y + r * 0.15)
+      ctx.lineTo(x + r * 0.15, y + r * 0.6)
+      ctx.stroke()
+    } else {
+      // Rouille : un boulon écaillé.
+      ctx.arc(x, y, r * 0.38, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.fillRect(x + r * 0.25, y - r * 0.55, r * 0.22, r * 0.22)
+    }
+  }
+
+  /**
+   * Ouvrages des pillards (v5.8) : échelles dressées (montants et barreaux le
+   * long de l'itinéraire), et chantiers en cours, en fantôme qui se construit.
+   */
+  #drawWorks(ctx, works, time, pixel) {
+    if (!works?.length) return
+    const px = Math.max(1, pixel)
+    for (const w of works) {
+      ctx.save()
+      ctx.globalAlpha = w.building ? 0.45 + 0.15 * Math.sin(time / 160) : 1
+      if (w.kind === 'ladder' && w.route) this.#ladder(ctx, w.route, w.progress, px)
+      else if (w.kind === 'bridge' && w.span) {
+        // Pont en chantier : les planches avancent depuis la berge.
+        const len = (w.span.x1 - w.span.x0 + 32) * w.progress
+        const x0 = w.span.x1 + 16 - len
+        for (let x = x0; x < w.span.x1 + 16; x += 13) {
+          ctx.fillStyle = '#9b7044'
+          ctx.fillRect(x, WORLD.GROUND_Y - 3, 11, 10)
+          ctx.strokeStyle = '#1e1a2b'
+          ctx.lineWidth = px
+          ctx.strokeRect(x, WORLD.GROUND_Y - 3, 11, 10)
+        }
+      }
+      ctx.restore()
+    }
+  }
+
+  /** Une échelle le long d'un itinéraire, construite jusqu'à `progress` (0..1). */
+  #ladder(ctx, route, progress, px) {
+    let total = 0
+    for (let i = 1; i < route.length; i++) total += Math.hypot(route[i].x - route[i - 1].x, route[i].y - route[i - 1].y)
+    let budget = total * Math.max(0, Math.min(1, progress))
+    ctx.lineCap = 'round'
+    for (let i = 1; i < route.length && budget > 0; i++) {
+      const a = route[i - 1]
+      const b = route[i]
+      const seg = Math.hypot(b.x - a.x, b.y - a.y)
+      const len = Math.min(seg, budget)
+      budget -= len
+      const ux = (b.x - a.x) / seg
+      const uy = (b.y - a.y) / seg
+      // Perpendiculaire : écart des montants.
+      const nx = -uy * 7
+      const ny = ux * 7
+      const ex = a.x + ux * len
+      const ey = a.y + uy * len
+      for (const [w, col] of [[5 * px, '#1e1a2b'], [3 * px, '#9b7044']]) {
+        ctx.strokeStyle = col
+        ctx.lineWidth = w
+        ctx.beginPath()
+        ctx.moveTo(a.x + nx, a.y + ny)
+        ctx.lineTo(ex + nx, ey + ny)
+        ctx.moveTo(a.x - nx, a.y - ny)
+        ctx.lineTo(ex - nx, ey - ny)
+        ctx.stroke()
+      }
+      ctx.strokeStyle = '#7a5530'
+      ctx.lineWidth = 2.2 * px
+      ctx.beginPath()
+      for (let d = 8; d < len; d += 14) {
+        const x = a.x + ux * d
+        const y = a.y + uy * d
+        ctx.moveTo(x + nx, y + ny)
+        ctx.lineTo(x - nx, y - ny)
+      }
+      ctx.stroke()
+    }
+  }
+
+  /**
+   * Pillards (v5.8) : un panneau « ! » au-dessus de ceux qui chargent l'engin,
+   * qui rebondit doucement. On les repère d'un coup d'œil, même de loin.
+   */
+  #drawRaiders(ctx, list, time, animate, pixel) {
+    const px = Math.max(1, pixel)
+    for (const e of list) {
+      if (e.kind !== 'target' || !e.raiding || e.alive === false) continue
+      const bob = animate === false ? 0 : Math.sin(time / 140 + e.id) * 3 * px
+      const x = e.x
+      const y = e.y - e.height / 2 - 22 * px + bob
+      const s = 11 * px
+      ctx.save()
+      ctx.beginPath()
+      ctx.moveTo(x, y - s)
+      ctx.lineTo(x + s, y + s * 0.8)
+      ctx.lineTo(x - s, y + s * 0.8)
+      ctx.closePath()
+      ctx.fillStyle = '#e2553b'
+      ctx.fill()
+      ctx.lineWidth = 2 * px
+      ctx.strokeStyle = '#1e1a2b'
+      ctx.stroke()
+      ctx.fillStyle = '#fff6dc'
+      ctx.fillRect(x - 1.4 * px, y - s * 0.45, 2.8 * px, s * 0.75)
+      ctx.fillRect(x - 1.4 * px, y + s * 0.42, 2.8 * px, 2.8 * px)
+      ctx.restore()
+    }
+  }
+
+  /**
+   * Étendard (v5.8) : un cercle d'or pâle au pied de chaque défenseur
+   * galvanisé, qui pulse doucement. On voit d'un coup d'œil qui il protège.
+   */
+  #drawAuras(ctx, list, time, animate, pixel) {
+    const k = animate === false ? 0.5 : 0.5 + 0.5 * Math.sin(time / 380)
+    ctx.save()
+    ctx.lineWidth = 2.4 * Math.max(1, pixel)
+    for (const e of list) {
+      if (e.kind !== 'target' || e.alive === false || !(e.aura > 1 || e.type === 'bannerman')) continue
+      const feet = e.y + e.height / 2
+      ctx.globalAlpha = e.type === 'bannerman' ? 0.75 : 0.35 + 0.35 * k
+      ctx.strokeStyle = '#f2c94c'
+      ctx.beginPath()
+      ctx.ellipse(e.x, feet - 1, e.width * 0.75 + k * 3, 5 + k, 0, 0, Math.PI * 2)
+      ctx.stroke()
+    }
+    ctx.restore()
+  }
+
+  /**
+   * Étalonnage de la lumière (repère écran) : le jour, une lumière chaude
+   * descend de l'astre sur la scène ; la nuit, un voile froid assombrit le
+   * haut de l'image. Dégradés mis en cache (ils ne changent qu'au redimensionnement).
+   */
+  #gradeCache = { key: '', fill: null, mode: 'source-over' }
+  #drawGrade(ctx, camera, theme) {
+    const th = THEMES[theme] ?? THEMES[1]
+    const w = camera.viewW
+    const h = camera.viewH
+    const key = `${theme}:${w}:${h}`
+    const c = this.#gradeCache
+    if (c.key !== key) {
+      if (th.night) {
+        const g = ctx.createLinearGradient(0, 0, 0, h)
+        g.addColorStop(0, 'rgba(10,14,40,0.28)')
+        g.addColorStop(0.6, 'rgba(10,14,40,0.06)')
+        g.addColorStop(1, 'rgba(10,14,40,0.18)')
+        Object.assign(c, { fill: g, mode: 'source-over' })
+      } else if (hasSunRays(th)) {
+        const sun = sunPosition(theme, w, h)
+        const g = ctx.createRadialGradient(sun.x, sun.y, 0, sun.x, sun.y, Math.hypot(w, h) * 0.9)
+        g.addColorStop(0, th.sun + '30')
+        g.addColorStop(0.5, th.sun + '10')
+        g.addColorStop(1, th.sun + '00')
+        Object.assign(c, { fill: g, mode: 'lighter' })
+      } else {
+        Object.assign(c, { fill: null })
+      }
+      c.key = key
+    }
+    if (!c.fill) return
+    ctx.save()
+    ctx.globalCompositeOperation = c.mode
+    ctx.fillStyle = c.fill
+    ctx.fillRect(0, 0, w, h)
+    ctx.restore()
   }
 
   /**

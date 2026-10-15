@@ -12,17 +12,17 @@
  */
 import { TAU, tone, roundRect, edge, lightOver, metalGradient, rivet, mailPattern, woodPattern, stitches, cached } from './realism.js'
 
-const TEAM = {
+export const TEAM = {
   1: { cloth: '#9e2b25', light: '#c9483d', dark: '#5e1512' },
   2: { cloth: '#3a7436', light: '#5a9a50', dark: '#1f421d' },
 }
-const STEEL = '#8e96a3'
-const GOLD = '#d2a53a'
+export const STEEL = '#8e96a3'
+export const GOLD = '#d2a53a'
 
 /* ---------- Pièces communes ---------- */
 
 /** Tissu : aplat + plis verticaux + volume. */
-function cloth(g, base, x0, y0, x1, y1, folds = 4) {
+export function cloth(g, base, x0, y0, x1, y1, folds = 4) {
   g.fillStyle = base
   g.fill()
   const gr = g.createLinearGradient(x0, 0, x1, 0)
@@ -36,7 +36,7 @@ function cloth(g, base, x0, y0, x1, y1, folds = 4) {
 }
 
 /** Membre (manche, jambe) : trait épais ombré suivant un chemin. */
-function limb(g, pts, width, base, { shade = true } = {}) {
+export function limb(g, pts, width, base, { shade = true } = {}) {
   const path = () => {
     g.beginPath()
     pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)))
@@ -62,7 +62,7 @@ function limb(g, pts, width, base, { shade = true } = {}) {
   }
 }
 
-function hand(g, x, y, r = 1.8) {
+export function hand(g, x, y, r = 1.8) {
   const gr = g.createRadialGradient(x - r * 0.4, y - r * 0.4, 0.2, x, y, r)
   gr.addColorStop(0, '#f2cfae')
   gr.addColorStop(1, '#a8704c')
@@ -73,7 +73,7 @@ function hand(g, x, y, r = 1.8) {
   edge(g, 0.5)
 }
 
-function boot(g, x, y, toward = -1) {
+export function boot(g, x, y, toward = -1) {
   g.beginPath()
   g.moveTo(x - 2.6, y - 6)
   g.lineTo(x + 2.6, y - 6)
@@ -91,7 +91,7 @@ function boot(g, x, y, toward = -1) {
  * Tête de profil trois-quarts tournée vers la gauche.
  * state : 'idle' | 'blink' | 'hurt'.
  */
-function head(g, cx, cy, r, state, { old = false, stubble = true } = {}) {
+export function head(g, cx, cy, r, state, { old = false, stubble = true } = {}) {
   // Oreille.
   g.beginPath()
   g.ellipse(cx + r * 0.62, cy + r * 0.05, r * 0.2, r * 0.3, 0.2, 0, TAU)
@@ -238,7 +238,7 @@ function head(g, cx, cy, r, state, { old = false, stubble = true } = {}) {
 
 /* ---------- Soldat (26 × 50) ---------- */
 
-function soldierBody(g, { team }) {
+export function soldierBody(g, { team }) {
   const c = TEAM[team]
   // Jambe éloignée.
   limb(g, [[3, 9], [3.4, 20]], 4.6, '#35313b')
@@ -357,7 +357,7 @@ function soldierArm(g) {
   edge(g, 0.4)
 }
 
-function soldierHead(g, { state }) {
+export function soldierHead(g, { state }) {
   head(g, -1, -16, 6.8, state)
   // Chapeau de fer : ombre portée du bord sur le front.
   g.save()
@@ -973,8 +973,7 @@ function alertLevel(id, alert, t) {
 }
 
 /** Pose de chaque calque à l'instant t. */
-function pose(type, t, seed, { hurt, alert }) {
-  const rig = RIGS[type]
+function pose(rig, type, t, seed, { hurt, alert, working = false, sprinting = false }) {
   const P = { body: { dx: 0, dy: 0 }, head: { rot: 0, flip: 1, dy: 0 }, arm: { rot: 0, dy: 0 }, shield: { rot: 0, dx: 0, dy: 0 } }
   // Report du poids d'une jambe sur l'autre.
   P.body.dx = Math.sin(t * 0.7 + seed * 3) * 0.35
@@ -993,6 +992,18 @@ function pose(type, t, seed, { hurt, alert }) {
   // Micro-mouvements permanents : la tête et le bras ne sont jamais tout à fait figés.
   P.head.rot = Math.sin(t * 0.9 + seed * 2) * 0.035
   P.arm.rot = Math.sin(t * 1.1 + seed) * 0.03
+  // Sapeur au travail (v5.8) : le marteau frappe deux fois par seconde.
+  if (working) {
+    const beat = (t * 2.2 + seed) % 1
+    P.arm.rot = beat < 0.35 ? -1.1 * smooth(beat / 0.35) : -1.1 * (1 - smooth(Math.min(1, (beat - 0.35) / 0.12)))
+    P.head.rot = 0.12
+    return P
+  }
+  // En pleine course : regard droit devant, plus de gestes.
+  if (sprinting) {
+    P.head.rot = -0.08
+    return P
+  }
   switch (action) {
     case 'lookBack':
       // La tête pivote : on « écrase » puis retourne le calque (le visage passe de gauche à droite).
@@ -1018,14 +1029,24 @@ function pose(type, t, seed, { hurt, alert }) {
       P.arm.dy = -3 * e
       P.arm.rot += (-0.16 + Math.sin(u * 30) * 0.05) * e
       break
+    case 'scan':
+      // Le guetteur scrute l'horizon d'un côté puis de l'autre.
+      P.head.rot += Math.sin(u * TAU * 2) * 0.12 * e
+      P.body.dx += -0.8 * e
+      break
+    case 'raise':
+      // Lève sa torche ou son étendard bien haut.
+      P.arm.dy = -2.4 * e
+      P.arm.rot += -0.08 * e
+      break
   }
   // Un projectile en vol : tous lèvent les yeux et se préparent.
   if (alert > 0) {
     P.head.rot = P.head.rot * (1 - alert) + 0.15 * alert
     P.head.flip = P.head.flip * (1 - alert) + alert
     if (type === 'soldier') P.arm.rot += -0.22 * alert
-    if (type === 'knight') {
-      P.shield.dy += -3.6 * alert
+    if (type === 'knight' || type === 'shieldbearer') {
+      P.shield.dy += (type === 'knight' ? -3.6 : -1.2) * alert
       P.shield.dx += -1 * alert
     }
     if (type === 'king') {
@@ -1036,8 +1057,14 @@ function pose(type, t, seed, { hurt, alert }) {
   return P
 }
 
-function animated(type) {
-  const rig = RIGS[type]
+/**
+ * Peintre animé d'un personnage à calques. `rig.layers` : calques mis en
+ * cache (corps, tête, bras…), chacun avec son pivot ; un calque peut avoir une
+ * partie `live`, redessinée à chaque image dans le même repère (flamme d'une
+ * torche, étoffe d'un étendard). `rig.torch` : calques du même personnage
+ * quand il porte une torche (veilleur de nuit, v5.8).
+ */
+export function animated(type, rig = RIGS[type]) {
   const [W, H] = rig.size
   return (ctx, s) => {
     const ex = s.extra ?? {}
@@ -1049,17 +1076,19 @@ function animated(type) {
     const state = ex.hurt ? 'hurt' : !ex.still && (t + seed * 3) % period < 0.13 ? 'blink' : 'idle'
     const still = Boolean(ex.still)
     const alert = still ? 0 : alertLevel(s.seed ?? 0, Boolean(ex.alert), t)
-    const P = still ? null : pose(type, t, seed, { hurt: Boolean(ex.hurt), alert })
+    const P = still ? null : pose(rig, type, t, seed, { hurt: Boolean(ex.hurt), alert, working: Boolean(ex.working), sprinting: Boolean(ex.sprinting) })
     ctx.save()
     ctx.scale(s.w / W, s.h / H)
     // Ronde (v5.1) : le personnage se tourne dans le sens de la marche et
     // avance d'un pas balancé (léger rebond, buste qui oscille).
     if (ex.walking && !still) {
       if (ex.facing > 0) ctx.scale(-1, 1)
-      const step = t * 9 + seed
+      // Course (v5.8) : foulées plus rapides et buste penché en avant.
+      const run = ex.sprinting ? 1 : 0
+      const step = t * (9 + run * 7) + seed
       ctx.translate(0, H / 2)
-      ctx.rotate(Math.sin(step) * 0.05)
-      ctx.translate(0, -H / 2 - Math.abs(Math.sin(step)) * 1.6)
+      ctx.rotate(Math.sin(step) * (0.05 + run * 0.03) - run * 0.16)
+      ctx.translate(0, -H / 2 - Math.abs(Math.sin(step)) * (1.6 + run))
     } else if (ex.facing > 0 && !still) {
       ctx.scale(-1, 1)
     }
@@ -1073,12 +1102,15 @@ function animated(type) {
         ctx.translate(0, -H / 2)
       }
     }
-    for (const layer of rig.layers) {
-      const key = `chr.${type}.${layer.name}.${team}.${layer.face ? state : 'any'}`
+    // Variante portée (v5.8) : pot de givre d'un pillard d'hiver, ou torche d'un veilleur.
+    const variant = ex.raid === 'frost' && rig.pot ? 'pot' : ex.torch && rig.torch ? 'torch' : null
+    for (const layer of variant ? rig[variant] : rig.layers) {
+      const key = `chr.${type}.${layer.name}${variant ? `.${variant}` : ''}.${team}.${layer.face ? state : 'any'}`
       const paint = (g) => layer.paint(g, { state, team })
       const q = P && layer.pivot ? P[layer.name] : null
       if (!q) {
         cached(ctx, key, rig.box, paint, 4)
+        layer.live?.(ctx, { t, seed, still, team, ex })
         continue
       }
       const [px, py] = layer.pivot
@@ -1088,14 +1120,81 @@ function animated(type) {
       if (q.flip !== undefined && q.flip !== 1) ctx.scale(Math.abs(q.flip) < 0.08 ? 0.08 * Math.sign(q.flip || 1) : q.flip, 1)
       ctx.translate(-px, -py)
       cached(ctx, key, rig.box, paint, 4)
+      layer.live?.(ctx, { t, seed, still, team, ex })
       ctx.restore()
     }
     ctx.restore()
   }
 }
 
+/** Soldat porteur de torche (veilleur de nuit, v5.8) : la lance laisse place à la torche. */
+RIGS.soldier.torch = [
+  { name: 'body', paint: soldierBody },
+  { name: 'arm', paint: (g) => torchArm(g, { sleeve: '#c9b48a' }), pivot: [8.6, -6], live: (ctx, o) => torchFlame(ctx, TORCH_TIP, o) },
+  { name: 'head', paint: soldierHead, pivot: [-1, -10.5], face: true },
+]
+
 export const CHARACTER_PAINTERS = Object.freeze({
   'target.soldier': animated('soldier'),
   'target.knight': animated('knight'),
   'target.king': animated('king'),
 })
+
+/* ---------- Torche (v5.8) ---------- */
+
+/** Bout de la torche, dans le repère du personnage. */
+export const TORCH_TIP = Object.freeze([14.6, -33])
+
+/** Bras levé tenant une torche : manche de bois, tête enroulée de toile poissée. */
+export function torchArm(g, { sleeve }) {
+  g.beginPath()
+  roundRect(g, 13.4, -30, 2.4, 33, 1)
+  g.fillStyle = woodPattern(g, { angle: Math.PI / 2, unitsPerTile: 120 })
+  g.fill()
+  g.fillStyle = 'rgba(0,0,0,0.18)'
+  g.fill()
+  edge(g, 0.5)
+  // Toile enroulée, noircie par la poix.
+  g.beginPath()
+  g.ellipse(14.6, -30, 2.6, 3.4, 0, 0, TAU)
+  const tar = g.createRadialGradient(13.8, -31, 0.3, 14.6, -30, 3.4)
+  tar.addColorStop(0, '#6b4a2a')
+  tar.addColorStop(1, '#1d130c')
+  g.fillStyle = tar
+  g.fill()
+  edge(g, 0.45)
+  g.strokeStyle = 'rgba(160,120,70,0.6)'
+  g.lineWidth = 0.4
+  for (const y of [-32, -30, -28]) {
+    g.beginPath()
+    g.moveTo(12.2, y)
+    g.lineTo(17, y + 0.8)
+    g.stroke()
+  }
+  limb(g, [[8.6, -6], [12.4, -3], [14.4, -8]], 4.4, sleeve)
+  hand(g, 14.5, -8.6, 2)
+}
+
+/**
+ * Flamme vivante au bout de la torche : trois langues qui ondulent et un
+ * cœur clair, en mélange additif. Dessinée à chaque image (jamais en cache).
+ */
+export function torchFlame(ctx, [x, y], { t, seed, still }) {
+  const k = still ? 0 : t
+  const sway = Math.sin(k * 7 + seed) * 0.8 + Math.sin(k * 13.1 + seed * 2) * 0.4
+  const h = 9 + Math.sin(k * 11 + seed) * 1.3 + Math.sin(k * 17.3) * 0.7
+  ctx.save()
+  ctx.globalCompositeOperation = 'lighter'
+  for (const [scale, color, a] of [[1.35, 'rgba(255,90,20,', 0.55], [1, 'rgba(255,160,40,', 0.8], [0.55, 'rgba(255,240,190,', 0.95]]) {
+    const w = 3.6 * scale
+    const hh = h * scale
+    ctx.beginPath()
+    ctx.moveTo(x - w, y + 1)
+    ctx.quadraticCurveTo(x - w * 0.9, y - hh * 0.5, x + sway * scale, y - hh)
+    ctx.quadraticCurveTo(x + w * 0.9, y - hh * 0.5, x + w, y + 1)
+    ctx.quadraticCurveTo(x, y + 3, x - w, y + 1)
+    ctx.fillStyle = `${color}${a})`
+    ctx.fill()
+  }
+  ctx.restore()
+}

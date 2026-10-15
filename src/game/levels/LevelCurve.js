@@ -54,6 +54,15 @@ export function plateauFor(rank) {
   return 110 + ((rank * 13) % 71)
 }
 
+/** Garde de la porte (v5.8) : dès ce niveau, un pavoisier tient la porte et les barils passent derrière le château. */
+export const GATE_GUARD_FROM = 19
+/**
+ * Exceptions : niveaux dont le baril de devant est la pièce maîtresse (il lance
+ * les dominos de fer du 85). Relevé par check:levels : sans lui, le niveau
+ * n'était plus faisable en Difficile.
+ */
+const KEG_AT_GATE = new Set([85])
+
 /** Rondes (v5.1) : les gardes au sol patrouillent dès ce niveau, ceux du château à partir du second. */
 export const PATROL_FROM = 6
 export const PATROL_INSIDE_FROM = 12
@@ -63,6 +72,95 @@ export function ogresFor(rank) {
   if (rank >= 85) return 1
   return rank >= 35 && rank % 3 === 2 ? 1 : 0
 }
+
+/**
+ * Défenseurs spéciaux (v5.8), introduits un par un selon le principe
+ * « présenter, développer, retourner » :
+ *  - éclaireur : seul au sol au niveau 9 (il esquive un tir direct : il faut
+ *    viser large ou faire tomber le château), puis un niveau sur trois ; à
+ *    partir du 27, certains sont postés DANS le château, où l'esquive ne les
+ *    sauve plus (le retournement) ;
+ *  - pavoisier : devant les murs au niveau 19 (il apprend le tir en cloche),
+ *    puis un niveau sur quatre, deux à partir du 61 ;
+ *  - sapeur : derrière le château au niveau 26 (il apprend à finir le travail
+ *    d'un coup), puis un niveau sur cinq ; à l'intérieur à partir du 71 ;
+ *  - porte-étendard : sur le toit au niveau 33 (abattre le chef d'abord), puis
+ *    un niveau sur six et chaque fin de chapitre à partir du 40 ;
+ *  - veilleurs : la nuit (chapitres 4 et 10), rondes et sentinelles portent une torche.
+ */
+export function rosterFor(rank) {
+  const chapter = Math.ceil(rank / 10)
+  return {
+    scouts: rank === 9 || (rank >= 12 && rank % 3 === 0) ? (rank >= 45 ? 2 : 1) : 0,
+    scoutInside: rank >= 27 && rank % 4 === 3,
+    shields: rank === 19 || (rank >= 21 && rank % 4 === 1) ? (rank >= 61 ? 2 : 1) : 0,
+    engineers: rank === 26 || (rank >= 31 && rank % 5 === 1) ? 1 : 0,
+    engineerInside: rank >= 71 && rank % 5 === 1,
+    banner: rank === 33 || (rank >= 39 && rank % 6 === 3) || (rank >= 40 && rank % 10 === 0),
+    torches: chapter === 4 || chapter === 10,
+  }
+}
+
+/**
+ * Pillards (v5.8) : des défenseurs qui, dès le premier tir, courent attaquer
+ * l'engin du joueur (pendant le vol des tirs seulement). Abattez-les en
+ * chemin, ou éteignez le feu avec un seau d'eau. Quand le terrain leur barre
+ * la route, ils jettent un pont (lac, lave, glace) ou dressent une échelle
+ * (montagne, plateau, douves au pied d'un plateau) : abattez l'ouvrage, et
+ * ceux qui sont dessus tombent. Niveaux choisis à la main (une idée à la fois) :
+ *
+ *  présenter   17  une torche, seule, avec les premiers seaux d'eau
+ *              32  l'échelle par-dessus une montagne
+ *              34  le pont sur un lac
+ *              36  le saboteur au marteau
+ *              71  le pot de givre (hiver)   95  l'ogre qui charge
+ *  développer  22, 28, 37 (descente d'un plateau), 42, 45 (pont sur la lave),
+ *              51, 55, 63, 69, 72 (pont sur la glace), 77, 82, 84, 85…
+ *  retourner   38  pont sur la lave ET échelle sur la montagne
+ *              46  torche et saboteur ensemble ; 98 l'ogre par-dessus la montagne
+ *  finales     40, 50, 60, 90 : deux torches à la fois ; 100 : deux torches et l'ogre
+ */
+export const RAIDS = Object.freeze({
+  17: ['fire'],
+  22: ['fire'],
+  28: ['fire'],
+  32: ['fire'],
+  34: ['fire'],
+  36: ['blow'],
+  37: ['fire'],
+  38: ['fire'],
+  40: ['fire', 'fire'],
+  42: ['fire'],
+  45: ['fire'],
+  46: ['fire', 'blow'],
+  50: ['fire', 'fire'],
+  51: ['fire'],
+  55: ['fire'],
+  57: ['blow'],
+  60: ['fire', 'fire'],
+  63: ['fire'],
+  69: ['fire'],
+  71: ['frost'],
+  72: ['frost'],
+  76: ['blow'],
+  77: ['frost'],
+  81: ['blow'],
+  82: ['fire'],
+  84: ['fire'],
+  85: ['fire'],
+  90: ['fire', 'fire'],
+  95: ['smash'],
+  98: ['smash'],
+  100: ['fire', 'fire', 'smash'],
+})
+
+/** @returns {('fire' | 'frost' | 'blow' | 'smash')[]} */
+export function raidFor(rank) {
+  return RAIDS[rank] ?? []
+}
+
+/** Type du pillard selon ce qu'il porte. */
+const RAIDER_TYPE = Object.freeze({ fire: 'scout', frost: 'scout', blow: 'engineer', smash: 'ogre' })
 
 /**
  * Barils et défenseurs supplémentaires (v5.0 : plus tôt et plus nombreux).
@@ -180,6 +278,16 @@ export function applyCurve(b, rank) {
     spireRock = { material: 'rock', x, y: surface - h / 2, w: 48, h, shape: 'rect' }
     extra.push({ kind: 'barrel', x, y: surface - h - BARREL.h / 2 - 1 })
   }
+  const roster = rosterFor(rank)
+  // Garde de la porte (v5.8) : dès le niveau 19, le premier garde posté devant
+  // les murs est un pavoisier (son pavois arrête les tirs tendus).
+  const special = (type, side, patrol, more = {}) => {
+    const t = TARGET_TYPES[type]
+    extra.push({ kind: 'target', type, x: slot(side, t.w), y: surface - t.h / 2 - 1, patrol, ...more })
+  }
+  const gateGuard = rank >= GATE_GUARD_FROM && roster.shields === 0
+  for (let i = 0; i < roster.shields + (gateGuard ? 1 : 0); i++) special('shieldbearer', -1, 0)
+  let replaced = gateGuard ? 1 : 0
   // Gardes : d'abord à l'abri derrière les murs, puis devant.
   const ogres = ogresFor(rank)
   for (let i = 0; i < guards; i++) {
@@ -187,25 +295,64 @@ export function applyCurve(b, rank) {
     // ogres (v5.1) devant les murs, à la place des premiers gardes postés devant.
     let type = (rank >= 40 && i === guards - 1) || (rank >= 15 && i % 2 === 1) ? 'knight' : 'soldier'
     if (i % 2 === 1 && Math.floor(i / 2) < ogres) type = 'ogre'
+    if (i % 2 === 1 && type !== 'ogre' && replaced > 0) {
+      replaced--
+      continue
+    }
     const t = TARGET_TYPES[type]
     const x = slot(i % 2 === 0 ? 1 : -1, t.w)
     extra.push({ kind: 'target', type, x, y: surface - t.h / 2 - 1, patrol: rank >= PATROL_FROM ? (type === 'ogre' ? 40 : 60) : 0 })
   }
-  // Barils : devant les murs (un tir bien placé ouvre la brèche), puis derrière.
+  // Défenseurs spéciaux (v5.8) : éclaireurs et sapeurs derrière (le second éclaireur devant).
+  // Le premier éclaireur sur le terrain dégagé derrière le château (on le voit courir), le second devant.
+  for (let i = 0; i < roster.scouts; i++) special('scout', i % 2 ? -1 : 1, 70)
+  if (roster.engineers && !roster.engineerInside) special('engineer', 1, 30)
+  // Retournements : l'éclaireur enfermé en haut du château, le sapeur au rez-de-chaussée.
+  const inside = b.targets.filter((t) => t.type === 'soldier').sort((p, q) => p.y - q.y)
+  if (roster.scoutInside && inside.length) Object.assign(inside[0], { type: 'scout', y: inside[0].y + (TARGET_TYPES.soldier.h - TARGET_TYPES.scout.h) / 2, patrol: 30 })
+  if (roster.engineerInside && inside.length > 1) {
+    const low = inside[inside.length - 1]
+    Object.assign(low, { type: 'engineer', y: low.y + (TARGET_TYPES.soldier.h - TARGET_TYPES.engineer.h) / 2, patrol: 30 })
+  }
+  // Barils (v5.8). Posés devant la porte, ils faisaient tout sauter au moindre
+  // tir proche : relevé par check:levels, la plupart des tirs gagnants
+  // commençaient par l'explosion d'un baril, et chaque niveau se résolvait de
+  // la même façon. Les premiers chapitres gardent leur baril devant (il
+  // apprend que la poudre fait tout sauter) ; ensuite, les barils sont rangés
+  // derrière le château, au plus loin : il faut un long tir en cloche, précis,
+  // pour les atteindre. Les poudrières dessinées par les niveaux, elles, restent.
   for (let i = 0; i < barrels; i++) {
-    const x = slot(i % 2 === 0 ? -1 : 1, BARREL.w)
+    const side = rank >= GATE_GUARD_FROM && !KEG_AT_GATE.has(rank) ? 1 : i % 2 === 0 ? -1 : 1
+    let x = slot(side, BARREL.w)
+    // Hors de portée du trébuchet derrière le château : devant, alors.
+    if (side > 0 && x + BARREL.w / 2 > REACH_RIGHT) {
+      occupied.pop()
+      x = slot(-1, BARREL.w)
+    }
     extra.push({ kind: 'barrel', x, y: surface - BARREL.h / 2 - 1 })
   }
+  // Pillards (v5.8) : postés devant, au plus loin, après les barils (rien ne leur
+  // barre la route ; le terrain, eux, le franchissent : ponts et échelles).
+  for (const raid of raidFor(rank)) special(RAIDER_TYPE[raid], -1, 0, { raid, torch: raid === 'fire' })
   // Sentinelles : sur les dalles les plus hautes et assez larges (rien au-dessus).
   const roofs = b.blocks
     .filter((k) => k.shape === 'rect' && k.w >= 60 && k.w > k.h * 2 && k.material !== 'rock')
     .filter((k) => !b.blocks.some((o) => o !== k && o.y < k.y && Math.abs(o.x - k.x) < (o.w + k.w) / 2 && o.y + o.h / 2 > k.y - k.h / 2 - 70))
     .filter((k) => !b.targets.some((t) => Math.abs(t.x - k.x) < k.w / 2 + 10 && t.y < k.y && t.y > k.y - 90))
     .sort((p, q) => p.y - q.y)
-  for (let i = 0; i < (SENTRY_SKIP.has(rank) ? 0 : Math.min(sentries, roofs.length)); i++) {
+  const posts = SENTRY_SKIP.has(rank) ? 0 : Math.min(Math.max(sentries, roster.banner ? 1 : 0), roofs.length)
+  for (let i = 0; i < posts; i++) {
     const k = roofs[i]
-    const t = TARGET_TYPES.soldier
-    extra.push({ kind: 'target', type: 'soldier', x: k.x, y: k.y - k.h / 2 - t.h / 2 - 1, patrol: rank >= 30 ? Math.max(0, Math.min(30, Math.floor(k.w / 2 - t.w / 2 - 8))) : 0 })
+    // Le porte-étendard prend le plus haut toit : sa bannière se voit de loin.
+    const type = roster.banner && i === 0 ? 'bannerman' : 'soldier'
+    const t = TARGET_TYPES[type]
+    const patrol = type === 'bannerman' || rank < 30 ? 0 : Math.max(0, Math.min(30, Math.floor(k.w / 2 - t.w / 2 - 8)))
+    extra.push({ kind: 'target', type, x: k.x, y: k.y - k.h / 2 - t.h / 2 - 1, patrol, sentry: true })
+  }
+  // Pas de toit libre : le porte-étendard remplace le défenseur le plus haut du château.
+  if (roster.banner && !posts) {
+    const top = b.targets.filter((t) => t.type === 'soldier').sort((p, q) => p.y - q.y)[0]
+    if (top) Object.assign(top, { type: 'bannerman', y: top.y + (TARGET_TYPES.soldier.h - TARGET_TYPES.bannerman.h) / 2, patrol: 0 })
   }
   // Rondes dans le château (v5.1) : un défenseur sur trois va et vient dans sa pièce.
   if (rank >= PATROL_INSIDE_FROM) {
@@ -214,8 +361,19 @@ export function applyCurve(b, rank) {
     })
   }
   for (const e of extra) {
-    if (e.kind === 'target') b.targets.push({ type: e.type, x: Math.round(e.x), y: Math.round(e.y), patrol: e.patrol ?? 0 })
-    else b.barrels.push({ x: Math.round(e.x), y: Math.round(e.y) })
+    if (e.kind === 'target') {
+      // La nuit, sentinelles et rondes portent une torche (veilleurs).
+      const torch = roster.torches && (e.type === 'soldier' || e.type === 'scout') && (e.sentry || e.patrol > 0)
+      b.targets.push({ type: e.type, x: Math.round(e.x), y: Math.round(e.y), patrol: e.patrol ?? 0, ...(torch || e.torch ? { torch: true } : {}), ...(e.raid ? { raid: e.raid } : {}) })
+    } else b.barrels.push({ x: Math.round(e.x), y: Math.round(e.y) })
+  }
+  // Veilleurs : au moins un par nuit, et les rondes du château aussi.
+  if (roster.torches) {
+    for (const t of b.targets) if ((t.type === 'soldier' || t.type === 'scout') && t.patrol > 0) t.torch = true
+    if (!b.targets.some((t) => t.torch)) {
+      const first = b.targets.find((t) => t.type === 'soldier')
+      if (first) first.torch = true
+    }
   }
 
   // 4. Roche : plateau (découpé en blocs ≤ ROCK_MAX_W) et talus de chaque côté.

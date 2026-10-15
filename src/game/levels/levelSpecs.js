@@ -458,11 +458,14 @@ export const LEVEL_SPECS = [
   },
 
   // 33. Le château de paille (point de rupture) : le deuxième étage est en paille.
+  //     v5.8 : de nuit, un veilleur y monte la garde. Abattez-le : sa torche
+  //     embrase la paille, et tout le donjon s'effondre.
   {
     shots: 4, wind: 0.7, ammo: { boulder: 2, bomb: 1, fire: 2 },
     build(b) {
       const t = b.tower(1500, { floors: 6, mats: ['stone', 'straw', 'wood'], slab: 'wood', w: 150, t: 22, h: 92, roof: 'straw' })
       b.target(t[0], 'knight')
+      b.watchman(t[1], 20)
       b.target(t[2], 'soldier', -30)
       b.target(t[2], 'soldier', 30)
       b.target(t[3])
@@ -485,6 +488,7 @@ export const LEVEL_SPECS = [
   },
 
   // 35. La crypte : une cave de barils sous une grande salle. Trouvez l'entrée.
+  //     v5.8 : ou abattez le veilleur posté devant la cave : sa torche y met le feu.
   {
     shots: 5, wind: 0.75, ammo: { boulder: 2, bomb: 2, fire: 1 },
     build(b) {
@@ -492,6 +496,7 @@ export const LEVEL_SPECS = [
       b.barrel(cellar, -50)
       b.barrel(cellar, 0)
       b.barrel(cellar, 50)
+      b.watchman(b.spot(1520 - 95 - 40, b.ground))
       const hall = b.tower(1520, { floors: 3, mat: 'wood', w: 170, floorY: cellar.topY, roof: 'wood' })
       b.target(hall[0], 'knight', -35)
       b.target(hall[0], 'soldier', 35)

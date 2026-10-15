@@ -50,6 +50,8 @@ const upgradeHint = computed(() => profile.value?.affordable ?? null)
 
 const achCount = (mask) => (mask & 1) + ((mask >> 1) & 1) + ((mask >> 2) & 1)
 const levelsOf = (c) => Array.from({ length: GAME.LEVELS_PER_CHAPTER }, (_, i) => (c - 1) * GAME.LEVELS_PER_CHAPTER + i + 1)
+/** Étoiles gagnées dans un chapitre (carte du chapitre, v6). */
+const chapterStars = (c) => levelsOf(c).reduce((sum, id) => sum + (profile.value.levels[id]?.stars ?? 0), 0)
 
 function tileLabel(id) {
   const lvl = profile.value.levels[id]
@@ -128,6 +130,11 @@ function onTabKey(e) {
       >
         <span class="tabs__num">{{ t('levels.chapter', { n: c }) }}</span>
         <span class="tabs__name">{{ t(`levels.chapters.${c}`) }}</span>
+        <!-- Avancement du chapitre (v6) : jauge et étoiles gagnées. -->
+        <span class="tabs__progress" aria-hidden="true">
+          <span class="tabs__bar" :style="{ '--p': chapterStars(c) / (GAME.LEVELS_PER_CHAPTER * 3) }" />
+          <span class="tabs__stars"><AppIcon name="star" :size="12" />{{ chapterStars(c) }}/{{ GAME.LEVELS_PER_CHAPTER * 3 }}</span>
+        </span>
       </button>
     </div>
 

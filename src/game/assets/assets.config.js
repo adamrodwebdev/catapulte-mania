@@ -34,6 +34,11 @@ export const ASSET_MANIFEST = Object.freeze({
   'target.knight': { type: 'procedural' },
   'target.king': { type: 'procedural' },
   'target.ogre': { type: 'procedural' },
+  // v5.8 : éclaireur, pavoisier, porte-étendard, sapeur.
+  'target.scout': { type: 'procedural' },
+  'target.shieldbearer': { type: 'procedural' },
+  'target.bannerman': { type: 'procedural' },
+  'target.engineer': { type: 'procedural' },
   // Éléments de gameplay
   barrel: { type: 'procedural' },
   'projectile.stone': { type: 'procedural' },
@@ -50,11 +55,16 @@ export const ASSET_MANIFEST = Object.freeze({
   // v5.1 : baliste et son carreau.
   ballista: { type: 'procedural' },
   'projectile.bolt': { type: 'procedural' },
+  // Ouvrages des pillards (v5.8)
+  'construct.bridge': { type: 'procedural' },
   // Décor de saison (événements)
   'deco.pumpkin': { type: 'procedural' },
   'deco.snow': { type: 'procedural' },
   // Décor (paramétré par le thème du chapitre)
   'scene.sky': { type: 'procedural' },
+  // v5.7 : chaînes lointaines (parallaxe 0,2) et plan intermédiaire (haies, camp, 0,75).
+  'scene.distant': { type: 'procedural' },
   'scene.far': { type: 'procedural' },
+  'scene.near': { type: 'procedural' },
   'scene.ground': { type: 'procedural' },
 })

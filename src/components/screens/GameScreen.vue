@@ -201,6 +201,7 @@ const coachNotify = (event, detail) => coach?.notify(event, detail)
 const coachTitle = computed(() => {
   const tool = coachTool.value
   if (tool === 'aim') return t('tutorial.aimTitle')
+  if (tool === 'drag') return t('tutorial.dragTitle')
   const [kind, name] = tool.split(':')
   const label = kind === 'ammo' ? t(`game.ammo.${name}`) : kind === 'engine' ? t(`game.engines.${name}`) : t(`powers.${name}`)
   return t('tutorial.title', { name: label })
@@ -294,6 +295,7 @@ async function startLevel({ rebuild = false } = {}) {
       engine: engine.value,
       replay: isChallenge.value && challengeStage.value === 'watch' ? state.match.challenge.actions : null,
       season: eventFor(dayKey()),
+      translate: (key) => t(key),
     }),
   )
   controller.on('turn', ({ name }) => showTurn(name))
@@ -320,6 +322,7 @@ async function startLevel({ rebuild = false } = {}) {
   controller.on('pause', (p) => {
     if (phase.value === 'playing' || phase.value === 'paused') phase.value = p ? 'paused' : 'playing'
     app.services.music.duck(p)
+    app.services.audio.duckAmbience(p)
   })
   controller.on('end', onEnd)
   controller.on('offer', () => {
@@ -423,6 +426,7 @@ function measureInsets() {
     el.style.setProperty('--dock-right', `${Math.round(dockRight)}px`)
     el.style.setProperty('--hud-top-h', `${Math.round(dockTop)}px`)
     el.style.setProperty('--hud-bottom-h', `${Math.round(dockBottom)}px`)
+    el.style.setProperty('--hud-controls-h', `${Math.round(dockBottom)}px`)
     controller.setInsets(0, 0)
     return
   }
@@ -432,8 +436,9 @@ function measureInsets() {
   // (Plafonné : sur deux lignes — trébuchet en portrait — le panneau ne doit pas masquer le château.)
   const bottomInset = bottom && bottom.height ? h - bottom.top - (compact ? Math.min(bottom.height * 0.55, 56) : 0) : 0
   controller.setInsets(top ? top.bottom : 0, bottomInset)
-  // Les sous-titres et l'astuce se placent juste au-dessus des commandes.
   root.value.style.setProperty('--hud-bottom-h', `${Math.round(bottomInset)}px`)
+  // Les sous-titres et l'astuce se placent juste au-dessus des commandes (leur bord réel).
+  root.value.style.setProperty('--hud-controls-h', `${Math.round(bottom && bottom.height ? h - bottom.top : 0)}px`)
   root.value.style.setProperty('--hud-top-h', `${Math.round(top ? top.bottom : 0)}px`)
 }
 function observeHud() {
@@ -469,6 +474,8 @@ watch(
 const play = async () => {
   app.services.audio.unlock()
   app.services.music.play('chapter', { chapter: level.value.chapter || 1 })
+  app.services.ambience.play(level.value.chapter || 1)
+  app.services.audio.duckAmbience(false)
   updateMusic()
   phase.value = 'playing'
   await nextTick()
@@ -630,6 +637,15 @@ function readEpilogue() {
   storyBeat.value = StoryRepository.after(GAME.LEVEL_COUNT)
 }
 
+/* ---------- Engin en feu (v5.8) ---------- */
+
+const engineBurning = computed(() => Boolean(hud.value?.condition?.states.some((s) => s.id === 'fire')))
+/** Seau d'eau : éteint le feu (bouton ou touche B), en visée comme en plein vol. */
+function useBucket() {
+  if (!controller || phase.value !== 'playing') return
+  if (controller.session.useBucket()) app.announce(t('captions.engine.extinguish'))
+}
+
 /* ---------- Musique ---------- */
 
 /** Dernier niveau d'un chapitre (tous les 10) : la tension reste élevée. */
@@ -645,9 +661,16 @@ function updateMusic() {
 }
 watch(() => [hud.value?.state, hud.value?.targetsLeft], () => phase.value === 'playing' && updateMusic())
 
+/** Écran de fin : une cloche par étoile, au rythme de leur apparition (voir game.css). */
+watch(end, (e) => {
+  const stars = e?.won ? e.stars ?? 0 : 0
+  for (let i = 0; i < stars; i++) setTimeout(() => app.services.audio.play('star', { intensity: 0.8 + i * 0.2 }), 220 + i * 260)
+})
+
 /** Fin de partie : présentation propre à chaque mode. */
 async function onEnd(e) {
   app.services.music.stop(1.5)
+  app.services.audio.stopLoops()
   lastLog = controller?.session.log ?? null
   if (isChallenge.value && challengeStage.value === 'watch') {
     // Fin de la relecture : retour à l'introduction, le défi peut commencer.
@@ -797,7 +820,7 @@ function onChallengeEnd({ won, scores }) {
   }, won ? 1400 : 900)
 }
 
-async function onStoryEnd({ won, result }) {
+async function onStoryEnd({ won, result, reason }) {
   lastResult = result
   doubling.value = 'idle'
   const maskBefore = state.profile?.levels[result.levelId]?.ach ?? 0
@@ -807,6 +830,7 @@ async function onStoryEnd({ won, result }) {
     end.value = {
       kind: 'story',
       won,
+      reason: reason ?? null,
       score: result.score,
       stars: result.stars,
       best: rec?.best ?? 0,
@@ -903,6 +927,10 @@ function onKey(e) {
     case 'KeyP':
       pause()
       break
+    // Seau d'eau (v5.8).
+    case 'KeyB':
+      useBucket()
+      break
     default:
       if (/^Digit[1-6]$/.test(e.code)) {
         const a = hud.value?.ammo[Number(e.code.slice(5)) - 1]
@@ -980,6 +1008,19 @@ const canvasLabel = computed(() =>
           @click="toggleAid"
         >
           <AppIcon name="aim" :size="22" />
+        </button>
+        <!-- Seau d'eau (v5.8) : éteint le feu de l'engin ; s'agite quand l'engin brûle. -->
+        <button
+          v-if="hud.condition?.bucketsTotal"
+          type="button"
+          :class="['btn btn--icon aid-btn bucket-btn', { 'bucket-btn--urgent': engineBurning && hud.condition.buckets > 0 }]"
+          :disabled="!engineBurning || hud.condition.buckets === 0"
+          :aria-label="t('game.bucket', { count: hud.condition.buckets })"
+          :title="engineBurning ? t('game.bucketUse') : t('game.bucketIdle')"
+          @click="useBucket"
+        >
+          <AppIcon name="bucket" :size="22" />
+          <span class="bucket-btn__count" aria-hidden="true">{{ hud.condition.buckets }}</span>
         </button>
         <button
           type="button"
@@ -1140,6 +1181,7 @@ const canvasLabel = computed(() =>
     <!-- Fin de niveau : campagne -->
     <ModalPanel v-if="phase === 'ended' && end?.kind === 'story'" labelledby="end-title" :tone="end.won ? 'victory' : 'defeat'" :closable="false">
       <h2 id="end-title" class="modal__title">{{ end.won ? t('end.victory') : t('end.defeat') }}</h2>
+      <p v-if="!end.won && end.reason === 'engine'" class="end__engine"><AppIcon name="flame" :size="18" />{{ t('end.engineDestroyed') }}</p>
       <template v-if="end.won">
         <StarRow :count="end.stars" :size="40" class="end__stars" />
         <dl class="end__scores">
@@ -1175,7 +1217,7 @@ const canvasLabel = computed(() =>
         <button v-if="end.campaignDone" type="button" class="btn" @click="readEpilogue"><AppIcon name="map" />{{ t('story.readEpilogue') }}</button>
         <p v-if="end.demoDone" class="end__note">{{ t('end.demoDone') }}</p>
       </template>
-      <p v-else>{{ t('end.defeatHint') }}</p>
+      <p v-else>{{ end.reason === 'engine' ? t('end.engineHint') : t('end.defeatHint') }}</p>
       <p v-if="!end.saved" class="notice notice--warning" role="alert">{{ t('end.saveError') }}</p>
     </ModalPanel>
 

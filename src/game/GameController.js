@@ -56,6 +56,8 @@ export class GameController extends EventBus {
   #pointers = new Set()
   /** Trébuchet (v5.4) : appui en cours (doigt ou souris), voir aim/TrebuchetInput.js. */
   #trebPress = null
+  /** Sifflement du projectile en vol (v5.7). */
+  #flight = null
 
   /**
    * @param {HTMLCanvasElement} canvas
@@ -68,7 +70,7 @@ export class GameController extends EventBus {
     return c
   }
 
-  constructor(canvas, level, { difficulty, completedLevels, settings, reducedMotion, audio, haptics, effects, mode, continueOffer = false, engine = 'catapult', replay = null, season = null }, registry) {
+  constructor(canvas, level, { difficulty, completedLevels, settings, reducedMotion, audio, haptics, effects, mode, continueOffer = false, engine = 'catapult', replay = null, season = null, translate = null }, registry) {
     super()
     this.#canvas = canvas
     this.#audio = audio
@@ -103,6 +105,11 @@ export class GameController extends EventBus {
     this.session.on('turn', (e) => this.emit('turn', e))
     this.session.on('offer', (e) => this.emit('offer', e))
     this.session.on('feedback', (f) => this.#feedback(f))
+    // Enchaînements : titre traduit, dessiné dans la scène (v5.7).
+    this.session.on('callout', ({ key, tier, x, y }) => {
+      const text = translate ? translate(`game.callout.${key}`) : key
+      this.session.particles.callout(x, y, text, tier)
+    })
   }
 
   /** Place occupée par le HUD (px CSS), mesurée par l'interface. */
@@ -163,6 +170,7 @@ export class GameController extends EventBus {
         else this.session.update(dt)
         this.#tickAim(dt)
       }
+      this.#flightSound()
       this.#renderer.render(this.#sceneWithAim())
       this.#hudTimer += dt
       // En vol (et en visée quand le vent souffle en rafales), le HUD suit en continu.
@@ -449,7 +457,36 @@ export class GameController extends EventBus {
     if (caption) this.emit('caption', { key: caption, side: pan < -0.33 ? 'left' : pan > 0.33 ? 'right' : 'center' })
   }
 
+  /**
+   * Le boulet siffle en fendant l'air : le souffle suit sa vitesse et sa
+   * position à l'écran (gauche/droite). Coupé dès l'impact ou en pause.
+   */
+  #flightSound() {
+    let p = null
+    if (!this.#paused && this.session.state === STATE.FLYING) {
+      for (const e of this.session.world.entities()) {
+        if (e.kind === 'projectile' && !e.hasImpacted && e.alive !== false) {
+          p = e
+          break
+        }
+      }
+    }
+    if (!p) {
+      this.#flight?.stop()
+      this.#flight = null
+      return
+    }
+    this.#flight ??= this.#audio.loop?.('flight') ?? null
+    if (!this.#flight) return
+    const v = p.body?.velocity ?? { x: 0, y: 0 }
+    const cam = this.session.camera
+    const sx = cam.worldToScreen(p.x, 0).x
+    this.#flight.update({ pan: clamp((sx / cam.viewW) * 2 - 1, -1, 1), speed: Math.hypot(v.x, v.y) / 30 })
+  }
+
   destroy() {
+    this.#flight?.stop()
+    this.#flight = null
     cancelAnimationFrame(this.#raf)
     this.#resizeObs?.disconnect()
     const cv = this.#canvas
