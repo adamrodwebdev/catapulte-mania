@@ -1,5 +1,5 @@
 <script setup>
-import { computed, defineAsyncComponent, ref } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useApp } from './app/AppContext.js'
 import HomeScreen from './components/screens/HomeScreen.vue'
 import ProfilesScreen from './components/screens/ProfilesScreen.vue'
@@ -41,6 +41,8 @@ const SCREENS = {
   editor: EditorScreen,
 }
 const current = computed(() => SCREENS[state.screen] || HomeScreen)
+// Portails : #app défile (voir base.css) ; chaque nouvel écran repart du haut.
+if (IS_PORTAL) watch(() => state.screen, () => document.getElementById('app')?.scrollTo?.(0, 0))
 
 /**
  * Générique du studio : une fois par session de navigation (et jamais si l'URL

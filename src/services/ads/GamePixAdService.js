@@ -13,18 +13,21 @@ import { ADS_ENABLED } from '../../config/gameConfig.js'
  * v5.6.1 : la liste de contrôle d'intégration GamePix vérifie aussi
  * updateScore (à chaque changement de score), updateLevel (niveau réussi),
  * lang (lu une fois au démarrage) et happyMoment (record, premier passage).
- * Premier interstitiel dès le premier niveau terminé, pour que l'équipe de
- * validation le voie.
+ * v5.6.2 : GamePix décide lui-même de montrer ou non une publicité à chaque
+ * appel d'interstitialAd (« Not every single interstitialAd() will trigger an
+ * ad ») : on l'appelle à chaque passage entre deux niveaux, sans délai de
+ * grâce. GamePix.loaded() renvoie une promesse : aucune pub avant sa fin.
  */
 export class GamePixAdService extends AdService {
   id = 'gamepix'
   #sdk = null
   #loaded = false
+  #started = false
   #lang = null
   #score = -1
 
   constructor() {
-    super(new AdPolicy({ minIntervalMs: 90_000, graceLevels: 1 }))
+    super(new AdPolicy({ minIntervalMs: 0, graceLevels: 0 }))
   }
 
   async init() {
@@ -61,14 +64,26 @@ export class GamePixAdService extends AdService {
   }
 
   loadingFinished() {
-    if (!this.#sdk || this.#loaded) return
-    this.#loaded = true
+    if (!this.#sdk || this.#started) return
+    this.#started = true
+    const ready = () => {
+      this.#loaded = true
+      this.reportScore(0)
+    }
     try {
       this.#sdk.loading?.(100)
-      this.#sdk.loaded?.()
+      const p = this.#sdk.loaded?.()
+      // loaded() renvoie une promesse dans le SDK v3 : on attend sa fin (échec : on continue).
+      if (p && typeof p.then === 'function') p.then(ready, ready)
+      else ready()
     } catch {
-      /* rien */
+      ready()
     }
+  }
+
+  /** Vrai quand GamePix.loaded() est terminé (publicités et statistiques permises). */
+  get ready() {
+    return this.#loaded
   }
 
   happytime() {
