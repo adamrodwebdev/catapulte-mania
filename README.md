@@ -491,6 +491,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v5.4.1 | Identité AdamRodWebDev : logo du portfolio (hexagone d'or) dans le générique, nom du studio mis à jour partout |
 | v5.5.0 | Interface mobile : plus aucun bouton sur la scène (colonne de commandes à droite à l'horizontale, plateau en bas à la verticale et sur tablette) |
 | v5.6.0 | Cinq portails non exclusifs (GameDistribution, itch.io, GamePix, Y8, Newgrounds) : kits intégrés, paquets d'envoi et fiches (`npm run release:portals`) |
+| v5.6.1 | GamePix : score, niveau, langue et moments forts transmis au portail (liste de contrôle d'intégration) |
 | v4.2.0 | Qualité des premières minutes (refus CrazyGames) : premier tir réussi, tutoriel en images, tirer-relâcher, barre de commandes compacte, caméra qui garde l'impact visible, trébuchet dès le niveau 4 |
 | v4.1.1 | Versions portails jouables dans le cadre isolé de CrazyGames (script classique unique), démarrage plus robuste |
 | v4.1.0 | Conformité CrazyGames : vidéos récompensées hors du jeu, langue du portail (anglais à défaut), démarrage en un clic, son coupé par le portail |

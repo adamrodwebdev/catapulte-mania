@@ -362,6 +362,11 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     const after = activeSlot.completedCount
     const unlocked = after > before ? PowerRegistry.unlockedAt(after) : null
     if (after > before) ads.reportProgress((after / GAME.LEVEL_COUNT) * 100)
+    if (result.won) {
+      ads.reportScore(result.score)
+      ads.reportLevel(result.levelId)
+      if (outcome.newBest || outcome.firstClear) ads.happytime()
+    }
     state.profile = profileView(activeSlot)
     await refreshSlots()
     return { ...outcome, unlockedPower: unlocked ? unlocked.id : null, saved }

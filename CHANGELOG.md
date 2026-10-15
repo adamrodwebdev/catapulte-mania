@@ -2,6 +2,16 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [5.6.1] – 2026-10-09
+
+### Corrigé — liste de contrôle d'intégration GamePix
+- `GamePix.updateScore` : envoyé à chaque changement de score (sans doublon) et à la fin d'un niveau réussi.
+- `GamePix.updateLevel` : envoyé quand un niveau est réussi.
+- `GamePix.lang` : lu une fois au démarrage, même si le joueur a déjà choisi sa langue.
+- `GamePix.happyMoment` : aussi déclenché par un record ou un premier passage dans la campagne.
+- Premier interstitiel dès le premier niveau terminé (puis au plus un toutes les 90 s) pour que la validation GamePix le voie.
+- 1 test de plus (212 au total).
+
 ## [5.6.0] – 2026-10-09
 ### Cinq portails non exclusifs
 CrazyGames mis de côté, le jeu est prêt pour cinq portails qui n'exigent

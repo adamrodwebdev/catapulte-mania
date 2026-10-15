@@ -306,7 +306,11 @@ async function startLevel({ rebuild = false } = {}) {
       coachNotify('fire', ammo)
     } else if (result === 'aimed') coachNotify('target')
   })
-  controller.on('hud', (h) => (hud.value = h))
+  controller.on('hud', (h) => {
+    hud.value = h
+    // Statistiques du portail (GamePix) : score courant, seulement s'il a changé.
+    if (Number.isSafeInteger(h?.score)) app.services.ads.reportScore(h.score)
+  })
   controller.on('caption', (c) => {
     app.caption(c.key, c.side)
     // Les grands fracas font monter la musique.

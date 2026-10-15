@@ -77,3 +77,33 @@ test('GamePix : loaded() avant toute pub, pause pendant la pub, ticket seulement
     assert.ok(calls.includes('happy'))
   })
 })
+
+test('GamePix (v5.6.1) : lang lu au démarrage, updateScore sans doublon, updateLevel, happyMoment', async () => {
+  const calls = []
+  const fake = {
+    loading: () => {},
+    loaded: () => calls.push('loaded'),
+    lang: () => (calls.push('lang'), 'fr-FR'),
+    updateScore: (n) => calls.push(`score:${n}`),
+    updateLevel: (n) => calls.push(`level:${n}`),
+    happyMoment: () => calls.push('happy'),
+  }
+  await withGamePix(fake, async () => {
+    const s = new GamePixAdService()
+    await s.init()
+    assert.ok(calls.includes('lang'), 'lang appelé dès init')
+    assert.equal(s.locale, 'fr')
+    s.reportScore(10) // avant loaded() : ignoré
+    s.loadingFinished()
+    s.reportScore(10)
+    s.reportScore(10)
+    s.reportScore(25)
+    s.reportScore(-3)
+    s.reportScore('99')
+    s.reportLevel(4)
+    s.reportLevel(0)
+    s.happytime()
+    assert.deepEqual(calls.slice(1), ['loaded', 'score:10', 'score:25', 'level:4', 'happy'])
+    assert.equal(s.policy.graceLevels, 1, 'pub visible dès le premier niveau terminé')
+  })
+})
