@@ -98,6 +98,12 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), num
   l'effondrement, qu'ils encaissent désormais), se postent devant.
 - `npm run check:levels` : le joueur automatique vise avec la courbe de
   l'aide à la visée (rafales des moulins, colonnes d'air chaud, sable).
+- Résultat mesuré en Difficile : les 100 niveaux restent gagnables, et la
+  tolérance médiane des premiers tirs passe de 3,4 % à 1,6 % (moyenne : de
+  13,4 % à 10,2 %), surtout parce que les niveaux les plus larges se
+  resserrent (niveau 8 : de 46 % à 11 %, niveau 13 : de 51 % à 20 %) ; le
+  joueur automatique a besoin de plus d'un tir sur 26 niveaux (22
+  auparavant).
 
 ### Corrigé
 - **Dans le vent, un tir ne réveillait pas ce qu'il touchait** : Matter ne
