@@ -12,15 +12,31 @@ export const SCORE = deepFreeze({
   BARREL: 100,
   /** Prime maximale d'une créature volante (voir Flyer.js). */
   FLYER_MAX: 400,
+  /** Grand siège (v6.0) : prime pour chaque étape prise avant la dernière. */
+  STAGE_BONUS: 2000,
+  /** Général (v6.0) : prime pour chaque vie qu'il perd (sa mort rapporte en plus sa valeur). */
+  GENERAL_HURT: 1500,
+  /** Renforts qu'un général peut appeler (v6.0) : prime maximale prévue par tir (garde-fou anti-triche). */
+  SUMMONS_MAX: 2000,
 })
 
-/** Points « bruts » de tout ce qui peut être détruit dans le niveau. */
+/** Points « bruts » de tout ce qui peut être détruit dans le niveau (toutes les étapes). */
 export function destructibleValue(level) {
-  const blocks = level.blocks.reduce((s, b) => s + MATERIALS[b.material].score, 0)
-  const targets = level.targets.reduce((s, t) => s + TARGET_TYPES[t.type].score, 0)
-  // Créatures volantes (v5.0) : comptées au maximum dans les blocs (garde-fou anti-triche).
-  const flyers = (level.flyers?.length ?? 0) * SCORE.FLYER_MAX
-  return { blocks: blocks + flyers, targets, barrels: level.barrels.length * SCORE.BARREL }
+  let blocks = 0
+  let targets = 0
+  let barrels = 0
+  let flyers = 0
+  for (const p of [level, ...(level.stages ?? [])]) {
+    blocks += p.blocks.reduce((s, b) => s + MATERIALS[b.material].score, 0)
+    targets += p.targets.reduce((s, t) => s + TARGET_TYPES[t.type].score, 0)
+    barrels += p.barrels.length * SCORE.BARREL
+    // Créatures volantes (v5.0) : comptées au maximum dans les blocs (garde-fou anti-triche).
+    flyers += (p.flyers?.length ?? 0) * SCORE.FLYER_MAX
+  }
+  // Grands sièges et généraux (v6.0) : primes d'étape, vies perdues et renforts possibles.
+  const stageBonus = (level.stages?.length ?? 0) * SCORE.STAGE_BONUS
+  const general = level.general ? 8 * SCORE.GENERAL_HURT + level.shots * SCORE.SUMMONS_MAX : 0
+  return { blocks: blocks + flyers, targets: targets + general, barrels: barrels + stageBonus }
 }
 
 /** Score de référence : toutes les cibles + la moitié des blocs, en un seul tir. */

@@ -65,6 +65,9 @@ function soft(rgb) {
  * explosions, étincelles sur la pierre et le fer, confettis à la victoire.
  * Les particules sont plafonnées (les plus anciennes cèdent la place).
  */
+/** Couleur des chiffres de dégâts selon leur cause (v6.1). */
+const DAMAGE_COLORS = Object.freeze({ crush: '#ff7a66', fall: '#ffb08a', knockout: '#ffb08a', explosion: '#ff9c4a', fire: '#ffc14d', impact: '#ff7a66', poison: '#8fe26a', shock: '#9fdcff', scald: '#e8f4ff', sting: '#ffd54a' })
+
 export class ParticleSystem {
   /** @type {object[]} */
   #items = []
@@ -317,6 +320,43 @@ export class ParticleSystem {
     this.#glints(x, y, 14)
   }
 
+  /** Éclat doré d'un tir restant changé en points (v6.0) : étincelles et étoiles. */
+  burst(x, y, n = 10) {
+    const r = this.#rng
+    for (let i = 0; i < this.#n(n); i++) {
+      const a = r.range(0, TAU)
+      const v = r.range(1.2, 3.2)
+      this.#spawn({ kind: 'ember', x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 1, max: r.range(400, 700), size: r.range(1.4, 2.6), color: r.pick(['#ffe08a', '#ffd04d', '#fff6d8']) })
+    }
+    this.#glints(x, y, 5)
+  }
+
+  /**
+   * Défenseur assommé (v6.0) : son dessin continue la chute qui l'a emporté.
+   * Il bondit, tourne sur lui-même en se débattant, puis s'efface ; en
+   * mouvement réduit (`still`), il s'efface seulement. Dessiné par le
+   * Renderer (voir drawSprite) : rien ne change à la simulation.
+   */
+  knockout(x, y, { key, w, h, angle = 0, vx = 0, extra = {}, still = false }) {
+    const r = this.#rng
+    const dir = vx ? Math.sign(vx) : r.chance(0.5) ? 1 : -1
+    this.#spawn({
+      kind: 'knockout', key, w, h, extra, still, x, y, rot: angle,
+      vx: still ? 0 : dir * r.range(0.8, 1.8) + vx * 0.3, vy: still ? 0 : r.range(-4.2, -3), spin: still ? 0 : dir * r.range(0.09, 0.15),
+      max: still ? 600 : 950,
+    })
+  }
+
+  /**
+   * Bulle de parole (v6.0) au-dessus d'un personnage : une courte réplique,
+   * lisible à toutes les échelles. Deux au plus à la fois (la plus ancienne s'efface).
+   */
+  bubble(x, y, text, { tone = 'ally' } = {}) {
+    const bubbles = this.#items.filter((q) => q.kind === 'bubble')
+    if (bubbles.length >= 2) this.#items = this.#items.filter((q) => q !== bubbles[0])
+    this.#spawn({ kind: 'bubble', x, y, vx: 0, vy: 0, max: 1900, text: String(text), tone })
+  }
+
   /** Petites étoiles brillantes (glace, verre, victoire). */
   #glints(x, y, n) {
     const r = this.#rng
@@ -326,8 +366,20 @@ export class ParticleSystem {
   }
 
   /** Texte flottant (points gagnés) : apparaît en grossissant, puis monte et s'efface. */
-  text(x, y, text, color = '#f6d98a') {
-    this.#spawn({ kind: 'text', x, y, vx: 0, vy: -0.9, max: 1200, size: 28, color, text: String(text) })
+  text(x, y, text, color = '#f6d98a', { size = 28, vx = 0, max = 1200 } = {}) {
+    this.#spawn({ kind: 'text', x, y, vx, vy: -0.9, max, size, color, text: String(text) })
+  }
+
+  /**
+   * Dégâts encaissés par un défenseur (v6.1) : « −12 », de la couleur de la
+   * cause (choc, feu, givre, orage, poison), plus gros quand le coup est rude,
+   * légèrement de biais pour que deux chiffres ne se recouvrent pas.
+   * @param {number} share part de ses points de vie que ce coup lui a coûté
+   */
+  damage(x, y, amount, cause = 'crush', share = 0.3) {
+    const color = DAMAGE_COLORS[cause] ?? DAMAGE_COLORS.crush
+    const size = Math.round(18 + Math.min(1, share) * 16)
+    this.text(x, y, `−${Math.max(1, Math.round(amount))}`, color, { size, vx: this.#rng.range(-0.5, 0.5), max: 900 })
   }
 
   /**
@@ -345,17 +397,32 @@ export class ParticleSystem {
     this.#items.length = 0
   }
 
+  /**
+   * Tir d'un général (v6.0) : un projectile décoratif qui part du donjon et
+   * retombe sur l'engin en `ms` (l'effet, lui, est appliqué par la partie au
+   * pas prévu). `sub` : 'bomb' | 'firepot' | 'boulder' | 'arrows' | 'frost'.
+   */
+  shell(x0, y0, x1, y1, ms, sub = 'bomb') {
+    const apex = Math.max(140, Math.min(420, Math.abs(x1 - x0) * 0.32))
+    this.#spawn({ kind: 'shell', sub, x: x0, y: y0, x0, y0, x1, y1, apex, vx: 0, vy: 0, life: 0, max: Math.max(200, ms), rot: 0, trailAt: 0 })
+  }
+
   /* ---------- Simulation ---------- */
 
   update(dtMs) {
     const k = dtMs / 16.67
     const drift = this.wind * 0.9
+    const trails = []
     for (const p of this.#items) {
       p.life += dtMs
       if (p.delay && p.life < p.delay) continue
       p.x += p.vx * k
       if (p.kind === 'smoke' || p.kind === 'flame' || p.kind === 'ember') p.x += drift * k * Math.min(1, p.life / 300)
       p.y += p.vy * k
+      if (p.kind === 'knockout') {
+        p.vy += 0.24 * k
+        p.rot += p.spin * k
+      }
       switch (p.kind) {
         case 'chunk':
         case 'shard':
@@ -403,7 +470,25 @@ export class ParticleSystem {
           p.size += 0.9 * k
           p.vy -= 0.02 * k
           break
+        case 'shell': {
+          // Parabole fixe (indépendante du vent) : départ, sommet, arrivée sur l'engin.
+          const t = Math.min(1, p.life / p.max)
+          p.x = p.x0 + (p.x1 - p.x0) * t
+          p.y = p.y0 + (p.y1 - p.y0) * t - p.apex * 4 * t * (1 - t)
+          p.rot += 0.18 * k
+          if (p.life - p.trailAt > 45 && t < 0.97) {
+            p.trailAt = p.life
+            trails.push(p)
+          }
+          break
+        }
       }
+    }
+    // Sillage des tirs des généraux (ajouté après le parcours).
+    for (const p of trails) {
+      if (p.sub === 'firepot' || p.sub === 'arrows') this.#spawn({ kind: 'ember', x: p.x, y: p.y, vx: 0, vy: -0.4, size: 1.6, life: 0, max: 380 })
+      else if (p.sub === 'frost') this.#spawn({ kind: 'smoke', x: p.x, y: p.y, vx: 0, vy: 0, size: 9, grow: 0.5, rgb: '206,236,255', opacity: 0.5, life: 0, max: 520 })
+      else this.#spawn({ kind: 'smoke', x: p.x, y: p.y, vx: 0, vy: -0.1, size: 5, grow: 0.3, rgb: '120,112,104', opacity: 0.35, life: 0, max: 480 })
     }
     this.#items = this.#items.filter((p) => p.life < p.max)
   }
@@ -530,11 +615,23 @@ export class ParticleSystem {
           ctx.drawImage(soft('255,170,70'), p.x - s / 2, p.y - s / 2, s, s)
           break
         }
+        case 'streak': {
+          ctx.globalAlpha = Math.sin(t * Math.PI) * 0.75
+          ctx.strokeStyle = `rgb(${p.rgb})`
+          ctx.lineWidth = 2 * Math.max(1, pixel)
+          ctx.lineCap = 'round'
+          ctx.beginPath()
+          ctx.moveTo(p.x, p.y)
+          ctx.lineTo(p.x - Math.sign(p.vx) * p.size, p.y - p.vy * 3)
+          ctx.stroke()
+          ctx.lineCap = 'butt'
+          break
+        }
         case 'bolt': {
           ctx.globalAlpha = t < 0.15 ? 1 : (1 - t) * (0.6 + 0.4 * Math.sin(p.life / 18))
           for (const [wdt, col] of [[9, 'rgba(150,190,255,0.5)'], [3.2, '#ffffff']]) {
             ctx.strokeStyle = col
-            ctx.lineWidth = wdt * Math.max(1, pixel)
+            ctx.lineWidth = wdt * (p.size ?? 1) * Math.max(1, pixel)
             ctx.lineJoin = 'round'
             ctx.beginPath()
             p.pts.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)))
@@ -542,6 +639,12 @@ export class ParticleSystem {
           }
           break
         }
+        case 'shell':
+          this.#drawShell(ctx, p, pixel)
+          break
+        case 'knockout':
+          this.#drawKnockout(ctx, p, t)
+          break
         case 'glint': {
           ctx.globalAlpha = Math.sin(t * Math.PI)
           ctx.strokeStyle = '#ffffff'
@@ -558,6 +661,7 @@ export class ParticleSystem {
       }
     }
     ctx.globalCompositeOperation = 'source-over'
+    for (const p of this.#items) if (p.kind === 'bubble') this.#drawBubble(ctx, p, pixel)
     for (const p of this.#items) if (p.kind === 'callout') this.#drawCallout(ctx, p, pixel)
     for (const p of this.#items) {
       if (p.kind !== 'text') continue
@@ -575,6 +679,127 @@ export class ParticleSystem {
     }
     ctx.restore()
     ctx.globalAlpha = 1
+  }
+
+  /** Le défenseur assommé : son dessin du jeu (visage crispé), tourné, qui s'efface. */
+  #drawKnockout(ctx, p, t) {
+    if (!this.drawSprite) return
+    ctx.save()
+    ctx.globalCompositeOperation = 'source-over'
+    ctx.globalAlpha = t < 0.55 ? 1 : Math.max(0, 1 - (t - 0.55) / 0.45)
+    ctx.translate(p.x, p.y)
+    ctx.rotate(p.rot)
+    this.drawSprite(ctx, p.key, { w: p.w, h: p.h, time: p.life, seed: 7, extra: { ...p.extra, hurt: true, still: p.still, walking: false } })
+    ctx.restore()
+  }
+
+  /**
+   * Bulle de parole : cartouche clair à bord sombre, petite pointe vers le
+   * personnage ; taille constante à l'écran (`pixel`), apparition en rebond.
+   */
+  #drawBubble(ctx, p, pixel) {
+    const t = p.life / p.max
+    const s = Math.max(1, pixel)
+    const pop = p.life < 140 ? 0.7 + (p.life / 140) * 0.3 : 1
+    const size = 15 * s * pop
+    ctx.save()
+    ctx.globalAlpha = t > 0.82 ? (1 - t) / 0.18 : 1
+    ctx.font = `700 ${Math.round(size)}px system-ui, -apple-system, 'Segoe UI', sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    const maxW = this.viewWidth > 0 ? this.viewWidth * 0.5 * pixel : 1e6
+    const w = Math.min(maxW, ctx.measureText(p.text).width) + 18 * s * pop
+    const h = size + 12 * s * pop
+    const x = p.x
+    const y = p.y - h / 2 - 8 * s
+    const enemy = p.tone === 'enemy'
+    ctx.beginPath()
+    const r = Math.min(10 * s, h / 2)
+    ctx.moveTo(x - w / 2 + r, y - h / 2)
+    ctx.arcTo(x + w / 2, y - h / 2, x + w / 2, y + h / 2, r)
+    ctx.arcTo(x + w / 2, y + h / 2, x - w / 2, y + h / 2, r)
+    ctx.lineTo(x + 4 * s, y + h / 2)
+    ctx.lineTo(x, y + h / 2 + 7 * s)
+    ctx.lineTo(x - 4 * s, y + h / 2)
+    ctx.arcTo(x - w / 2, y + h / 2, x - w / 2, y - h / 2, r)
+    ctx.arcTo(x - w / 2, y - h / 2, x + w / 2, y - h / 2, r)
+    ctx.closePath()
+    ctx.fillStyle = enemy ? '#fbeee8' : '#fbf6ea'
+    ctx.fill()
+    ctx.lineWidth = 2 * s
+    ctx.strokeStyle = enemy ? '#7a1f1a' : '#1e1a2b'
+    ctx.stroke()
+    ctx.fillStyle = enemy ? '#5a1612' : '#1e1a2b'
+    ctx.fillText(p.text, x, y + 1 * s, maxW)
+    ctx.restore()
+  }
+
+  /** Tir d'un général en vol : bombe à mèche, pot de feu, rocher, volée de flèches ou nuée de givre. */
+  #drawShell(ctx, p, pixel) {
+    ctx.save()
+    ctx.globalCompositeOperation = 'source-over'
+    ctx.globalAlpha = 1
+    ctx.translate(p.x, p.y)
+    const lw = Math.max(1, pixel)
+    if (p.sub === 'arrows') {
+      // Cinq flèches en éventail, la pointe en feu, orientées selon la course.
+      const t = Math.min(1, p.life / p.max)
+      const dx = p.x1 - p.x0
+      const dy = p.y1 - p.y0 - p.apex * 4 * (1 - 2 * t)
+      ctx.rotate(Math.atan2(dy, dx))
+      for (let i = 0; i < 5; i++) {
+        const ox = -i * 9
+        const oy = (i - 2) * 7
+        ctx.strokeStyle = '#4a3220'
+        ctx.lineWidth = 2 * lw
+        ctx.beginPath()
+        ctx.moveTo(ox - 16, oy)
+        ctx.lineTo(ox + 6, oy)
+        ctx.stroke()
+        ctx.fillStyle = '#ffb347'
+        ctx.beginPath()
+        ctx.arc(ox + 8, oy, 3.2, 0, TAU)
+        ctx.fill()
+      }
+    } else if (p.sub === 'frost') {
+      ctx.globalAlpha = 0.85
+      const s = 46
+      ctx.drawImage(soft('214,240,255'), -s / 2, -s / 2, s, s)
+      ctx.fillStyle = '#ffffff'
+      for (let i = 0; i < 4; i++) {
+        const a = p.rot + (i * TAU) / 4
+        ctx.fillRect(Math.cos(a) * 9 - 1.5, Math.sin(a) * 9 - 1.5, 3, 3)
+      }
+    } else if (p.sub === 'boulder') {
+      ctx.rotate(p.rot)
+      ctx.fillStyle = '#7f796f'
+      ctx.strokeStyle = '#4b463f'
+      ctx.lineWidth = 2 * lw
+      ctx.beginPath()
+      for (let i = 0; i < 7; i++) {
+        const a = (i * TAU) / 7
+        const r = 13 + ((i * 5) % 3)
+        i ? ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r) : ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r)
+      }
+      ctx.closePath()
+      ctx.fill()
+      ctx.stroke()
+    } else {
+      // Bombe (noire, mèche qui crépite) ou pot de feu (terre cuite, flammes).
+      const pot = p.sub === 'firepot'
+      ctx.fillStyle = pot ? '#a5533d' : '#1f1b28'
+      ctx.strokeStyle = pot ? '#5e2a1c' : '#000000'
+      ctx.lineWidth = 2 * lw
+      ctx.beginPath()
+      ctx.arc(0, 0, pot ? 9 : 10, 0, TAU)
+      ctx.fill()
+      ctx.stroke()
+      const flick = 0.7 + 0.3 * Math.sin(p.life / 30)
+      ctx.globalCompositeOperation = 'lighter'
+      const s = (pot ? 34 : 16) * flick
+      ctx.drawImage(soft(pot ? '255,150,60' : '255,210,120'), (pot ? 0 : 6) - s / 2, (pot ? -8 : -9) - s / 2, s, s)
+    }
+    ctx.restore()
   }
 
   /**
@@ -672,6 +897,77 @@ export class ParticleSystem {
   }
 
   /** Éclair (pouvoir Foudre) : tracé brisé du ciel jusqu'au point frappé. */
+  /**
+   * Arc électrique (v6.1, orbe d'orage) : un zigzag bleu-blanc d'un point à
+   * l'autre, bref, et un éclat à l'arrivée.
+   */
+  arc(x0, y0, x1, y1) {
+    const r = this.#rng
+    const len = Math.hypot(x1 - x0, y1 - y0)
+    const n = Math.max(3, Math.min(9, Math.round(len / 22)))
+    const nx = -(y1 - y0) / (len || 1)
+    const ny = (x1 - x0) / (len || 1)
+    const pts = [{ x: x0, y: y0 }]
+    for (let i = 1; i < n; i++) {
+      const k = i / n
+      const off = r.range(-14, 14) * Math.sin(k * Math.PI)
+      pts.push({ x: x0 + (x1 - x0) * k + nx * off, y: y0 + (y1 - y0) * k + ny * off })
+    }
+    pts.push({ x: x1, y: y1 })
+    this.#spawn({ kind: 'bolt', x: x1, y: y1, vx: 0, vy: 0, max: 280, size: 0.7, pts })
+    this.#spawn({ kind: 'flash', x: x1, y: y1, vx: 0, vy: 0, max: 200, size: 70, rgb: '200,230,255' })
+    for (let i = 0; i < this.#n(5); i++) {
+      const a = r.range(0, Math.PI * 2)
+      this.#spawn({ kind: 'ember', x: x1, y: y1, vx: Math.cos(a) * r.range(1, 3), vy: Math.sin(a) * r.range(1, 3) - 0.5, max: r.range(200, 420), size: r.range(1.2, 2), color: r.pick(['#e8f6ff', '#9fdcff', '#ffffff']) })
+    }
+  }
+
+  /** Nuage qui naît (v6.1) : le pot éclate, une bouffée de sa couleur jaillit. */
+  puff(x, y, radius = 100, rgb = '120,200,70') {
+    const r = this.#rng
+    for (let i = 0; i < this.#n(10); i++) {
+      const a = r.range(0, Math.PI * 2)
+      const v = r.range(0.6, 2.2)
+      this.#spawn({ kind: 'smoke', x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.4, max: r.range(700, 1300), size: r.range(radius * 0.25, radius * 0.5), rgb, opacity: 0.55 })
+    }
+  }
+
+  /**
+   * Traînée de rafale (v6.1, moulin) : un trait clair qui file dans le sens du
+   * souffle ; `rgb` prend la couleur de l'élément du monde (givre, braises…).
+   */
+  streak(x, y, dir, rgb = '245,248,255') {
+    this.#spawn({ kind: 'streak', x, y, vx: dir * this.#rng.range(7, 10), vy: this.#rng.range(-0.3, 0.3), max: this.#rng.range(260, 420), size: this.#rng.range(26, 44), rgb })
+  }
+
+  /**
+   * Citerne crevée (v6.1) : l'eau jaillit de la cuve, retombe en pluie et
+   * tache le sol de flaques claires (ou de givre, en Hiver).
+   */
+  water(x, y, radius = 160, ice = false) {
+    const r = this.#rng
+    for (let i = 0; i < this.#n(44); i++) {
+      const a = -Math.PI / 2 + r.range(-1.6, 1.6)
+      const sp = r.range(1.5, 6.5)
+      this.#spawn({
+        kind: 'drop', x: x + r.range(-radius * 0.2, radius * 0.2), y: y + r.range(-10, 10),
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.7, max: 2200,
+        size: r.range(1.2, 3.4), color: ice ? r.pick(['#e8f6ff', '#bfe6ff', '#ffffff']) : r.pick(['#7fb6e6', '#5f9bd1', '#a8d0f2', '#4d86c0']), splat: true,
+      })
+    }
+    for (let i = 0; i < this.#n(8); i++) {
+      this.#spawn({ kind: 'smoke', x: x + r.range(-20, 20), y: y + r.range(-10, 10), vx: r.range(-0.8, 0.8), vy: r.range(-0.6, 0.2), max: r.range(400, 700), size: r.range(10, 18), grow: 0.5, rgb: ice ? '230,244,255' : '170,205,235', opacity: 0.4 })
+    }
+  }
+
+  /** Bulles vertes qui montent (un défenseur empoisonné tousse). */
+  cough(x, y) {
+    const r = this.#rng
+    for (let i = 0; i < this.#n(2); i++) {
+      this.#spawn({ kind: 'smoke', x: x + r.range(-6, 6), y, vx: r.range(-0.3, 0.3), vy: r.range(-1.2, -0.6), max: r.range(450, 750), size: r.range(5, 9), rgb: '140,215,80', opacity: 0.6 })
+    }
+  }
+
   lightning(x, y, top = -400) {
     const r = this.#rng
     const pts = [{ x: x + r.range(-60, 60), y: top }]

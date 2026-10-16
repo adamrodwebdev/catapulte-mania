@@ -34,6 +34,10 @@ const DEFINITIONS = Object.freeze({
   blood: { validate: Schema.boolean(), fallback: !IS_PORTAL },
   // v5.0 : cris synthétisés des défenseurs qui tombent (désactivables).
   screams: { validate: Schema.boolean(), fallback: true },
+  // v6.0 : filmer le plus beau tir de la partie (rien n'est envoyé). Pas sur les portails.
+  highlights: { validate: Schema.boolean(), fallback: !IS_PORTAL },
+  // v6.1 : barres de vie au-dessus des défenseurs blessés et des généraux.
+  healthBars: { validate: Schema.boolean(), fallback: true },
   // Carte « l'aide à la visée est désactivée » déjà montrée (v5.0).
   assistTipSeen: { validate: Schema.boolean(), fallback: false },
   volume: { validate: Schema.number({ min: 0, max: 1 }), fallback: 0.7 },

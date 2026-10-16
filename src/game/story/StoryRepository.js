@@ -28,39 +28,51 @@ const Y = 'ysolde'
 const A = 'aubert'
 const G = 'gontran'
 const M = 'mordrac'
+// Les généraux de Mordrac (v6.0), un par chapitre.
+const RU = 'rufus'
+const GA = 'galeran'
+const BE = 'bertille'
+const MO = 'morgane'
+const AN = 'anselme'
+const IL = 'ilsa'
+const HU = 'hugues'
+const UL = 'ulric'
+const BA = 'baudouin'
 const page = (speaker, cast = speaker ? [speaker] : []) => ({ speaker, cast })
 
 /** @type {readonly StoryBeat[]} */
+// Chaque chapitre se clôt sur l'entrée en scène de son général (v6.0) ;
+// Bertille, l'ancienne apprentie de Gontran, le nargue en face.
 const BEATS = deepFreeze([
-  { id: 'prologue', chapter: 1, before: 1, pages: [page(null, [A, M]), page(Y), page(G, [G, Y]), page(G)] },
-  { id: 'ch2', chapter: 2, before: 11, pages: [page(M), page(G, [G, Y])] },
-  { id: 'ch3', chapter: 3, before: 21, pages: [page(G), page(Y, [G, Y])] },
-  { id: 'ch4', chapter: 4, before: 31, pages: [page(A), page(Y, [G, Y])] },
-  { id: 'ch5', chapter: 5, before: 41, pages: [page(M), page(G)] },
-  { id: 'ch6', chapter: 6, before: 51, pages: [page(Y), page(G, [G, Y])] },
-  { id: 'ch7', chapter: 7, before: 61, pages: [page(M), page(G)] },
-  { id: 'ch8', chapter: 8, before: 71, pages: [page(Y, [G, Y]), page(G, [G, Y])] },
-  { id: 'ch9', chapter: 9, before: 81, pages: [page(A), page(Y, [G, Y])] },
+  { id: 'prologue', chapter: 1, before: 1, pages: [page(null, [A, M]), page(Y), page(G, [G, Y]), page(G), page(RU)] },
+  { id: 'ch2', chapter: 2, before: 11, pages: [page(M), page(G, [G, Y]), page(GA)] },
+  { id: 'ch3', chapter: 3, before: 21, pages: [page(G), page(Y, [G, Y]), page(BE, [G, BE])] },
+  { id: 'ch4', chapter: 4, before: 31, pages: [page(A), page(Y, [G, Y]), page(MO)] },
+  { id: 'ch5', chapter: 5, before: 41, pages: [page(M), page(G), page(AN)] },
+  { id: 'ch6', chapter: 6, before: 51, pages: [page(Y), page(G, [G, Y]), page(IL)] },
+  { id: 'ch7', chapter: 7, before: 61, pages: [page(M), page(G), page(HU)] },
+  { id: 'ch8', chapter: 8, before: 71, pages: [page(Y, [G, Y]), page(G, [G, Y]), page(UL)] },
+  { id: 'ch9', chapter: 9, before: 81, pages: [page(A), page(Y, [G, Y]), page(BA)] },
   { id: 'ch10', chapter: 10, before: 91, pages: [page(M), page(G), page(Y, [G, Y])] },
   { id: 'epilogue', chapter: 10, after: 100, pages: [page(null, [M]), page(A, [A, Y]), page(Y, [G, Y])] },
 ])
 
 /**
  * Qui parle avant chaque niveau (indice 0 = niveau 1). Maître Gontran donne
- * les conseils techniques, Ysolde mène la troupe, Mordrac nargue avant les
- * forteresses de fin de chapitre, et le roi Aubert, captif, écrit à sa fille
- * dans les derniers chapitres.
+ * les conseils techniques, Ysolde mène la troupe, le général du chapitre
+ * nargue la troupe avant son grand siège (v6.0), Mordrac avant le Trône, et
+ * le roi Aubert, captif, écrit à sa fille dans les derniers chapitres.
  */
 const LINE_SPEAKERS = Object.freeze([
-  G, Y, G, Y, G, G, Y, G, G, M, // 1-10
-  G, Y, G, G, G, G, G, Y, G, M, // 11-20 (14 : Gontran présente son trébuchet)
-  G, G, Y, G, G, Y, G, Y, Y, M, // 21-30
-  G, Y, G, G, Y, Y, G, G, Y, M, // 31-40
-  G, G, Y, Y, G, Y, G, G, Y, M, // 41-50
-  Y, G, Y, G, Y, G, Y, G, Y, M, // 51-60
-  G, Y, G, G, Y, G, Y, G, Y, M, // 61-70
-  G, Y, Y, G, Y, G, G, Y, G, M, // 71-80
-  A, G, Y, G, G, Y, Y, G, G, M, // 81-90
+  G, Y, G, Y, G, G, Y, G, G, RU, // 1-10
+  G, Y, G, G, G, G, G, Y, G, GA, // 11-20 (14 : Gontran présente son trébuchet)
+  G, G, Y, G, G, Y, G, Y, Y, BE, // 21-30
+  G, Y, G, G, Y, Y, G, G, Y, MO, // 31-40
+  G, G, Y, Y, G, Y, G, G, Y, AN, // 41-50
+  Y, G, Y, G, Y, G, Y, G, Y, IL, // 51-60
+  G, Y, G, G, Y, G, Y, G, Y, HU, // 61-70
+  G, Y, Y, G, Y, G, G, Y, G, UL, // 71-80
+  A, G, Y, G, G, Y, Y, G, G, BA, // 81-90
   Y, G, Y, G, A, Y, G, M, A, M, // 91-100
 ])
 

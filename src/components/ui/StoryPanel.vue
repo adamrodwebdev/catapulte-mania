@@ -31,7 +31,13 @@ const cast = computed(() =>
   page.value.cast.map((id, i) => {
     const side = page.value.cast.length === 1 ? 'center' : i === 0 ? 'left' : 'right'
     const facing = CHARACTERS[id].facing
-    return { id, side, flip: (side === 'left' && facing === 'left') || (side === 'right' && facing === 'right'), speaking: id === page.value.speaker }
+    return {
+      id,
+      side,
+      flip: (side === 'left' && facing === 'left') || (side === 'right' && facing === 'right'),
+      cut: CHARACTERS[id].cut === true,
+      speaking: id === page.value.speaker,
+    }
   }),
 )
 
@@ -97,7 +103,7 @@ onBeforeUnmount(() => {
           :key="c.id"
           :id="c.id"
           :flip="c.flip"
-          :class="['story__actor', `story__actor--${c.side}`, { 'story__actor--quiet': page.speaker && !c.speaking }]"
+          :class="['story__actor', `story__actor--${c.side}`, { 'story__actor--cut': c.cut, 'story__actor--quiet': page.speaker && !c.speaking }]"
           height="min(52vh, 26rem, 52vw)"
           decorative
         />

@@ -15,9 +15,12 @@ import { AIM } from '../aim.js'
  * gestes dans le moteur. Les pouvoirs (interdits en défi) sont refusés.
  */
 
-const AMMO = Object.freeze(['stone', 'boulder', 'fire', 'bomb', 'split', 'frost'])
+// Munitions par leur rang dans le code : on ajoute à la fin (v6.1 : botte de paille,
+// orbe d'orage, pot de poison), pour que les liens déjà partagés restent valides.
+const AMMO = Object.freeze(['stone', 'boulder', 'fire', 'bomb', 'split', 'frost', 'bale', 'thunder', 'poison'])
 export const MAX_CODE_LENGTH = 4000
-const MAX_ACTIONS = 60
+// v6.0 : un grand siège note aussi chaque fin de tour (e), l’étape suivante (g) et les ordres du général (b).
+const MAX_ACTIONS = 120
 const STEPS = Schema.int({ min: 0, max: 30000 })
 /** v2 (v5.0) : instants des tirs comptés depuis le début de la partie (pas absolus). */
 const AT = Schema.int({ min: 0, max: 1_000_000 })
@@ -59,6 +62,8 @@ const actionSchema = (raw, path) => {
   if (k === 'x' && raw.length === 2) return { k, d: STEPS(raw[1], `${path}.d`) }
   // v5.8 : seau d'eau jeté sur l'engin en feu (pas absolu, comme un tir).
   if (k === 'w' && raw.length === 2) return { k, d: AT(raw[1], `${path}.d`) }
+  // v6.0 : étape suivante d'un grand siège (g), ordre d'un général (b), fin d'un tour (e) — pas absolus.
+  if ((k === 'g' || k === 'b' || k === 'e') && raw.length === 2) return { k, d: AT(raw[1], `${path}.d`) }
   throw new ValidationError(path, 'unknown action')
 }
 
@@ -102,6 +107,7 @@ export class ReplayCode {
       if (x.k === 't') return ['t', x.d, AMMO.indexOf(x.a), exact(x.r), x.l]
       if (x.k === 'x') return ['x', x.d]
       if (x.k === 'w') return ['w', x.d]
+      if (x.k === 'g' || x.k === 'b' || x.k === 'e') return [x.k, x.d]
       throw new ValidationError('log', `action ${x.k} cannot be shared`)
     })
     const data = { v: 2, day, l: levelId, e: engine, n: PROFILE_NAME.test(name) ? name : '', a }

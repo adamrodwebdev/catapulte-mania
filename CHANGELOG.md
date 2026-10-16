@@ -2,6 +2,197 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [6.1.0] – 2026-10-15
+### Des défenseurs qui encaissent, des chocs qui portent
+- **Points de vie pour tous les défenseurs**, comme les généraux : soldat 30,
+  chevalier 70, roi 40, éclaireur 20, pavoisier 50, porte-étendard et sapeur
+  30, ogre 420. Blessé, un défenseur porte une barre de vie (crantée, la perte
+  s'efface avec un temps de retard) et chaque coup affiche ses dégâts, de la
+  couleur de leur cause (choc, feu, poison, foudre…). Réglage « Barres de
+  vie », activé par défaut. Il lui arrive de crier quand il encaisse
+  (« Ouille ! »).
+- **Module des chutes** (`FallingObjects.js`, pur et testé) : vitesse d'un
+  objet qui tombe et vitesse au contact (√(v² + 2gh)), images avant le
+  contact, énergie et dégâts d'un choc, dégâts d'une chute, capacité de
+  poussée d'un défenseur.
+- **Des chocs qui comptent** : un coup coûte selon son énergie et la dureté de
+  ce qui frappe (paille 0,3, verre 0,8, bois 1, pierre 1,2, fer 1,4) ; une
+  chute, au-delà de 4 px par image à l'arrivée, selon la vitesse (l'armure
+  amortit) ; renversé, un défenseur perd 35 % de ses points et se relève ;
+  écrasé sous une lourde charge ou coincé entre deux blocs, il succombe.
+- **Impact et puissance** : le survivant d'un coup recule et chancelle, la
+  caméra encaisse le choc, et un gros coup projette le bloc frappé dans le
+  sens du tir.
+- **Repousser ce qui tombe** : un défenseur voit venir une planche, un
+  tonneau ou un bloc qui tombe lentement, s'arc-boute et le rejette de côté
+  (« Hop là ! »), s'il en a la force (un chevalier repousse plus lourd qu'un
+  éclaireur). Sonné, il n'y peut rien ; un tablier sur sa charnière ou une
+  charge à sa corde, il ne les soulève pas.
+
+### Munitions
+- **Botte de paille** (niveau 29, qui l'enseigne) : elle ne casse rien, ne
+  blesse personne et ne fait jamais sauter un baril : elle pousse. Le baril
+  perché sur le mur d'enceinte du monastère tombe sur la garde de la porte…
+  Au contact d'une flamme, elle s'enflamme.
+- **Orbe d'orage** (niveau 22) : la décharge frappe ce qu'il touche, puis
+  saute de défenseur en défenseur (quatre sauts, de plus en plus faibles) ;
+  le fer la relaie, l'armure la conduit (chevaliers, pavoisiers, généraux),
+  l'eau aussi (défenseurs trempés, pluie de l'Orage). Les défenseurs frappés
+  restent sonnés et ne repoussent plus rien ; un baril saute, ce qui est
+  gelé éclate en vapeur.
+- **Pot de poison** (niveau 37) : un nuage qui dérive au vent et ronge ceux
+  qui le respirent (ils toussent, et le poison agit encore un peu après) ;
+  une flamme le fait exploser, le givre le fige.
+- **Munitions élémentaires moins écrasantes** : un coup direct de feu, de
+  givre, d'orage ou de poison ôte au plus un quart des points d'un défenseur.
+  Ce sont leurs effets qui comptent, et on les voit enfin.
+- Le clavier choisit les munitions de 1 à 9 (de 1 à 6 auparavant : les trois
+  nouvelles restaient hors d'atteinte).
+- Les liens « Défier un ami » et l'atelier de châteaux connaissent les
+  nouvelles munitions ; les liens et les châteaux déjà partagés restent
+  valides.
+
+### Ouvrages
+- **Moulin** (niveaux 13, 49, 56, 63 et 76) : ses ailes s'emballent (une
+  seconde de préavis), puis une rafale souffle vers l'engin et dévie les
+  tirs ; gelé ou abattu, il se tait.
+- Et d'autres ouvrages de siège : **forge** (niveaux 25 et 94 : ses flammes
+  enflamment ce qui les traverse, la rafale d'un moulin en fait un jet de
+  feu, la citerne l'éteint en vapeur), **citerne** (niveaux 38 et 87 :
+  crevée, elle inonde ce qui est dessous : feu éteint, défenseurs trempés,
+  gelés en Hiver), **ruche** (niveau 18 : l'essaim fond sur les gardes, les
+  pique et les fait fuir ; la fumée le disperse), **sacs de farine** (niveau
+  43 : le nuage de farine explose à la première flamme).
+
+### Souffle du monde
+- **Chaque chapitre a son vent**, et ce vent fait quelque chose : rafales à
+  toutes les difficultés (Fort de pierre), braises qui portent le feu plus
+  loin sous le vent (Forteresse), poches de miasmes qui dérivent sur le
+  château et explosent au feu du joueur (Marais), sable qui étouffe le feu
+  des tirs et les freine (Désert), colonnes d'air chaud qui portent les tirs
+  (Montagne), bise qui givre le tir : il cogne deux fois moins les murs et
+  éclate à l'impact, le feu s'y éteint (Hiver), vent d'orage qui charge le
+  tir, qui se décharge sur les défenseurs proches (Orage), vent de feu qui
+  enflamme le tir : feu grégeois offert, le givre y fond (Trône). La
+  Palissade et la Citadelle gardent une simple brise. Rien ne s'embrase
+  avant le premier tir, et les miasmes ne craignent pas les torches des
+  veilleurs : seul le feu du joueur les allume.
+- **Exposition** : un tir s'imprègne du vent qu'il traverse, trois fois plus
+  vite dans la rafale d'un moulin ; l'aide à la visée marque le point où
+  l'élément le saisira. Les effets se cumulent avec les ouvrages et entre eux
+  (feu et givre s'annulent en vapeur, le feu embrase le gaz, l'eau conduit
+  la foudre).
+- Le nom du vent remplace « Vent » dans le bandeau, avec une pastille de sa
+  couleur à côté de sa force (visible aussi sur téléphone) ; une carte le
+  présente au premier niveau de son chapitre.
+- Le trébuchet en tient compte : son projectile arrive sur le fanion,
+  colonnes d'air chaud et rafale du moment comprises.
+
+### Niveaux
+- **Niveau 29** (le monastère, tutoriel de la botte de paille) : un baril
+  perché sur le mur d'enceinte, au-dessus des gardes de la porte, à côté de
+  la nef de verre.
+- **Niveau 78** (l'escalier gelé) : la bise émousse les pierres ; deux
+  boulets explosifs de plus, et les gardes qui se postaient derrière le
+  dernier gradin, à l'abri de tout tir (ils ne mouraient que de
+  l'effondrement, qu'ils encaissent désormais), se postent devant.
+- `npm run check:levels` : le joueur automatique vise avec la courbe de
+  l'aide à la visée (rafales des moulins, colonnes d'air chaud, sable).
+
+### Corrigé
+- **Dans le vent, un tir ne réveillait pas ce qu'il touchait** : Matter ne
+  recalcule pas le mouvement d'un corps soumis à une force, si bien qu'un
+  bloc ou un baril endormi restait de marbre et que le tir rebondissait
+  comme sur un mur (sauf à le briser). Les tirs poussent et renversent
+  désormais autant par vent que par temps calme.
+- Grands sièges : le tour du général se compte en pas de simulation ; un
+  rejeu pouvait diverger d'un pas après son ordre.
+- Sur téléphone et tablette, les intitulés du bandeau (score, cibles, tirs,
+  vent) sont de nouveau lus par les lecteurs d'écran ; la barre des
+  munitions signale par un fondu celles qui sont cachées, et ramène en vue
+  la munition choisie ou montrée par le tutoriel.
+- README : tableaux des tutoriels et des pouvoirs remis à jour.
+
+## [6.0.0] – 2026-10-15
+### Les généraux de Mordrac et les grands sièges
+- **Grands sièges** : chaque fin de chapitre (niveaux 10 à 100) se joue en
+  plusieurs étapes. Le premier château pris, le donjon du général arrive sur le
+  même terrain, avec quelques tirs en plus ; le Trône (niveau 100) en compte
+  trois. La caméra, le score maximal et les étoiles tiennent compte des étapes.
+- **Dix généraux**, un par chapitre, chacun avec son nom, son titre, sa devise
+  et son caractère : Rufus Grosbois, Sire Galeran, Bertille Salpêtre
+  (l'ancienne apprentie de Gontran), la comtesse Morgane, le baron Anselme,
+  Ilsa la Rouge, Hugues de l'Aire, le margrave Ulric, Baudouin le Tonnant, et
+  le duc Mordrac lui-même. Ils ont **plusieurs vies** (une au plus par tir,
+  même sous un effondrement qui dure) et, entre deux tirs, donnent un
+  **ordre annoncé à l'avance** : réparer, cri de guerre, mur de boucliers,
+  saboteur, mercenaire, bombe, pot de feu, couvre-feu, flèches enflammées,
+  repli, tempête de sable, faucons, éboulis, souffle glacé, rempart de glace,
+  foudre, ouragan (17 ordres).
+- **Dessinés en détail** sur la scène (casque, barbe, cape à fibule d'or,
+  arme : hache, épée, bombe à mèche, bâton à orbe, dagues, cimeterre, faucon
+  qui bat des ailes, marteau d'orage, lame noire) ; ils brandissent leur arme
+  quand ils donnent un ordre, et leurs vies s'affichent en cœurs.
+- **Interface** : barre du général (buste, nom, vies, prochain ordre, qui
+  s'embrase quand il agit), bannières (étape prise, entrée en scène, ordre,
+  vie perdue, chute), étape en cours dans le bandeau, fiche du général dans
+  l'introduction du niveau, voile du couvre-feu, cor de guerre.
+- **La Chronique** : chaque général se présente à l'ouverture de son chapitre
+  et nargue la troupe avant son grand siège, avec son portrait pixel art tiré
+  de son illustration (116 lignes, 52 couleurs au plus, comme les autres
+  personnages). Un personnage à mi-corps (le roi Aubert, Bertille, Hugues)
+  touche désormais le bas de la scène au lieu d'y flotter.
+
+### Coup de grâce, défenseurs et mécanismes
+- **Coup de grâce** : quand un tir file vers la dernière cible, le temps
+  ralentit, la caméra se rapproche et le tambour roule. Puis « Victoire ! »,
+  et chaque tir restant éclate en points au-dessus de l'engin, le score
+  montant à mesure (sans ralenti ni gros plan en mouvement réduit).
+- **Défenseurs assommés** : ils basculent et tournoient avant de disparaître.
+  **Répliques en bulles** : un défenseur voit venir le tir, pleure un
+  camarade, nargue après un tir manqué ; le général crie quand il perd une vie.
+- **Mécanismes** : **potence** (une charge pendue à une corde : tranchez-la,
+  elle tombe ; niveau 15) et **pont-levis** (brisez sa chaîne, le tablier
+  s'abat sur la garde de la porte ; niveau 28). Cordes et chaînes se
+  tranchent au tir ou à l'explosion.
+- **Jauge de destruction** (à partir du niveau 6) : abattre la moitié d'un
+  château donne une pierre de plus, une par étape ; elle évite une défaite et
+  ne compte jamais pour les étoiles.
+
+### Modes
+- **Siège sans fin : la main de trois cartes.** Après chaque château pris, on
+  garde une carte parmi trois (munitions, renforts, intendant, fortune),
+  tirées de la graine du siège.
+- **Coupe de la semaine** : cinq châteaux, les mêmes pour tous pendant la
+  semaine (Normal, catapulte, sans pouvoirs), à rejouer à volonté ; la
+  médaille (bronze, argent, or) dépend des étoiles ; on défie ses amis par un
+  lien.
+- **Moments forts** : le plus beau tir de la partie est filmé et proposé à la
+  fin, à enregistrer ou partager (réglage ; rien n'est envoyé ; désactivé sur
+  les portails).
+- **Coup de pouce** : au premier chapitre, en Facile et Normal, après deux
+  défaites d'affilée, les défenseurs encaissent un peu moins et le vent
+  faiblit, sans le dire. Après trois défaites d'affilée, on peut **passer le
+  niveau** (sans étoile) et revenir le prendre plus tard.
+
+### Technique
+- Relectures exactes même avec des pillards en marche : la fin de chaque tour
+  est notée au pas près (liens « Bats mon tir » de 120 gestes au plus).
+- Sauvegarde v10 (coupe de la semaine, défaites au front, niveaux passés),
+  migrée depuis la v9 et contrôlée comme les autres champs.
+- Portraits : encodeur en Node sans dépendance (`npm run portraits`), à la
+  place du script Python.
+- Contrôle des niveaux : les grands sièges sont jugés étape par étape, et
+  `--levels` accepte une liste (`10,20,30`).
+
+### Corrigé
+- Un général au-delà de deux vies ne pouvait pas avoir trois étoiles : le par
+  de son étape vaut au moins ses vies.
+- Une sauvegarde refusée ne bloque plus la fin de partie : le bilan s'affiche
+  avec l'avis « non enregistré ».
+- Un tout petit château (atelier) pouvait recevoir un défi vide et faire
+  échouer la fin de partie.
+
 ## [5.9.0] – 2026-10-15
 ### Interface 2026 : « Verre & Or »
 L'identité ne change pas (or héraldique, bleu guède, capitales Cinzel) ; la

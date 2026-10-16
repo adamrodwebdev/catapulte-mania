@@ -16,12 +16,18 @@ import StarRow from '../ui/StarRow.vue'
 import AchievementList from '../ui/AchievementList.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import CoachBubble from '../game/CoachBubble.vue'
+import BossBar from '../game/BossBar.vue'
+import BossBanner from '../game/BossBanner.vue'
+import GeneralBust from '../game/GeneralBust.vue'
+import HighlightClip from '../game/HighlightClip.vue'
+import { GENERALS, SKILL_ICONS, livesFor } from '../../game/bosses/generals.js'
 import StoryPanel from '../ui/StoryPanel.vue'
 import PixelPortrait from '../ui/PixelPortrait.vue'
 import { StoryRepository } from '../../game/story/StoryRepository.js'
 import { TutorialCoach } from '../../game/tutorial/Tutorial.js'
 import { HotSeatMatch } from '../../game/modes/HotSeatMatch.js'
 import { EndlessRun } from '../../domain/EndlessRun.js'
+import { CARDS } from '../../domain/EndlessDeck.js'
 import { CastleCode, buildCustomLevel, STORAGE_KEYS } from '../../game/editor/CastleDesign.js'
 import { eventFor } from '../../game/events/Season.js'
 import { dayKey } from '../../game/daily/DailyChallenge.js'
@@ -60,7 +66,9 @@ const isDuel = computed(() => mode.value === 'duel')
 /** Défi du jour, et défi reçu par un lien « Bats mon tir ». */
 const isDaily = computed(() => mode.value === 'daily')
 const isChallenge = computed(() => mode.value === 'challenge')
-const isDefi = computed(() => isDaily.value || isChallenge.value)
+/** Coupe de la semaine (v6.0) : mêmes règles que le défi du jour. */
+const isCup = computed(() => mode.value === 'cup')
+const isDefi = computed(() => isDaily.value || isChallenge.value || isCup.value)
 /** Siège sans fin : la partie en cours (objet non réactif) et sa copie d'affichage. */
 const isEndless = computed(() => mode.value === 'endless')
 /** Château de l'atelier (le sien en essai, ou celui d'un ami). */
@@ -99,6 +107,40 @@ function newTourney() {
 const turnBanner = ref(null)
 let turnTimer = null
 
+/* ---------- Grands sièges et généraux (v6.0) ---------- */
+
+/** Durée de chaque bannière (ms). */
+const BANNER_MS = Object.freeze({ cleared: 2000, intro: 3400, order: 1700, hurt: 1700, fallen: 2800 })
+const bossBanner = ref(null)
+let bossQueue = []
+let bossTimer = null
+function pushBossBanner(item) {
+  // Une présentation ou une chute passe devant les ordres encore en attente.
+  if (item.kind === 'intro' || item.kind === 'fallen') bossQueue = bossQueue.filter((b) => b.kind !== 'order')
+  bossQueue.push(item)
+  if (!bossBanner.value) nextBossBanner()
+}
+function nextBossBanner() {
+  clearTimeout(bossTimer)
+  bossBanner.value = bossQueue.shift() ?? null
+  if (bossBanner.value) bossTimer = setTimeout(nextBossBanner, BANNER_MS[bossBanner.value.kind] ?? 2000)
+}
+function clearBossBanners() {
+  bossQueue = []
+  clearTimeout(bossTimer)
+  bossBanner.value = null
+}
+/** Le général du grand siège en cours (barre du général), s'il y en a un. */
+const levelGeneral = computed(() => (hud.value?.stageCount > 1 ? (level.value?.general ?? null) : null))
+/** Difficulté de la partie (comme pour la session) : les vies du général en dépendent. */
+const matchDifficulty = computed(() => (isMulti.value ? 'hard' : isDefi.value || isCustom.value || !state.profile ? 'normal' : state.profile.difficulty))
+/** Introduction d'un grand siège : le général qui attend à la dernière étape, ses vies et ses ordres. */
+const introGeneral = computed(() => {
+  const id = level.value?.general
+  if (!id || !isCampaign.value || (level.value.stageCount ?? 1) < 2) return null
+  return { id, stages: level.value.stageCount, lives: livesFor(id, matchDifficulty.value), skills: GENERALS[id].skills }
+})
+
 const aiming = computed(() => phase.value === 'playing' && hud.value?.state === 'aiming')
 
 /* ---------- Engin : catapulte ou trébuchet ---------- */
@@ -117,6 +159,7 @@ const ballistaReady = computed(() => ballistaUnlocked(completedForEngine.value, 
 const engine = computed(() => {
   // Défis : engin imposé, le même pour tous.
   if (isDaily.value) return state.match.daily?.engine ?? 'catapult'
+  if (isCup.value) return 'catapult'
   if (isChallenge.value) return state.match.challenge?.engine ?? 'catapult'
   if (trebuchetLesson.value) return 'trebuchet'
   if (engineChoice.value && state.settings.engine === 'ballista' && ballistaReady.value) return 'ballista'
@@ -250,7 +293,7 @@ async function startLevel({ rebuild = false } = {}) {
     }
   }
   // Défis : le défi du jour exige un profil (la série), le défi par lien un code validé.
-  if ((isDaily.value && (!profile || !state.match.daily)) || (isChallenge.value && !state.match.challenge)) {
+  if ((isDaily.value && (!profile || !state.match.daily)) || (isCup.value && (!profile || !state.match.cup)) || (isChallenge.value && !state.match.challenge)) {
     app.go('home', { replace: true })
     return
   }
@@ -270,7 +313,7 @@ async function startLevel({ rebuild = false } = {}) {
     isDefi.value || isCustom.value
       ? createMode(mode.value, { completedLevels })
       : isEndless.value
-        ? createMode('endless', { effects, completedLevels, shots: endlessRun.shots })
+        ? createMode('endless', { effects, completedLevels, shots: endlessRun.shots, bonusAmmo: endlessRun.loadout.ammo, supply: endlessRun.loadout.supply })
       : mode.value === 'story' || mode.value === 'free'
       ? createMode(mode.value, { effects, completedLevels })
       : mode.value === 'hotseat'
@@ -296,6 +339,8 @@ async function startLevel({ rebuild = false } = {}) {
       replay: isChallenge.value && challengeStage.value === 'watch' ? state.match.challenge.actions : null,
       season: eventFor(dayKey()),
       translate: (key) => t(key),
+      // Coup de pouce discret (v6.0) : campagne seule, premier chapitre, après des défaites.
+      luck: mode.value === 'story' && profile ? (app.activeSlot?.luckFor(state.levelId, profile.difficulty) ?? 0) : 0,
     }),
   )
   controller.on('turn', ({ name }) => showTurn(name))
@@ -329,6 +374,19 @@ async function startLevel({ rebuild = false } = {}) {
     offer.value = 'idle'
     showPowers.value = false
     phase.value = 'offer'
+  })
+  controller.on('stage', (e) => {
+    if (e.phase === 'cleared') pushBossBanner({ kind: 'cleared', id: e.general, stage: e.stage, total: e.total })
+    else if (e.general) {
+      pushBossBanner({ kind: 'intro', id: e.general })
+      // Le général entre en scène : la musique monte.
+      app.services.music.surge(3, 6)
+    }
+  })
+  controller.on('general', (e) => {
+    if (e.kind === 'turn') pushBossBanner({ kind: 'order', id: e.id, skill: e.skill, icon: SKILL_ICONS[e.skill] ?? null })
+    else if (e.kind === 'hurt') pushBossBanner({ kind: 'hurt', id: e.id, lives: e.lives })
+    else if (e.kind === 'fallen') pushBossBanner({ kind: 'fallen', id: e.id })
   })
   hud.value = controller.session.hud
   stopCoach()
@@ -390,6 +448,8 @@ async function shareRun() {
 
 function destroyController() {
   clearTimeout(coachTimer)
+  clearBossBanners()
+  highlight.value = null
   coach = null
   coachStep.value = null
   controller?.destroy()
@@ -569,6 +629,8 @@ function quit() {
   refreshTourney()
   endlessRun = null
   if (isCustom.value) return app.go(state.match.custom?.fromEditor ? 'editor' : 'home')
+  // Coupe de la semaine : retour à l'accueil, la coupe ouverte.
+  if (isCup.value) state.showCup = true
   app.go(isMulti.value ? 'multiplayer' : isDefi.value ? 'home' : isEndless.value ? 'modes' : 'levels')
 }
 /** Rejouer : en « chacun sa partie », la revanche repart d'un tournoi neuf. */
@@ -668,7 +730,18 @@ watch(end, (e) => {
 })
 
 /** Fin de partie : présentation propre à chaque mode. */
+/** Durée du décompte des tirs restants (v6.0) : le bilan attend la fin du spectacle. */
+let celebrateMs = 0
+/** Moments forts (v6.0) : le plus beau tir de la partie, filmé (ou null). */
+const highlight = shallowRef(null)
+const clipName = computed(() => `catapulte-mania-${isCup.value ? 'coupe' : isDaily.value ? 'defi' : 'niveau'}-${state.levelId}`)
+
 async function onEnd(e) {
+  celebrateMs = e.celebrateMs ?? 0
+  highlight.value = null
+  controller?.highlight().then((clip) => {
+    if (phase.value === 'ended' || phase.value === 'playing') highlight.value = clip
+  })
   app.services.music.stop(1.5)
   app.services.audio.stopLoops()
   lastLog = controller?.session.log ?? null
@@ -678,6 +751,7 @@ async function onEnd(e) {
     return
   }
   if (isDaily.value) return onDailyEnd(e)
+  if (isCup.value) return onCupEnd(e)
   if (isEndless.value) return onEndlessEnd(e)
   if (isCustom.value) return onCustomEnd(e)
   if (isChallenge.value) return onChallengeEnd(e)
@@ -717,7 +791,7 @@ async function onEnd(e) {
     else if (view.kind === 'round') app.announce(t('end.roundDone', { name: view.result.name }))
     else if (view.kind === 'roundEnd') app.announce(view.winner === null ? t('end.roundDraw') : t('end.roundWon', { name: tourney.players[view.winner] }))
     else app.announce(t('end.cleared'))
-  }, 1200)
+  }, 1200 + celebrateMs)
 }
 
 /** Fin d'un niveau de la campagne à deux : progression commune, meilleur joueur. */
@@ -741,12 +815,12 @@ async function onCoopEnd({ won, result, renown }) {
     }
     phase.value = 'ended'
     app.announce(won ? `${t('end.victory')} ${t('a11y.stars', { count: result.stars })}` : t('end.defeat'))
-  }, won ? 1400 : 900)
+  }, won ? 1400 + celebrateMs : 900)
 }
 
 /** Fin du défi du jour : série, record du jour, partage. */
 async function onDailyEnd({ won, result, scores }) {
-  const outcome = result ? await app.recordDaily(result, state.match.daily.key) : { saved: true }
+  const outcome = result ? await safely(() => app.recordDaily(result, state.match.daily.key), { newBest: false, extended: false, reward: null }) : { saved: true }
   const score = result?.score ?? scores?.[0] ?? 0
   setTimeout(() => {
     end.value = {
@@ -762,7 +836,57 @@ async function onDailyEnd({ won, result, scores }) {
     }
     phase.value = 'ended'
     app.announce(won ? `${t('end.victory')} ${t('end.score')} ${score}. ${t('daily.streak', { count: end.value.streak })}` : t('end.defeat'))
-  }, won ? 1400 : 900)
+  }, won ? 1400 + celebrateMs : 900)
+}
+
+/** Passer le niveau après trois défaites (v6.0) : le suivant s'ouvre, on y va. */
+async function skipLevel() {
+  const id = state.levelId
+  await app.skipLevel(id)
+  if (id < PLAYABLE_LEVELS) {
+    state.levelId = id + 1
+    state.match = { ...state.match, levelId: id + 1 }
+    startLevel()
+  } else app.go('levels')
+}
+
+/** Fin d'un château de la coupe de la semaine (v6.0) : étoiles, médaille, château suivant. */
+async function onCupEnd({ won, result, scores }) {
+  const { week, index } = state.match.cup
+  const outcome = result ? await safely(() => app.recordCup(result, week, index), { newBest: false, medal: null, medalUp: false }) : { saved: true }
+  const score = result?.score ?? scores?.[0] ?? 0
+  const view = state.profile?.cup
+  setTimeout(() => {
+    end.value = {
+      kind: 'cup',
+      won,
+      score,
+      stars: result?.stars ?? 0,
+      index,
+      newBest: won && outcome.newBest,
+      cupStars: outcome.stars ?? view?.stars ?? 0,
+      maxStars: view?.maxStars ?? 15,
+      medal: outcome.medal ?? view?.medal ?? null,
+      medalUp: Boolean(outcome.medalUp),
+      next: index < (view?.castles.length ?? 5) ? index + 1 : null,
+      saved: outcome.saved !== false,
+    }
+    phase.value = 'ended'
+    app.announce(won ? `${t('end.victory')} ${t('a11y.stars', { count: end.value.stars })}` : t('end.defeat'))
+  }, won ? 1400 + celebrateMs : 900)
+}
+async function nextCupCastle() {
+  await app.services.ads.interstitial()
+  await app.startCup(end.value?.next ?? 1)
+  startLevel()
+}
+async function shareCup() {
+  const c = state.profile?.cup
+  if (!c) return
+  share.value = { state: 'busy', url: '' }
+  const text = t('cup.shareText', { medal: c.medal ? t(`cup.medals.${c.medal}`) : t('cup.noMedal'), stars: c.stars, max: c.maxStars })
+  const r = await app.shareCup(text)
+  share.value = { state: r.method, url: r.url }
 }
 
 /** Fin d'un château du siège sans fin : château suivant, ou fin du siège. */
@@ -775,11 +899,19 @@ async function onEndlessEnd({ result }) {
   setTimeout(() => {
     end.value =
       step === 'next'
-        ? { kind: 'endlessNext', ...endlessRun.last, wave: endlessRun.wave, shots: endlessRun.shots, total: endlessRun.score }
+        ? { kind: 'endlessNext', ...endlessRun.last, wave: endlessRun.wave, shots: endlessRun.shots, total: endlessRun.score, hand: endlessRun.hand, picked: null }
         : { kind: 'endlessOver', cleared: endlessRun.cleared, total: endlessRun.score, newBest: outcome?.newBest, newWave: outcome?.newWave, best: state.profile?.endless?.best ?? 0, saved: outcome?.saved !== false }
     phase.value = 'ended'
     app.announce(step === 'next' ? t('endless.castleDown', { n: endlessRun.cleared }) : t('endless.over', { count: endlessRun.cleared }))
-  }, step === 'next' ? 1400 : 900)
+  }, step === 'next' ? 1400 + celebrateMs : 900)
+}
+/** Main du siège (v6.0) : garder une carte, puis passer au château suivant. */
+function pickCard(id) {
+  if (!endlessRun || !end.value?.hand || end.value.picked) return
+  endlessRun.pick(id)
+  end.value = { ...end.value, picked: id, shots: endlessRun.shots }
+  refreshEndless()
+  app.announce(t('endless.cardKept', { name: t(`endless.cards.${id}.name`) }))
 }
 async function nextCastle() {
   await app.services.ads.interstitial()
@@ -806,7 +938,7 @@ function onCustomEnd({ won, scores }) {
     end.value = { kind: 'custom', won, score: scores?.[0] ?? 0, fromEditor }
     phase.value = 'ended'
     app.announce(won ? t('editor.taken') : t('end.defeat'))
-  }, won ? 1400 : 900)
+  }, won ? 1400 + celebrateMs : 900)
 }
 
 /** Fin d'un défi par lien : a-t-on battu le score de l'ami ? */
@@ -817,14 +949,28 @@ function onChallengeEnd({ won, scores }) {
     end.value = { kind: 'challenge', won, score, target, beaten: won && score > target, name: state.match.challenge?.name || '' }
     phase.value = 'ended'
     app.announce(end.value.beaten ? t('daily.beaten') : t('daily.notBeaten', { score: target }))
-  }, won ? 1400 : 900)
+  }, won ? 1400 + celebrateMs : 900)
+}
+
+/**
+ * Enregistrement d'un résultat : une sauvegarde refusée (profil incohérent,
+ * stockage plein) ne doit jamais bloquer la fin de partie ; le bilan s'affiche
+ * alors avec l'avis « non enregistré ».
+ */
+async function safely(record, fallback) {
+  try {
+    return await record()
+  } catch (err) {
+    console.warn('[save]', err)
+    return { ...fallback, saved: false }
+  }
 }
 
 async function onStoryEnd({ won, result, reason }) {
   lastResult = result
   doubling.value = 'idle'
   const maskBefore = state.profile?.levels[result.levelId]?.ach ?? 0
-  const outcome = await app.recordResult(result)
+  const outcome = await safely(() => app.recordResult(result), { newBest: false, unlockedPower: null, gold: 0, newAchievements: 0 })
   const rec = state.profile?.levels[result.levelId]
   setTimeout(() => {
     end.value = {
@@ -844,10 +990,12 @@ async function onStoryEnd({ won, result, reason }) {
       hasNext: won && result.levelId < PLAYABLE_LEVELS,
       campaignDone: won && result.levelId === GAME.LEVEL_COUNT,
       demoDone: won && IS_DEMO && result.levelId === PLAYABLE_LEVELS,
+      // Trois défaites d'affilée (v6.0) : on peut passer au niveau suivant.
+      canSkip: !won && Boolean(app.activeSlot?.canSkip(result.levelId)),
     }
     phase.value = 'ended'
     app.announce(won ? `${t('end.victory')} ${t('end.score')} ${result.score}. ${t('a11y.stars', { count: result.stars })}` : t('end.defeat'))
-  }, won ? 1400 : 900)
+  }, won ? 1400 + celebrateMs : 900)
 }
 
 /** Titre de l'introduction et du bandeau : niveau, ou arène en face-à-face. */
@@ -858,6 +1006,8 @@ const matchTitle = computed(() =>
     ? t('endless.castle', { n: endlessView.value?.wave ?? 1 })
     : isDaily.value
     ? t('daily.title')
+    : isCup.value
+    ? t('cup.castle', { n: state.match.cup?.index ?? 1 })
     : isChallenge.value
       ? state.match.challenge?.name
         ? t('daily.challengeFrom', { name: state.match.challenge.name })
@@ -868,6 +1018,7 @@ const matchSubtitle = computed(() => {
   if (isCustom.value) return state.match.custom?.fromEditor ? t('editor.testing') : t('editor.title')
   if (isEndless.value) return `${t('endless.title')} · ${t('end.points', { score: (endlessView.value?.score ?? 0).toLocaleString(state.locale) })}`
   if (isDaily.value) return `${formatDay(state.match.daily.key)} · ${t('game.level', { n: state.levelId })}`
+  if (isCup.value) return `${t('cup.title')} · ${t('game.level', { n: state.levelId })}`
   if (isChallenge.value) return t('game.level', { n: state.levelId })
   if (isCoop.value) return `${t('mp.formats.coop.name')} · ${t('levels.chapter', { n: level.value.chapter })} · ${t(`levels.chapters.${level.value.chapter}`)}`
   if (mode.value === 'hotseat' && tourneyView.value) return `${t('mp.formats.hotseat.name')} · ${t('mp.roundOf', { n: Math.min(tourneyView.value.round + 1, 3) })}`
@@ -932,7 +1083,8 @@ function onKey(e) {
       useBucket()
       break
     default:
-      if (/^Digit[1-6]$/.test(e.code)) {
+      // Munitions : touches 1 à 9, dans l'ordre de la barre (neuf munitions depuis la v6.1).
+      if (/^Digit[1-9]$/.test(e.code)) {
         const a = hud.value?.ammo[Number(e.code.slice(5)) - 1]
         if (a) selectAmmo(a.type)
         break
@@ -957,6 +1109,9 @@ function formatAnnouncement({ key, params = {} }) {
   const p = { ...params }
   if (key === 'a11y.turn') p.wind = windText(hud.value?.wind ?? 0)
   if (key === 'a11y.powerUsed') p.power = t(`powers.${params.power}`)
+  // Généraux (v6.0) : leur nom et celui de leur ordre.
+  if (params.general) p.general = t(`characters.${params.general}.name`)
+  if (key === 'a11y.generalOrder') p.skill = t(`skills.${params.skill}.name`)
   return t(key, p)
 }
 
@@ -974,6 +1129,11 @@ const canvasLabel = computed(() =>
     <template v-if="hud">
       <GameHud :hud="hud" :title="matchTitle" :subtitle="matchSubtitle" :coach="coachAnchor" @pause="pause" @powers="showPowers = !showPowers" />
       <p v-if="turnBanner" class="turn-banner" aria-hidden="true">{{ turnBanner }}</p>
+      <!-- Grand siège (v6.0) : le général, ses vies et son prochain ordre ; les bannières de ses actes. -->
+      <BossBar v-if="levelGeneral && (hud.general || hud.stage < hud.stageCount)" :id="levelGeneral" :view="hud.general" :stage-count="hud.stageCount" :acting="hud.state === 'enemy'" />
+      <BossBanner v-if="bossBanner && phase !== 'intro' && phase !== 'story'" :key="`${bossBanner.kind}-${bossBanner.id}-${bossBanner.lives ?? ''}-${bossBanner.skill ?? ''}`" :item="bossBanner" />
+      <!-- Couvre-feu d'un général : la nuit tombe sur la visée (ni trajectoire, ni repère du dernier tir). -->
+      <div v-if="hud.curfew && aiming" class="curfew-veil" aria-hidden="true" />
 
       <PowersMenu
         v-if="showPowers && phase === 'playing'"
@@ -1135,6 +1295,23 @@ const canvasLabel = computed(() =>
           {{ t(`intro.novelty.${n}`) }}
         </li>
       </ul>
+      <section v-if="introGeneral" class="intro-general" :aria-label="t('boss.label', { name: t(`characters.${introGeneral.id}.name`) })">
+        <GeneralBust :id="introGeneral.id" :size="64" class="intro-general__bust" />
+        <div class="intro-general__body">
+          <p class="intro-general__kicker">{{ t('boss.siege', { count: introGeneral.stages }) }}</p>
+          <p class="intro-general__name">{{ t(`characters.${introGeneral.id}.name`) }}</p>
+          <p class="intro-general__title">
+            {{ t(`characters.${introGeneral.id}.role`) }} ·
+            <span class="intro-general__lives">{{ t('boss.lives', { count: introGeneral.lives }) }}</span>
+          </p>
+          <ul class="intro-general__skills">
+            <li v-for="s in introGeneral.skills" :key="s">
+              <AppIcon :name="SKILL_ICONS[s]" :size="16" />
+              <span><strong>{{ t(`skills.${s}.name`) }}</strong> {{ t(`skills.${s}.desc`) }}</span>
+            </li>
+          </ul>
+        </div>
+      </section>
       <div v-if="introRewards && (introRewards.hint || introRewards.free || pendingHint || pendingFree)" class="intro-rewards">
         <p class="intro-rewards__title">{{ t('ads.introTitle') }}</p>
         <button v-if="introRewards.hint" type="button" class="btn btn--reward btn--small" :disabled="rewardBusy" @click="watchFor('hint')"><AppIcon name="play" :size="16" />{{ t('ads.introHint') }}</button>
@@ -1190,6 +1367,7 @@ const canvasLabel = computed(() =>
         </dl>
         <p class="end__shots">{{ t('end.shotsUsed', { count: end.shotsUsed }) }}<template v-if="end.stars < 3"> · {{ t('end.star3Hint', { count: level.par }) }}</template></p>
       </template>
+      <HighlightClip v-if="highlight" :clip="highlight" :name="clipName" />
       <div class="modal__actions">
         <button v-if="end.hasNext" type="button" class="btn btn--primary btn--large" data-autofocus @click="nextLevel">
           {{ t('end.next') }}
@@ -1218,6 +1396,10 @@ const canvasLabel = computed(() =>
         <p v-if="end.demoDone" class="end__note">{{ t('end.demoDone') }}</p>
       </template>
       <p v-else>{{ end.reason === 'engine' ? t('end.engineHint') : t('end.defeatHint') }}</p>
+      <div v-if="end.canSkip" class="end__skip">
+        <p class="end__note">{{ t('end.skipHint') }}</p>
+        <button type="button" class="btn" @click="skipLevel"><AppIcon name="arrow" />{{ t('end.skip') }}</button>
+      </div>
       <p v-if="!end.saved" class="notice notice--warning" role="alert">{{ t('end.saveError') }}</p>
     </ModalPanel>
 
@@ -1242,8 +1424,28 @@ const canvasLabel = computed(() =>
       <p class="end__big">{{ t('end.points', { score: end.score.toLocaleString(state.locale) }) }}</p>
       <p>{{ t('endless.bonus', { count: end.bonus }) }} · {{ t('endless.shots', { count: end.shots }) }}</p>
       <p class="notice">{{ t('endless.total', { score: end.total.toLocaleString(state.locale) }) }}</p>
+      <!-- Main du siège (v6.0) : trois cartes, on en garde une. -->
+      <section v-if="end.hand?.length" class="deck" :aria-label="t('endless.handTitle')">
+        <p class="deck__title">{{ end.picked ? t('endless.cardKept', { name: t(`endless.cards.${end.picked}.name`) }) : t('endless.handTitle') }}</p>
+        <div class="deck__cards" role="radiogroup" :aria-label="t('endless.handTitle')">
+          <button
+            v-for="id in end.hand"
+            :key="id"
+            type="button"
+            role="radio"
+            :aria-checked="String(end.picked === id)"
+            :disabled="Boolean(end.picked) && end.picked !== id"
+            :class="['deck-card', { 'deck-card--kept': end.picked === id }]"
+            @click="pickCard(id)"
+          >
+            <AppIcon :name="CARDS[id].icon" :size="28" class="deck-card__icon" />
+            <span class="deck-card__name">{{ t(`endless.cards.${id}.name`) }}</span>
+            <span class="deck-card__desc">{{ t(`endless.cards.${id}.desc`, { count: CARDS[id].count ?? 1 }) }}</span>
+          </button>
+        </div>
+      </section>
       <div class="modal__actions">
-        <button type="button" class="btn btn--primary btn--large" data-autofocus @click="nextCastle">{{ t('endless.next', { n: end.wave }) }}</button>
+        <button type="button" class="btn btn--primary btn--large" data-autofocus :disabled="Boolean(end.hand?.length) && !end.picked" @click="nextCastle">{{ t('endless.next', { n: end.wave }) }}</button>
         <button type="button" class="btn btn--ghost" @click="quit"><AppIcon name="map" />{{ t('endless.stop') }}</button>
       </div>
     </ModalPanel>
@@ -1273,6 +1475,7 @@ const canvasLabel = computed(() =>
         <p v-if="end.reward" class="end__badge">{{ t('season.reward', { name: t(`workshop.names.${end.reward}`) }) }}</p>
       </template>
       <p v-else>{{ t('daily.lost') }}</p>
+      <HighlightClip v-if="highlight" :clip="highlight" :name="clipName" />
       <p class="notice">{{ t('daily.comeBack') }}</p>
       <div v-if="end.won" class="share">
         <button type="button" class="btn btn--primary" :disabled="share.state === 'busy'" @click="shareRun"><AppIcon name="users" />{{ t('daily.share') }}</button>
@@ -1284,6 +1487,36 @@ const canvasLabel = computed(() =>
       <div class="modal__actions">
         <button type="button" :class="['btn', { 'btn--primary btn--large': !end.won }]" :data-autofocus="!end.won ? '' : undefined" @click="restart"><AppIcon name="refresh" />{{ t('end.retry') }}</button>
         <button type="button" class="btn btn--ghost" @click="quit"><AppIcon name="map" />{{ t('daily.menu') }}</button>
+      </div>
+    </ModalPanel>
+
+    <!-- Fin : un château de la coupe de la semaine (v6.0) -->
+    <ModalPanel v-if="phase === 'ended' && end?.kind === 'cup'" labelledby="end-title" :tone="end.won ? 'victory' : 'defeat'" :closable="false">
+      <p class="modal__eyebrow">{{ t('cup.title') }} · {{ t('cup.castle', { n: end.index }) }}</p>
+      <h2 id="end-title" class="modal__title">{{ end.won ? t('end.victory') : t('end.defeat') }}</h2>
+      <template v-if="end.won">
+        <StarRow :count="end.stars" class="end__stars" />
+        <p class="end__big">{{ t('end.points', { score: end.score.toLocaleString(state.locale) }) }}</p>
+        <p v-if="end.newBest" class="end__badge">{{ t('cup.newBest') }}</p>
+      </template>
+      <p v-else>{{ t('cup.lost') }}</p>
+      <p class="cup-line">
+        <span :class="['cup-medal', end.medal ? `cup-medal--${end.medal}` : 'cup-medal--none']" aria-hidden="true"><AppIcon name="trophy" :size="20" /></span>
+        {{ t('cup.progress', { stars: end.cupStars, max: end.maxStars }) }} · {{ end.medal ? t(`cup.medals.${end.medal}`) : t('cup.noMedal') }}
+      </p>
+      <HighlightClip v-if="highlight" :clip="highlight" :name="clipName" />
+      <p v-if="end.medalUp && end.medal" class="end__badge">{{ t('cup.medalWon', { medal: t(`cup.medals.${end.medal}`) }) }}</p>
+      <div v-if="end.medal" class="share">
+        <button type="button" class="btn btn--primary" :disabled="share.state === 'busy'" @click="shareCup"><AppIcon name="users" />{{ t('cup.share') }}</button>
+        <p v-if="share.state === 'copied'" class="share__done" role="status">{{ t('daily.copied') }}</p>
+        <p v-else-if="share.state === 'shared'" class="share__done" role="status">{{ t('daily.shared') }}</p>
+        <label v-else-if="share.state === 'manual'" class="share__manual">{{ t('daily.copyManual') }}<input class="input" type="text" readonly :value="share.url" @focus="$event.target.select()"></label>
+      </div>
+      <p v-if="!end.saved" class="notice notice--warning" role="alert">{{ t('end.saveError') }}</p>
+      <div class="modal__actions">
+        <button v-if="end.won && end.next" type="button" class="btn btn--primary btn--large" data-autofocus @click="nextCupCastle">{{ t('cup.next', { n: end.next }) }}</button>
+        <button type="button" :class="['btn', { 'btn--primary btn--large': !end.won || !end.next }]" :data-autofocus="!end.won || !end.next ? '' : undefined" @click="restart"><AppIcon name="refresh" />{{ t('end.retry') }}</button>
+        <button type="button" class="btn btn--ghost" @click="quit"><AppIcon name="map" />{{ t('cup.back') }}</button>
       </div>
     </ModalPanel>
 

@@ -89,6 +89,27 @@ export class ScoreKeeper {
     return Math.round(gained * this.factor)
   }
 
+  /**
+   * Grand siège (v6.0) : une étape est prise avant la dernière.
+   * @returns {number} points gagnés (difficulté comprise)
+   */
+  registerStage() {
+    if (this.#finalized) return 0
+    this.#points += SCORE.STAGE_BONUS
+    return Math.round(SCORE.STAGE_BONUS * this.factor)
+  }
+
+  /**
+   * Général (v6.0) : il vient de perdre une vie (sa mort, elle, est comptée
+   * comme celle d'une cible).
+   * @returns {number} points gagnés (difficulté comprise)
+   */
+  registerGeneralHurt() {
+    if (this.#finalized) return 0
+    this.#points += SCORE.GENERAL_HURT
+    return Math.round(SCORE.GENERAL_HURT * this.factor)
+  }
+
   /** Coût d'un pouvoir spécial. */
   spend(cost) {
     Guard.int(cost, 'cost', { min: 0, max: 5000 })

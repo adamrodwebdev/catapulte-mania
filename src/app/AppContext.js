@@ -11,6 +11,7 @@ import { AmbienceDirector } from '../game/audio/AmbienceDirector.js'
 import { LevelRepository } from '../game/levels/LevelRepository.js'
 import { starsFor } from '../game/score/ScoreRules.js'
 import { PowerRegistry } from '../game/powers/PowerRegistry.js'
+import { WeeklyCup, weekKey, CUP } from '../game/daily/WeeklyCup.js'
 import { DailyChallenge, dayKey } from '../game/daily/DailyChallenge.js'
 import { ReplayCode } from '../game/replay/ReplayCode.js'
 import { ENDLESS } from '../domain/EndlessRun.js'
@@ -34,6 +35,8 @@ const KEY = Symbol('app')
  */
 function checkRecord(levelId, rec) {
   const level = LevelRepository.get(levelId)
+  // Niveau passé (v6.0) : aucune étoile tant qu'il n'est pas pris pour de bon.
+  if (rec.skipped) return 0
   if (rec.best > level.maxScore) throw new ValidationError(`levels.${levelId}.best`, 'impossible score')
   if (rec.shots > level.shots + 10) throw new ValidationError(`levels.${levelId}.shots`, 'impossible shot count')
   return rec.shots > 0 ? starsFor(level, rec.shots) : Math.max(1, rec.stars)
@@ -108,6 +111,10 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     badChallenge: false,
     /** Château reçu par lien (atelier d'un ami), en attente sur l'accueil : { code, name }. */
     incomingCastle: null,
+    /** Coupe de la semaine reçue par lien (v6.0) : { week, current } ou null. */
+    incomingCup: null,
+    /** Ouvrir la coupe à l'accueil (retour d'un château de la coupe). */
+    showCup: false,
     /** Code du château de l'atelier que le joueur a lui-même pris (condition pour le partager). */
     editorVerified: null,
     /** Écran à ouvrir une fois un profil choisi (ex. 'daily'). */
@@ -229,7 +236,7 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     const levels = {}
     for (let id = 1; id <= GAME.LEVEL_COUNT; id++) {
       const rec = slot.levelRecord(id)
-      levels[id] = { unlocked: slot.isUnlocked(id) && id <= PLAYABLE_LEVELS, stars: rec?.stars ?? 0, best: rec?.best ?? 0, completed: Boolean(rec), shots: rec?.shots ?? 0, ach: rec?.ach ?? 0 }
+      levels[id] = { unlocked: slot.isUnlocked(id) && id <= PLAYABLE_LEVELS, stars: rec?.stars ?? 0, best: rec?.best ?? 0, completed: Boolean(rec), shots: rec?.shots ?? 0, ach: rec?.ach ?? 0, skipped: Boolean(rec?.skipped) }
     }
     return {
       index: slot.index,
@@ -257,6 +264,7 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
       upgrades: slot.upgrades,
       cosmetics: slot.cosmetics,
       daily: dailyView(slot),
+      cup: cupView(slot),
       endless: { ...slot.endless, unlocked: slot.completedCount >= ENDLESS.UNLOCK },
       login: slot.loginStatus(),
       affordable: affordableUpgrade(slot),
@@ -295,6 +303,19 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
   }
 
   /** Défi du jour vu par un profil : série en cours, record du jour, derniers jours. */
+  /** Coupe de la semaine pour l'interface : châteaux, meilleurs résultats, étoiles, médaille. */
+  function cupView(slot) {
+    const week = weekKey()
+    const saved = slot.cup
+    const current = saved.week === week
+    const castles = WeeklyCup.forWeek(week).levels.map((levelId, i) => {
+      const rec = current ? saved.castles[i + 1] : null
+      return { index: i + 1, levelId, best: rec?.best ?? 0, stars: rec?.stars ?? 0 }
+    })
+    const stars = castles.reduce((sum, c) => sum + c.stars, 0)
+    return { week, castles, stars, maxStars: CUP.CASTLES * 3, medal: current ? saved.medal || null : null, thresholds: CUP.MEDALS, trophies: saved.trophies }
+  }
+
   function dailyView(slot) {
     const today = dayKey()
     const d = slot.daily
@@ -411,6 +432,89 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     return { ...outcome, saved, reward }
   }
 
+  /**
+   * Enregistre un château de la coupe de la semaine (résultat authentifié).
+   * @returns {Promise<{ newBest: boolean, stars: number, medal: string | null, medalUp: boolean, saved: boolean }>}
+   */
+  async function recordCup(result, week, index) {
+    if (!activeSlot) return { newBest: false, stars: 0, medal: null, medalUp: false, saved: false }
+    const outcome = activeSlot.recordCup(result, week, index)
+    let saved
+    try {
+      saved = await saves.save(activeSlot)
+    } catch {
+      saved = false
+    }
+    if (outcome.medalUp) ads.happytime()
+    state.profile = profileView(activeSlot)
+    return { ...outcome, saved }
+  }
+
+  /** Lance un château de la coupe de la semaine (un profil est nécessaire pour la médaille). */
+  async function startCup(index = 1) {
+    if (!activeSlot) {
+      const last = saves.lastSlot
+      if (!(Number.isInteger(last) && (await openProfile(last)))) {
+        state.afterProfile = 'cup'
+        go('profiles')
+        return
+      }
+    }
+    const cup = WeeklyCup.thisWeek()
+    const i = Math.max(1, Math.min(CUP.CASTLES, Math.trunc(index) || 1))
+    state.match = { mode: 'cup', levelId: cup.levels[i - 1], levels: null, arenaId: 1, duelId: 1, players: [], daily: null, challenge: null, cup: { week: cup.key, index: i } }
+    state.levelId = cup.levels[i - 1]
+    go('game')
+  }
+
+  /** Partage sa coupe : lien qui ouvre la coupe de la semaine chez un ami. */
+  async function shareCup(text) {
+    const week = weekKey()
+    let url = await ads.inviteLink({ coupe: week })
+    if (!url) url = `${globalThis.location ? `${location.origin}${location.pathname}` : ''}#coupe=${week}`
+    try {
+      if (globalThis.navigator?.share) {
+        await navigator.share({ title: 'Catapulte Mania', text, url })
+        return { url, method: 'shared' }
+      }
+    } catch (e) {
+      if (e?.name === 'AbortError') return { url, method: 'manual' }
+    }
+    try {
+      await navigator.clipboard.writeText(`${text} ${url}`)
+      return { url, method: 'copied' }
+    } catch {
+      return { url, method: 'manual' }
+    }
+  }
+
+  /** Au démarrage : une coupe partagée par lien ? (celle de la semaine, ou une coupe finie). */
+  function readIncomingCup() {
+    let week
+    try {
+      week = ads.inviteParam('coupe')
+      if (!week && globalThis.location?.hash.startsWith('#coupe=')) week = decodeURIComponent(location.hash.slice(7))
+    } catch {
+      week = null
+    }
+    if (!week) return
+    state.incomingCup = /^\d{4}-W\d{2}$/.test(week) ? { week, current: week === weekKey() } : null
+  }
+
+  /** Passe un niveau après trois défaites d'affilée (v6.0) ; le suivant s'ouvre. */
+  async function skipLevel(levelId) {
+    if (!activeSlot) return false
+    activeSlot.skipLevel(levelId)
+    let saved
+    try {
+      saved = await saves.save(activeSlot)
+    } catch {
+      saved = false
+    }
+    state.profile = profileView(activeSlot)
+    return saved
+  }
+
   /** Lance le défi du jour (un profil est nécessaire pour la série). */
   async function startDaily() {
     if (!activeSlot) {
@@ -432,6 +536,7 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     const next = state.afterProfile
     state.afterProfile = null
     if (next === 'daily') return startDaily()
+    if (next === 'cup') return startCup(1)
     if (next === 'endless') return startEndless()
     go('levels')
   }
@@ -589,6 +694,7 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     }
   }
   readIncomingChallenge()
+  readIncomingCup()
 
   /* ----- Atelier (or et améliorations) ----- */
 
@@ -720,6 +826,10 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     recordCoop,
     recordDaily,
     startDaily,
+    recordCup,
+    startCup,
+    shareCup,
+    skipLevel,
     startChallenge,
     startEndless,
     recordEndless,

@@ -175,7 +175,8 @@ test('enchaînement en partie : deux défenseurs d’un seul tir font un « doub
   n = 0
   while (s.state !== 'ended' && n++ < 3000) s.update(1000 / 30)
   assert.equal(s.state, 'ended')
-  assert.deepEqual(callouts.map((c) => [c.key, c.tier]), [['double', 1]])
+  // Le doublé, puis le titre de victoire au-dessus des ruines (v6.0).
+  assert.deepEqual(callouts.map((c) => [c.key, c.tier]), [['double', 1], ['victory', 3]])
   assert.equal(combos.length, 1)
   assert.equal(combos[0].caption, 'combo')
   s.destroy()

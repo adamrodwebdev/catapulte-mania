@@ -3,6 +3,7 @@ import { CATEGORY, WORLD } from '../physics/constants.js'
 import { NavGraph } from './NavGraph.js'
 import { Perception } from './Perception.js'
 import { UnitBrain, REPAIR } from './UnitBrain.js'
+import { assess, contactSpeed, fallDamage } from '../physics/FallingObjects.js'
 
 const { Body, Sleeping } = Matter
 
@@ -44,6 +45,8 @@ const GET_UP_RATE = 0.012
 const CALM_AFTER_MS = 700
 /** Pas entre deux relevés du terrain partagés par les cerveaux. */
 const SHARED_EVERY = 4
+/** Bras levés (v6.1) : un objet repoussable arrive dans moins de tant d'images (≈ 0,6 s). */
+const BRACE_FRAMES = 36
 
 /** Distance d'un point à un itinéraire (suite de segments). */
 function distToRoute(route, x, y) {
@@ -157,6 +160,18 @@ export class UnitDirector {
     return this.#brains.get(unit) ?? null
   }
 
+  /** Grand siège (v6.0) : nouveau château, tout repart de zéro (graphe, cerveaux, ouvrages). */
+  reset() {
+    this.#brains.clear()
+    this.#jobs.clear()
+    this.#bridges.clear()
+    this.#ladders = []
+    this.#shared = null
+    this.#signature = null
+    this.nav = null
+    this.#vx = new WeakMap()
+  }
+
   /** Un pas de simulation (structure en place). */
   step() {
     const port = this.#port
@@ -164,6 +179,7 @@ export class UnitDirector {
     const units = []
     const flying = []
     const fires = []
+    const movers = []
     let shooting = false
     for (const e of port.entities()) {
       if (e.kind === 'target') {
@@ -172,7 +188,12 @@ export class UnitDirector {
         if (!e.alive) continue
         shooting = true
         if (!e.hasImpacted) flying.push(e)
-      } else if (e.alive && e.burning > 0) fires.push(e)
+        else if (e.speed > 0.4) movers.push(e)
+      } else {
+        if (e.alive && e.burning > 0) fires.push(e)
+        // v6.1 : ce qui tombe (blocs, barils) : les défenseurs l'anticipent.
+        if ((e.kind === 'block' || e.kind === 'barrel') && e.alive && !e.terrain && !e.body.isSleeping && e.speed > 0.4) movers.push(e)
+      }
     }
     for (const u of units) if (!this.#brains.has(u)) this.#brains.set(u, new UnitBrain(u, this.#brains.size))
     const time = port.time()
@@ -187,7 +208,10 @@ export class UnitDirector {
     if (shooting) this.#lastProjectileAt = time
     if (this.#steps % 10 === 0) this.#banners(units)
     // Ce qui change lentement (qui est sur quelle corniche, feux, blocs abîmés) : tous les 4 pas.
-    if (this.#steps % SHARED_EVERY === 0 || !this.#shared) this.#shared = this.#survey(units, fires, flying.length > 0 || shooting, time)
+    if (this.#steps % SHARED_EVERY === 0 || !this.#shared) {
+      this.#shared = this.#survey(units, fires, flying.length > 0 || shooting, time)
+      this.#anticipate(units, movers, time)
+    }
     this.#steps++
     const ctx = this.#ctx
     ctx.nav = this.nav
@@ -200,13 +224,36 @@ export class UnitDirector {
     for (const u of units) this.#move(u, ctx)
   }
 
+  /**
+   * Anticipation (v6.1, voir physics/FallingObjects.js) : un objet qui tombe
+   * sur un défenseur assez lentement pour qu'il le repousse ? Il lève les bras
+   * avant qu'il n'arrive (le geste, lui, part au contact).
+   */
+  #anticipate(units, movers, time) {
+    for (const u of units) {
+      let brace = false
+      if (movers.length && u.ableAt?.(time)) {
+        for (const o of movers) {
+          if (Math.abs(o.x - u.x) > 170 || o.y > u.y + u.height / 2) continue
+          const a = assess(u, o, Body.getVelocity(o.body), time)
+          if (a.verdict === 'push' && a.frames <= BRACE_FRAMES) {
+            brace = true
+            break
+          }
+        }
+      }
+      u.bracing = brace
+    }
+  }
+
   /* ---------- Navigation ---------- */
 
   #refreshNav() {
     const solids = []
     let sig = 0
     for (const e of this.#port.entities()) {
-      if (!e.alive || (e.kind !== 'block' && e.kind !== 'barrel')) continue
+      // Une charge pendue à sa corde (v6.0) n'est pas un sol où l'on marche.
+      if (!e.alive || (e.kind !== 'block' && e.kind !== 'barrel') || e.tethered > 0) continue
       const b = e.body.bounds
       // Posé à plat : rectangle à 0°, 90° ou 180° près (|sin 2θ| petit).
       const flat = e.kind === 'block' && e.shape !== 'triangle' && Math.abs(Math.sin(2 * e.angle)) < 0.06
@@ -298,6 +345,10 @@ export class UnitDirector {
       passThrough: (u) => {
         u.body.collisionFilter.mask &= ~CATEGORY.TARGET
       },
+      // Fin du repli d'un général (v6.0) : il redevient solide pour ses camarades.
+      solid: (u) => {
+        u.body.collisionFilter.mask |= CATEGORY.TARGET
+      },
       // Ouvrages (v5.8).
       build: (u, link) => self.#build(u, link),
       climb: (u, link) => self.#startClimb(u, link),
@@ -327,12 +378,13 @@ export class UnitDirector {
     }
     const v = Body.getVelocity(u.body)
     const upright = Math.abs(Math.atan2(Math.sin(u.angle), Math.cos(u.angle))) < 0.25
-    // Gelé, renversé ou en l'air : il ne marche pas (et ne pense pas).
-    if (u.frozenMs > 0 || !upright || Math.abs(v.y) > 0.6) {
+    // Gelé, sonné (v6.1), renversé ou en l'air : il ne marche pas (et ne pense pas).
+    if (u.frozenMs > 0 || u.stunnedAt?.(ctx.time) || !upright || u.gettingUp || Math.abs(v.y) > 0.6) {
       u.working = false
       this.#stop(u, v)
-      // Pillard tombé de travers mais posé (appuyé contre la roche) : il se relève.
-      if (!upright && u.raiding && !(u.frozenMs > 0) && Math.hypot(v.x, v.y) < 0.3) this.#getUp(u)
+      // Tombé de travers mais posé : le pillard et le général se relèvent aussitôt, les
+      // autres une fois leur chute encaissée (v6.1) ; un redressement commencé va à son terme.
+      if ((!upright || u.gettingUp) && (u.raiding || u.type === 'general' || u.knockedDown || u.gettingUp) && !(u.frozenMs > 0) && (u.gettingUp || Math.hypot(v.x, v.y) < 0.3)) this.#getUp(u)
       return
     }
     const vx = brain.step(ctx)
@@ -446,15 +498,25 @@ export class UnitDirector {
 
   /**
    * Se relever : il pivote vers la verticale à vitesse d'homme, sans bondir.
-   * Couché (au-delà de l'angle de mise hors de combat), il reste à terre : la
-   * règle du K.-O. s'applique comme à tout défenseur.
+   * Couché, il attend d'avoir encaissé sa chute (règle du K.-O., v6.1 : des
+   * points de vie en moins), puis se relève à son tour.
    */
   #getUp(u) {
     const tilt = Math.atan2(Math.sin(u.angle), Math.cos(u.angle))
-    if (Math.abs(tilt) >= WORLD.KNOCKOUT_ANGLE) return
+    // Un général (v6.0) se relève même couché : ce sont ses vies qui comptent, pas sa chute.
+    const general = u.type === 'general'
+    if (Math.abs(tilt) >= WORLD.KNOCKOUT_ANGLE && !general && !u.knockedDown && !u.gettingUp) return
     Sleeping.set(u.body, false)
-    Body.setAngle(u.body, Math.sign(tilt) * Math.max(0, Math.abs(tilt) - GET_UP_RATE))
+    const next = Math.sign(tilt) * Math.max(0, Math.abs(tilt) - GET_UP_RATE * (general ? 2.5 : u.knockedDown || u.gettingUp ? 2 : 1))
+    // v6.1 : il pivote sur ce qui le porte (le centre remonte à mesure), sans
+    // s'enfoncer dans le sol ; une fois lancé, il va jusqu'au bout.
+    const reach = (a) => (u.height / 2) * Math.abs(Math.cos(a)) + (u.width / 2) * Math.abs(Math.sin(a))
+    Body.setPosition(u.body, { x: u.x, y: u.y - (reach(next) - reach(tilt)) })
+    Body.setAngle(u.body, next)
+    Body.setVelocity(u.body, { x: 0, y: 0 })
     Body.setAngularVelocity(u.body, 0)
+    u.gettingUp = Math.abs(next) > 0.04
+    if (general) u.downMs = 0
   }
 
   /** Un pas d'escalade : la position suit l'échelle ; à l'arrêt hors du vol des tirs. */
@@ -488,8 +550,10 @@ export class UnitDirector {
 
   /**
    * Fin de l'escalade (ou échelle renversée) : la physique reprend la main.
-   * `fell` : l'échelle bascule, le grimpeur est jeté loin de la paroi et tombe
-   * (la chute le met hors de combat si elle est haute, voir PhysicsWorld).
+   * `fell` : l'échelle bascule, le grimpeur est jeté loin de la paroi et tombe.
+   * v6.1 : une chute sans prise, de toute sa hauteur (il dévale la paroi sans
+   * jamais toucher le sol de plein fouet) : elle coûte ce que coûterait une
+   * chute libre de cette hauteur (voir FallingObjects.fallDamage).
    */
   #release(u, fell = false) {
     const c = u.climbing
@@ -509,6 +573,12 @@ export class UnitDirector {
     // tomber ; c'est l'arrivée, sur la roche ou au sol, qui décide de son sort.
     Body.setVelocity(u.body, { x: away * WORKS_TIMING.FALL_PUSH.x, y: -WORKS_TIMING.FALL_PUSH.y })
     Body.setAngularVelocity(u.body, away * 0.02)
+    const height = Math.max(0, this.#port.groundY - (u.y + u.height / 2))
+    const dmg = fallDamage(u, contactSpeed(0, height))
+    if (dmg >= 1) {
+      const died = u.damage(dmg, 'fall')
+      this.#port.emit('hurt', { entity: u, amount: dmg, cause: 'fall', lethal: died, x: u.x, y: u.y - u.height * 0.35, dir: away })
+    }
   }
 
   /** Plus d'appui : frottement de marche (il glisse au lieu de rester collé), corps réveillé. */

@@ -848,6 +848,8 @@
   transition: filter calc(0.3s * var(--speed)), transform calc(0.3s * var(--speed));
   animation: story-actor-in calc(0.5s * var(--speed)) ease-out both;
 }
+/* Personnage à mi-corps : coupé par le bas du décor, comme par un cadre. */
+.story__actor--cut { bottom: 0; }
 .story__actor--center { left: 50%; transform: translateX(-50%); }
 .story__actor--left { left: 12%; }
 .story__actor--right { right: 12%; }

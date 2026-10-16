@@ -23,7 +23,11 @@
  * gagnent d'un coup (« tolérance ») — plus elle est basse, plus le niveau
  * demande de trouver LE bon tir.
  *
- * Usage : node scripts/check-levels.mjs [--levels 1-10] [--difficulty hard] [--engine trebuchet]
+ * v6.0 : grands sièges. Un tir vaut d'abord par l'étape atteinte (prendre la
+ * première fait apparaître le donjon du général, avec ses défenseurs), puis
+ * par les cibles restantes, puis par les vies ôtées au général.
+ *
+ * Usage : node scripts/check-levels.mjs [--levels 1-10 | --levels 10,20,30] [--difficulty hard] [--engine trebuchet]
  */
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads'
 import { availableParallelism } from 'node:os'
@@ -44,6 +48,15 @@ async function loadGame() {
   const { PROJECTILE_TYPES } = await import('../src/game/entities/catalog.js')
   const { Trebuchet } = await import('../src/game/Trebuchet.js')
   return { GameSession, LevelRepository, TrajectoryPredictor, AIM, windageOf, PROJECTILE_TYPES, Trebuchet }
+}
+
+/**
+ * Avancement d'une partie (plus c'est grand, mieux c'est) : l'étape d'abord,
+ * puis les cibles restantes de l'étape, les vies du général, et le score.
+ */
+function progress(session) {
+  const lives = session.council?.alive ? session.council.general.lives : 0
+  return session.stage * 1e8 - session.targetsLeft * 1e5 - lives * 4e4 + session.score.current
 }
 
 /** Joue une partie en appliquant une liste de tirs ; s'arrête au tour suivant. */
@@ -83,18 +96,18 @@ function replay(G, level, difficulty, shots, engine = 'catapult') {
  * En Difficile, la visée tient compte de l'altitude, de la prise au vent du
  * projectile et de la rafale du moment (comme l'aide à la trajectoire) ; les
  * rafales pendant le vol, elles, se découvrent au tir, comme pour un joueur.
+ * v6.1 : la courbe est celle de l'aide à la visée (GameSession.predictShot) :
+ * rafales des moulins, colonnes d'air chaud de la Montagne, sable qui freine.
  */
 function solvePower(G, session, angle, tx, ty, ammo = 'stone') {
   const c = session.catapult
-  const field = session.world.windField
-  const windage = G.windageOf({ type: ammo, radius: G.PROJECTILE_TYPES[ammo].radius })
   let lo = 0
   let hi = 1
   for (let i = 0; i < 18; i++) {
     const mid = (lo + hi) / 2
     c.setAim(angle, mid)
-    const windAccel = field.dynamic ? field.frozen(c.launchPoint.x, session.world.time, windage) : null
-    const pts = G.TrajectoryPredictor.predict(c.launchPoint, c.velocity, { wind: session.wind, windAccel, maxPoints: 400, every: 1 })
+    // v6.1 : la courbe de l'aide à la visée (rafales des moulins, colonnes d'air chaud, sable).
+    const pts = session.predictShot(ammo)
     const at = pts.find((p) => p.x >= tx)
     const y = at ? at.y : Infinity
     if (y > ty) lo = mid
@@ -119,7 +132,7 @@ function candidates(G, session, engine = 'catapult') {
   for (const t of points) {
     for (const angle of ANGLES) {
       for (const ammo of ammoTypes) {
-        const power = solvePower(G, session, angle, t.x, t.y, session.world.windField.dynamic ? ammo : 'stone')
+        const power = solvePower(G, session, angle, t.x, t.y, ammo)
         if (power <= 0.001 || power >= 0.999) continue
         out.push({ angle, power: Math.round(power * 1000) / 1000, ammo })
       }
@@ -175,7 +188,7 @@ async function checkLevel(G, id, difficulty, engine = 'catapult') {
   // Tolérance : part des premiers tirs essayés qui gagnent d'un coup.
   let tried = 0
   let oneShot = 0
-  for (let turn = 0; turn < 12; turn++) {
+  for (let turn = 0; turn < Math.max(12, level.shots + 2); turn++) {
     const { session, ended } = replay(G, level, difficulty, history, engine)
     if (ended) {
       solved = ended.won
@@ -186,8 +199,7 @@ async function checkLevel(G, id, difficulty, engine = 'catapult') {
     let best = null
     for (const cand of candidates(G, session, engine)) {
       const r = replay(G, level, difficulty, [...history, cand], engine)
-      const left = r.session.targetsLeft
-      const value = (level.targets.length - left) * 100000 + r.session.score.current
+      const value = r.ended?.won ? Infinity : progress(r.session)
       if (!best || value > best.value) best = { cand, value, won: r.ended?.won }
       r.session.destroy()
       if (turn === 0) {
@@ -206,8 +218,10 @@ async function checkLevel(G, id, difficulty, engine = 'catapult') {
 
 function parseRange(arg, max) {
   if (!arg) return Array.from({ length: max }, (_, i) => i + 1)
-  const [a, b] = arg.split('-').map(Number)
-  return Array.from({ length: (b || a) - a + 1 }, (_, i) => a + i)
+  return arg.split(',').flatMap((part) => {
+    const [a, b] = part.split('-').map(Number)
+    return Array.from({ length: (b || a) - a + 1 }, (_, i) => a + i)
+  })
 }
 
 if (isMainThread) {

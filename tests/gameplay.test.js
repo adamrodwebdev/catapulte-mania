@@ -48,7 +48,9 @@ test('l’aide à la trajectoire prédit exactement le vol réel', () => {
 
 test('étoiles : 3 en par tirs, puis de moins en moins avec les tirs', () => {
   for (const l of LevelRepository.all()) {
-    assert.ok(l.par >= 1 && l.par <= 2 && l.par <= l.star2 && l.star2 <= l.shots, `niveau ${l.id}`)
+    // Grand siège (v6.0) : le par de chaque étape s'ajoute à celui du premier château.
+    const stagePar = (l.stages ?? []).reduce((s, st) => s + st.par, 0)
+    assert.ok(l.par - stagePar >= 1 && l.par - stagePar <= 2 && l.par <= l.star2 && l.star2 <= l.shots, `niveau ${l.id}`)
     let prev = 3
     for (let n = 1; n <= l.shots + 3; n++) {
       const st = starsFor(l, n)
@@ -187,7 +189,8 @@ test('premiers pas : niveau 1 réglé pour toucher, trajectoire montrée jusqu�
 
 test('étoiles au nombre de tirs : 3 en un tir (deux pour les grands châteaux)', () => {
   for (const l of LevelRepository.all()) {
-    assert.ok(l.par === 1 || l.par === 2, `niveau ${l.id}`)
+    const stagePar = (l.stages ?? []).reduce((s, st) => s + st.par, 0)
+    assert.ok(l.par - stagePar === 1 || l.par - stagePar === 2, `niveau ${l.id}`)
     assert.ok(l.star2 >= l.par && l.star2 <= l.shots, `niveau ${l.id}`)
     assert.equal(l.achievements.length, 3, `niveau ${l.id}`)
     assert.equal(new Set(l.achievements).size, 3, `niveau ${l.id} : succès distincts`)

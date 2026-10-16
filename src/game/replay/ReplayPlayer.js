@@ -27,7 +27,10 @@ export class ReplayPlayer {
    */
   constructor(session, actions) {
     this.#session = session
-    this.#queue = actions.map((a) => ({ ...a }))
+    const all = actions.map((a) => ({ ...a }))
+    // Étapes, ordres des généraux et fins de tour (v6.0) : la partie les exécute elle-même, au pas enregistré.
+    session.preloadRecorded?.(all)
+    this.#queue = all.filter((a) => a.k !== 'g' && a.k !== 'b' && a.k !== 'e')
     session.on('end', () => (this.done = true))
   }
 

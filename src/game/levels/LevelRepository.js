@@ -12,52 +12,109 @@ import { TREBUCHET_UNLOCK } from '../Trebuchet.js'
 import { applyCurve, ammoFor, AMMO_UNLOCK } from './LevelCurve.js'
 import { ZONE_KINDS } from '../physics/Terrain.js'
 import { FLYER_NAMES } from '../entities/Flyer.js'
+import { GENERAL_IDS } from '../bosses/generals.js'
+import { PROP_NAMES } from '../entities/props.js'
+import { worldWindFor } from '../physics/WorldWinds.js'
+
+/** Premier niveau où la jauge de destruction donne une pierre (même valeur que GameSession.GAUGE). */
+const GAUGE_FROM_LEVEL = 6
 
 const coord = Schema.number({ min: -500, max: 4000 })
 const WORLD_GROUND = 900
 const size = Schema.number({ min: 6, max: 600 })
 
+const blocksSchema = Schema.array(
+  // angle (v6.0) : un tablier de pont-levis légèrement penché ; 0 pour tout le reste.
+  // prop (v6.1) : ouvrage (moulin, forge, citerne, ruche, farine ; voir entities/props.js).
+  Schema.object({ material: Schema.enum(MATERIAL_NAMES), x: coord, y: coord, w: size, h: size, shape: Schema.enum(['rect', 'triangle']), angle: Schema.optional(Schema.number({ min: -0.5, max: 0.5 }), 0), prop: Schema.optional(Schema.nullable(Schema.enum(PROP_NAMES)), null) }),
+  { maxLength: 200 },
+)
+const targetsSchema = Schema.array(
+  // patrol (v5.1) : demi-longueur de la ronde (0 = immobile).
+  // torch (v5.8) : veilleur de nuit, sa torche met le feu là où il tombe.
+  // raid (v5.8) : pillard qui court attaquer l'engin du joueur.
+  // general (v6.0) : lequel des généraux de Mordrac (cible de type « general »).
+  Schema.object({
+    type: Schema.enum(Object.keys(TARGET_TYPES)),
+    x: coord,
+    y: coord,
+    patrol: Schema.optional(Schema.int({ min: 0, max: 200 }), 0),
+    torch: Schema.optional(Schema.boolean(), false),
+    raid: Schema.optional(Schema.nullable(Schema.enum(['fire', 'frost', 'blow', 'smash'])), null),
+    general: Schema.optional(Schema.nullable(Schema.enum(GENERAL_IDS)), null),
+  }),
+  { maxLength: 20 },
+)
+const barrelsSchema = Schema.array(Schema.object({ x: coord, y: coord }), { maxLength: 20 })
+/** Mécanismes (v6.0) : liens entre deux blocs (rang dans `blocks`, point dans le repère du bloc), charnières. */
+const offset = Schema.number({ min: -300, max: 300 })
+const blockIndex = Schema.int({ min: 0, max: 199 })
+const tethersSchema = Schema.array(
+  Schema.object({ kind: Schema.enum(['rope', 'chain']), a: blockIndex, ax: offset, ay: offset, b: blockIndex, bx: offset, by: offset }),
+  { maxLength: 8 },
+)
+const hingesSchema = Schema.array(Schema.object({ b: blockIndex, x: coord, y: coord }), { maxLength: 6 })
+
+/** Liens et charnières du constructeur → rangs des blocs (après la courbe de la campagne). */
+function mechanisms(sb, where) {
+  const at = (block) => {
+    const i = sb.blocks.indexOf(block)
+    if (i < 0) throw new Error(`${where}: mechanism on an unknown block`)
+    return i
+  }
+  return {
+    tethers: sb.tethers.map((t) => ({ kind: t.kind, a: at(t.a), ax: t.ax, ay: t.ay, b: at(t.b), bx: t.bx, by: t.by })),
+    // Point de la charnière dans le monde (le bloc peut être incliné).
+    hinges: sb.hinges.map((h) => {
+      const a = h.b.angle ?? 0
+      return { b: at(h.b), x: h.b.x + h.dx * Math.cos(a) - h.dy * Math.sin(a), y: h.b.y + h.dx * Math.sin(a) + h.dy * Math.cos(a) }
+    }),
+  }
+}
+const flyersSchema = Schema.array(
+  Schema.object({
+    type: Schema.enum(FLYER_NAMES),
+    x: coord,
+    y: Schema.number({ min: -800, max: 1000 }),
+    range: Schema.number({ min: 0, max: 900 }),
+    period: Schema.number({ min: 1500, max: 20000 }),
+    phase: Schema.number({ min: 0, max: 1 }),
+  }),
+  { maxLength: 8 },
+)
+
 /** Schéma d'un niveau construit : protège contre une erreur de saisie dans levelSpecs.js. */
 const levelSchema = Schema.object(
   {
-    shots: Schema.int({ min: 1, max: 12 }),
+    // v6.0 : jusqu'à 16 tirs (grands sièges en plusieurs étapes).
+    shots: Schema.int({ min: 1, max: 16 }),
     wind: Schema.number({ min: 0, max: 1 }),
-    ammo: Schema.record(new RegExp(`^(?:${PROJECTILE_NAMES.join('|')})$`), Schema.int({ min: 0, max: 10 }), { maxKeys: 6 }),
-    blocks: Schema.array(
-      Schema.object({ material: Schema.enum(MATERIAL_NAMES), x: coord, y: coord, w: size, h: size, shape: Schema.enum(['rect', 'triangle']) }),
-      { maxLength: 200 },
-    ),
-    targets: Schema.array(
-      // patrol (v5.1) : demi-longueur de la ronde (0 = immobile).
-      // torch (v5.8) : veilleur de nuit, sa torche met le feu là où il tombe.
-      // raid (v5.8) : pillard qui court attaquer l'engin du joueur.
-      Schema.object({
-        type: Schema.enum(Object.keys(TARGET_TYPES)),
-        x: coord,
-        y: coord,
-        patrol: Schema.optional(Schema.int({ min: 0, max: 200 }), 0),
-        torch: Schema.optional(Schema.boolean(), false),
-        raid: Schema.optional(Schema.nullable(Schema.enum(['fire', 'frost', 'blow', 'smash'])), null),
-      }),
-      { maxLength: 20 },
-    ),
-    barrels: Schema.array(Schema.object({ x: coord, y: coord }), { maxLength: 20 }),
+    ammo: Schema.record(new RegExp(`^(?:${PROJECTILE_NAMES.join('|')})$`), Schema.int({ min: 0, max: 10 }), { maxKeys: 10 }),
+    blocks: blocksSchema,
+    targets: targetsSchema,
+    barrels: barrelsSchema,
     // v5.0 : terrains du sol et créatures volantes.
     zones: Schema.array(Schema.object({ kind: Schema.enum(ZONE_KINDS), x0: coord, x1: coord }), { maxLength: 6 }),
-    flyers: Schema.array(
-      Schema.object({
-        type: Schema.enum(FLYER_NAMES),
-        x: coord,
-        y: Schema.number({ min: -800, max: 1000 }),
-        range: Schema.number({ min: 0, max: 900 }),
-        period: Schema.number({ min: 1500, max: 20000 }),
-        phase: Schema.number({ min: 0, max: 1 }),
-      }),
-      { maxLength: 8 },
-    ),
+    flyers: flyersSchema,
+    tethers: tethersSchema,
+    hinges: hingesSchema,
   },
   { strict: true },
 )
+
+/**
+ * Étape suivante d'un grand siège (v6.0) : un autre château, sur le même
+ * terrain, avec les tirs et les munitions qui restent. Son `focus` cadre la
+ * caméra ; `shots` et `par` s'ajoutent à ceux du niveau.
+ */
+const stageSchema = Schema.object({ blocks: blocksSchema, targets: targetsSchema, barrels: barrelsSchema, flyers: flyersSchema, tethers: tethersSchema, hinges: hingesSchema }, { strict: true })
+
+/** Un général n'apparaît qu'en cible de type « general », et une cible « general » a toujours son général. */
+function checkGenerals(targets, where) {
+  for (const t of targets) {
+    if ((t.type === 'general') !== Boolean(t.general)) throw new Error(`${where}: a general target needs its general id (and only it)`)
+  }
+}
 
 /**
  * Construit, valide et gèle un niveau à partir de sa description.
@@ -79,11 +136,32 @@ export function buildLevel(spec, id, chapter, seedSalt = 0, { tutorial = null, r
     const cold = b.zones.some((z) => z.kind !== 'lake')
     ammo = ammoFor(rank, ammo, { cold })
   }
+  // Grands sièges (v6.0) : les étapes suivantes, chacune avec ses tirs en plus. Le terrain
+  // (plateaux de roche, douves) reste celui du niveau : `floorAt(x)` donne le dessus du sol.
+  const rock = b.blocks.filter((k) => k.material === 'rock' && k.shape === 'rect')
+  const floorAt = (x) => rock.filter((k) => Math.abs(x - k.x) <= k.w / 2).reduce((top, k) => Math.min(top, k.y - k.h / 2), WORLD_GROUND)
+  const stages = (spec.stages ?? []).map((st, i) => {
+    const sb = new StructureBuilder()
+    st.build(sb, { floorAt })
+    const where = `level ${id} stage ${i + 2}`
+    const d = stageSchema({ blocks: sb.blocks, targets: sb.targets, barrels: sb.barrels, flyers: sb.flyers, ...mechanisms(sb, where) }, where)
+    if (!d.targets.length) throw new Error(`${where}: no target`)
+    checkGenerals(d.targets, where)
+    const sbounds = sb.bounds()
+    return {
+      ...d,
+      shots: Guard.int(st.shots, `${where} shots`, { min: 1, max: 8 }),
+      par: Guard.int(st.par ?? 1, `${where} par`, { min: 1, max: 6 }),
+      focus: { left: 0, right: Math.max(1500, sbounds.right + 160), top: Math.min(250, sbounds.top - 180) },
+    }
+  })
+  shots += stages.reduce((s, st) => s + st.shots, 0)
   const data = levelSchema(
-    { shots, wind: spec.wind, ammo, blocks: b.blocks, targets: b.targets, barrels: b.barrels, zones: b.zones, flyers: b.flyers },
+    { shots, wind: spec.wind, ammo, blocks: b.blocks, targets: b.targets, barrels: b.barrels, zones: b.zones, flyers: b.flyers, ...mechanisms(b, `level ${id}`) },
     `level ${id}`,
   )
   if (!data.targets.length) throw new Error(`level ${id}: no target`)
+  checkGenerals(data.targets, `level ${id}`)
   const bounds = b.bounds()
   const level = {
     id,
@@ -91,9 +169,15 @@ export function buildLevel(spec, id, chapter, seedSalt = 0, { tutorial = null, r
     seed: ((id + seedSalt) * 2654435761) >>> 0,
     ...data,
     focus: { left: 0, right: Math.max(1500, bounds.right + 160), top: Math.min(250, bounds.top - 180) },
+    stages,
+    stageCount: 1 + stages.length,
+    /** Général de Mordrac qui défend ce niveau (fin de chapitre), ou null. */
+    general: [...data.targets, ...stages.flatMap((st) => st.targets)].find((t) => t.general)?.general ?? null,
   }
   // Étoiles : 3 en `par` tirs (1, ou 2 pour les châteaux très garnis), 2 en `star2` tirs.
-  level.par = Guard.int(spec.par ?? (data.targets.length >= 6 ? 2 : 1), `level ${id} par`, { min: 1, max: data.shots })
+  // Grand siège : le par de chaque étape s'ajoute.
+  const basePar = spec.par ?? (data.targets.length >= 6 ? 2 : 1)
+  level.par = Guard.int(basePar + stages.reduce((s, st) => s + st.par, 0), `level ${id} par`, { min: 1, max: data.shots })
   level.star2 = Math.min(data.shots, level.par + Math.max(1, Math.floor((data.shots - level.par) / 2)))
   // Outil présenté par un tutoriel guidé (voir LevelRepository.tutorialFor).
   level.tutorial = tutorial
@@ -220,6 +304,14 @@ export class LevelRepository {
       l.zones.forEach((z) => seen.add(`terrain:${z.kind}`))
       l.flyers.forEach((f) => seen.add(`flyer:${f.type}`))
       if (l.blocks.some((b) => b.material === 'rock' && b.shape === 'triangle' && b.h >= 150 && b.x < 1100)) seen.add('terrain:mountain')
+      // Grands sièges (v6.0) : les défenseurs des étapes suivantes comptent aussi.
+      for (const st of l.stages ?? []) st.targets.forEach((t) => seen.add(`target:${t.type}`))
+      // Mécanismes (v6.0) : potence (corde) et pont-levis (chaîne).
+      for (const t of [l, ...(l.stages ?? [])].flatMap((p) => p.tethers ?? [])) seen.add(t.kind === 'chain' ? 'contraption:drawbridge' : 'contraption:gallows')
+      if (l.stageCount > 1) seen.add('siege')
+      // v6.1 : ouvrages et souffle du monde.
+      for (const p of [l, ...(l.stages ?? [])]) p.blocks.forEach((b) => b.prop && seen.add(`prop:${b.prop}`))
+      seen.add(`wind:${worldWindFor(l.chapter)}`)
     }
     const level = LevelRepository.get(id)
     const now = new Set()
@@ -235,6 +327,19 @@ export class LevelRepository {
     if (level.blocks.some((b) => b.material === 'rock' && b.shape === 'triangle' && b.h >= 150 && b.x < 1100)) now.add('terrain:mountain')
     LevelRepository.newAmmo(id).forEach((a) => now.add(`ammo:${a}`))
     if (id === TREBUCHET_UNLOCK + 1) now.add('engine:trebuchet')
+    for (const st of level.stages ?? []) st.targets.forEach((t) => now.add(`target:${t.type}`))
+    if (level.stageCount > 1) now.add('siege')
+    for (const t of [level, ...(level.stages ?? [])].flatMap((p) => p.tethers ?? [])) now.add(t.kind === 'chain' ? 'contraption:drawbridge' : 'contraption:gallows')
+    // Jauge de destruction (v6.0, voir GameSession) : présentée au niveau où elle apparaît.
+    if (id === GAUGE_FROM_LEVEL) now.add('gauge')
+    // v6.1 : ouvrages et souffle du monde (le vent simple n'a pas de fiche).
+    for (const p of [level, ...(level.stages ?? [])]) p.blocks.forEach((b) => b.prop && now.add(`prop:${b.prop}`))
+    const wind = worldWindFor(level.chapter)
+    if (wind !== 'breeze') now.add(`wind:${wind}`)
+    // Le général a sa propre fiche dans l'introduction (voir GameScreen.vue).
+    now.delete('target:general')
+    // La roche du décor n'a pas de fiche : celle de la montagne la présente (v6.1, plus de clé brute à l'écran).
+    now.delete('material:rock')
     return [...now].filter((k) => !seen.has(k))
   }
 }

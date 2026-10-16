@@ -54,9 +54,18 @@
     padding: 0;
   }
   .hud-top__powers span,
-  .hud-top__chapter,
-  .hud-stat dt {
+  .hud-top__chapter {
     display: none;
+  }
+  .hud-stat dt {
+    /* Masquée à l'œil, mais lue par les lecteurs d'écran (v6.1). */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
   .hud-top__name {
     font-size: var(--fs-1);
@@ -275,9 +284,18 @@
     text-overflow: ellipsis;
   }
   .hud-top__powers span,
-  .hud-top__chapter,
-  .hud-stat dt {
+  .hud-top__chapter {
     display: none;
+  }
+  .hud-stat dt {
+    /* Masquée à l'œil, mais lue par les lecteurs d'écran (v6.1). */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
   .hud-stats {
     gap: var(--space-2);

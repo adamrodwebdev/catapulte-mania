@@ -347,6 +347,24 @@
   gap: var(--space-1);
 }
 
+/* v6.1 : neuf munitions. Sur téléphone, la barre défile : un fondu signale
+   celles qui sont cachées de chaque côté (voir AmmoBar.vue). */
+.ammo--more-start,
+.ammo--more-end {
+  --ammo-fade: 1.75rem;
+  -webkit-mask-image: linear-gradient(var(--ammo-fade-dir, to right), var(--ammo-fade-a, #000) 0, #000 var(--ammo-fade), #000 calc(100% - var(--ammo-fade)), var(--ammo-fade-b, #000) 100%);
+  mask-image: linear-gradient(var(--ammo-fade-dir, to right), var(--ammo-fade-a, #000) 0, #000 var(--ammo-fade), #000 calc(100% - var(--ammo-fade)), var(--ammo-fade-b, #000) 100%);
+}
+.ammo--column {
+  --ammo-fade-dir: to bottom;
+}
+.ammo--more-start {
+  --ammo-fade-a: transparent;
+}
+.ammo--more-end {
+  --ammo-fade-b: transparent;
+}
+
 .ammo__item {
   position: relative;
   display: grid;
@@ -438,6 +456,29 @@
     radial-gradient(circle at 70% 35%, #8b857a 22%, transparent 24%),
     radial-gradient(circle at 50% 72%, #8b857a 22%, transparent 24%),
     var(--surface);
+}
+
+/* v6.1 : botte de paille (deux liens), orbe d'orage (cœur bleu dans sa cage), pot de poison. */
+.ammo__item--bale .ammo__icon {
+  width: 26px;
+  height: 26px;
+  background:
+    linear-gradient(90deg, transparent 29%, #6b4a26 29% 37%, transparent 37% 63%, #6b4a26 63% 71%, transparent 71%),
+    radial-gradient(circle at 35% 30%, #f6dc8c, #c99a45 72%);
+}
+
+.ammo__item--thunder .ammo__icon {
+  border-color: #2b2f3a;
+  background:
+    linear-gradient(90deg, transparent 46%, #2b2f3a 46% 54%, transparent 54%),
+    radial-gradient(circle at 45% 40%, #ffffff, #9fd2ff 40%, #3d6fb8 80%);
+  box-shadow: 0 0 8px rgba(140, 200, 255, 0.85);
+}
+
+.ammo__item--poison .ammo__icon {
+  border-radius: 46% 46% 50% 50%;
+  background: radial-gradient(circle at 35% 35%, #c6ef86, #5f9e3a 55%, #2f5a22 90%);
+  box-shadow: 0 -5px 0 -2px #b08850, 0 0 6px rgba(150, 230, 90, 0.55);
 }
 
 .ammo__name {
@@ -874,7 +915,14 @@
   }
 
   .hud-stat dt {
-    display: none;
+    /* Masquée à l'œil, mais lue par les lecteurs d'écran (v6.1). */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 
   .game__hint {
@@ -1065,6 +1113,28 @@
 .hud-stat--wind .hud-stat__value {
   position: relative;
 }
+
+/* v6.1 : souffle du monde — une pastille de la couleur de l'élément, devant la
+   force du vent (visible aussi sur téléphone, où les intitulés sont masqués). */
+.wind-element {
+  display: inline-block;
+  width: 0.55em;
+  height: 0.55em;
+  margin-inline-end: 0.3em;
+  border-radius: 50%;
+  vertical-align: 0.05em;
+  background: var(--world-wind, #f5f8ff);
+  box-shadow: 0 0 6px var(--world-wind, #f5f8ff);
+}
+
+.world-wind--gusts { --world-wind: #eef3fb; }
+.world-wind--embers { --world-wind: #ffaa5a; }
+.world-wind--miasma { --world-wind: #aabe6e; }
+.world-wind--sand { --world-wind: #e2c48c; }
+.world-wind--thermal { --world-wind: #fff3d6; }
+.world-wind--frost { --world-wind: #bfe6ff; }
+.world-wind--charge { --world-wind: #cfe8ff; }
+.world-wind--fire { --world-wind: #ff9650; }
 
 .wind-gust {
   position: absolute;

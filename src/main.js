@@ -14,6 +14,7 @@ import './styles/ui.css'
 import './styles/screens.css'
 import './styles/game.css'
 import './styles/modes.css'
+import './styles/bosses.css'
 import './styles/studio.css'
 import './styles/mobile.css'
 

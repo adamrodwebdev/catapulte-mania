@@ -59,7 +59,7 @@ test('siège sans fin : un château pris rapporte points et tirs, une défaite t
 test('siège sans fin : résultats et parties non authentiques refusés', () => {
   const run = EndlessRun.start(7)
   assert.throws(() => run.record({ levelId: run.levelFor(), won: true, score: 99999, shotsUsed: 1 }, 3), /engine/)
-  const other = LevelRepository.get(run.levelFor() === 50 ? 51 : 50)
+  const other = LevelRepository.get(run.levelFor() === 51 ? 52 : 51)
   const { end } = finish(other)
   assert.throws(() => run.record(end.result, 3), /wrong castle/)
   const slot = SaveSlot.create(0, 'Robin', 'normal')

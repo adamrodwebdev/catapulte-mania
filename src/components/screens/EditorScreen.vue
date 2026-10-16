@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, markRaw } from 'vue'
 import { useApp } from '../../app/AppContext.js'
 import AppIcon from '../ui/AppIcon.vue'
 import ModalPanel from '../ui/ModalPanel.vue'
-import { emptyDesign, placePart, removeAt, CastleCode, PARTS, LIMITS, STORAGE_KEYS } from '../../game/editor/CastleDesign.js'
+import { emptyDesign, placePart, removeAt, CastleCode, PARTS, LIMITS, STORAGE_KEYS, DESIGN_AMMO } from '../../game/editor/CastleDesign.js'
 import { BUILD_MATERIALS } from '../../game/entities/materials.js'
 
 /**
@@ -250,9 +250,9 @@ onBeforeUnmount(() => ro?.disconnect())
         <fieldset class="field">
           <legend class="field__label">{{ t('game.ammoTitle') }}</legend>
           <div class="editor__ammo">
-            <label v-for="a in ['boulder', 'fire', 'frost', 'bomb', 'split']" :key="a" class="editor__ammo-item">
+            <label v-for="a in DESIGN_AMMO" :key="a" class="editor__ammo-item">
               <span>{{ t(`game.ammo.${a}`) }}</span>
-              <input class="input" type="number" min="0" max="5" :value="design.ammo[a]" @change="setAmmo(a, Number($event.target.value) || 0)">
+              <input class="input" type="number" min="0" max="5" :value="design.ammo[a] ?? 0" @change="setAmmo(a, Number($event.target.value) || 0)">
             </label>
           </div>
         </fieldset>

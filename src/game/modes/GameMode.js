@@ -24,6 +24,16 @@ export class GameMode {
   coupDeGrace = false
   /** Un seul score pour l'équipe (campagne à deux) ? */
   sharedScore = false
+  /**
+   * Grands sièges (v6.0) : jouer les étapes suivantes d'une fin de chapitre
+   * (et leur général). Le siège sans fin ne joue que le premier château.
+   */
+  grandSiege = true
+  /**
+   * Jauge de destruction (v6.0) : abattre la moitié d'un château donne une
+   * pierre de plus. Pas au face-à-face (chacun son camp).
+   */
+  destructionGauge = true
 
   /**
    * @param {{ players?: string[], effects?: object, completedLevels?: number }} [opts]

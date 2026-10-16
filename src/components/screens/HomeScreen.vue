@@ -5,6 +5,8 @@ import AppIcon from '../ui/AppIcon.vue'
 import LanguagePicker from '../ui/LanguagePicker.vue'
 import SiegeLandscape from '../ui/SiegeLandscape.vue'
 import ModalPanel from '../ui/ModalPanel.vue'
+import CupPanel from '../ui/CupPanel.vue'
+import { WeeklyCup } from '../../game/daily/WeeklyCup.js'
 import { DailyChallenge, dayKey } from '../../game/daily/DailyChallenge.js'
 import { eventFor } from '../../game/events/Season.js'
 import { IS_DEMO, IS_PORTAL, PLAYABLE_LEVELS, APP_VERSION } from '../../config/gameConfig.js'
@@ -55,6 +57,28 @@ const dailyStreak = computed(() => state.profile?.daily?.streak ?? 0)
 function daily() {
   app.services.audio.unlock()
   app.startDaily()
+}
+/** Coupe de la semaine (v6.0) : le panneau s'ouvre sur le profil en cours (ou le dernier). */
+const cupWeek = WeeklyCup.thisWeek()
+const cupOpen = ref(Boolean(state.showCup))
+state.showCup = false
+const cupHint = computed(() => {
+  const c = state.profile?.cup
+  if (!c) return t('cup.menuHint', { n: cupWeek.levels.length })
+  return c.medal ? `${t(`cup.medals.${c.medal}`)} · ${t('cup.progress', { stars: c.stars, max: c.maxStars })}` : t('cup.progress', { stars: c.stars, max: c.maxStars })
+})
+async function openCup() {
+  app.services.audio.unlock()
+  if (!state.profile) {
+    const last = lastProfile.value
+    if (!last || !(await app.openProfile(last.index))) return app.startCup(1)
+  }
+  cupOpen.value = true
+}
+/** Lien d'une coupe : celle de la semaine s'ouvre ; une coupe finie, on le dit. */
+function acceptCup() {
+  state.incomingCup = null
+  openCup()
 }
 function acceptChallenge() {
   app.services.audio.unlock()
@@ -116,6 +140,15 @@ function open(screen) {
               </span>
             </button>
           </li>
+          <li v-if="!IS_DEMO">
+            <button type="button" class="banner__item" @click="openCup">
+              <AppIcon name="trophy" />
+              <span class="banner__text">
+                {{ t('cup.title') }}
+                <small>{{ cupHint }}</small>
+              </span>
+            </button>
+          </li>
           <li>
             <button type="button" class="banner__item" @click="open('modes')">
               <AppIcon name="users" />
@@ -155,6 +188,15 @@ function open(screen) {
       <div class="modal__actions">
         <button type="button" class="btn btn--primary btn--large" data-autofocus @click="app.startCustom(state.incomingCastle.code)">{{ t('editor.attack') }}</button>
         <button type="button" class="btn btn--ghost" @click="state.incomingCastle = null">{{ t('daily.later') }}</button>
+      </div>
+    </ModalPanel>
+    <CupPanel v-if="cupOpen" @close="cupOpen = false" />
+    <ModalPanel v-if="state.incomingCup" labelledby="incoming-cup-title" @close="state.incomingCup = null">
+      <h2 id="incoming-cup-title" class="modal__title">{{ t('cup.title') }}</h2>
+      <p>{{ state.incomingCup.current ? t('cup.incoming') : t('cup.incomingOver') }}</p>
+      <div class="modal__actions">
+        <button type="button" class="btn btn--primary btn--large" data-autofocus @click="acceptCup">{{ state.incomingCup.current ? t('cup.open') : t('cup.openThisWeek') }}</button>
+        <button type="button" class="btn btn--ghost" @click="state.incomingCup = null">{{ t('daily.later') }}</button>
       </div>
     </ModalPanel>
     <p v-if="state.badChallenge" class="notice notice--warning home__notice" role="alert">{{ t('daily.badLink') }}</p>

@@ -2,7 +2,7 @@
 """
 Transforme une illustration pixel art (grande image, fond en damier) en
 « maître » de portrait : art/portraits/<id>.png, petit (≈ 100 × 120 pixels),
-détouré, au plus 52 couleurs. Étape suivante : encode.py.
+détouré, au plus 52 couleurs. Étape suivante : encode.mjs (npm run portraits).
 
 Usage : python3 scripts/portraits/convert.py <image.png> <id> [--dark-bg] [--cut-bottom]
   --dark-bg     : le damier de fond est sombre (sinon clair)

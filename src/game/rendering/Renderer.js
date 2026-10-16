@@ -3,7 +3,10 @@ import { WORLD } from '../physics/constants.js'
 import { WindLayer } from './WindLayer.js'
 import { drawLake, drawLava } from '../assets/procedural/liquids.js'
 import { THEMES } from '../assets/procedural/painters.js'
+import { GUARD_MS } from '../entities/General.js'
 import { hasSunRays, moteKind, motes, sunPosition } from '../assets/procedural/scenery.js'
+import { roundRect } from '../assets/procedural/realism.js'
+import { CLOUD_KINDS } from '../physics/Clouds.js'
 
 /** Emprise du bâti de chaque engin (repère local, avant le miroir) : là où se voient les avaries. */
 const ENGINE_FRAME = Object.freeze({
@@ -123,6 +126,7 @@ export class Renderer {
       // Échelles des pillards (v5.8) : devant la roche, derrière les défenseurs qui y grimpent.
       if (!worksDrawn && e.kind !== 'block' && e.kind !== 'barrel') {
         this.#drawWorks(ctx, scene.works, time, pixel)
+        this.#drawTethers(ctx, scene.tethers, pixel)
         worksDrawn = true
       }
       ctx.save()
@@ -131,22 +135,37 @@ export class Renderer {
       if (e.kind === 'flyer') ctx.rotate(-e.angle)
       // Carreau de baliste : toujours pointé dans le sens de sa course.
       if (e.bolt) ctx.rotate(Math.atan2(e.body.velocity.y, e.body.velocity.x) - e.angle)
+      // Général intouchable (v6.0) : il pulse doucement le temps de se relever (voilé, sans pulsation, en mouvement réduit).
+      if (e.guardMs > 0) ctx.globalAlpha = animate === false ? 0.6 : 0.6 + 0.4 * Math.cos(time / 53)
       assets.draw(ctx, e.assetKey, {
         w: e.width, h: e.height, vertices: e.localVertices, shape: e.shape, damage: e.damageRatio,
         burning: e.burning > 0, time, seed: e.id, pixel,
         extra:
           e.kind === 'target'
-            ? { hurt: time - e.hurtAt < 600 || e.damageRatio > 0.6, team: e.team, still: animate === false, alert, frozen: e.frozenMs > 0, walking: e.walking && e.frozenMs <= 0, facing: e.facing, swing: (scene.worldTime ?? 0) - (e.swatAt ?? -Infinity), torch: e.torch, sprinting: e.sprinting && e.walking, working: e.working, aura: e.aura > 1, raid: e.raid, climbing: Boolean(e.climbing) }
+            ? {
+                hurt: time - e.hurtAt < 600 || e.damageRatio > 0.6, team: e.team, still: animate === false, alert, frozen: e.frozenMs > 0, walking: e.walking && e.frozenMs <= 0, facing: e.facing,
+                swing: (scene.worldTime ?? 0) - (e.swatAt ?? -Infinity), torch: e.torch, sprinting: e.sprinting && e.walking, working: e.working, aura: e.aura > 1, raid: e.raid,
+                climbing: Boolean(e.climbing), general: e.generalId, order: (scene.worldTime ?? 0) - (e.orderAt ?? -Infinity),
+                // v6.1 : il repousse (ms depuis le geste), bras levés, sonné ou électrisé, empoisonné.
+                push: (scene.worldTime ?? 0) - (e.pushAt ?? -Infinity), brace: Boolean(e.bracing), stun: (scene.worldTime ?? 0) < (e.stunUntil ?? 0) ? e.stunKind : null,
+                poisoned: (scene.worldTime ?? 0) < (e.poisonUntil ?? 0),
+              }
             : e.kind === 'flyer'
               ? { flap: animate === false ? 0.25 : e.flap, facing: e.facing, carrying: e.carrying }
-              : undefined,
+              : e.prop
+                ? { mill: e.mill?.angle ?? 0, frozen: e.frozenMs > 0, quenched: (e.quenchedUntil ?? 0) > (scene.worldTime ?? 0), still: animate === false }
+                : undefined,
       })
-      if (e.frozenMs > 0) this.#drawFrost(ctx, e, time, pixel)
+      // Gelé, ou givré en vol par la bise (v6.1).
+      if (e.frozenMs > 0 || e.rimed) this.#drawFrost(ctx, e, time, pixel)
       if (e.kind === 'projectile' && e.snowScale > 1.04) this.#drawSnowball(ctx, e, pixel)
       ctx.restore()
     }
 
-    if (!worksDrawn) this.#drawWorks(ctx, scene.works, time, pixel)
+    if (!worksDrawn) {
+      this.#drawWorks(ctx, scene.works, time, pixel)
+      this.#drawTethers(ctx, scene.tethers, pixel)
+    }
     // Vent : traînées, manche à air, fanion du château.
     if (scene.wind) this.#wind.draw(ctx, scene.wind, pixel)
 
@@ -173,13 +192,18 @@ export class Renderer {
     const view = { left: camera.screenToWorld(0, 0).x, right: camera.screenToWorld(camera.viewW, 0).x }
     for (const c of scene.catapults || []) if (c.condition?.show) this.#drawEngineBar(ctx, c, pixel, scene.highContrast, view)
     this.#drawRaiders(ctx, list, time, animate, pixel)
+    this.#drawGenerals(ctx, list, time, animate, pixel)
+    if (scene.healthBars !== false) this.#drawHealth(ctx, list, scene.worldTime ?? 0, pixel)
 
     // Viseur un peu plus petit sur les écrans bas (téléphone à l'horizontale).
     if (scene.aim) this.#drawAim(ctx, scene.aim, pixel * Math.max(0.72, Math.min(1, camera.viewH / 720)), scene.highContrast)
     if (scene.trebAim) this.#drawTrebAim(ctx, scene.trebAim, time, pixel, scene.highContrast)
 
+    if (scene.clouds?.size) this.#drawClouds(ctx, scene.clouds, scene.worldTime ?? 0, time, animate)
     this.#drawFireLight(ctx, list, theme, time, animate, scene.catapults || [])
     scene.particles.viewWidth = camera.viewW
+    // Défenseurs assommés (v6.0) : les particules empruntent le dessin des personnages.
+    scene.particles.drawSprite ??= (c, key, state) => assets.draw(c, key, state)
     scene.particles.draw(ctx, pixel)
 
     if (scene.trajectory && scene.trajectory.length) this.#drawTrajectory(ctx, scene.trajectory, pixel, scene.highContrast)
@@ -509,21 +533,242 @@ export class Renderer {
   }
 
   /**
+   * Mécanismes (v6.0) : cordes de chanvre (légèrement détendues, torsadées),
+   * chaînes de fer (maillons alternés), boulons des charnières.
+   */
+  #drawTethers(ctx, view, pixel) {
+    if (!view || (!view.links.length && !view.hinges.length)) return
+    ctx.save()
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    for (const l of view.links) {
+      if (l.kind === 'chain') {
+        const len = Math.hypot(l.bx - l.ax, l.by - l.ay)
+        const n = Math.max(2, Math.round(len / 7))
+        const a = Math.atan2(l.by - l.ay, l.bx - l.ax)
+        for (let i = 0; i < n; i++) {
+          const u = (i + 0.5) / n
+          ctx.save()
+          ctx.translate(l.ax + (l.bx - l.ax) * u, l.ay + (l.by - l.ay) * u)
+          ctx.rotate(a)
+          ctx.beginPath()
+          // Un maillon sur deux de face (anneau), l'autre de profil (barrette).
+          if (i % 2) ctx.rect(-4.2, -0.9, 8.4, 1.8)
+          else ctx.ellipse(0, 0, 4.6, 2.6, 0, 0, Math.PI * 2)
+          ctx.lineWidth = 2.6
+          ctx.strokeStyle = '#2b2d33'
+          ctx.stroke()
+          ctx.lineWidth = 1.3
+          ctx.strokeStyle = '#9aa1ad'
+          ctx.stroke()
+          ctx.restore()
+        }
+        continue
+      }
+      // Corde : un léger ventre quand elle a du mou, une torsade sombre.
+      const mx = (l.ax + l.bx) / 2
+      const my = (l.ay + l.by) / 2 + Math.min(18, l.slack * 0.6)
+      const path = () => {
+        ctx.beginPath()
+        ctx.moveTo(l.ax, l.ay)
+        ctx.quadraticCurveTo(mx, my, l.bx, l.by)
+      }
+      path()
+      ctx.lineWidth = 4.4
+      ctx.strokeStyle = '#3a2614'
+      ctx.stroke()
+      path()
+      ctx.lineWidth = 2.8
+      ctx.strokeStyle = '#b08a55'
+      ctx.stroke()
+      path()
+      ctx.setLineDash([2.2, 3.2])
+      ctx.lineWidth = 2.8
+      ctx.strokeStyle = 'rgba(70,46,22,0.75)'
+      ctx.stroke()
+      ctx.setLineDash([])
+      if (l.stub) {
+        // Bout effiloché de la corde tranchée.
+        ctx.lineWidth = 1
+        ctx.strokeStyle = '#8a6a40'
+        for (const d of [-2.5, 0, 2.5]) {
+          ctx.beginPath()
+          ctx.moveTo(l.bx, l.by)
+          ctx.lineTo(l.bx + d, l.by + 5)
+          ctx.stroke()
+        }
+      }
+    }
+    for (const h of view.hinges) {
+      ctx.beginPath()
+      ctx.arc(h.x, h.y, 4.2, 0, Math.PI * 2)
+      ctx.fillStyle = '#4b515b'
+      ctx.fill()
+      ctx.lineWidth = 1.4 * Math.max(1, pixel)
+      ctx.strokeStyle = '#1e1a2b'
+      ctx.stroke()
+    }
+    ctx.restore()
+  }
+
+  /**
+   * Généraux (v6.0) : leurs vies en cœurs au-dessus de la tête. Le cœur qu'il
+   * vient de perdre enfle puis se vide pendant qu'il se relève.
+   */
+  #drawGenerals(ctx, list, time, animate, pixel) {
+    const px = Math.max(1, pixel)
+    for (const e of list) {
+      if (e.kind !== 'target' || e.type !== 'general' || e.alive === false) continue
+      const n = e.maxLives
+      const s = 5.5 * px
+      const step = s * 2.4
+      const x0 = e.x - ((n - 1) * step) / 2
+      const y = e.y - e.height / 2 - 16 * px
+      const lost = e.guardMs > 0 ? 1 - e.guardMs / GUARD_MS : 1
+      for (let i = 0; i < n; i++) {
+        const full = i < e.lives
+        const fresh = i === e.lives && lost < 1
+        const k = fresh && animate !== false ? 1 + 0.5 * Math.sin(lost * Math.PI) : 1
+        this.#heart(ctx, x0 + i * step, y, s * k, full || (fresh && lost < 0.6), px)
+      }
+    }
+  }
+
+  /**
+   * Nuages (v6.1) : des volutes douces qui tournent lentement (poison vert,
+   * miasmes ternes, farine blanche) ; ils s'estompent avant de disparaître.
+   */
+  #drawClouds(ctx, clouds, worldTime, time, animate) {
+    const spin = animate === false ? 0 : time / 2400
+    for (const c of clouds.list) {
+      const r = clouds.radiusAt(c, worldTime)
+      const alpha = clouds.alphaAt(c, worldTime)
+      const rgb = CLOUD_KINDS[c.kind]?.rgb ?? '200,200,200'
+      // Essaim : des abeilles qui tournoient, pas une nappe.
+      if (c.kind === 'bees') {
+        ctx.save()
+        ctx.fillStyle = `rgba(${rgb},${0.95 * alpha})`
+        const t = animate === false ? 0 : time / 1000
+        for (let i = 0; i < 26; i++) {
+          const a = i * 2.39996 + t * (1.5 + (i % 5) * 0.4)
+          const d = r * (0.25 + ((i * 37) % 70) / 100)
+          ctx.beginPath()
+          ctx.arc(c.x + Math.cos(a) * d, c.y + Math.sin(a * 1.31) * d * 0.7, 2.2, 0, Math.PI * 2)
+          ctx.fill()
+        }
+        ctx.restore()
+        continue
+      }
+      ctx.save()
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * Math.PI * 2 + spin * (i % 2 ? 1 : -1)
+        const d = i === 6 ? 0 : r * 0.42
+        const x = c.x + Math.cos(a) * d
+        const y = c.y + Math.sin(a) * d * 0.7
+        const rr = r * (i === 6 ? 0.75 : 0.55)
+        const g = ctx.createRadialGradient(x, y, rr * 0.1, x, y, rr)
+        g.addColorStop(0, `rgba(${rgb},${0.42 * alpha})`)
+        g.addColorStop(1, `rgba(${rgb},0)`)
+        ctx.fillStyle = g
+        ctx.beginPath()
+        ctx.arc(x, y, rr, 0, Math.PI * 2)
+        ctx.fill()
+      }
+      ctx.restore()
+    }
+  }
+
+  /**
+   * Barres de vie (v6.1) : au-dessus de chaque défenseur blessé, et toujours
+   * sous les cœurs d'un général. Taille constante à l'écran ; un cran tous
+   * les 10 points de vie ; la part qui vient d'être perdue reste blanche un
+   * instant, puis fond (affichage seulement).
+   */
+  #drawHealth(ctx, list, worldTime, pixel) {
+    const px = Math.max(1, pixel)
+    for (const e of list) {
+      if (e.kind !== 'target' || e.alive === false || !Number.isFinite(e.maxHp)) continue
+      const general = e.type === 'general'
+      const hp = Math.max(0, e.hp)
+      // Retard d'affichage : la barre blanche rattrape la vie réelle en ~0,4 s.
+      const lag = e.barLag === undefined || e.barLag < hp ? hp : Math.max(hp, e.barLag - e.maxHp * 0.025)
+      e.barLag = lag
+      if (!general && hp >= e.maxHp - 0.5 && lag >= e.maxHp - 0.5) continue
+      const w = (general ? 34 : 26) * px
+      const h = 4.5 * px
+      const top = general ? e.y - e.height / 2 - 9 * px : e.body.bounds.min.y - 10 * px
+      const x0 = e.x - w / 2
+      const k = hp / e.maxHp
+      const poisoned = worldTime < (e.poisonUntil ?? 0)
+      ctx.save()
+      ctx.fillStyle = 'rgba(20,16,30,0.78)'
+      ctx.beginPath()
+      roundRect(ctx, x0 - px, top - px, w + 2 * px, h + 2 * px, 2.5 * px)
+      ctx.fill()
+      if (lag > hp) {
+        ctx.fillStyle = 'rgba(255,248,232,0.9)'
+        ctx.fillRect(x0 + w * k, top, w * ((lag - hp) / e.maxHp), h)
+      }
+      ctx.fillStyle = poisoned ? '#9be05a' : k > 0.6 ? '#6fd36a' : k > 0.3 ? '#f2c14e' : '#e5534b'
+      ctx.fillRect(x0, top, w * k, h)
+      ctx.fillStyle = 'rgba(255,255,255,0.28)'
+      ctx.fillRect(x0, top, w * k, h * 0.4)
+      // Crans : tous les 10 points (50 au-delà de 120), pour compter les coups.
+      const notch = e.maxHp > 120 ? 50 : 10
+      ctx.fillStyle = 'rgba(20,16,30,0.55)'
+      for (let v = notch; v < e.maxHp - 0.5; v += notch) ctx.fillRect(x0 + (w * v) / e.maxHp - 0.5 * px, top, px, h)
+      ctx.restore()
+    }
+  }
+
+  #heart(ctx, x, y, s, full, px) {
+    ctx.save()
+    ctx.beginPath()
+    ctx.moveTo(x, y + s * 0.9)
+    ctx.bezierCurveTo(x - s * 1.3, y + s * 0.1, x - s * 1.1, y - s * 1, x, y - s * 0.35)
+    ctx.bezierCurveTo(x + s * 1.1, y - s * 1, x + s * 1.3, y + s * 0.1, x, y + s * 0.9)
+    ctx.closePath()
+    ctx.fillStyle = full ? '#e2453b' : 'rgba(30,26,43,0.55)'
+    ctx.fill()
+    ctx.lineWidth = 1.6 * px
+    ctx.strokeStyle = full ? '#1e1a2b' : 'rgba(255,246,220,0.85)'
+    ctx.stroke()
+    if (full) {
+      ctx.beginPath()
+      ctx.arc(x - s * 0.45, y - s * 0.25, s * 0.22, 0, Math.PI * 2)
+      ctx.fillStyle = 'rgba(255,255,255,0.7)'
+      ctx.fill()
+    }
+    ctx.restore()
+  }
+
+  /**
    * Étendard (v5.8) : un cercle d'or pâle au pied de chaque défenseur
    * galvanisé, qui pulse doucement. On voit d'un coup d'œil qui il protège.
+   * Cri de guerre d'un général (v6.0) : un cercle rouge qui bat plus vite.
    */
   #drawAuras(ctx, list, time, animate, pixel) {
     const k = animate === false ? 0.5 : 0.5 + 0.5 * Math.sin(time / 380)
+    const fast = animate === false ? 0.5 : 0.5 + 0.5 * Math.sin(time / 150)
     ctx.save()
     ctx.lineWidth = 2.4 * Math.max(1, pixel)
     for (const e of list) {
-      if (e.kind !== 'target' || e.alive === false || !(e.aura > 1 || e.type === 'bannerman')) continue
+      if (e.kind !== 'target' || e.alive === false) continue
       const feet = e.y + e.height / 2
-      ctx.globalAlpha = e.type === 'bannerman' ? 0.75 : 0.35 + 0.35 * k
-      ctx.strokeStyle = '#f2c94c'
-      ctx.beginPath()
-      ctx.ellipse(e.x, feet - 1, e.width * 0.75 + k * 3, 5 + k, 0, 0, Math.PI * 2)
-      ctx.stroke()
+      if (e.aura > 1 || e.type === 'bannerman') {
+        ctx.globalAlpha = e.type === 'bannerman' ? 0.75 : 0.35 + 0.35 * k
+        ctx.strokeStyle = '#f2c94c'
+        ctx.beginPath()
+        ctx.ellipse(e.x, feet - 1, e.width * 0.75 + k * 3, 5 + k, 0, 0, Math.PI * 2)
+        ctx.stroke()
+      }
+      if (e.buff > 1) {
+        ctx.globalAlpha = 0.45 + 0.4 * fast
+        ctx.strokeStyle = '#ff6a3d'
+        ctx.beginPath()
+        ctx.ellipse(e.x, feet - 1, e.width * 0.9 + fast * 4, 6 + fast, 0, 0, Math.PI * 2)
+        ctx.stroke()
+      }
     }
     ctx.restore()
   }
@@ -1091,10 +1336,65 @@ export class Renderer {
     ctx.restore()
   }
 
+  /**
+   * Repère d'élément sur la courbe de visée (v6.1) : une pastille de la couleur
+   * de l'élément, avec son signe (flocon, flamme, éclair, grains de sable).
+   */
+  #elementMark(ctx, x, y, element, pixel) {
+    const px = Math.max(1, pixel)
+    const r = 11 * px
+    const color = { frost: '#bfe6ff', fire: '#ffb347', charge: '#cfe8ff', sand: '#e2c48c' }[element] ?? '#ffffff'
+    ctx.save()
+    ctx.globalAlpha = 0.95
+    ctx.beginPath()
+    ctx.arc(x, y, r, 0, Math.PI * 2)
+    ctx.fillStyle = 'rgba(20,16,30,0.82)'
+    ctx.fill()
+    ctx.lineWidth = 2 * px
+    ctx.strokeStyle = color
+    ctx.stroke()
+    ctx.strokeStyle = color
+    ctx.fillStyle = color
+    ctx.lineWidth = 1.6 * px
+    ctx.lineCap = 'round'
+    ctx.beginPath()
+    if (element === 'frost') {
+      for (let k = 0; k < 3; k++) {
+        const a = (k * Math.PI) / 3
+        ctx.moveTo(x - Math.cos(a) * r * 0.6, y - Math.sin(a) * r * 0.6)
+        ctx.lineTo(x + Math.cos(a) * r * 0.6, y + Math.sin(a) * r * 0.6)
+      }
+      ctx.stroke()
+    } else if (element === 'fire') {
+      ctx.moveTo(x, y - r * 0.65)
+      ctx.quadraticCurveTo(x + r * 0.55, y, x, y + r * 0.55)
+      ctx.quadraticCurveTo(x - r * 0.55, y, x, y - r * 0.65)
+      ctx.fill()
+    } else if (element === 'charge') {
+      ctx.moveTo(x + r * 0.15, y - r * 0.65)
+      ctx.lineTo(x - r * 0.3, y + r * 0.05)
+      ctx.lineTo(x + r * 0.2, y + r * 0.05)
+      ctx.lineTo(x - r * 0.15, y + r * 0.65)
+      ctx.stroke()
+    } else {
+      for (const [dx, dy] of [[-0.35, -0.2], [0.3, -0.3], [0, 0.25], [-0.25, 0.4], [0.35, 0.3]]) {
+        ctx.moveTo(x + dx * r + 1.5 * px, y + dy * r)
+        ctx.arc(x + dx * r, y + dy * r, 1.5 * px, 0, Math.PI * 2)
+      }
+      ctx.fill()
+    }
+    ctx.restore()
+  }
+
   #drawTrajectory(ctx, points, pixel, highContrast) {
     const n = points.length
     for (let i = 0; i < n; i++) {
       const p = points[i]
+      // Repère du souffle du monde (v6.1) : ici, le vent marque le tir.
+      if (p.mark) {
+        this.#elementMark(ctx, p.x, p.y, p.mark, pixel)
+        continue
+      }
       const t = i / n
       ctx.globalAlpha = 1 - t * 0.6
       ctx.beginPath()

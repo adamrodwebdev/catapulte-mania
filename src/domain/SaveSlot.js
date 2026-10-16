@@ -9,6 +9,7 @@ import { DAY_KEY, dayNumber, DailyChallenge } from '../game/daily/DailyChallenge
 import { EndlessRun } from './EndlessRun.js'
 import { eventFor, EVENTS } from '../game/events/Season.js'
 import { emptyLogin, loginStatus, claimLogin, checkLogin, LOGIN_CYCLE } from '../game/progression/LoginRewards.js'
+import { WEEK_KEY, WeeklyCup, CUP } from '../game/daily/WeeklyCup.js'
 
 /** Nom de profil : lettres (toutes langues), chiffres, espaces, tirets. */
 export const PROFILE_NAME = /^[\p{L}\p{N}][\p{L}\p{N} _'-]{0,15}$/u
@@ -37,7 +38,23 @@ const DAILY = Schema.object({
   days: Schema.record(DAY_KEY, Schema.int({ min: 0, max: GAME.MAX_LEVEL_SCORE }), { maxKeys: DAILY_HISTORY }),
 })
 
-/** Schéma de la sauvegarde (version 8). Toute clé inconnue est refusée. */
+/**
+ * Coupe de la semaine (v10) : la semaine en cours, le meilleur de chaque
+ * château (1 à 5), la médaille de la semaine ; les médailles gagnées en tout.
+ */
+const CUP_SAVE = Schema.object({
+  week: Schema.string({ minLength: 0, maxLength: 8, pattern: /^(?:|\d{4}-W\d{2})$/ }),
+  castles: Schema.record(/^[1-5]$/, Schema.object({ best: Schema.int({ min: 0, max: GAME.MAX_LEVEL_SCORE }), stars: Schema.int({ min: 1, max: 3 }) }), { maxKeys: CUP.CASTLES }),
+  medal: Schema.enum(['', 'bronze', 'silver', 'gold']),
+  trophies: Schema.object({ bronze: COUNTER, silver: COUNTER, gold: COUNTER }),
+})
+
+/** Coupe vide (nouveau profil, ou profil d'avant la v10). */
+export function emptyCup() {
+  return { week: '', castles: {}, medal: '', trophies: { bronze: 0, silver: 0, gold: 0 } }
+}
+
+/** Schéma de la sauvegarde (version 10). Toute clé inconnue est refusée. */
 export const saveSchema = Schema.object({
   version: Schema.enum([GAME.SAVE_VERSION]),
   name: Schema.string({ minLength: 1, maxLength: 16, pattern: PROFILE_NAME }),
@@ -54,6 +71,8 @@ export const saveSchema = Schema.object({
       shots: Schema.int({ min: 0, max: 100 }),
       // v3 : succès obtenus (masque de 3 bits)
       ach: Schema.int({ min: 0, max: 7 }),
+      // v10 : niveau passé après trois défaites (0 étoile, à reprendre plus tard).
+      skipped: Schema.optional(Schema.boolean()),
     }),
     { maxKeys: GAME.LEVEL_COUNT },
   ),
@@ -90,7 +109,16 @@ export const saveSchema = Schema.object({
     claims: Schema.int({ min: 0, max: 100000 }),
     gold: GOLD_INT,
   }),
+  // v10 : coupe de la semaine.
+  cup: CUP_SAVE,
+  // v10 : défaites d'affilée au premier niveau pas encore réussi (coup de pouce, niveau à passer).
+  frontier: Schema.object({ level: Schema.int({ min: 0, max: GAME.LEVEL_COUNT }), fails: Schema.int({ min: 0, max: 1e6 }) }),
 })
+
+/** Défaites d'affilée après lesquelles on peut passer un niveau (v6.0). */
+export const SKIP_AFTER = 3
+/** Coup de pouce discret du premier chapitre : à partir de 2 défaites, +10 % par défaite, au plus 30 %. */
+export const LUCK = Object.freeze({ CHAPTER_MAX_LEVEL: 10, FROM_FAILS: 2, STEP: 0.1, MAX: 0.3 })
 
 /**
  * Migration des anciennes sauvegardes (avant validation du schéma).
@@ -104,6 +132,7 @@ export const saveSchema = Schema.object({
  * v6 → v7 : défi du jour, vide.
  * v7 → v8 : siège sans fin, vide.
  * v8 → v9 : récompenses de connexion, vides.
+ * v9 → v10 : coupe de la semaine, vide ; aucune défaite au front.
  * @param {any} raw
  */
 export function migrateSave(raw) {
@@ -131,6 +160,9 @@ export function migrateSave(raw) {
   if (save && typeof save === 'object' && save.version === 6) save = { ...save, version: 7, daily: { last: '', streak: 0, bestStreak: 0, days: {} } }
   if (save && typeof save === 'object' && save.version === 7) save = { ...save, version: 8, endless: { best: 0, bestWave: 0, sieges: 0 } }
   if (save && typeof save === 'object' && save.version === 8) save = { ...save, version: 9, login: emptyLogin() }
+  if (save && typeof save === 'object' && save.version === 9) save = { ...save, version: 10, cup: emptyCup(), frontier: { level: 0, fails: 0 } }
+  // Version de développement de la v10 (coupe sans le front) : le champ manquant est ajouté, vide.
+  if (save && typeof save === 'object' && save.version === 10 && save.frontier === undefined) save = { ...save, frontier: { level: 0, fails: 0 } }
   return save
 }
 
@@ -174,6 +206,8 @@ export class SaveSlot {
       daily: { last: '', streak: 0, bestStreak: 0, days: {} },
       endless: { best: 0, bestWave: 0, sieges: 0 },
       login: emptyLogin(),
+      cup: emptyCup(),
+      frontier: { level: 0, fails: 0 },
     })
     return new SaveSlot(index, data)
   }
@@ -194,11 +228,14 @@ export class SaveSlot {
       if (id !== i + 1) throw new ValidationError(`save.levels.${id}`, 'progression gap')
       const rec = data.levels[id]
       if (rec.attempts < 1) throw new ValidationError(`save.levels.${id}`, 'no attempt recorded')
-      if (checkRecord) {
+      if (rec.skipped && (rec.stars > 0 || rec.best > 0 || rec.shots > 0)) throw new ValidationError(`save.levels.${id}`, 'skipped level with a result')
+      if (checkRecord && !rec.skipped) {
         const stars = checkRecord(id, { best: rec.best, stars: rec.stars, shots: rec.shots })
         if (Number.isInteger(stars)) rec.stars = stars
       }
     })
+    // Front : un niveau pas encore réussi (ou aucun).
+    if (data.frontier.level && data.levels[data.frontier.level]) throw new ValidationError('save.frontier.level', 'already completed')
     // Campagne à deux : progression continue elle aussi, étoiles recalculées.
     Object.keys(data.coop).map(Number).sort((a, b) => a - b).forEach((id, i) => {
       if (id !== i + 1) throw new ValidationError(`save.coop.${id}`, 'progression gap')
@@ -220,6 +257,13 @@ export class SaveSlot {
     // Coffres de connexion : au plus un par jour depuis la création du profil.
     const loginError = checkLogin(data.login, data.createdAt)
     if (loginError) throw new ValidationError('save.login', loginError)
+    // Coupe de la semaine : semaine valide, médaille conforme aux étoiles, et comptée.
+    const cup = data.cup
+    if (cup.week && !WEEK_KEY.test(cup.week)) throw new ValidationError('save.cup.week', 'invalid week')
+    if (!cup.week && (Object.keys(cup.castles).length || cup.medal)) throw new ValidationError('save.cup.week', 'results without a week')
+    const cupStars = Object.values(cup.castles).reduce((sum, c) => sum + c.stars, 0)
+    if ((WeeklyCup.medalFor(cupStars) ?? '') !== cup.medal) throw new ValidationError('save.cup.medal', 'medal does not match the stars')
+    if (cup.medal && cup.trophies[cup.medal] < 1) throw new ValidationError('save.cup.trophies', 'medal not counted')
     return new SaveSlot(index, data)
   }
 
@@ -392,9 +436,19 @@ export class SaveSlot {
     this.#data.updatedAt = Math.max(now, this.#data.updatedAt)
 
     const prev = this.#data.levels[result.levelId]
+    const front = this.#data.frontier
     if (!result.won) {
       if (prev) prev.attempts += 1
+      // Défaites d'affilée au premier niveau pas encore réussi (v6.0).
+      else {
+        front.fails = front.level === result.levelId ? front.fails + 1 : 1
+        front.level = result.levelId
+      }
       return { newBest: false, firstClear: false, gold: 0, newAchievements: 0 }
+    }
+    if (front.level === result.levelId) {
+      front.level = 0
+      front.fails = 0
     }
     const firstClear = !prev
     const before = prev ?? { stars: 0, ach: 0 }
@@ -410,6 +464,8 @@ export class SaveSlot {
       return { newBest: true, firstClear: true, gold, newAchievements }
     }
     prev.attempts += 1
+    // Un niveau passé, enfin pris : il compte désormais comme les autres.
+    delete prev.skipped
     const newBest = result.score > prev.best
     if (newBest) prev.best = result.score
     prev.stars = Math.max(prev.stars, result.stars)
@@ -417,6 +473,46 @@ export class SaveSlot {
     prev.shots = prev.shots > 0 ? Math.min(prev.shots, shots) : shots
     prev.ach |= result.achievements
     return { newBest, firstClear: false, gold, newAchievements }
+  }
+
+  /* ---------- Coup de pouce et niveau passé (v6.0) ---------- */
+
+  /** Défaites d'affilée sur ce niveau (s'il n'est pas encore réussi). */
+  failsAt(levelId) {
+    const f = this.#data.frontier
+    return f.level === levelId && !this.isCompleted(levelId) ? f.fails : 0
+  }
+
+  /** Après trois défaites d'affilée, on peut passer le niveau (jamais le dernier). */
+  canSkip(levelId) {
+    return levelId < GAME.LEVEL_COUNT && this.isUnlocked(levelId) && !this.isCompleted(levelId) && this.failsAt(levelId) >= SKIP_AFTER
+  }
+
+  /**
+   * Passe un niveau : il compte comme fait (le suivant s'ouvre), sans étoile,
+   * sans or ni score ; on peut revenir le prendre pour de bon.
+   */
+  skipLevel(levelId, now = Date.now()) {
+    if (!this.canSkip(levelId)) throw new ValidationError('skip', 'level cannot be skipped')
+    this.#data.levels[levelId] = { stars: 0, best: 0, attempts: Math.max(1, this.failsAt(levelId)), shots: 0, ach: 0, skipped: true }
+    this.#data.frontier = { level: 0, fails: 0 }
+    this.#data.updatedAt = Math.max(now, this.#data.updatedAt)
+  }
+
+  /** Niveau passé (sans l'avoir pris) ? */
+  isSkipped(levelId) {
+    return Boolean(this.#data.levels[levelId]?.skipped)
+  }
+
+  /**
+   * Coup de pouce discret du premier chapitre (Facile et Normal) : après deux
+   * défaites d'affilée, les défenseurs encaissent un peu moins et le vent
+   * faiblit (10 % par défaite, 30 % au plus). Rien ne l'annonce.
+   */
+  luckFor(levelId, difficulty) {
+    if (levelId > LUCK.CHAPTER_MAX_LEVEL || difficulty === 'hard') return 0
+    const fails = this.failsAt(levelId)
+    return fails >= LUCK.FROM_FAILS ? Math.min(LUCK.MAX, LUCK.STEP * (fails - LUCK.FROM_FAILS + 1)) : 0
   }
 
   /**
@@ -561,6 +657,52 @@ export class SaveSlot {
     }
     this.#data.updatedAt = Math.max(this.#data.updatedAt, Date.now())
     return { newBest, streak: d.streak, extended }
+  }
+
+  /* ---------- Coupe de la semaine ---------- */
+
+  /** La coupe (copie) : semaine, meilleur de chaque château, médaille, médailles gagnées. */
+  get cup() {
+    return structuredClone(this.#data.cup)
+  }
+
+  /**
+   * Enregistre un château de la coupe (résultat authentifié, château de la
+   * coupe de la semaine `week`). Une nouvelle semaine remet la coupe à zéro ;
+   * les médailles gagnées restent. Pas d'or : la récompense est la médaille.
+   * @param {LevelResult} result
+   * @param {string} week AAAA-Www
+   * @param {number} index château (1 à 5)
+   * @returns {{ newBest: boolean, stars: number, medal: string | null, medalUp: boolean }}
+   */
+  recordCup(result, week, index) {
+    if (!LevelResult.isAuthentic(result)) throw new ValidationError('result', 'not issued by the game engine')
+    Guard.int(index, 'cup castle', { min: 1, max: CUP.CASTLES })
+    const cup = WeeklyCup.forWeek(week)
+    if (result.levelId !== cup.levels[index - 1] || result.difficulty !== cup.difficulty) throw new ValidationError('result', 'not this week\'s cup')
+    const c = this.#data.cup
+    const total = () => Object.values(c.castles).reduce((sum, r) => sum + r.stars, 0)
+    // Horloge reculée : une coupe plus ancienne que la dernière jouée ne change rien.
+    if (c.week && week < c.week) return { newBest: false, stars: total(), medal: c.medal || null, medalUp: false }
+    if (c.week !== week) {
+      c.week = week
+      c.castles = {}
+      c.medal = ''
+    }
+    if (!result.won) return { newBest: false, stars: total(), medal: c.medal || null, medalUp: false }
+    const prev = c.castles[index]
+    const newBest = !prev || result.score > prev.best
+    c.castles[index] = { best: Math.max(prev?.best ?? 0, result.score), stars: Math.max(prev?.stars ?? 0, result.stars) }
+    const stars = total()
+    const medal = WeeklyCup.medalFor(stars) ?? ''
+    const medalUp = medal !== c.medal
+    if (medalUp) {
+      if (c.medal) c.trophies[c.medal] -= 1
+      c.trophies[medal] += 1
+      c.medal = medal
+    }
+    this.#data.updatedAt = Math.max(this.#data.updatedAt, Date.now())
+    return { newBest, stars, medal: medal || null, medalUp }
   }
 
   /* ---------- Siège sans fin ---------- */

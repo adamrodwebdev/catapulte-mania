@@ -21,6 +21,8 @@ const browserGlobals = Object.fromEntries(
     'CanvasRenderingContext2D', 'AudioContext', 'URL', 'URLSearchParams', 'structuredClone',
     'CustomEvent', 'Event', 'EventTarget', 'ResizeObserver', 'KeyboardEvent', 'PointerEvent',
     'DOMException', 'ImageData', 'DOMMatrix', 'queueMicrotask', 'btoa', 'atob', 'Path2D', 'createImageBitmap', 'OffscreenCanvas',
+    // v6.0 : moments forts filmés (MediaRecorder).
+    'Blob', 'File', 'MediaRecorder',
   ].map((name) => [name, 'readonly']),
 )
 

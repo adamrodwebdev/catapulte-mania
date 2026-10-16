@@ -28,16 +28,22 @@ export const SOUND_IDS = Object.freeze([
   'whoosh', 'rubble', 'combo',
   // v5.8 : marteau du sapeur.
   'hammer',
+  // v6.0 : cor de guerre (étape prise, ordre d'un général), roulement de tambour (coup de grâce).
+  'horn', 'drumroll',
+  // v6.0 : un tir restant changé en points (de plus en plus aigu).
+  'bonus',
+  // v6.1 : orbe d'orage (grésillement), pot de poison (le gaz fuse).
+  'zap', 'hiss',
 ])
 
 /** Sons « musicaux » : jamais désaccordés par la variation aléatoire. */
-const TUNED = new Set(['victory', 'defeat', 'power', 'star', 'lock', 'tick', 'click', 'combo', 'split'])
+const TUNED = new Set(['victory', 'defeat', 'power', 'star', 'lock', 'tick', 'click', 'combo', 'split', 'horn', 'drumroll', 'bonus'])
 
 /** Part de réverbération propre à certains sons (les autres : valeur par défaut). */
 const WET = Object.freeze({
   explosion: 0.55, thunder: 0.6, breach: 0.4, victory: 0.45, defeat: 0.5, power: 0.5, star: 0.35,
   combo: 0.4, scream: 0.35, iron: 0.4, glass: 0.3, rubble: 0.3, stone: 0.25, down: 0.2,
-  tick: 0.04, click: 0.04, lock: 0.15,
+  tick: 0.04, click: 0.04, lock: 0.15, horn: 0.6, drumroll: 0.35,
 })
 const WET_DEFAULT = 0.18
 
@@ -500,6 +506,19 @@ export class AudioService {
         this.#tone(out, t + 0.05, { freq: 48, to: 28, decay: 1.4, peak: 0.55 })
         this.#noiseHit(out, t + 0.5, { type: 'lowpass', freq: 300, sweepTo: 80, attack: 0.2, decay: 1.4, peak: 0.4 })
         break
+      case 'zap':
+        // Orbe d'orage (v6.1) : grésillement électrique, claquement sec, bourdon qui s'éteint.
+        this.#tone(out, t, { type: 'square', freq: 110, to: 60, attack: 0.002, decay: 0.35, peak: 0.12 * k })
+        this.#noiseHit(out, t, { type: 'highpass', freq: 4200, decay: 0.05, peak: 0.45 * k })
+        this.#rattle(out, t + 0.01, 8, { freq: 5200, spread: 0.05, peak: 0.12 * k })
+        this.#noiseHit(out, t + 0.03, { type: 'bandpass', freq: 1800, sweepTo: 600, q: 3, attack: 0.005, decay: 0.3, peak: 0.25 * k })
+        break
+      case 'hiss':
+        // Pot de poison (v6.1) : le grès éclate, le gaz fuse et bouillonne.
+        this.#noiseHit(out, t, { type: 'highpass', freq: 3500, decay: 0.05, peak: 0.35 })
+        this.#noiseHit(out, t + 0.02, { type: 'bandpass', freq: 2400, sweepTo: 1200, q: 1.2, attack: 0.03, decay: 0.8 * k, peak: 0.25 * k })
+        for (let i = 0; i < 4; i++) this.#tone(out, t + 0.1 + i * 0.07, { type: 'sine', freq: 300 + i * 90, to: 700 + i * 120, attack: 0.005, decay: 0.06, peak: 0.05 })
+        break
       case 'lock':
         // « C'est le moment » : deux notes claires et montantes.
         this.#tone(out, t, { type: 'triangle', freq: 988, decay: 0.08, peak: 0.16 })
@@ -663,6 +682,37 @@ export class AudioService {
         // (l'intensité porte l'angle du tir, voir GameSession). Aide les malvoyants.
         this.#tone(out, t, { type: 'triangle', freq: 220 + k * 520, decay: 0.06, peak: 0.12 })
         break
+      case 'horn':
+        // Cor de guerre : appel grave qui monte d'une quinte et se tient, souffle dans le pavillon.
+        // Bref (un seul appel) quand un général donne un ordre, entier quand une étape tombe.
+        if (k < 0.8) {
+          this.#brass(out, t, 110, 0.34, 0.11 * k)
+          this.#brass(out, t, 55, 0.34, 0.05 * k)
+          this.#noiseHit(out, t, { type: 'bandpass', freq: 420, q: 1.4, attack: 0.05, decay: 0.4, peak: 0.04 * k })
+          break
+        }
+        this.#brass(out, t, 98, 0.32, 0.09 * k)
+        this.#brass(out, t + 0.3, 147, 1.1, 0.1 * k)
+        this.#brass(out, t + 0.3, 73.5, 1.1, 0.05 * k)
+        this.#noiseHit(out, t, { type: 'bandpass', freq: 420, q: 1.4, attack: 0.08, decay: 1.3, peak: 0.04 * k })
+        break
+      case 'bonus':
+        // Tir restant changé en points : pièce qui tinte, un peu plus haut à chaque fois.
+        this.#bell(out, t, 988 * Math.pow(2, (k - 0.5) * 0.9), 0.08, 0.55)
+        this.#tone(out, t, { type: 'triangle', freq: 1976 * Math.pow(2, (k - 0.5) * 0.9), decay: 0.06, peak: 0.04 })
+        break
+      case 'drumroll': {
+        // Roulement de caisse claire qui enfle (environ 1,2 s), avant le coup de grâce.
+        const n = 26
+        for (let i = 0; i < n; i++) {
+          const at = t + i * 0.046
+          const swell = 0.25 + (i / n) * 0.75
+          this.#noiseHit(out, at, { type: 'bandpass', freq: 2300, q: 1.1, attack: 0.001, decay: 0.05, peak: 0.13 * swell * k })
+          this.#tone(out, at, { type: 'triangle', freq: 190, decay: 0.04, peak: 0.05 * swell * k })
+        }
+        this.#timpani(out, t + n * 0.046, 98, 0.35 * k)
+        break
+      }
     }
   }
 }

@@ -6,9 +6,14 @@ import { clamp } from '../core/utils/math.js'
 import { DIFFICULTY, GAME } from '../config/gameConfig.js'
 import { PhysicsWorld } from './physics/PhysicsWorld.js'
 import { WIND_PROFILES, windageOf } from './physics/WindField.js'
+import { WORLD_WINDS, worldWindFor, exposureStep, THERMAL } from './physics/WorldWinds.js'
+import { MILL } from './entities/props.js'
 import { WORLD } from './physics/constants.js'
 import { Block } from './entities/Block.js'
 import { Target } from './entities/Target.js'
+import { General } from './entities/General.js'
+import { WarCouncil } from './bosses/WarCouncil.js'
+import { livesFor } from './bosses/generals.js'
 import { Barrel } from './entities/Barrel.js'
 import { Flyer } from './entities/Flyer.js'
 import { Projectile, PROJECTILE_TYPES } from './entities/Projectile.js'
@@ -42,15 +47,51 @@ export const STATE = Object.freeze({
   FLYING: 'flying',
   /** Défaite en suspens : un dernier tir est proposé contre une vidéo (portails). */
   OFFER: 'offer',
+  /** Grand siège (v6.0) : une étape est prise, la suivante se prépare. */
+  STAGE: 'stage',
+  /** Tour du général (v6.0) : il donne son ordre entre deux tirs. */
+  ENEMY: 'enemy',
   ENDED: 'ended',
 })
+
+/** Grand siège : pas de simulation entre la prise d'une étape et l'arrivée de la suivante (≈ 1,1 s). */
+export const STAGE_SWAP_STEPS = 132
+/** Tour du général : pas avant son ordre (le temps de l'annoncer), durées d'affichage (ms). */
+export const ENEMY_ACT_STEPS = 48
+const ENEMY_MIN_MS = 1500
+const ENEMY_MAX_MS = 4500
+
+/**
+ * Coup de grâce (v6.0). Suspense : le tir file vers la dernière cible, le
+ * temps ralentit et le tambour roule (rien ne change à la simulation : le
+ * ralenti espace seulement les pas). Puis, la victoire acquise, chaque tir
+ * restant éclate en points, un par un, avant le bilan.
+ */
+const SUSPENSE = Object.freeze({ RANGE: 260, MAX_MS: 1400, SCALE: 0.4 })
+export const BONUS_POP_MS = 230
+const BONUS_POP_MAX = 12
+
+/**
+ * Jauge de destruction (v6.0) : chaque bloc abattu la remplit de sa valeur ;
+ * à la moitié du château, une pierre de plus (une par étape, à partir du
+ * niveau 6). Elle évite une défaite, mais ne compte jamais pour les étoiles.
+ */
+export const GAUGE = Object.freeze({ SHARE: 0.5, FROM_LEVEL: 6 })
+
+/**
+ * Répliques des défenseurs (v6.0), en bulles : à l'arrivée d'un tir, à la
+ * chute d'un camarade, après un tir manqué. Rares (au plus une toutes les
+ * 3,5 s) et purement visuelles : un hasard à part, jamais celui du monde.
+ */
+const BARK = Object.freeze({ COOLDOWN_MS: 3500, INCOMING: 0.3, LOST: 0.35, MISSED: 0.55, HURT: 0.35, PUSH: 0.4, LINES: 4 })
 
 const SETTLE_MS = 1200
 const REST_CONFIRM_MS = 450
 const MAX_TURN_MS = 11000
 const IDLE_WIN_MS = 1200
 const FIRE_WAIT_MS = 20000
-const AMMO_ORDER = Object.freeze(['stone', 'fire', 'boulder', 'frost', 'bomb', 'split'])
+// v6.1 : botte de paille, orbe d'orage et pot de poison à la suite.
+export const AMMO_ORDER = Object.freeze(['stone', 'fire', 'boulder', 'frost', 'bomb', 'split', 'bale', 'thunder', 'poison'])
 /** Engins de siège : catapulte (visée angle + puissance) ou trébuchet (deux clics). */
 export const ENGINES = Object.freeze(['catapult', 'trebuchet', 'ballista'])
 
@@ -96,6 +137,23 @@ export class GameSession extends EventBus {
   #windRng
   #baseWind = 0
   #slowMo = 0
+  /** Suspense du dernier tir : { turn, t, on, slow, x, y } ou null (v6.0). */
+  #suspense = null
+  /** Tirs restants qui éclatent en points après la victoire : { left, paid, t, next, per, final } ou null. */
+  #bonus = null
+  /** Score affiché pendant ce décompte (sinon le score courant), et tirs déjà changés en points. */
+  #shownScore = null
+  #bonusPaid = 0
+  /** Fin de partie en plan large (décompte des tirs restants). */
+  #wideEnd = false
+  /** Coup de pouce (0 à 0,3) : défenseurs moins résistants, vent plus faible. */
+  #luck = 0
+  /** Jauge de destruction de l'étape : { value, goal, earned } (goal 0 : pas de jauge). */
+  #gauge = { value: 0, goal: 0, earned: false }
+  /** Répliques des défenseurs : hasard visuel, dernier instant, défenseurs abattus pendant ce tir. */
+  #barkRng
+  #barkAt = -Infinity
+  #downThisShot = 0
   /** Arrêt sur image d'un gros choc (ms) : l'impact « pèse » (v5.7). */
   #hitStop = 0
   /** Seaux d'eau du niveau (v5.8) : ils éteignent le feu de l'engin. */
@@ -139,8 +197,26 @@ export class GameSession extends EventBus {
   /** Le repère d'impact était-il sur le château à l'image précédente ? (signal sonore) */
   /** Tir suivi pour tracer sa trajectoire (repère fantôme du tir suivant). */
   #tracked = null
+  /** Grand siège (v6.0) : étape en cours (0 = le château du niveau) et ses cibles de départ. */
+  #stageIndex = 0
+  #stageTargets = 0
+  /** Général de l'étape en cours (v6.0), ou null. */
+  #council = null
+  /** Tour du général en cours : son ordre est-il donné ? */
+  #enemy = null
+  /** Effets programmés à un pas précis : { at, run, seq } triés par pas (voir #runScheduled). */
+  #scheduled = []
+  #seq = 0
+  /** Relecture : pas enregistrés des étapes (g) et des ordres des généraux (b). */
+  #recorded = null
+  /** Ordres des généraux : vent imposé au prochain tour, couvre-feu (pas d'aide à la visée). */
+  #windOverride = null
+  #curfew = false
+  #curfewNext = false
   /** Repère sonore du balancier : dernière tranche de 15° annoncée. */
   #tickBand = null
+  /** Souffle du monde (v6.1, voir physics/WorldWinds.js) : son élément, ou null. */
+  #element = null
   options = { trajectoryAid: false, reducedMotion: false, blood: true, screams: true }
 
   /**
@@ -152,9 +228,11 @@ export class GameSession extends EventBus {
    * @param {object} opts options d'affichage et de difficulté
    * @param {import('./modes/GameMode.js').GameMode} [mode] règles (histoire par défaut)
    */
-  constructor(level, { difficulty, completedLevels, trajectoryAid = false, reducedMotion = false, screenShake = true, blood = true, screams = true, startPower = 100, effects = NO_EFFECTS, continueOffer = false, engine = 'catapult', slowSwing = false, infiniteSwing = false, replay = false, season = null }, mode = null) {
+  constructor(level, { difficulty, completedLevels, trajectoryAid = false, reducedMotion = false, screenShake = true, blood = true, screams = true, healthBars = true, startPower = 100, effects = NO_EFFECTS, continueOffer = false, engine = 'catapult', slowSwing = false, infiniteSwing = false, replay = false, season = null, luck = 0 }, mode = null) {
     super()
     this.#level = level
+    // Coup de pouce discret (v6.0, premier chapitre après des défaites : voir SaveSlot.luckFor).
+    this.#luck = clamp(Number(luck) || 0, 0, 0.3)
     this.#difficulty = Guard.oneOf(difficulty, GAME.DIFFICULTIES, 'difficulty')
     Guard.int(completedLevels, 'completedLevels', { min: 0, max: GAME.LEVEL_COUNT })
     this.#mode = mode || new StoryMode({ effects, completedLevels })
@@ -162,13 +240,15 @@ export class GameSession extends EventBus {
     this.#unlockedPowers = new Set(this.#mode.powersEnabled ? PowerRegistry.unlocked(completedLevels).map((p) => p.id) : [])
     const diff = DIFFICULTY[this.#difficulty]
     this.#windRng = new SeededRandom(level.seed)
+    this.#barkRng = new SeededRandom((level.seed * 7 + 3) >>> 0)
     /**
      * Premiers pas (campagne, niveaux 1 à 3) : la trajectoire est montrée et le
      * premier tir est déjà réglé pour toucher. Un nouveau joueur réussit son
      * premier tir avant d'avoir rien lu (exigence de prise en main des portails).
      */
     this.#assist = this.#mode.id === 'story' && level.id <= ASSIST_LEVELS
-    this.options = { trajectoryAid: trajectoryAid || this.#assist, reducedMotion, blood, screams: Boolean(screams), startPower, trail: fx.trail || 'smoke' }
+    // v6.1 : barres de vie des défenseurs (réglage, affichées par défaut).
+    this.options = { trajectoryAid: trajectoryAid || this.#assist, reducedMotion, blood, screams: Boolean(screams), healthBars: healthBars !== false, startPower, trail: fx.trail || 'smoke' }
     /** Proposer un dernier tir contre une vidéo (campagne solo, portails). */
     this.continueOffer = Guard.boolean(continueOffer, 'continueOffer')
     const versus = this.#mode.id === 'versus'
@@ -207,7 +287,13 @@ export class GameSession extends EventBus {
       }
     })
 
-    this.world = new PhysicsWorld(this.#events, { seed: level.seed, windProfile: WIND_PROFILES[this.#difficulty], zones: level.zones ?? [] })
+    // Souffle du monde (v6.1) : le vent du chapitre (le Fort de pierre souffle en rafales à toutes les difficultés).
+    this.windId = level.worldWind ?? worldWindFor(level.chapter)
+    this.#element = WORLD_WINDS[this.windId] ?? WORLD_WINDS.breeze
+    const profile = WIND_PROFILES[this.#difficulty]
+    const windProfile = this.#element.gust ? { ...profile, gust: Math.max(profile.gust, this.#element.gust) } : profile
+    this.world = new PhysicsWorld(this.#events, { seed: level.seed, windProfile, zones: level.zones ?? [] })
+    this.world.setWorldWind(this.windId)
     // Le trébuchet est en retrait : le monde s'étend jusqu'à lui (un tir lâché trop tôt part en arrière).
     if (this.#engine === 'trebuchet') this.world.leftLimit = TREBUCHET_X - 700
     /** Zone cadrée par la caméra : de l'engin au bout du château. */
@@ -216,6 +302,9 @@ export class GameSession extends EventBus {
       right: level.focus.right,
       top: level.focus.top,
     })
+    // v6.1 : les moulins font face à l'engin ; l'Hiver gèle l'eau, la Tempête trempe tout.
+    this.world.engineX = this.#engine === 'trebuchet' ? TREBUCHET_X : CATAPULT_X.left
+    this.world.weather = { wet: level.chapter === 9, winter: level.chapter === 8 }
     this.particles = new ParticleSystem()
     this.particles.surfaceAt = (x, y) => this.world.solidAt(x, y)
     this.particles.density = reducedMotion ? 0.35 : 1
@@ -223,10 +312,9 @@ export class GameSession extends EventBus {
     this.camera.follow = !reducedMotion
     this.camera.shakeEnabled = screenShake && !reducedMotion
 
-    for (const b of level.blocks) this.world.add(new Block(b))
-    for (const t of level.targets) this.world.add(new Target(t, diff.targetHp))
-    for (const b of level.barrels) this.world.add(new Barrel(b))
-    for (const f of level.flyers ?? []) this.world.add(new Flyer(f))
+    // Effets programmés (étapes, ordres des généraux) : exécutés au pas exact, avant la simulation.
+    this.world.beforeStep = () => this.#runScheduled()
+    this.#spawnCastle(level)
     this.#applyStartPower()
     this.#loadEngine()
     // État de l'engin (v5.8) : points de vie, avaries, seaux d'eau. Les pillards
@@ -369,6 +457,38 @@ export class GameSession extends EventBus {
     return this.world.filter((e) => e.kind === 'target' && e.alive).length
   }
 
+  /** Grand siège (v6.0) : étape en cours (1 = le château du niveau) et nombre d'étapes. */
+  get stage() {
+    return this.#stageIndex + 1
+  }
+
+  get stageCount() {
+    return this.#mode.grandSiege === false ? 1 : (this.#level.stageCount ?? 1)
+  }
+
+  /** Général de l'étape en cours (conseil de guerre), ou null. */
+  get council() {
+    return this.#council
+  }
+
+  /** Couvre-feu (ordre d'un général) : pas d'aide à la visée ni de repère du tir précédent. */
+  get curfew() {
+    return this.#curfew
+  }
+
+  /**
+   * Relecture (« Bats mon tir ») : instants enregistrés des étapes et des ordres
+   * des généraux. Appelé par le ReplayPlayer avant de rejouer.
+   * @param {{ k: string, d: number }[]} actions
+   */
+  preloadRecorded(actions) {
+    this.#recorded = {
+      g: actions.filter((a) => a.k === 'g').map((a) => a.d),
+      b: actions.filter((a) => a.k === 'b').map((a) => a.d),
+      e: actions.filter((a) => a.k === 'e').map((a) => a.d),
+    }
+  }
+
   /** Munitions disponibles : pierres (limitées par les tirs) + munitions spéciales. */
   get ammo() {
     const p = this.player
@@ -396,9 +516,12 @@ export class GameSession extends EventBus {
     return {
       state: this.#state,
       mode: this.#mode.id,
-      score: this.score.current,
-      shotsLeft: this.player.shotsLeft,
+      score: this.#shownScore === null ? this.score.current : Math.round(this.#shownScore),
+      shotsLeft: this.player.shotsLeft === null ? null : this.player.shotsLeft - this.#bonusPaid,
       shotsTotal: this.player.shotsTotal,
+      // Pierres gagnées à la jauge de destruction (v6.0), et la jauge elle-même.
+      bonusShots: this.player.bonusShots ?? 0,
+      gauge: this.#gauge.goal ? { ratio: Math.min(1, this.#gauge.value / this.#gauge.goal), earned: this.#gauge.earned } : null,
       activePlayer: this.#active,
       players: this.players.map((p) => ({
         name: p.name,
@@ -410,9 +533,16 @@ export class GameSession extends EventBus {
       })),
       powersEnabled: this.#mode.powersEnabled,
       targetsLeft: this.targetsLeft,
-      targetsTotal: this.#level.targets.length,
+      targetsTotal: Math.max(this.targetsLeft, this.#stageTargets + (this.#council?.summonCount ?? 0)),
+      // Grand siège et général (v6.0).
+      stage: this.#stageIndex + 1,
+      stageCount: this.stageCount,
+      general: this.#council?.view() ?? null,
+      curfew: this.#curfew,
       wind: Math.round(this.world.wind * 100) / 100,
       ...this.#windView(),
+      // v6.1 : le souffle du monde (son nom remplace « Vent » quand il porte un élément).
+      worldWind: this.worldWind,
       // Valeurs exactes de la visée (pas de 0,5° et 0,5 %, v5.2).
       angle: this.#engine === 'trebuchet' ? this.#trebHud().angle : Math.round(this.catapult.angle * 2) / 2,
       power: this.#engine === 'trebuchet' ? this.#trebHud().power : Math.round(this.catapult.power * 200) / 2,
@@ -529,14 +659,54 @@ export class GameSession extends EventBus {
     const calm = this.#pendingPower === 'falcon'
     const windage = windageOf({ type: ammo, radius: PROJECTILE_TYPES[ammo].radius })
     const time = this.world.time
+    const air = this.#airOptions(ammo, calm)
     return (start, velocity) =>
       TrajectoryPredictor.predict(start, velocity, {
         wind: calm ? 0 : this.world.wind,
         windAccel: calm || !field.dynamic ? null : field.frozen(start.x, time, windage),
+        ...air,
         obstacles,
         maxPoints,
         every,
       })
+  }
+
+  /**
+   * Ce que l'air fait au tir en plus du vent (v6.1), tel que l'aide à la visée le
+   * montre : rafales des moulins du moment, colonnes d'air chaud, et le point où
+   * le souffle du monde marque le tir (le sable le freine alors).
+   */
+  #airOptions(type, calm = false) {
+    const windage = windageOf({ type, radius: PROJECTILE_TYPES[type].radius })
+    const mill = MILL.ACCEL * WORLD.WIND_RATIO * WORLD.GRAVITY * WORLD.GRAVITY_SCALE * windage
+    const props = this.world.props
+    const field = this.world.windField
+    const element = calm ? null : this.world.exposureElement
+    const t = this.world.time
+    return {
+      gustAccel: props.zones.length ? (x, y) => props.gustAt(x, y) * mill : null,
+      lift: this.world.thermals.length ? (x, y) => this.world.liftAt(x, y) : null,
+      expose: element ? { step: (x, y) => exposureStep(field.base === 0 ? 0 : field.at(x, y, t), props.gustAt(x, y), WORLD.STEP_MS), element, slow: element === 'sand' ? this.world.worldWind.slow : 0 } : null,
+    }
+  }
+
+  /**
+   * Course entière du tir tel qu'il est réglé, sans obstacles, avec tout ce que
+   * l'aide à la visée prend en compte (v6.1). Pour les outils : le joueur
+   * automatique de scripts/check-levels.mjs vise comme un joueur qui suit la courbe.
+   * @param {string} [type] munition (par défaut, celle choisie)
+   */
+  predictShot(type = this.player.selectedAmmo, { maxPoints = 400, every = 1 } = {}) {
+    const field = this.world.windField
+    const start = this.catapult.launchPoint
+    const windage = windageOf({ type, radius: PROJECTILE_TYPES[type].radius })
+    return TrajectoryPredictor.predict(start, this.catapult.velocity, {
+      wind: this.world.wind,
+      windAccel: field.dynamic ? field.frozen(start.x, this.world.time, windage) : null,
+      ...this.#airOptions(type),
+      maxPoints,
+      every,
+    })
   }
 
   /**
@@ -655,6 +825,8 @@ export class GameSession extends EventBus {
 
   /** Points de l'aide à la trajectoire (ou null si désactivée / hors visée). */
   get trajectory() {
+    // Couvre-feu (v6.0) : la nuit cache la courbe (l'Œil du faucon, acheté, la montre quand même).
+    if (this.#curfew && this.#pendingPower !== 'falcon') return null
     const falcon = this.#pendingPower === 'falcon'
     // Baliste (v5.1) : sa ligne de mire (début de la trajectoire) reste toujours visible.
     const sight = this.#engine === 'ballista' && !this.options.trajectoryAid && !this.#hint && !falcon
@@ -669,6 +841,8 @@ export class GameSession extends EventBus {
     return TrajectoryPredictor.predict(start, this.catapult.velocity, {
       wind: calm ? 0 : this.world.wind,
       windAccel: calm || !field.dynamic ? null : field.frozen(start.x, this.world.time, windage),
+      // v6.1 : rafales des moulins (celles du moment), colonnes d'air chaud, et repère du souffle du monde.
+      ...this.#airOptions(projType, calm),
       // La baliste tire à travers la roche : la mire l'ignore.
       obstacles: this.world.filter((e) => e.kind !== 'projectile' && e.kind !== 'flyer' && !(projType === 'bolt' && e.terrain)),
       // Œil du faucon : la courbe entière, jusqu'au point d'impact.
@@ -855,6 +1029,10 @@ export class GameSession extends EventBus {
       if (type === 'bomb') shot.mods.explodes = true
       if (type === 'split') shot.mods.splits = true
       if (type === 'boulder') shot.mods.massFactor *= 1.3
+      // v6.1 : carreau d'orage, carreau à fiole de poison, carreau à tampon (il pousse sans blesser).
+      if (type === 'thunder') shot.mods.thunder = true
+      if (type === 'poison') shot.mods.poison = true
+      if (type === 'bale') shot.mods.soft = true
     }
     const projType = ballista ? 'bolt' : type
     shot.mods.blastFactor = this.#mode.effects.blastFactor ?? 1
@@ -880,6 +1058,8 @@ export class GameSession extends EventBus {
     this.#fireStep = this.steps
     this.score.startShot(type)
     this.#setState(STATE.FLYING)
+    this.#downThisShot = 0
+    this.#bark('incoming', BARK.INCOMING)
     this.#feedback({ sound: 'creak', x: this.catapult.x, intensity: 0.6 })
     const launch = (start, v) => {
       this.#loadedAmmo = null
@@ -949,7 +1129,7 @@ export class GameSession extends EventBus {
     const dt = clamp(dtMs, 0, 100)
     this.#time += dt
     this.#stateT += dt
-    const timeScale = this.#hitStop > 0 ? 0.04 : this.#slowMo > 0 ? 0.35 : 1
+    const timeScale = this.#hitStop > 0 ? 0.04 : this.#slowMo > 0 ? 0.35 : this.#suspense?.on && this.#suspense.slow ? SUSPENSE.SCALE : 1
     this.#hitStop = Math.max(0, this.#hitStop - dt)
     this.#slowMo = Math.max(0, this.#slowMo - dt)
     // Les pillards ne courent que pendant le vol des tirs : la pression reste au tour par tour.
@@ -962,6 +1142,8 @@ export class GameSession extends EventBus {
     this.particles.update(dt * timeScale)
     this.#visualEffects()
     this.#trackGhost()
+    this.#watchSuspense(dt)
+    if (this.#bonus) this.#tickBonus(dt)
     this.#updateCamera(dt)
     if (this.#state === STATE.AIMING || this.#state === STATE.FLYING) this.#watchGusts()
     if (this.armed) {
@@ -981,7 +1163,16 @@ export class GameSession extends EventBus {
       // Victoire sans tir : le feu ou un pouvoir (séisme) a éliminé les dernières
       // cibles pendant la visée. On laisse 1,2 s pour voir la chute, puis on conclut.
       this.#idleWinT = this.#mode.evaluate(this)?.won ? this.#idleWinT + dt : 0
-      if (this.#idleWinT >= IDLE_WIN_MS) this.#finish(this.#mode.evaluate(this))
+      if (this.#idleWinT >= IDLE_WIN_MS) {
+        this.#idleWinT = 0
+        if (this.#hasNextStage()) this.#beginStage()
+        else this.#finish(this.#mode.evaluate(this))
+      }
+    } else if (this.#state === STATE.ENEMY) {
+      // Le général a donné son ordre et l'a mené à bien (repli, tirs à distance) : au joueur.
+      const done = this.#enemy?.acted && !this.#council?.busy && !this.#scheduled.length
+      const elapsed = (this.steps - (this.#enemy?.from ?? this.steps)) * WORLD.STEP_MS
+      if ((done && elapsed >= ENEMY_MIN_MS) || (this.#enemy?.acted && elapsed > ENEMY_MAX_MS)) this.#nextTurn()
     } else if (this.#state === STATE.FLYING) {
       // Une cible en feu va succomber : on attend avant de rendre la main.
       // Au dernier tir, on laisse aussi le feu finir son œuvre (jusqu'à 20 s).
@@ -989,7 +1180,18 @@ export class GameSession extends EventBus {
       const waitFire = burning.some((e) => e.kind === 'target') || (this.player.shotsLeft === 0 && burning.length > 0 && this.#stateT < FIRE_WAIT_MS)
       this.#restT = this.world.isAtRest() && !this.catapult.busy && !this.#pendingLaunch && !waitFire ? this.#restT + dt : 0
       const allDown = this.targetsLeft === 0
-      if (!this.#pendingLaunch && (this.#restT >= REST_CONFIRM_MS || (this.#stateT > MAX_TURN_MS && !waitFire) || this.#stateT > FIRE_WAIT_MS || (allDown && this.#stateT > 3500))) this.#endTurn()
+      // Relecture (v6.0) : le tour finit au pas enregistré. Ce pas fixe aussi la
+      // marche des pillards (ils n'avancent que pendant le vol des tirs).
+      const recorded = this.#replay ? this.#recorded?.e : null
+      if (recorded?.length) {
+        if (this.steps >= recorded[0]) {
+          recorded.shift()
+          this.#endTurn()
+        }
+      } else if (!this.#pendingLaunch && (this.#restT >= REST_CONFIRM_MS || (this.#stateT > MAX_TURN_MS && !waitFire) || this.#stateT > FIRE_WAIT_MS || (allDown && this.#stateT > 3500))) {
+        if (!this.#replay) this.#log.push({ k: 'e', d: this.steps })
+        this.#endTurn()
+      }
     }
   }
 
@@ -1037,7 +1239,13 @@ export class GameSession extends EventBus {
       catapults,
       // Ouvrages des pillards (v5.8) : échelles et chantiers.
       works: this.world.units.works,
+      // Mécanismes (v6.0) : cordes, chaînes, charnières.
+      tethers: this.world.tethers.view(),
+      // Nuages (v6.1) : poison, miasmes, farine.
+      clouds: this.world.clouds,
       versus: this.#mode.id === 'versus',
+      // v6.1 : barres de vie au-dessus des défenseurs blessés (et des généraux).
+      healthBars: this.options.healthBars,
       wind: {
         field: this.world.windField,
         time: this.world.time,
@@ -1079,6 +1287,8 @@ export class GameSession extends EventBus {
     if (s === STATE.AIMING) {
       this.#aimStep = this.steps
       this.#newTrebTurn()
+      // Le général annonce l'ordre qu'il donnera après ce tir (v6.0).
+      this.#council?.plan()
     }
     this.emit('hud', this.hud)
   }
@@ -1117,7 +1327,14 @@ export class GameSession extends EventBus {
   }
 
   #rollWind() {
-    const max = this.#level.wind * DIFFICULTY[this.#difficulty].windFactor
+    // Ordre d'un général (tempête, ouragan) : le vent du prochain tour est imposé.
+    if (this.#windOverride !== null) {
+      this.#baseWind = this.#windOverride
+      this.#windOverride = null
+      this.world.wind = Math.round(this.#baseWind * 100) / 100
+      return
+    }
+    const max = this.#level.wind * DIFFICULTY[this.#difficulty].windFactor * (1 - this.#luck)
     if (max <= 0) {
       this.#baseWind = 0
     } else {
@@ -1129,11 +1346,14 @@ export class GameSession extends EventBus {
   }
 
   #endTurn() {
+    if (this.#downThisShot === 0 && this.targetsLeft > 0) this.#bark('missed', BARK.MISSED)
     this.#turn++
     this.#restT = 0
     // Orage (v5.8) : la pluie rouille l'engin, une couche tous les trois tours.
     if (this.condition.raining && this.#turn % 3 === 0) this.condition.addRust()
     const verdict = this.#mode.evaluate(this)
+    // Grand siège (v6.0) : l'étape est prise, on passe à la suivante.
+    if (verdict?.won && this.#hasNextStage()) return this.#beginStage()
     if (verdict && !verdict.won && this.continueOffer && !this.#continued && this.#mode.id === 'story') {
       this.#pendingVerdict = verdict
       this.#setState(STATE.OFFER)
@@ -1142,6 +1362,15 @@ export class GameSession extends EventBus {
       return
     }
     if (verdict) return this.#finish(verdict)
+    // Le général (v6.0) donne son ordre avant que le joueur ne vise à nouveau.
+    if (this.#council?.alive) return this.#beginEnemyTurn()
+    this.#nextTurn()
+  }
+
+  /** Tour suivant : joueur suivant, nouveau vent, engin rechargé, visée. */
+  #nextTurn() {
+    // Le général peut de nouveau perdre une vie (une au plus par tir).
+    if (this.#council) this.#council.general.shielded = false
     const next = this.#mode.nextPlayer(this.#active, this)
     const changed = next !== this.#active
     this.#active = next
@@ -1150,9 +1379,299 @@ export class GameSession extends EventBus {
     this.#rollWind()
     this.#applyStartPower()
     this.#loadEngine()
+    this.#curfew = this.#curfewNext
+    this.#curfewNext = false
     this.#setState(STATE.AIMING)
     if (changed) this.emit('turn', { player: next, name: this.player.name })
     this.emit('announce', { key: 'a11y.turn', params: { targets: this.targetsLeft, shots: this.player.shotsLeft ?? '∞', wind: Math.round(this.world.wind * 10) } })
+  }
+
+  /* ---------- Grand siège et généraux (v6.0) ---------- */
+
+  /** Fait apparaître un château (celui du niveau ou d'une étape) et son éventuel général. */
+  #spawnCastle(part) {
+    const diff = DIFFICULTY[this.#difficulty]
+    const blocks = part.blocks.map((b) => this.world.add(new Block(b)))
+    // Jauge de destruction (v6.0) : la moitié de la valeur des blocs du château (hors roche).
+    const worth = blocks.filter((e) => !e.terrain).reduce((sum, e) => sum + e.scoreValue, 0)
+    const gauged = this.#mode.destructionGauge && this.player.shotsLeft !== null && (this.#level.id ?? 0) >= GAUGE.FROM_LEVEL
+    this.#gauge = { value: 0, goal: gauged ? Math.round(worth * GAUGE.SHARE) : 0, earned: false }
+    // Mécanismes (v6.0) : potences (cordes) et ponts-levis (chaînes, charnières).
+    for (const t of part.tethers ?? []) this.world.tethers.tie({ kind: t.kind, a: blocks[t.a], pointA: { x: t.ax, y: t.ay }, b: blocks[t.b], pointB: { x: t.bx, y: t.by } })
+    for (const h of part.hinges ?? []) this.world.tethers.hinge(blocks[h.b], { x: h.x, y: h.y })
+    for (const t of part.targets) {
+      if (t.type === 'general') {
+        const general = this.world.add(new General(t, diff.targetHp * (1 - this.#luck), livesFor(t.general, this.#difficulty)))
+        this.#council = new WarCouncil(this.#councilPort(), general)
+      } else this.world.add(new Target(t, diff.targetHp * (1 - this.#luck)))
+    }
+    for (const b of part.barrels) this.world.add(new Barrel(b))
+    for (const f of part.flyers ?? []) this.world.add(new Flyer(f))
+    this.#stageTargets = part.targets.length
+    this.#seedWorldWind(part)
+  }
+
+  /**
+   * Souffle du monde (v6.1) : les poches de miasmes des Marais (au ras du sol,
+   * entre les défenseurs) et les colonnes d'air chaud de la Montagne (le long
+   * de la roche, ou devant le château). Placées d'après le château : identiques
+   * à chaque partie.
+   */
+  #seedWorldWind(part) {
+    const el = this.#element
+    const xs = part.targets.map((t) => t.x).sort((a, b) => a - b)
+    if (el.pockets && xs.length) {
+      const lo = xs[0]
+      const hi = xs.at(-1)
+      for (let i = 0; i < el.pockets; i++) {
+        const x = lo + ((hi - lo) * (i + 1)) / (el.pockets + 1)
+        this.world.clouds.spawn('miasma', x, WORLD.GROUND_Y - 70 - (i % 2) * 90, this.world.time)
+      }
+    }
+    if (el.columns) {
+      const rock = part.blocks.filter((b) => b.material === 'rock' && b.shape === 'triangle').map((b) => b.x)
+      const left = Math.min(...part.blocks.map((b) => b.x - b.w / 2))
+      const at = rock.length ? rock.slice(0, el.columns) : [left - 220]
+      this.world.thermals = at.map((x) => ({ x }))
+    }
+  }
+
+  /** Souffle du monde du niveau (pour l'interface) : identifiant et élément. */
+  get worldWind() {
+    return { id: this.windId, element: this.#element?.element ?? null }
+  }
+
+  /** Ce que le conseil de guerre d'un général peut faire au monde (et rien d'autre). */
+  #councilPort() {
+    const self = this
+    return {
+      get world() {
+        return self.world
+      },
+      get condition() {
+        return self.condition
+      },
+      get particles() {
+        return self.particles
+      },
+      get hpFactor() {
+        return DIFFICULTY[self.#difficulty].targetHp
+      },
+      engineSpot: () => this.#engineSpot(),
+      castleLeft: () => this.#castleLeft(),
+      after: (steps, run) => this.#schedule(this.steps + steps, run),
+      windNext: (v) => {
+        this.#windOverride = clamp(v * DIFFICULTY[this.#difficulty].windFactor, -1, 1)
+      },
+      curfew: () => {
+        this.#curfewNext = true
+      },
+      feedback: (fx) => this.#feedback(fx),
+      emit: (kind, data) => this.#onGeneral(kind, data),
+    }
+  }
+
+  /** Réaction aux événements d'un général : points d'une vie perdue, sous-titres, interface. */
+  #onGeneral(kind, data) {
+    if (kind === 'hurt') {
+      const shooter = this.players[this.#shooter] ?? this.player
+      const gained = shooter.score.registerGeneralHurt()
+      if (gained) this.particles.text(data.x, data.y - 50, `+${gained}`)
+      this.particles.shockwave(data.x, data.y, 120)
+      this.#feedback({ sound: 'iron', x: data.x, intensity: 1.2, caption: `general.hurt`, haptic: 'kill' })
+      this.emit('bark', { key: `generals.${data.id}.hurt`, x: data.x, y: data.y - 56, tone: 'enemy' })
+      this.emit('announce', { key: 'a11y.generalHurt', params: { count: data.lives } })
+    }
+    this.emit('general', { kind, ...data })
+    this.emit('hud', this.hud)
+  }
+
+  #hasNextStage() {
+    return this.#stageIndex < this.stageCount - 1
+  }
+
+  /** Programme un effet au pas `at` (exécuté avant la simulation de ce pas). */
+  #schedule(at, run) {
+    this.#scheduled.push({ at, run, seq: this.#seq++ })
+    this.#scheduled.sort((a, b) => a.at - b.at || a.seq - b.seq)
+  }
+
+  /**
+   * Programme un effet décidé par la partie (étape suivante, ordre d'un
+   * général) : son pas est noté dans le journal ; en relecture, c'est le pas
+   * enregistré qui fait foi.
+   */
+  #scheduleLogged(kind, delay, run) {
+    let at = this.steps + delay
+    if (this.#replay) {
+      const rec = this.#recorded?.[kind]?.shift()
+      if (rec !== undefined) at = Math.max(rec, this.steps)
+    } else this.#log.push({ k: kind, d: at })
+    this.#schedule(at, run)
+  }
+
+  /** Avant chaque pas de simulation : les effets dus (et la garde du général). */
+  #runScheduled() {
+    const now = this.steps
+    while (this.#scheduled.length && this.#scheduled[0].at <= now) this.#scheduled.shift().run()
+    this.#council?.step()
+  }
+
+  /** L'étape est prise : prime, annonce, et la suivante arrive (au pas enregistré). */
+  #beginStage() {
+    this.#setState(STATE.STAGE)
+    const shooter = this.players[this.#shooter] ?? this.player
+    const gained = shooter.score.registerStage()
+    const mid = (this.#castleLeft() + this.focus.right) / 2
+    if (gained) this.particles.text(mid, WORLD.GROUND_Y - 320, `+${gained}`)
+    const next = this.#level.stages[this.#stageIndex]
+    this.emit('stage', { phase: 'cleared', stage: this.#stageIndex + 1, total: this.stageCount, general: next.targets.find((t) => t.general)?.general ?? null })
+    this.#feedback({ sound: 'horn', x: mid, intensity: 1, caption: 'stage.cleared' })
+    this.emit('announce', { key: 'a11y.stageCleared', params: { stage: this.#stageIndex + 1, total: this.stageCount } })
+    this.#scheduleLogged('g', STAGE_SWAP_STEPS, () => this.#swapStage())
+  }
+
+  /** Remplace le château pris par celui de l'étape suivante (même terrain, mêmes tirs). */
+  #swapStage() {
+    const stage = this.#level.stages[this.#stageIndex]
+    // Tout ce qui appartient au château pris disparaît ; le terrain (roche, douves) reste.
+    for (const e of [...this.world.entities()]) {
+      if (e.kind === 'block' && e.terrain) continue
+      this.world.remove(e)
+    }
+    this.world.resetStage()
+    this.#council = null
+    this.#stageIndex++
+    this.#spawnCastle(stage)
+    const left = this.#engine === 'trebuchet' ? TREBUCHET_X - 230 : stage.focus.left
+    this.focus = Object.freeze({ left, right: stage.focus.right, top: stage.focus.top })
+    this.particles.clear()
+    this.#punchUsed = false
+    this.emit('stage', { phase: 'begin', stage: this.#stageIndex + 1, total: this.stageCount, general: this.#council?.id ?? null })
+    // Préparation du tour comme après un tir (même joueur en solo).
+    const next = this.#mode.nextPlayer(this.#active, this)
+    this.#active = next
+    this.#powerUsedThisTurn = false
+    this.#pendingPower = null
+    this.#rollWind()
+    this.#applyStartPower()
+    this.#loadEngine()
+    this.#setState(STATE.SETTLING)
+  }
+
+  /**
+   * Suspense (v6.0) : un tir file vers la dernière cible (celle dont la chute
+   * donne la victoire). Le temps ralentit (sauf en mouvement réduit), la
+   * caméra se rapproche et le tambour roule ; un tir par tour, au plus.
+   */
+  #watchSuspense(dt) {
+    const s = this.#suspense
+    if (s?.on) {
+      s.t += dt
+      const p = this.#activeProjectiles().find((e) => !e.hasImpacted)
+      const last = this.world.filter((e) => e.kind === 'target' && e.alive)[0]
+      const closing = p && last && p.body.velocity.x * (last.x - p.x) + p.body.velocity.y * (last.y - p.y) > 0
+      if (!closing || this.#state !== STATE.FLYING || s.t > SUSPENSE.MAX_MS) s.on = false
+      else {
+        s.x = (p.x + last.x) / 2
+        s.y = (p.y + last.y) / 2
+      }
+      return
+    }
+    if (this.#state !== STATE.FLYING || s?.turn === this.#turn || this.targetsLeft !== 1 || this.#hasNextStage() || this.#mode.id === 'versus') return
+    const last = this.world.filter((e) => e.kind === 'target' && e.alive)[0]
+    // Un général qui a encore plusieurs vies n'est pas un coup de grâce.
+    if (!last || (last.type === 'general' && last.lives > 1)) return
+    for (const p of this.#activeProjectiles()) {
+      if (p.hasImpacted) continue
+      const dx = last.x - p.x
+      const dy = last.y - p.y
+      if (Math.hypot(dx, dy) > SUSPENSE.RANGE || p.body.velocity.x * dx + p.body.velocity.y * dy <= 0) continue
+      this.#suspense = { turn: this.#turn, t: 0, on: true, slow: !this.options.reducedMotion, x: (p.x + last.x) / 2, y: (p.y + last.y) / 2 }
+      this.#feedback({ sound: 'drumroll', x: last.x, caption: 'suspense' })
+      return
+    }
+  }
+
+  /** Jauge de destruction : à la moitié du château abattue, une pierre de plus (une par étape). */
+  #fillGauge(worth) {
+    const g = this.#gauge
+    // La partie finie, le château peut encore s'effondrer : plus de pierre à gagner.
+    if (!g.goal || g.earned || this.#state === STATE.ENDED) return
+    g.value += worth
+    if (g.value < g.goal) return
+    g.earned = true
+    const p = this.players[this.#shooter] ?? this.player
+    if (p.shotsLeft === null) return
+    p.shotsLeft += 1
+    p.shotsTotal += 1
+    p.bonusShots = (p.bonusShots ?? 0) + 1
+    this.emit('callout', { key: 'bonusStone', tier: 2, x: (this.#castleLeft() + this.focus.right) / 2, y: WORLD.GROUND_Y - 360 })
+    this.#feedback({ sound: 'power', x: this.catapult.x, intensity: 0.8, caption: 'bonusStone' })
+    this.emit('announce', { key: 'a11y.bonusStone' })
+    this.emit('hud', this.hud)
+  }
+
+  /**
+   * Réplique d'un défenseur (bulle) : `kind` 'incoming' | 'lost' | 'missed'.
+   * Le plus proche de `near` (camarade d'un défenseur abattu), sinon un défenseur au hasard.
+   */
+  #bark(kind, chance, near = null, self = false) {
+    if (this.#mode.id === 'versus' || this.#time - this.#barkAt < BARK.COOLDOWN_MS) return
+    if (this.#barkRng.next() > chance) return
+    // `self` (v6.1) : c'est le défenseur lui-même qui parle (il a mal, il repousse).
+    const crew = this.world.filter((e) => e.kind === 'target' && e.alive && e.type !== 'general' && e.type !== 'ogre' && (self ? e === near : e !== near) && !e.raiding)
+    if (!crew.length) return
+    let who = crew[Math.floor(this.#barkRng.next() * crew.length)]
+    if (near && !self) {
+      who = crew.reduce((a, b) => (Math.hypot(b.x - near.x, b.y - near.y) < Math.hypot(a.x - near.x, a.y - near.y) ? b : a))
+      if (Math.hypot(who.x - near.x, who.y - near.y) > 260) return
+    }
+    this.#barkAt = this.#time
+    const n = 1 + Math.floor(this.#barkRng.next() * BARK.LINES)
+    this.emit('bark', { key: `game.bark.${kind}${n}`, x: who.x, y: who.y - who.height / 2 - 6, tone: 'enemy' })
+  }
+
+  /** Après la victoire : chaque tir restant éclate en points au-dessus de l'engin. */
+  #tickBonus(dt) {
+    const b = this.#bonus
+    b.t += dt
+    while (b.left > 0 && b.t >= b.next) {
+      b.left--
+      b.paid++
+      this.#bonusPaid++
+      b.next += BONUS_POP_MS
+      const x = this.catapult.x + (this.catapult.dir || 1) * 20
+      const y = this.catapult.y - 110 - (b.paid % 2) * 26
+      this.particles.text(x, y, `+${Math.round(b.per)}`, '#ffe08a')
+      if (!this.options.reducedMotion) this.particles.burst(x, y + 30, 10)
+      this.#feedback({ sound: 'bonus', x, intensity: 0.5 + b.paid * 0.1 })
+      this.#shownScore = Math.min(b.final, this.#shownScore + b.per)
+      this.emit('hud', this.hud)
+    }
+    if (b.left === 0 && b.t >= b.next) {
+      this.#shownScore = b.final
+      this.#bonus = null
+      this.emit('hud', this.hud)
+    }
+  }
+
+  /** Tour du général : il annonce son ordre, puis le donne au pas enregistré. */
+  #beginEnemyTurn() {
+    const council = this.#council
+    // Durées comptées en pas de simulation (v6.1) : la relecture, qui avance pas à
+    // pas, rend la main au joueur exactement au même pas que la partie jouée.
+    this.#enemy = { acted: false, from: this.steps }
+    this.#setState(STATE.ENEMY)
+    this.emit('general', { kind: 'turn', id: council.id, skill: council.intent })
+    // Un bref appel de cor : le général donne son ordre.
+    this.#feedback({ sound: 'horn', x: council.general.x, intensity: 0.6, caption: 'general.order' })
+    this.emit('announce', { key: 'a11y.generalOrder', params: { general: council.id, skill: council.intent } })
+    this.#scheduleLogged('b', ENEMY_ACT_STEPS, () => {
+      if (council.alive && this.#state === STATE.ENEMY) council.act()
+      this.#enemy.acted = true
+      this.emit('hud', this.hud)
+    })
   }
 
   /**
@@ -1193,20 +1712,40 @@ export class GameSession extends EventBus {
     // Score commun (campagne à deux) : les tirs des deux joueurs comptent ensemble.
     const team = this.#mode.sharedScore ? this.players : [p]
     const shotsLeft = team.reduce((sum, pl) => sum + (pl.shotsLeft ?? 0), 0)
-    const shotsUsed = team.reduce((sum, pl) => sum + (pl.shotsTotal - pl.shotsLeft), 0)
+    // Les pierres gagnées à la jauge ne comptent pas pour les étoiles (v6.0).
+    const regular = team.reduce((sum, pl) => sum + pl.shotsTotal - (pl.bonusShots ?? 0), 0)
+    const shotsUsed = Math.min(regular, team.reduce((sum, pl) => sum + (pl.shotsTotal - pl.shotsLeft), 0))
     const result = this.#mode.recordsResult ? this.score.finalize({ won, shotsLeft, shotsUsed }) : null
     const scores = this.#mode.sharedScore
       ? this.players.map(() => (result ? result.score : p.score.finalScore({ won, shotsLeft })))
       : this.players.map((pl) => pl.score.finalScore({ won, shotsLeft: pl.shotsLeft ?? 0 }))
     const happy = this.players.length > 1 || won
     this.#setState(STATE.ENDED)
+    this.#suspense = null
     // Château pris : confettis au-dessus des ruines.
+    const left = this.#castleLeft()
     if (won && this.#mode.id !== 'versus' && !this.options.reducedMotion) {
-      const left = this.#castleLeft()
       this.particles.confetti((left + this.focus.right) / 2, WORLD.GROUND_Y - 380, Math.max(300, this.focus.right - left))
     }
     this.#feedback({ sound: happy ? 'victory' : 'defeat', x: 1000, caption: happy ? 'victory' : 'defeat', haptic: happy ? 'victory' : 'defeat' })
-    this.emit('end', { won, result, winner, scores, reason, renown: [...this.#renown], mode: this.#mode.id })
+    // Les tirs restants éclatent en points, un par un (une seule équipe de tirs : solo).
+    const pops = won && this.#mode.id !== 'versus' && this.players.length === 1 ? Math.min(BONUS_POP_MAX, shotsLeft) : 0
+    const final = result ? result.score : scores[0]
+    if (pops > 0 && final > this.score.current) {
+      this.#shownScore = this.score.current
+      this.#bonus = { left: pops, paid: 0, t: 0, next: 650, per: (final - this.score.current) / pops, final }
+      // La caméra recule une fois pour toutes : l'engin et le château, jusqu'au bilan.
+      this.#wideEnd = true
+    }
+    // Titre de victoire (« Coup de grâce ! » quand un général est tombé) : au-dessus des
+    // ruines, ou au milieu du champ quand la caméra recule pour le décompte.
+    if (won && this.#mode.id !== 'versus') {
+      const castleMid = (left + this.focus.right) / 2
+      const x = this.#wideEnd ? (this.catapult.x + castleMid) / 2 : castleMid
+      this.emit('callout', { key: this.#council ? 'coupDeGrace' : 'victory', tier: 3, x, y: WORLD.GROUND_Y - 330 })
+    }
+    const celebrateMs = this.#bonus ? 650 + pops * BONUS_POP_MS : 0
+    this.emit('end', { won, result, winner, scores, reason, renown: [...this.#renown], mode: this.#mode.id, celebrateMs })
   }
 
   /** Haut actuel du château (blocs et personnages encore debout), pour cadrer au plus près. */
@@ -1231,6 +1770,12 @@ export class GameSession extends EventBus {
     if (this.#punch && this.#punch.ms > 0 && solo) this.#punch.ms -= dt
     if (treb && this.armed) {
       // Balancier : tout le terrain reste visible (le bras ET le château), pour choisir l'instant du lâcher.
+      cam.overview()
+    } else if (this.#suspense?.on && this.#suspense.slow && cam.follow) {
+      // Suspense : entre le tir et la dernière cible.
+      cam.focusOn(this.#suspense.x, this.#suspense.y, close)
+    } else if (this.#wideEnd && this.#state === STATE.ENDED) {
+      // Tirs restants qui éclatent en points : l'engin et le château, ensemble, jusqu'au bilan.
       cam.overview()
     } else if (this.#punch && this.#punch.ms > 0 && solo && cam.follow) {
       cam.focusOn(this.#punch.x, this.#punch.y, close)
@@ -1286,7 +1831,8 @@ export class GameSession extends EventBus {
 
   /** Dernier tir du joueur actif : angle, puissance et trajectoire (repères de la visée). */
   get lastShot() {
-    return this.player.lastShot ?? null
+    // Couvre-feu (v6.0) : le repère du tir précédent est caché aussi.
+    return this.#curfew ? null : (this.player.lastShot ?? null)
   }
 
   /**
@@ -1335,7 +1881,33 @@ export class GameSession extends EventBus {
     return Number.isFinite(left) ? left : this.focus.right - 800
   }
 
+  /** Rafales des moulins (v6.1) : des traînées filent dans la zone, dans le sens du souffle. */
+  #gustStreaks() {
+    const zones = this.world.props.zones
+    if (!zones.length || this.options.reducedMotion) return
+    for (const z of zones) {
+      if (((this.#time / 16) | 0) % 2) continue
+      const d = 40 + ((this.#time * 0.37 + z.x) % 480)
+      this.particles.streak(z.x + z.dir * d, z.y + ((((this.#time / 23) | 0) % 9) - 4) * 18, z.dir, this.#element?.rgb)
+    }
+  }
+
   #visualEffects() {
+    this.#gustStreaks()
+    // Colonnes d'air chaud (Montagne) : des brins de lumière qui montent.
+    if (!this.options.reducedMotion) {
+      for (const c of this.world.thermals) {
+        if (((this.#time / 16) | 0) % 3) continue
+        const k = ((this.#time * 0.13 + c.x) % THERMAL.HALF_W) * 2 - THERMAL.HALF_W
+        this.particles.streak(c.x + k * 0.8, WORLD.GROUND_Y - 30 - ((this.#time * 0.21) % 500), 0, this.#element?.rgb)
+      }
+    }
+    for (const e of this.world.entities()) {
+      if (e.kind !== 'projectile' || e.hasImpacted || !e.alive) continue
+      // Le tir marqué par le souffle du monde : chargé (étincelles), ensablé (poussière).
+      if (e.charged && ((this.#time / 16) | 0) % 2 === 0) this.particles.spark(e.x, e.y)
+      if (e.sanded && ((this.#time / 16) | 0) % 3 === 0) this.particles.dust(e.x, e.y, 1, '226,196,140')
+    }
     // L'engin en feu (v5.8) : plus le feu est intense, plus il y a de flammes.
     const level = this.condition.fireLevel
     if (level) {
@@ -1356,7 +1928,42 @@ export class GameSession extends EventBus {
       }
       // Boulet encore brûlant après l'impact : il continue de flamber.
       if (e.kind === 'projectile' && e.hasImpacted && e.heatMs > 0) this.particles.flame(e.x, e.y - e.radius * 0.6, e.radius * 1.2)
+      if (e.kind === 'target' && e.shownDamage > 0) this.#showDamage(e)
+      // Forge (v6.1) : ses flammes montent, et crachent dans la rafale d'un moulin.
+      if (e.kind === 'block' && e.prop === 'forge' && e.alive && !(e.frozenMs > 0) && !((e.quenchedUntil ?? 0) > this.world.time)) {
+        this.particles.flame(e.x, e.y - e.height / 2 - 6, 34, 0.9)
+        if (this.world.time - (e.jetAt ?? -Infinity) < 60) {
+          const dir = Math.sign(this.world.props.gustAt(e.x, e.y - e.height / 2 - 40)) || -1
+          for (let i = 1; i <= 3; i++) this.particles.flame(e.x + dir * i * 60, e.y - e.height / 2 - 30, 40, 1.1)
+        }
+      }
+      // Trempé (citerne) : il dégoutte.
+      if (e.kind === 'target' && e.wetMs > 0 && e.alive && ((this.#time / 16) | 0) % 11 === e.id % 11) this.particles.dust(e.x, e.y + e.height * 0.3, 1, '150,190,230')
+      if (e.kind === 'target' && e.alive) {
+        const wt = this.world.time
+        // Empoisonné : il tousse des bulles vertes ; électrisé : des étincelles bleues (v6.1).
+        if (e.poisonUntil > wt && ((this.#time / 16) | 0) % 14 === e.id % 14) this.particles.cough(e.x, e.y - e.height * 0.45)
+        if (e.stunKind === 'shock' && e.stunUntil > wt && ((this.#time / 16) | 0) % 5 === e.id % 5) this.particles.spark(e.x + (((this.#time / 7) | 0) % 3 - 1) * 8, e.y - e.height * 0.2)
+      }
     }
+  }
+
+  /**
+   * Chiffres de dégâts (v6.1) : ce qu'un défenseur vient d'encaisser, regroupé
+   * (le feu et le poison rongent par petites touches : un chiffre toutes les
+   * 0,3 s). Abattu, il n'en a pas : ses points gagnés s'affichent à la place.
+   */
+  #showDamage(e) {
+    if (!e.alive) {
+      e.shownDamage = 0
+      return
+    }
+    const dot = e.shownCause === 'fire' || e.shownCause === 'poison' || e.shownCause === 'sting'
+    if (e.shownDamage < 1 || (dot && this.#time - (e.numberAt ?? -Infinity) < 300)) return
+    if (!dot && this.#time - (e.numberAt ?? -Infinity) < 60) return
+    e.numberAt = this.#time
+    this.particles.damage(e.x, e.y - e.height / 2 - 18, e.shownDamage, e.shownCause, e.shownDamage / e.maxHp)
+    e.shownDamage = 0
   }
 
   #feedback(f) {
@@ -1411,6 +2018,12 @@ export class GameSession extends EventBus {
 
   #bindWorldEvents() {
     const ev = this.#events
+    // Corde tranchée, chaîne rompue (v6.0) : la charge tombe, le tablier s'abat.
+    ev.on('tether:cut', ({ kind, x, y }) => {
+      if (kind === 'chain') this.particles.impact(x, y, 'iron', 260)
+      else this.particles.debris(x, y, 'straw', 16)
+      this.#feedback({ sound: kind === 'chain' ? 'iron' : 'wood', x, intensity: 0.9, caption: `contraption.${kind}Cut`, haptic: 'impact' })
+    })
     ev.on('entity:destroyed', ({ entity, cause }) => {
       // Pont des pillards rompu (v5.8) : ni points ni statistiques de château.
       if (entity.construct) {
@@ -1434,6 +2047,20 @@ export class GameSession extends EventBus {
           this.particles.dust(entity.x, entity.y, 10)
         }
         this.#feedback({ sound: 'down', x: entity.x, caption: `down.${entity.type}`, haptic: 'kill' })
+        // Assommé (v6.0) : le dessin bascule et s'efface (sauf chute hors du monde ou noyade).
+        if (cause !== 'fall' && cause !== 'out' && cause !== 'drown') {
+          this.particles.knockout(entity.x, entity.y, {
+            key: entity.assetKey, w: entity.width, h: entity.height, angle: entity.angle, vx: entity.body.velocity.x,
+            extra: { team: entity.team, general: entity.generalId, facing: entity.facing }, still: this.options.reducedMotion,
+          })
+        }
+        this.#downThisShot++
+        this.#bark('lost', BARK.LOST, entity)
+        // Un général tombe pour de bon (v6.0) : l'interface le célèbre.
+        if (entity.type === 'general') {
+          this.emit('general', { kind: 'fallen', id: entity.generalId, x: entity.x, y: entity.y })
+          this.emit('announce', { key: 'a11y.generalFallen', params: { general: entity.generalId } })
+        }
         // Cri du défenseur (réglage « Cris des soldats ») : voix selon le personnage.
         if (this.options.screams) this.#feedback({ sound: 'scream', x: entity.x, intensity: entity.type === 'knight' || entity.type === 'ogre' ? 1.3 : entity.type === 'king' ? 0.5 : 1, caption: 'scream' })
         this.emit('announce', { key: 'a11y.targetDown', params: { left: this.targetsLeft } })
@@ -1442,6 +2069,7 @@ export class GameSession extends EventBus {
       } else if (entity.kind === 'flyer') {
         if (gained) this.particles.text(entity.x, entity.y - 30, `+${gained}`, '#cfe6ff')
       } else if (entity.kind === 'block') {
+        if (!entity.terrain) this.#fillGauge(entity.scoreValue)
         this.particles.debris(entity.x, entity.y, entity.material, Math.max(entity.width, entity.height))
         if (gained && entity.scoreValue >= 100) this.particles.text(entity.x, entity.y - 20, `+${gained}`, '#e8eef7')
         this.#feedback({ sound: entity.sound, x: entity.x, intensity: 0.8, caption: cause === 'fire' ? null : `break.${entity.material}` })
@@ -1467,6 +2095,77 @@ export class GameSession extends EventBus {
       this.#feedback({ sound, x, intensity: clamp(energy / 400, 0.3, 1.2), caption: null, haptic: energy > 300 ? 'impact' : null })
       if (energy > 400) this.camera.shake(Math.min(6, energy / 300))
       if (energy > 900 && entity.kind !== 'projectile') this.#freeze(40)
+    })
+    // v6.1 : un défenseur encaisse un coup (il survit, ou pas) : son, secousse, arrêt sur image.
+    ev.on('hurt', ({ entity, amount, cause, lethal, x, y, dir }) => {
+      const share = Math.min(1.5, amount / (entity.maxHp || 1))
+      if (cause === 'crush' || cause === 'fall' || cause === 'knockout') {
+        this.particles.dust(x, y + entity.height * 0.3, cause === 'fall' ? 6 : 3)
+        if (!lethal) this.particles.burst(x, y - 6, Math.round(3 + share * 6))
+      }
+      // Sous-titre pour les vrais coups seulement (les petites touches ne bavardent pas).
+      this.#feedback({ sound: cause === 'shock' ? null : 'hit', x, intensity: clamp(0.45 + share * 0.6, 0.45, 1.2), caption: lethal || share < 0.4 || cause === 'shock' ? null : `hurt.${cause === 'fall' || cause === 'knockout' ? 'fall' : 'hit'}`, haptic: share > 0.5 ? 'impact' : null })
+      if (share >= 0.5) {
+        this.camera.shake(Math.min(5, 1.5 + share * 3))
+        this.#freeze(lethal ? 55 : 35)
+      }
+      // Un rescapé râle (rarement) : « Ouille ! »
+      if (!lethal && share >= 0.3) this.#bark('hurt', BARK.HURT, entity, true)
+      void dir
+    })
+    // v6.1 : orbe d'orage — arcs d'un défenseur à l'autre.
+    ev.on('thunder', ({ x, y, path }) => {
+      this.particles.arc(x, y - 30, x, y)
+      for (const s of path) this.particles.arc(s.x0, s.y0, s.x1, s.y1)
+      this.camera.shake(path.length ? 4 : 2)
+      this.#freeze(path.length ? 45 : 0)
+      this.#feedback({ sound: 'zap', x, intensity: Math.min(1.2, 0.6 + path.length * 0.15), caption: path.length ? 'thunder' : 'thunderMiss', haptic: path.length ? 'explosion' : 'impact' })
+    })
+    // v6.1 : le souffle du monde marque un tir (givre, braises, sable, orage) ; un tir givré éclate.
+    ev.on('element', ({ kind, x, y }) => {
+      if (kind === 'quench' || kind === 'thaw') this.particles.steam(x, y, 40)
+      else if (kind === 'rime') this.particles.frost(x, y, 40)
+      else if (kind === 'kindle') this.particles.flame(x, y, 30, 1.2)
+      else if (kind === 'smother' || kind === 'sand') this.particles.dust(x, y, 6, '226,196,140')
+      else if (kind === 'charge') this.particles.arc(x - 14, y - 10, x + 12, y + 8)
+      else if (kind === 'shatter') this.particles.frost(x, y, 55)
+      const sound = { quench: 'steam', thaw: 'steam', rime: 'frost', kindle: 'fire', smother: 'snow', sand: 'snow', charge: 'zap', shatter: 'glass' }[kind]
+      this.#feedback({ sound, x, intensity: 0.7, caption: `element.${kind}` })
+    })
+    // v6.1 : moulins — les ailes s'emballent (préavis), puis la rafale.
+    ev.on('mill', ({ kind, x }) => {
+      this.#feedback({ sound: kind === 'warn' ? 'creak' : 'gust', x, intensity: kind === 'warn' ? 0.7 : 1, caption: `mill.${kind}` })
+    })
+    // v6.1 : ouvrages brisés — inondation, braises.
+    ev.on('prop', ({ kind, x, y, r, winter }) => {
+      if (kind === 'flood') {
+        this.particles.water(x, y, r, winter)
+        if (winter) this.particles.frost(x, y + r * 0.4, r)
+        this.#feedback({ sound: 'splash', x, intensity: 1, caption: winter ? 'prop.floodIce' : 'prop.flood', haptic: 'impact' })
+      } else if (kind === 'embers') {
+        this.particles.burst(x, y, 14)
+        this.#feedback({ sound: 'fire', x, intensity: 1, caption: 'prop.embers' })
+      }
+    })
+    // v6.1 : nuages — le pot éclate, le gaz s'embrase, le givre le fige.
+    ev.on('cloud', ({ kind, x, y, r, event }) => {
+      if (event === 'spawn') {
+        this.particles.puff(x, y, r, kind === 'flour' ? '244,238,222' : kind === 'bees' ? '70,60,40' : '120,200,70')
+        this.#feedback({ sound: kind === 'bees' ? 'flyer' : 'hiss', x, intensity: 0.9, caption: `cloud.${kind}` })
+      } else if (event === 'disperse') {
+        this.particles.dust(x, y, 6, '90,80,60')
+        this.#feedback({ sound: null, x, caption: 'cloud.disperse' })
+      } else if (event === 'blast') {
+        this.#feedback({ sound: 'explosion', x, intensity: 0.9, caption: 'cloud.blast', haptic: 'explosion' })
+      } else if (event === 'freeze') {
+        this.particles.frost(x, y, r * 0.8)
+        this.#feedback({ sound: 'frost', x, intensity: 0.6, caption: 'cloud.freeze' })
+      }
+    })
+    // v6.1 : un tir puissant projette le bloc frappé — onde de choc et coup de boutoir.
+    ev.on('power', ({ energy, x, y, vx, vy }) => {
+      if (energy >= 450) this.particles.shockwave(x, y, Math.min(220, 90 + energy / 8))
+      this.camera.kick(vx, vy * 0.5, Math.min(12, 3 + energy / 160))
     })
     ev.on('explosion', ({ x, y, radius }) => {
       this.particles.explosion(x, y, radius)
@@ -1522,6 +2221,11 @@ export class GameSession extends EventBus {
       if (kind === 'dodge') {
         this.particles.dust(x, entity.y + entity.height / 2 - 4, 4)
         this.#feedback({ sound: 'whoosh', x, intensity: 0.6, caption: 'unit.dodge' })
+      } else if (kind === 'push') {
+        // v6.1 : il repousse ce qui lui tombait dessus.
+        this.particles.dust(x, y, 4)
+        this.#feedback({ sound: 'whoosh', x, intensity: 0.8, caption: 'unit.push' })
+        this.#bark('push', BARK.PUSH, entity, true)
       } else if (kind === 'shieldBlock') {
         this.particles.impact(x, y, 'iron', 500)
         this.camera.shake(3)

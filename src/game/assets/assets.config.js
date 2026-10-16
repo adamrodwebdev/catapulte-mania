@@ -39,6 +39,8 @@ export const ASSET_MANIFEST = Object.freeze({
   'target.shieldbearer': { type: 'procedural' },
   'target.bannerman': { type: 'procedural' },
   'target.engineer': { type: 'procedural' },
+  // v6.0 : les généraux (un dessin par général, choisi d'après extra.general).
+  'target.general': { type: 'procedural' },
   // Éléments de gameplay
   barrel: { type: 'procedural' },
   'projectile.stone': { type: 'procedural' },
@@ -47,6 +49,16 @@ export const ASSET_MANIFEST = Object.freeze({
   'projectile.bomb': { type: 'procedural' },
   'projectile.split': { type: 'procedural' },
   'projectile.frost': { type: 'procedural' },
+  // v6.1 : botte de paille, orbe d'orage, pot de poison.
+  'projectile.bale': { type: 'procedural' },
+  'projectile.thunder': { type: 'procedural' },
+  'projectile.poison': { type: 'procedural' },
+  // v6.1 : ouvrages des châteaux.
+  'prop.windmill': { type: 'procedural' },
+  'prop.forge': { type: 'procedural' },
+  'prop.cistern': { type: 'procedural' },
+  'prop.hive': { type: 'procedural' },
+  'prop.flour': { type: 'procedural' },
   // Créatures volantes (v5.0)
   'flyer.crow': { type: 'procedural' },
   'flyer.wyvern': { type: 'procedural' },

@@ -14,10 +14,13 @@ import { WORLD } from '../../physics/constants.js'
 import { catapult, trebuchet } from './engines.js'
 import { CHARACTER_PAINTERS } from './characters.js'
 import { TROOP_PAINTERS } from './troops.js'
+import { GENERAL_PAINTERS } from './warlords.js'
 import { drawBlockBody, drawBarrelBody } from './materials.js'
 
 export { CATAPULT_GEOMETRY, CATAPULT_SKINS } from './engines.js'
 import { CREATURE_PAINTERS } from './creatures.js'
+import { ELEMENT_PAINTERS } from './elements.js'
+import { STRUCTURE_PAINTERS } from './structures.js'
 import { celestial, distant, hasSunRays, near, skyGradient, stars, sunPosition, sunRays } from './scenery.js'
 
 const INK = '#1e1a2b'
@@ -602,9 +605,12 @@ export const PAINTERS = Object.freeze({
   'block.rock': blockPainter('rock'),
   ...CHARACTER_PAINTERS,
   ...TROOP_PAINTERS,
+  ...GENERAL_PAINTERS,
   barrel,
   ...projectiles,
   ...CREATURE_PAINTERS,
+  ...ELEMENT_PAINTERS,
+  ...STRUCTURE_PAINTERS,
   catapult,
   trebuchet,
   'deco.pumpkin': pumpkin,

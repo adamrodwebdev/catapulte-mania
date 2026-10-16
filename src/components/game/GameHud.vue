@@ -23,6 +23,11 @@ const windNow = computed(() => props.hud.windNow ?? props.hud.wind)
 const windKmh = computed(() => props.hud.windKmh ?? Math.round(Math.abs(windNow.value) * 30))
 /** Rafale en cours (Difficile) : affichée au-delà d'un seuil. */
 const gusting = computed(() => props.hud.windDynamic && props.hud.gust > 0.35 && windKmh.value > 0)
+/** Souffle du monde (v6.1) : son nom et son effet (infobulle), sinon « Vent » / « Vent en rafales ». */
+const worldWindId = computed(() => props.hud.worldWind?.id ?? 'breeze')
+const windLabel = computed(() => (worldWindId.value !== 'breeze' ? t(`game.worldWind.${worldWindId.value}`) : props.hud.windDynamic && windKmh.value > 0 ? t('game.windGusty') : t('game.wind')))
+const worldWindDesc = computed(() => (worldWindId.value !== 'breeze' ? t(`game.worldWindDesc.${worldWindId.value}`) : undefined))
+const worldWindClass = computed(() => (worldWindId.value !== 'breeze' ? ['world-wind', `world-wind--${worldWindId.value}`] : null))
 const hasPowers = computed(() => props.hud.powersEnabled !== false && props.hud.powers.some((p) => p.unlocked))
 const duo = computed(() => props.hud.players.length > 1)
 
@@ -48,7 +53,11 @@ const infinite = computed(() => props.hud.shotsTotal === null)
       <AppIcon name="pause" />
     </button>
     <div class="hud-top__level">
-      <span class="hud-top__name">{{ title }}</span>
+      <span class="hud-top__name">
+        {{ title }}
+        <!-- Grand siège (v6.0) : l'étape en cours. -->
+        <span v-if="hud.stageCount > 1" class="hud-top__stage">{{ t('game.stage', { stage: hud.stage, total: hud.stageCount }) }}</span>
+      </span>
       <span class="hud-top__chapter">{{ subtitle }}</span>
     </div>
 
@@ -78,8 +87,23 @@ const infinite = computed(() => props.hud.shotsTotal === null)
         <dd class="hud-stat__value">
           <template v-if="infinite"><AppIcon name="infinity" :size="20" /><span class="visually-hidden">{{ t('game.infinite') }}</span></template>
           <template v-else>
-            <span class="shots" aria-hidden="true">
-              <span v-for="i in hud.shotsTotal" :key="i" :class="['shots__dot', { 'shots__dot--used': i > hud.shotsLeft }]" />
+            <span class="shots-col">
+              <span class="shots" aria-hidden="true">
+                <span v-for="i in hud.shotsTotal" :key="i" :class="['shots__dot', { 'shots__dot--used': i > hud.shotsLeft, 'shots__dot--bonus': i > hud.shotsTotal - (hud.bonusShots || 0) }]" />
+              </span>
+              <!-- Jauge de destruction (v6.0) : à moitié du château, une pierre de plus. -->
+              <span
+                v-if="hud.gauge"
+                :class="['gauge', { 'gauge--full': hud.gauge.earned }]"
+                role="meter"
+                :aria-label="t('game.gauge')"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                :aria-valuenow="Math.round(hud.gauge.ratio * 100)"
+                :title="t('game.gaugeHint')"
+              >
+                <span class="gauge__fill" :style="{ '--fill': hud.gauge.ratio }" />
+              </span>
             </span>
             <span class="shots__text">{{ hud.shotsLeft }}</span>
           </template>
@@ -99,8 +123,10 @@ const infinite = computed(() => props.hud.shotsTotal === null)
         </dd>
       </div>
       <div :class="['hud-stat hud-stat--wind', `hud-stat--wind-${hud.windLevel || 'calm'}`, { 'hud-stat--gust': gusting }]">
-        <dt>{{ hud.windDynamic && windKmh > 0 ? t('game.windGusty') : t('game.wind') }}</dt>
+        <!-- v6.1 : le souffle du monde prend le nom du vent quand il porte quelque chose. -->
+        <dt :title="worldWindDesc" :class="worldWindClass">{{ windLabel }}</dt>
         <dd class="hud-stat__value">
+          <span v-if="worldWindClass" :class="['wind-element', ...worldWindClass]" aria-hidden="true" />
           <template v-if="windKmh === 0">{{ t('game.windCalm') }}</template>
           <template v-else>
             <AppIcon name="arrow" :size="18" :class="['wind-arrow', { 'wind-arrow--left': windNow < 0 }]" />

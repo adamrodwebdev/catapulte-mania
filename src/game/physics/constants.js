@@ -38,8 +38,31 @@ export const WORLD = deepFreeze({
    * rien sous lui est réveillé et retombe. Rien ne flotte jamais dans le vide.
    */
   SUPPORT_CHECK_EVERY: 30,
-  /** Une cible qui retombe à cette vitesse (ou plus) sur un obstacle meurt de sa chute. */
+  /** Une cible qui retombe à cette vitesse (ou plus) sur un obstacle meurt de sa chute (jusqu'à la v6.0). */
   TARGET_FALL_SPEED: 3,
+  /**
+   * Points de vie des défenseurs (v6.1, voir FallingObjects.js) : un contact
+   * plus lent que SAFE ne fait rien ; au-delà, le coup vaut
+   * K × dureté × ½·min(masse, MASS_CAP)·(vitesse − SAFE)².
+   */
+  HIT: { SAFE: 0.7, K: 4, MASS_CAP: 60 },
+  /**
+   * Repousser (v6.1) : ce qui arrive plus lentement que SPEED, et dont la
+   * quantité de mouvement ne dépasse pas la force du défenseur, est renvoyé
+   * (SHOVE : vitesse donnée à un objet de masse 8, moins pour plus lourd).
+   * Un défenseur ne repousse qu'une fois par COOLDOWN_MS.
+   */
+  PUSH: { SPEED: 1.8, COOLDOWN_MS: 500, SHOVE: 5.5 },
+  /** Chute (v6.1) : sans dommage jusqu'à SAFE ; mortelle à SAFE + LETHAL_DV (× √résistance). */
+  FALL: { SAFE: 4, LETHAL_DV: 4.5 },
+  /**
+   * Coup encaissé (v6.1) : le défenseur est repoussé (KNOCK × part de ses
+   * points de vie perdue, au plus KNOCK_MAX) et sonné STAGGER_MS (il ne
+   * repousse plus rien).
+   */
+  STAGGER_MS: 600,
+  KNOCK: 7,
+  KNOCK_MAX: 4.5,
   /** Une cible renversée (inclinaison > 70°) pendant ce délai est mise hors de combat. */
   KNOCKOUT_ANGLE: 1.2,
   KNOCKOUT_MS: 1500,

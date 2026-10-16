@@ -36,6 +36,13 @@ const SENTRY_SKIP = new Set([28, 68])
  */
 const GUARDS_FRONT = new Set([66, 99])
 const REACH_RIGHT = WORLD.WIDTH - 340
+/**
+ * Niveaux en escalier (v6.1) : le dernier gradin, le plus haut, abrite la place
+ * derrière le château, qu'aucun tir n'atteint. Un garde posté là ne mourait que
+ * de l'effondrement ; avec ses points de vie, il y survit : il se poste devant
+ * (relevé par scripts/check-levels.mjs).
+ */
+const REAR_SHELTERED = new Set([78])
 /** Les terrains commencent au-delà de cette abscisse (la catapulte reste sur la terre ferme). */
 const FIELD_LEFT = 480
 /** Pied gauche minimal d'une montagne. */
@@ -160,7 +167,7 @@ export function raidFor(rank) {
 }
 
 /** Type du pillard selon ce qu'il porte. */
-const RAIDER_TYPE = Object.freeze({ fire: 'scout', frost: 'scout', blow: 'engineer', smash: 'ogre' })
+export const RAIDER_TYPE = Object.freeze({ fire: 'scout', frost: 'scout', blow: 'engineer', smash: 'ogre' })
 
 /**
  * Barils et défenseurs supplémentaires (v5.0 : plus tôt et plus nombreux).
@@ -179,7 +186,8 @@ export function garrisonFor(rank) {
  * Munitions (v5.0) : chaque munition se débloque tôt dans la campagne (rang du
  * niveau) et reste ensuite disponible au moins en un exemplaire.
  */
-export const AMMO_UNLOCK = Object.freeze({ fire: 3, boulder: 5, frost: 7, bomb: 10, split: 14 })
+// v6.1 : orbe d'orage (chevaliers et fer, niveau 22), botte de paille (barils perchés, 29), pot de poison (37).
+export const AMMO_UNLOCK = Object.freeze({ fire: 3, boulder: 5, frost: 7, bomb: 10, split: 14, thunder: 22, bale: 29, poison: 37 })
 
 /**
  * @param {number} rank
@@ -259,11 +267,12 @@ export function applyCurve(b, rank) {
     .map((it) => ({ l: it.x - (it.w ?? 30) / 2, r: it.x + (it.w ?? 30) / 2 }))
   const take = (x, w) => occupied.push({ l: x - w / 2, r: x + w / 2 })
   const free = (x, w) => occupied.every((o) => x + w / 2 + 6 <= o.l || x - w / 2 - 6 >= o.r)
-  const slot = (side, w) => {
+  const slot = (side, w, { guard = false } = {}) => {
     let x = side < 0 ? castle.left - w / 2 - 10 : castle.right + w / 2 + 10
     for (let i = 0; i < 40 && !free(x, w); i++) x += side * 12
-    // Trop loin derrière le château (hors de portée du trébuchet) : devant, alors.
-    if (side > 0 && GUARDS_FRONT.has(rank) && x + w / 2 > REACH_RIGHT) return slot(-1, w)
+    // Trop loin derrière le château (hors de portée du trébuchet), ou à l'abri de
+    // tout tir (un défenseur, v6.1) : devant, alors.
+    if (side > 0 && ((GUARDS_FRONT.has(rank) && x + w / 2 > REACH_RIGHT) || (guard && REAR_SHELTERED.has(rank)))) return slot(-1, w, { guard })
     take(x, w)
     return x
   }
@@ -283,7 +292,7 @@ export function applyCurve(b, rank) {
   // les murs est un pavoisier (son pavois arrête les tirs tendus).
   const special = (type, side, patrol, more = {}) => {
     const t = TARGET_TYPES[type]
-    extra.push({ kind: 'target', type, x: slot(side, t.w), y: surface - t.h / 2 - 1, patrol, ...more })
+    extra.push({ kind: 'target', type, x: slot(side, t.w, { guard: true }), y: surface - t.h / 2 - 1, patrol, ...more })
   }
   const gateGuard = rank >= GATE_GUARD_FROM && roster.shields === 0
   for (let i = 0; i < roster.shields + (gateGuard ? 1 : 0); i++) special('shieldbearer', -1, 0)
@@ -300,7 +309,7 @@ export function applyCurve(b, rank) {
       continue
     }
     const t = TARGET_TYPES[type]
-    const x = slot(i % 2 === 0 ? 1 : -1, t.w)
+    const x = slot(i % 2 === 0 ? 1 : -1, t.w, { guard: true })
     extra.push({ kind: 'target', type, x, y: surface - t.h / 2 - 1, patrol: rank >= PATROL_FROM ? (type === 'ogre' ? 40 : 60) : 0 })
   }
   // Défenseurs spéciaux (v5.8) : éclaireurs et sapeurs derrière (le second éclaireur devant).

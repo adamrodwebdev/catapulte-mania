@@ -37,11 +37,17 @@ export const LIMITS = Object.freeze({ parts: 60, targets: 12, barrels: 8 })
  * son auteur (preuve qu'il est faisable, condition pour le partager).
  */
 export const STORAGE_KEYS = Object.freeze({ draft: 'castle-draft', verified: 'castle-verified' })
-const AMMO = Object.freeze(['boulder', 'fire', 'bomb', 'split', 'frost'])
+/**
+ * Munitions spéciales que l'atelier propose, dans l'ordre du code du château :
+ * on ajoute à la fin (v6.1 : botte de paille, orbe d'orage, pot de poison),
+ * pour que les châteaux déjà partagés restent valides.
+ */
+export const DESIGN_AMMO = Object.freeze(['boulder', 'fire', 'bomb', 'split', 'frost', 'bale', 'thunder', 'poison'])
+const AMMO = DESIGN_AMMO
 
 /** Château vide, prêt à construire. */
 export function emptyDesign() {
-  return { name: '', theme: 1, shots: 4, wind: 0.3, ammo: { boulder: 1, fire: 0, bomb: 1, split: 0, frost: 0 }, parts: [] }
+  return { name: '', theme: 1, shots: 4, wind: 0.3, ammo: { boulder: 1, fire: 0, bomb: 1, split: 0, frost: 0, bale: 0, thunder: 0, poison: 0 }, parts: [] }
 }
 
 const footprint = (p) => ({ left: p.x - PARTS[p.kind].w / 2, right: p.x + PARTS[p.kind].w / 2 })

@@ -1,0 +1,773 @@
+/*
+ * Grands sièges et généraux (v6.0) : barre du général, bannières, couvre-feu,
+ * présentation du général dans l'introduction du niveau.
+ *
+ * Le pourpre (--danger, garance) est la couleur de Mordrac et de ses
+ * généraux ; l'or reste celle du joueur.
+ */
+
+.general-bust {
+  display: block;
+  flex: none;
+}
+
+/* ---------- Jauge de destruction, sous les tirs ---------- */
+.shots-col {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.gauge {
+  display: block;
+  height: 3px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-muted) 28%, transparent);
+}
+
+.gauge__fill {
+  display: block;
+  width: calc(var(--fill, 0) * 100%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--grad-fire);
+  transition: width var(--dur-2) var(--ease-out);
+}
+
+.gauge--full .gauge__fill {
+  background: var(--grad-gold);
+}
+
+/* La pierre gagnée à la jauge : une perle cerclée de feu. */
+.shots__dot--bonus:not(.shots__dot--used) {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--c-gold-deep) 85%, transparent),
+    0 0 0 1.5px var(--danger),
+    0 0 8px color-mix(in srgb, var(--danger) 55%, transparent);
+}
+
+:root[data-motion='reduced'] .gauge__fill {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='full']) .gauge__fill {
+    transition: none;
+  }
+}
+
+/* ---------- Étape du grand siège, à côté du nom du niveau ---------- */
+.hud-top__stage {
+  display: inline-block;
+  margin-left: var(--space-1);
+  padding: 1px var(--space-2);
+  font-family: var(--font-body);
+  font-size: var(--fs-0);
+  font-weight: 700;
+  line-height: 1.4;
+  vertical-align: middle;
+  white-space: nowrap;
+  color: var(--text);
+  background: color-mix(in srgb, var(--danger) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 55%, transparent);
+  border-radius: var(--radius-pill);
+}
+
+/* ---------- Barre du général : en haut à droite, du côté du château ---------- */
+.boss-bar {
+  position: absolute;
+  z-index: 5;
+  top: calc(var(--hud-top-h, 4rem) + var(--space-2));
+  right: calc(var(--dock-right, 0px) + max(var(--space-3), env(safe-area-inset-right)));
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  width: min(19rem, calc(100% - var(--dock-right, 0px) - 2 * var(--space-3)));
+  margin: 0;
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1);
+  color: var(--text);
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-l);
+  box-shadow: var(--inner-hi), var(--elev-2);
+  pointer-events: none;
+  animation: boss-bar-in var(--dur-3) var(--ease-spring);
+}
+
+.boss-bar__bust {
+  border-radius: var(--radius);
+  background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--danger) 32%, transparent), transparent 70%);
+}
+
+.boss-bar__body {
+  min-width: 0;
+}
+
+.boss-bar__name,
+.boss-bar__title,
+.boss-bar__line {
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.boss-bar__name {
+  font-family: var(--font-display);
+  font-size: var(--fs-1);
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.boss-bar__title {
+  font-size: var(--fs-0);
+  color: var(--text-muted);
+}
+
+.boss-bar__line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  font-size: var(--fs-0);
+}
+
+.boss-bar__label {
+  color: var(--text-muted);
+}
+
+.boss-bar__intent strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--accent-text);
+}
+
+.boss-bar__lives {
+  display: flex;
+  gap: 2px;
+  align-self: start;
+  margin: 0;
+  padding-top: var(--space-1);
+  color: var(--danger);
+}
+
+.boss-bar__heart--lost {
+  color: color-mix(in srgb, var(--text-muted) 40%, transparent);
+}
+
+/* Avant son donjon : il attend, présenté en retrait. */
+.boss-bar--waiting {
+  opacity: 0.9;
+}
+
+.boss-bar--waiting .boss-bar__bust {
+  filter: grayscale(0.55) brightness(0.85);
+}
+
+/* Il donne son ordre : la barre s'embrase de pourpre. */
+.boss-bar--acting {
+  border-color: color-mix(in srgb, var(--danger) 80%, transparent);
+  box-shadow: var(--inner-hi), var(--elev-2), 0 0 0 3px color-mix(in srgb, var(--danger) 35%, transparent);
+}
+
+.boss-bar--acting .boss-bar__intent strong {
+  color: var(--danger);
+}
+
+/* Intouchable le temps de se relever : ses cœurs battent. */
+.boss-bar--guard .boss-bar__lives {
+  animation: boss-heartbeat 0.45s ease-in-out infinite alternate;
+}
+
+@keyframes boss-bar-in {
+  from {
+    opacity: 0;
+    translate: 12px 0;
+  }
+}
+
+@keyframes boss-heartbeat {
+  to {
+    scale: 1.15;
+  }
+}
+
+/* ---------- Bannières (étape prise, entrée en scène, ordre, blessure, chute) ---------- */
+.boss-banner {
+  --banner-ms: 1700ms;
+  position: absolute;
+  z-index: 15;
+  left: calc((100% - var(--dock-right, 0px)) / 2);
+  top: calc(var(--hud-top-h, 4rem) + var(--space-3));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: max-content;
+  max-width: min(32rem, calc(100% - var(--dock-right, 0px) - 2 * var(--space-3)));
+  margin: 0;
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2);
+  color: var(--text);
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  border: 1px solid color-mix(in srgb, var(--danger) 75%, transparent);
+  border-radius: var(--radius-l);
+  box-shadow: var(--inner-hi), var(--elev-3);
+  pointer-events: none;
+  animation:
+    boss-banner-in var(--dur-3) var(--ease-spring),
+    boss-banner-out 0.35s ease-in calc(var(--banner-ms) - 350ms) forwards;
+}
+
+.boss-banner--cleared {
+  --banner-ms: 2000ms;
+  border-color: color-mix(in srgb, var(--accent) 75%, transparent);
+  box-shadow: var(--inner-hi), var(--gold-glow), var(--elev-3);
+}
+
+.boss-banner--intro {
+  --banner-ms: 3400ms;
+}
+
+.boss-banner--fallen {
+  --banner-ms: 2800ms;
+  border-color: color-mix(in srgb, var(--accent) 75%, transparent);
+  box-shadow: var(--inner-hi), var(--gold-glow), var(--elev-3);
+}
+
+.boss-banner__bust {
+  border-radius: var(--radius);
+  background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--danger) 35%, transparent), transparent 70%);
+}
+
+.boss-banner__icon {
+  flex: none;
+  margin-left: var(--space-2);
+  color: var(--accent-text);
+}
+
+.boss-banner__text {
+  min-width: 0;
+}
+
+.boss-banner__kicker {
+  margin: 0;
+  font-size: var(--fs-0);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--danger);
+}
+
+.boss-banner--cleared .boss-banner__kicker,
+.boss-banner--fallen .boss-banner__kicker {
+  color: var(--accent-text);
+}
+
+.boss-banner__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-3);
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.boss-banner--big .boss-banner__title {
+  font-size: var(--fs-4);
+}
+
+.boss-banner__quote {
+  margin: 2px 0 0;
+  font-size: var(--fs-1);
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+/* Écran étroit : la barre du général occupe le coin droit, la bannière passe dessous. */
+@media (max-width: 1099px) {
+  .game:has(.boss-bar) .boss-banner {
+    top: calc(var(--hud-top-h, 4rem) + 4.5rem);
+  }
+}
+
+@keyframes boss-banner-in {
+  from {
+    opacity: 0;
+    translate: 0 -10px;
+    scale: 0.94;
+  }
+}
+
+@keyframes boss-banner-out {
+  to {
+    opacity: 0;
+    translate: 0 -6px;
+  }
+}
+
+/* ---------- Couvre-feu : la nuit tombe sur la visée ---------- */
+.curfew-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(ellipse 70% 80% at 30% 65%, color-mix(in srgb, var(--overlay) 30%, transparent), var(--overlay) 80%);
+  animation: curfew-in 0.8s ease-out;
+}
+
+@keyframes curfew-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---------- Introduction d'un grand siège : le général qui attend ---------- */
+.intro-general {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+  width: 100%;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
+  text-align: left;
+  background: var(--surface-2);
+  border-left: 4px solid var(--danger);
+  border-radius: var(--radius);
+}
+
+.intro-general__bust {
+  border-radius: var(--radius);
+  background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--danger) 30%, transparent), transparent 70%);
+}
+
+.intro-general__kicker {
+  margin: 0;
+  font-size: var(--fs-0);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--danger);
+}
+
+.intro-general__name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-2);
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.intro-general__title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--fs-0);
+  color: var(--text-muted);
+}
+
+.intro-general__lives {
+  font-weight: 700;
+  color: var(--danger);
+}
+
+.intro-general__skills {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-0);
+}
+
+.intro-general__skills li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+
+.intro-general__skills .icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--danger);
+}
+
+/* ---------- Téléphones ---------- */
+@media (orientation: landscape) and (max-height: 500px) {
+  .boss-bar {
+    width: min(15rem, calc(100% - var(--dock-right, 0px) - 2 * var(--space-2)));
+    right: calc(var(--dock-right, 0px) + var(--space-2));
+    top: calc(var(--hud-top-h, 3rem) + var(--space-1));
+    padding-right: var(--space-2);
+  }
+
+  .boss-bar__title {
+    display: none;
+  }
+
+  .boss-banner {
+    top: calc(var(--hud-top-h, 3rem) + var(--space-2));
+    max-width: min(24rem, calc(100% - var(--dock-right, 0px) - 17rem));
+  }
+
+  .boss-banner__quote {
+    display: none;
+  }
+
+  .game:has(.boss-bar) .boss-banner {
+    top: calc(var(--hud-top-h, 3rem) + var(--space-2));
+    left: calc((100% - var(--dock-right, 0px) - 15rem) / 2);
+  }
+}
+
+@media (orientation: portrait) and (max-width: 600px) {
+  .boss-bar {
+    width: calc(100% - 2 * var(--space-2));
+    right: var(--space-2);
+    top: calc(var(--hud-top-h, 3.5rem) + var(--space-1));
+  }
+
+  /* Le ciel est vide au-dessus de la scène : la bannière y descend, sous les sous-titres. */
+  .boss-banner,
+  .game:has(.boss-bar) .boss-banner {
+    top: calc(var(--hud-top-h, 3.5rem) + 9.5rem);
+  }
+
+  .boss-banner__title {
+    font-size: var(--fs-2);
+  }
+
+  /* Le nom du niveau a peu de place : la barre du général dit déjà où l'on en est. */
+  .hud-top__stage {
+    display: none;
+  }
+
+  .boss-banner--big .boss-banner__title {
+    font-size: var(--fs-3);
+  }
+
+  /* Sous-titres (en haut sur téléphone vertical) : sous la barre du général. */
+  .game:has(.boss-bar) .captions {
+    top: calc(var(--hud-top-h, 3.5rem) + 4.25rem);
+  }
+}
+
+/* ---------- Mouvement réduit : pas d'entrée ni de battement ---------- */
+:root[data-motion='reduced'] .boss-bar,
+:root[data-motion='reduced'] .boss-bar--guard .boss-bar__lives,
+:root[data-motion='reduced'] .curfew-veil {
+  animation: none;
+}
+
+:root[data-motion='reduced'] .boss-banner {
+  animation: boss-banner-out 0.01s linear calc(var(--banner-ms) - 10ms) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='full']) .boss-bar,
+  :root:not([data-motion='full']) .boss-bar--guard .boss-bar__lives,
+  :root:not([data-motion='full']) .curfew-veil {
+    animation: none;
+  }
+
+  :root:not([data-motion='full']) .boss-banner {
+    animation: boss-banner-out 0.01s linear calc(var(--banner-ms) - 10ms) forwards;
+  }
+}
+
+/* ---------- Siège sans fin : la main de trois cartes (v6.0) ---------- */
+.deck {
+  display: grid;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.deck__title {
+  margin: 0;
+  font-weight: 700;
+  text-align: center;
+}
+
+.deck__cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  container-type: inline-size;
+}
+
+.deck-card {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: var(--space-1);
+  min-height: 44px;
+  padding: var(--space-3) var(--space-2);
+  font: inherit;
+  text-align: center;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-l);
+  box-shadow: var(--inner-hi), var(--elev-1);
+  cursor: pointer;
+  transition:
+    translate var(--dur-2) var(--ease-spring),
+    box-shadow var(--dur-2) var(--ease-out),
+    border-color var(--dur-2) var(--ease-out);
+}
+
+.deck-card:hover:not(:disabled),
+.deck-card:focus-visible {
+  translate: 0 -3px;
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+  box-shadow: var(--inner-hi), var(--gold-glow), var(--elev-2);
+}
+
+.deck-card:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.deck-card__icon {
+  color: var(--accent-text);
+}
+
+.deck-card__name {
+  max-width: 100%;
+  font-family: var(--font-display);
+  /* Le nom le plus long tient sur une ligne dans un tiers de la main. */
+  font-size: clamp(0.7rem, 3.1cqi, var(--fs-1));
+  font-weight: 700;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+.deck-card__desc {
+  font-size: var(--fs-0);
+  color: var(--text-muted);
+}
+
+.deck-card--kept {
+  translate: 0 -3px;
+  border-color: var(--accent);
+  box-shadow: var(--inner-hi), var(--gold-glow), var(--elev-2);
+}
+
+.deck-card:disabled:not(.deck-card--kept) {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Écran étroit : les cartes en rangées, l'icône à gauche. */
+@media (max-width: 479px) {
+  .deck__cards {
+    grid-template-columns: 1fr;
+  }
+
+  .deck-card {
+    grid-template-columns: auto 1fr;
+    justify-items: start;
+    text-align: left;
+    column-gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .deck-card__icon {
+    grid-row: span 2;
+    align-self: center;
+  }
+}
+
+:root[data-motion='reduced'] .deck-card {
+  transition: none;
+  translate: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='full']) .deck-card {
+    transition: none;
+    translate: none;
+  }
+}
+
+/* ---------- Coupe de la semaine (v6.0) ---------- */
+.cup-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.cup-medal {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  color: var(--on-medal);
+  box-shadow: var(--inner-hi), var(--elev-1);
+}
+
+.cup-trophies .cup-medal {
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-inline: var(--space-1) 2px;
+}
+
+.cup-medal--gold {
+  background: var(--grad-gold);
+}
+
+.cup-medal--silver {
+  background: var(--medal-silver);
+}
+
+.cup-medal--bronze {
+  background: var(--medal-bronze);
+}
+
+.cup-medal--none {
+  color: var(--text-muted);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1.5px var(--hairline-strong);
+}
+
+.cup-rules {
+  margin: 0;
+  font-size: var(--fs-0);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.cup-castles {
+  display: grid;
+  gap: var(--space-2);
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cup-castle {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+}
+
+.cup-castle__n {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--accent-text);
+  border: 1.5px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  border-radius: 50%;
+}
+
+.cup-castle__body {
+  display: grid;
+  min-width: 0;
+}
+
+.cup-castle__name {
+  overflow: hidden;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cup-castle__body small {
+  color: var(--text-muted);
+}
+
+.cup-castle .btn {
+  min-height: 44px;
+}
+
+.cup-trophies {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin: 0;
+  font-size: var(--fs-0);
+  color: var(--text-muted);
+}
+
+/* Téléphone : les étoiles passent sous le nom du château. */
+@media (max-width: 479px) {
+  .cup-castle {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .cup-castle .stars {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .cup-castle .btn {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+}
+
+/* ---------- Moments forts : le plus beau tir, filmé (v6.0) ---------- */
+.clip {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.clip__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  font-weight: 700;
+}
+
+.clip__video {
+  display: block;
+  width: min(100%, 22rem);
+  height: auto;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--elev-1);
+}
+
+.clip__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.clip__actions .btn {
+  min-height: 44px;
+}
+
+/* Enregistrer : la flèche pointe vers le bas. */
+.clip__save-icon {
+  rotate: 90deg;
+}

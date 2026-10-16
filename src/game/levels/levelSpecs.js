@@ -155,6 +155,20 @@ export const LEVEL_SPECS = [
       b.target(r[0])
       b.target(r[2])
     },
+    // Grand siège (v6.0) : le camp de Rufus Grosbois, une palissade puis sa grande loge de rondins.
+    stages: [
+      {
+        shots: 3,
+        par: 2,
+        build(b) {
+          b.palisade(1290, { count: 5, h: 118 })
+          const k = b.tower(1600, { floors: 2, w: 210, mat: 'wood', h: 105, roof: 'straw' })
+          b.general(k[0], 'rufus', -20)
+          b.target(k[1], 'soldier', -45)
+          b.target(k[1], 'soldier', 45)
+        },
+      },
+    ],
   },
 
   /* ===== Chapitre 2 — Le Fort de pierre ===== */
@@ -186,6 +200,9 @@ export const LEVEL_SPECS = [
       b.barrel(t[0], -26)
       b.barrel(t[0], 26)
       garrison(b, t.slice(1))
+      // v6.1 : un moulin devant la tour. Ses rafales soufflent sur l'approche : tirez
+      // entre deux rafales… ou abattez ses ailes.
+      b.windmill(1340)
     },
   },
 
@@ -204,14 +221,13 @@ export const LEVEL_SPECS = [
   },
 
   // 15. Le chevalier : un donjon de pierre, le chevalier au rez-de-chaussée.
+  //     v6.0 : devant, une potence. Une pierre pend au-dessus d'un garde : tranchez la corde.
   {
     shots: 5, wind: 0.4, ammo: { boulder: 2 },
     build(b) {
       const k = b.tower(1550, { floors: 4, mat: 'stone', w: 150, t: 26, roof: 'wood' })
       garrison(b, k, ['knight'])
-      const side = b.tower(1300, { floors: 2, roof: 'straw' })
-      b.target(side[1])
-      b.barrel(side[0])
+      b.target(b.gallows(1290))
     },
   },
 
@@ -253,6 +269,8 @@ export const LEVEL_SPECS = [
       b.barrel(mid, 20)
       garrison(b, a.slice(1))
       garrison(b, c, ['knight'])
+      // v6.1 : une ruche sur la salle du milieu : brisée, l'essaim fond sur les gardes.
+      b.prop('hive', b.spot(1550, mid.topY))
     },
   },
 
@@ -287,6 +305,20 @@ export const LEVEL_SPECS = [
       b.target(k[3])
       b.target(r[2], 'knight')
     },
+    // Grand siège (v6.0) : le donjon de Sire Galeran, le chevalier au deuxième étage.
+    stages: [
+      {
+        shots: 3,
+        par: 2,
+        build(b) {
+          const k = b.tower(1620, { floors: 3, mats: ['stone', 'stone', 'wood'], w: 220, t: 24, roof: 'wood' })
+          b.target(k[0], 'knight', -50)
+          b.general(k[1], 'galeran', 30)
+          b.target(k[2], 'soldier')
+          b.target(b.spot(1420, 900), 'shieldbearer')
+        },
+      },
+    ],
   },
 
   /* ===== Chapitre 3 — La Forteresse ===== */
@@ -345,6 +377,9 @@ export const LEVEL_SPECS = [
         const h = b.tower(x, { floors: 1 + (i % 2), w: 100, roof: 'straw' })
         b.target(h[h.length - 1])
       })
+      // v6.1 : une forge devant le hameau : un tir qui traverse ses flammes s'enflamme
+      // et met le feu aux toits de paille (le vent de la Forteresse porte les braises).
+      b.prop('forge', b.spot(1120, b.ground))
     },
   },
 
@@ -380,8 +415,9 @@ export const LEVEL_SPECS = [
   },
 
   // 28. Le pont-levis : une salle suspendue entre deux tours. Coupez le pont.
+  //     v6.0 : un vrai pont-levis garde la porte. Brisez sa chaîne : il s'abat sur les gardes.
   {
-    shots: 5, wind: 0.6, ammo: { boulder: 2, bomb: 2, split: 1 },
+    shots: 6, wind: 0.6, ammo: { boulder: 2, bomb: 2, split: 1 },
     build(b) {
       const a = b.tower(1350, { floors: 4, mat: 'stone', slab: 'iron', t: 26 })
       const c = b.tower(1750, { floors: 4, mat: 'stone', slab: 'iron', t: 26 })
@@ -389,21 +425,29 @@ export const LEVEL_SPECS = [
       const hall = b.room(1550, a[3].topY - 22, { mat: 'wood', w: 150, h: 95 })
       b.target(hall, 'knight', -30)
       b.target(hall, 'soldier', 30)
-      b.target(a[1])
+      // Le tablier dressé devant la tour, sa chaîne accrochée au pilier du premier étage.
+      const post = a[1].posts[0]
+      b.drawbridge(1240, { block: post, x: post.x - 13, y: post.y - 12 })
+      b.target(b.spot(1150, b.ground))
+      b.target(b.spot(1192, b.ground))
       b.target(c[0], 'knight')
       b.target(c[2])
     },
   },
 
-  // 29. Le monastère : une nef basse et un campanile de six étages.
+  // 29. Le monastère : une nef basse et un campanile de six étages. v6.1 (botte de
+  // paille) : un baril perché sur le mur d'enceinte, au-dessus des gardes de la
+  // porte. Poussé sans sauter, il tombe sur eux… et la nef de verre est tout près.
   {
-    shots: 6, wind: 0.65, ammo: { boulder: 2, bomb: 2, fire: 2 },
+    shots: 6, wind: 0.65, ammo: { boulder: 2, bomb: 2, fire: 2, bale: 2 },
     build(b) {
+      const wall = b.wall(1150, { mat: 'stone', w: 40, h: 170, n: 4 })
+      b.barrel(b.spot(1150, wall.topY))
+      b.target(b.spot(1205, b.ground))
+      b.target(b.spot(1242, b.ground))
       const nave = b.tower(1400, { floors: 2, mats: ['glass', 'stone'], slab: 'stone', w: 220, t: 22, roof: 'stone' })
       const tower = b.tower(1680, { floors: 6, mats: ['stone', 'stone', 'iron', 'stone', 'glass'], slab: 'stone', t: 24, h: 92, roof: 'wood' })
-      b.target(nave[0], 'soldier', -50)
-      b.barrel(nave[0], 0)
-      b.target(nave[0], 'knight', 50)
+      b.target(nave[0], 'knight', 30)
       b.target(nave[1])
       b.target(tower[1], 'knight')
       b.target(tower[3])
@@ -428,6 +472,20 @@ export const LEVEL_SPECS = [
       b.target(r[1], 'knight')
       b.target(r[3])
     },
+    // Grand siège (v6.0) : la poudrière de Bertille Salpêtre, ses barils juste sous elle.
+    stages: [
+      {
+        shots: 3,
+        par: 2,
+        build(b) {
+          const k = b.tower(1600, { floors: 3, mats: ['brick', 'brick', 'wood'], slab: 'wood', w: 190, t: 22, roof: 'wood' })
+          b.barrel(k[0], -45)
+          b.barrel(k[0], 45)
+          b.general(k[1], 'bertille')
+          b.target(k[2], 'soldier')
+        },
+      },
+    ],
   },
 
   /* ===== Chapitre 4 — La Citadelle (de nuit) ===== */
@@ -551,9 +609,12 @@ export const LEVEL_SPECS = [
     build(b) {
       const steps = [[1300, 2], [1460, 3], [1620, 4], [1780, 5], [1940, 6]]
       steps.forEach(([x, floors], i) => {
-        const t = b.tower(x, { floors, mats: ['stone', 'stone', 'wood'], slab: i > 2 ? 'iron' : 'stone', w: 110, t: 24, h: 92, roof: i === 4 ? 'stone' : 'straw' })
+        // v6.1 : la deuxième tour porte une citerne au lieu d'un toit.
+        const t = b.tower(x, { floors, mats: ['stone', 'stone', 'wood'], slab: i > 2 ? 'iron' : 'stone', w: 110, t: 24, h: 92, roof: i === 4 ? 'stone' : i === 1 ? null : 'straw' })
         b.target(t[floors - 1], i === 4 ? 'king' : i % 2 ? 'knight' : 'soldier')
         if (floors >= 4) b.target(t[1])
+        // Crevée, elle trempe les tours voisines : l'orbe d'orage y frappe plus fort.
+        if (i === 1) b.prop('cistern', b.spot(x, t[floors - 1].topY))
       })
     },
   },
@@ -597,5 +658,19 @@ export const LEVEL_SPECS = [
       b.target(r[2])
       b.barrel(r[1])
     },
+    // Grand siège (v6.0) : la tour de la comtesse Morgane, sa garde de nuit porte des torches.
+    stages: [
+      {
+        shots: 4,
+        par: 3,
+        build(b) {
+          const k = b.tower(1660, { floors: 4, mats: ['stone', 'stone', 'iron', 'wood'], slab: 'stone', w: 170, t: 24, h: 96, roof: 'wood' })
+          b.watchman(k[0], -30)
+          b.target(k[1], 'knight')
+          b.watchman(k[2])
+          b.general(k[3], 'morgane')
+        },
+      },
+    ],
   },
 ]

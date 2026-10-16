@@ -64,6 +64,9 @@ const BOLT_TINT = {
   'projectile.bomb': '#2b2b33',
   'projectile.split': '#c9c3b7',
   'projectile.boulder': '#8a8478',
+  'projectile.thunder': '#bfe4ff',
+  'projectile.poison': '#8fe26a',
+  'projectile.bale': '#e2bf6a',
 }
 
 function bolt(g, x0, x1, tint) {

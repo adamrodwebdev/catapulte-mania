@@ -56,6 +56,8 @@ export const BEHAVIOURS = Object.freeze({
   scout: ['panic', 'raid', 'dodge', 'flee', 'patrol'],
   shieldbearer: ['panic', 'guard'],
   bannerman: ['panic', 'flee'],
+  // v6.0 : un général se replie sur ordre, s'abrite des tirs qu'il voit venir.
+  general: ['panic', 'retreat', 'cover', 'flee'],
   engineer: ['panic', 'raid', 'cover', 'flee', 'repair', 'patrol'],
 })
 
@@ -164,8 +166,10 @@ export class UnitBrain {
     const next = wp.ledge === ledge.id ? null : ctx.nav.ledge(wp.ledge)
     const span = next ? { x0: Math.min(ledge.x0, next.x0), x1: Math.max(ledge.x1, next.x1) } : ledge
     const goalX = next ? wp.x + Math.sign(wp.x - u.x || 1) * (u.width / 2 + 4) : wp.x
+    // Un pillard qui charge, un général qui se replie : ils passent entre leurs camarades.
+    const pushing = plan.kind === 'raid' || plan.kind === 'retreat'
     const r = steer({ x: u.x, vx: ctx.vx(u), halfW: u.width / 2 }, goalX, span, GAITS[plan.gait], {
-      allies: plan.kind === 'raid' ? [] : ctx.alliesOn(ledge.id, u),
+      allies: pushing ? [] : ctx.alliesOn(ledge.id, u),
       blocked: (dir) => ctx.blocked(u, dir),
       speedScale: plan.gait === 'walk' ? this.speedScale : 1,
     })
@@ -222,6 +226,9 @@ export class UnitBrain {
     } else if (plan.kind === 'raid') {
       const engine = ctx.engines[0]
       this.#assault = { x: this.unit.x, engineX: engine?.x ?? this.unit.x - 1, count: 0, nextAt: ctx.time + 350 }
+    } else if (plan.kind === 'retreat') {
+      this.unit.retreat = null
+      ctx.solid(this.unit)
     } else if (plan.kind === 'repair' && plan.data?.alive) {
       this.#workOn = plan.data
       this.#workUntil = ctx.time + REPAIR.WORK_MS
@@ -257,7 +264,8 @@ export class UnitBrain {
   /** En feu : course éperdue vers le bout le plus éloigné de sa corniche. */
   propose_panic(ctx, ledge) {
     const u = this.unit
-    if (!(u.burning > 0)) return null
+    // En feu, ou piqué par un essaim (v6.1) : il court droit devant lui.
+    if (!(u.burning > 0) && !(u.panicUntil > ctx.time)) return null
     const x = u.x - ledge.x0 > ledge.x1 - u.x ? ledge.x0 : ledge.x1
     return { kind: 'panic', goal: { x, ledge: ledge.id }, gait: 'sprint' }
   }
@@ -286,6 +294,21 @@ export class UnitBrain {
       ctx.emit('raid', { entity: u })
     }
     return { kind: 'raid', goal: { x, ledge: goal.id }, gait: RAID.GAIT[u.type] ?? 'sprint' }
+  }
+
+  /** Général (v6.0) : sur son propre ordre de repli, il court à l'autre bout de son château. */
+  propose_retreat(ctx) {
+    const u = this.unit
+    if (!u.retreat) return null
+    if (this.plan?.kind === 'retreat') return this.plan
+    const goal = ctx.nav.ledgeAt(u.retreat.x, u.retreat.y)
+    if (!goal) {
+      u.retreat = null
+      return null
+    }
+    // Il se faufile entre ses gardes le temps du repli (voir #arrive).
+    ctx.passThrough(u)
+    return { kind: 'retreat', goal: { x: u.retreat.x, ledge: goal.id }, gait: 'sprint' }
   }
 
   /** Éclaireur : le projectile tombe près de lui → il file à l'endroit sûr le plus proche. */
