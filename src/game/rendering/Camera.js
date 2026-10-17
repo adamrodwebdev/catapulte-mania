@@ -25,6 +25,8 @@ export class Camera {
   #focus = { left: 0, right: WORLD.WIDTH, top: 200 }
   #trauma = 0
   #shakeT = 0
+  /** Coup de boutoir en cours (px écran, v6.1). */
+  #kick = { x: 0, y: 0 }
   follow = true
   shakeEnabled = true
   /** Marges (px) occupées par le HUD en haut et en bas : la scène est cadrée entre les deux. */
@@ -61,6 +63,14 @@ export class Camera {
   setFocus(left, right, top) {
     this.#focus = { left, right, top }
     this.overview(true)
+  }
+
+  /**
+   * Bord gauche de la zone d'intérêt (v6.2) : il suit l'engin qui roule. Pas de
+   * saut : la vue d'ensemble y glisse à son rythme habituel.
+   */
+  setFocusLeft(left) {
+    if (Number.isFinite(left)) this.#focus = { ...this.#focus, left }
   }
 
   #fitScale() {
@@ -142,6 +152,19 @@ export class Camera {
     this.#trauma = Math.min(1, this.#trauma + intensity / 16)
   }
 
+  /**
+   * Coup de boutoir (v6.1) : l'image recule d'un coup dans le sens du choc
+   * (px écran), puis revient en ressort amorti (~0,15 s). Désactivé avec le
+   * tremblement (réglage, mouvement réduit).
+   */
+  kick(dx, dy, strength = 6) {
+    if (!this.shakeEnabled) return
+    const len = Math.hypot(dx, dy) || 1
+    const s = Math.min(14, strength)
+    this.#kick.x = clamp(this.#kick.x + (dx / len) * s, -16, 16)
+    this.#kick.y = clamp(this.#kick.y + (dy / len) * s, -16, 16)
+  }
+
   /** Traumatisme courant (0..1), pour les tests et les effets qui en dépendent. */
   get trauma() {
     return this.#trauma
@@ -163,15 +186,20 @@ export class Camera {
     this.scale *= Math.exp(clamp(want, -maxStep, maxStep))
     this.#shakeT += dtMs
     this.#trauma = Math.max(0, this.#trauma - dtMs * 0.0017)
+    const back = Math.pow(0.0005, dtMs / 1000)
+    this.#kick.x *= back
+    this.#kick.y *= back
   }
 
   /** Décalage (px écran) et roulis (rad) du tremblement. */
   get offset() {
-    if (this.#trauma <= 0) return { x: 0, y: 0, roll: 0 }
+    const kx = this.#kick.x
+    const ky = this.#kick.y
+    if (this.#trauma <= 0) return { x: kx, y: ky, roll: 0 }
     const k = this.#trauma * this.#trauma
     const amp = k * Math.min(26, Math.max(10, this.viewH * 0.03))
     const t = this.#shakeT
-    return { x: smooth(t, 1.3) * amp, y: smooth(t, 7.9) * amp * 0.8, roll: smooth(t, 4.2) * k * 0.018 }
+    return { x: smooth(t, 1.3) * amp + kx, y: smooth(t, 7.9) * amp * 0.8 + ky, roll: smooth(t, 4.2) * k * 0.018 }
   }
 
   /**

@@ -2,10 +2,12 @@ import { GameMode } from './GameMode.js'
 import { NO_EFFECTS } from '../progression/UpgradeCatalog.js'
 import { LevelRepository } from '../levels/LevelRepository.js'
 import { renownSum, COUP_DE_GRACE } from './Renown.js'
+import { HEROIC } from '../progression/Mastery.js'
 
 /** Mode histoire : un joueur, résultat enregistré (or, étoiles, déblocages). */
 export class StoryMode extends GameMode {
   id = 'story'
+  campaignAids = true
   recordsResult = true
 
   /**
@@ -24,6 +26,34 @@ export class StoryMode extends GameMode {
     }
     return out
   }
+}
+
+/**
+ * Campagne héroïque (v6.2, « nouvelle partie + ») : la campagne pour qui la
+ * maîtrise. Châteaux plus solides, un tir de moins (jamais moins de deux),
+ * vent plus fort ; les niveaux ont un pillard de plus (LevelRepository.heroic).
+ * Le résultat donne des médailles (Campagne héroïque), ni or ni succès.
+ */
+export class HeroicMode extends StoryMode {
+  id = 'heroic'
+  // Pour qui maîtrise déjà la campagne : sans ses aides de débutant.
+  campaignAids = false
+  /** Points de vie des blocs et des défenseurs, solidité des jonctions (voir GameSession). */
+  fortify = HEROIC.FORTIFY
+  windFactor = HEROIC.WIND
+
+  shotsFor(level, difficulty) {
+    return Math.max(2, super.shotsFor(level, difficulty) + HEROIC.SHOTS)
+  }
+}
+
+/**
+ * Terres du Duc (v6.2) : le chapitre secret de la maîtrise, cinq châteaux.
+ * Règles de la campagne ; le résultat donne des médailles.
+ */
+export class DukeMode extends StoryMode {
+  id = 'duke'
+  campaignAids = false
 }
 
 /**
@@ -124,6 +154,7 @@ export class HotSeatMode extends GameMode {
  */
 export class CoopMode extends StoryMode {
   id = 'coop'
+  campaignAids = false
   coupDeGrace = true
   sharedScore = true
 
@@ -162,7 +193,9 @@ export class CoopMode extends StoryMode {
  */
 export class VersusMode extends GameMode {
   id = 'versus'
+  twoCamps = true
   powersEnabled = false
+  destructionGauge = false
 
   constructor(opts = {}) {
     super({ ...opts, effects: NO_EFFECTS })
@@ -217,6 +250,14 @@ export class DailyMode extends GameMode {
 }
 
 /**
+ * Coupe de la semaine (v6.0) : cinq châteaux, mêmes règles que le défi du jour
+ * (Normal, catapulte, sans pouvoirs ni améliorations) ; chaque résultat compte.
+ */
+export class CupMode extends DailyMode {
+  id = 'cup'
+}
+
+/**
  * Défi lancé par un lien « Bats mon tir » : mêmes règles que le défi du jour,
  * rien n'est enregistré ; on compare son score à celui de l'ami.
  */
@@ -238,15 +279,31 @@ export class CustomMode extends ChallengeMode {
  */
 export class EndlessMode extends StoryMode {
   id = 'endless'
+  campaignAids = false
+  // Un château par vague : pas d'étapes ni de général (voir GameMode#grandSiege).
+  grandSiege = false
 
-  /** @param {{ shots: number } & object} opts tirs disponibles pour ce château */
-  constructor({ shots, ...opts } = {}) {
+  /**
+   * @param {{ shots: number, bonusAmmo?: object, supply?: number } & object} opts
+   *   tirs disponibles pour ce château ; cartes gardées (v6.0) : munitions en
+   *   plus pour ce château, intendants (+1 de chaque munition spéciale)
+   */
+  constructor({ shots, bonusAmmo = {}, supply = 0, ...opts } = {}) {
     super(opts)
     this.shots = Math.max(1, Math.min(12, Math.trunc(Number(shots) || 1)))
+    this.bonusAmmo = Object.freeze(Object.fromEntries(Object.entries(bonusAmmo).map(([t, n]) => [t, Math.max(0, Math.min(6, Math.trunc(Number(n) || 0)))])))
+    this.supply = Math.max(0, Math.min(2, Math.trunc(Number(supply) || 0)))
   }
 
   shotsFor() {
     return this.shots
+  }
+
+  ammoFor(level, difficulty) {
+    const out = super.ammoFor(level, difficulty)
+    if (this.supply) for (const type of Object.keys(out)) out[type] += this.supply
+    for (const [type, n] of Object.entries(this.bonusAmmo)) if (n > 0) out[type] = (out[type] ?? 0) + n
+    return out
   }
 }
 
@@ -255,6 +312,10 @@ export function createMode(id, opts) {
   switch (id) {
     case 'story':
       return new StoryMode(opts)
+    case 'heroic':
+      return new HeroicMode(opts)
+    case 'duke':
+      return new DukeMode(opts)
     case 'free':
       return new FreeMode(opts)
     case 'duel':
@@ -267,6 +328,8 @@ export function createMode(id, opts) {
       return new CoopMode(opts)
     case 'daily':
       return new DailyMode(opts)
+    case 'cup':
+      return new CupMode(opts)
     case 'challenge':
       return new ChallengeMode(opts)
     case 'endless':

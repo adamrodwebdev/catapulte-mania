@@ -2,6 +2,488 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [6.2.0] – 2026-10-17
+### Des châteaux qui tiennent ensemble
+- **Assemblage des châteaux** (`CastleJoints.js`) : au premier tir, chaque bloc
+  est soudé à ses voisins (appui, contact de côté) et les fondations au sol,
+  par un liant qui dépend des matériaux : mortier (pierre, brique, grès,
+  marbre), chevilles (bois), liens (paille), rivets (fer), glace, plomb
+  (verre) ; entre deux matériaux, le plus faible l'emporte. Un coup use les
+  jonctions du bloc frappé selon son énergie et propage le choc, atténué, à
+  ses voisins ; une charge qui dure (porte-à-faux, bascule) les use aussi.
+  Usée, une jonction se lézarde, craque, puis cède : le château encaisse,
+  fléchit et s'effondre par morceaux. Le feu ronge chevilles et liens et fait
+  fondre la glace, le gel rend les jonctions cassantes, une explosion les
+  arrache dans son rayon.
+- **Clés de voûte** : les blocs qui portent le plus sans relais ont des
+  jonctions déjà fragiles, et une lézarde les signale. Entamées, elles se
+  désagrègent et lâchent tout ce qu'elles tiennent. Une carte les présente au
+  niveau 5.
+- **Combos d'éléments** (`ElementCombos.js`), annoncés dans le ciel : **fer
+  rougi** (le feu chauffe le fer, qui enflamme le bois et la paille voisins et
+  brûle qui le touche), **trempe** (du givre ou de l'eau sur du fer rougi : il
+  se fend), **fer électrisé** (la foudre le laisse chargé un instant), **eau
+  électrisée** (la foudre court chez tous les défenseurs trempés), **éclats de
+  glace** (une explosion brise la glace, dont les éclats blessent alentour),
+  **vapeur brûlante** (glace et feu).
+- **Ailes** : les châteaux ne sont plus symétriques. Une annexe s'accole au
+  château (une seconde dès le niveau 40, derrière s'il reste à portée), chacune
+  défaite par sa munition : remise de paille (le feu), bastion de glace (le feu
+  ou la bombe), poudrière (deux barils derrière un mur), galerie de verre sur
+  pilotis (la mitraille), casemate de fer (la foudre, le fer rougi), baril
+  perché sur un mur (la botte de paille). Chacune abrite un des gardes :
+  autant de défenseurs qu'avant. Jamais là où s'abat un pont-levis.
+
+### L'engin roule
+- **Avancer et reculer** (dès le niveau 2) : maintenez ◀ ou ▶ sous la scène
+  (Q et D en AZERTY, A et D en QWERTY) entre deux tirs. La catapulte et la
+  baliste roulent, roues qui tournent, poussière, grincements, et se cabrent à
+  l'accélération. La roche, l'eau, la glace, la lave, un débris ou un
+  défenseur les arrêtent, et elles ne s'approchent jamais du château plus près
+  que la portée de ses archers, que des flèches plantées au sol montrent (au
+  plus 380 px d'avance, jusqu'au bord du camp en arrière). De plus près, le
+  tir est plus sûr… mais les pillards arrivent plus vite. Un pillard qui
+  frappait l'engin ne l'atteint plus s'il recule, mais le rattrape au tir
+  suivant. Le trébuchet reste en place.
+- Chaque déplacement est noté au pas près : les relectures et les liens
+  « Bats mon tir » refont le même chemin.
+
+### Pillards et grands sièges
+- **Des pillards avant chaque grand siège** : les trois derniers niveaux de
+  chaque chapitre (le grand siège compris) en ont au moins un, soit 21
+  niveaux de plus. Au niveau 8, le tout premier attend embusqué dans le champ,
+  de ce côté-ci de la montagne et des douves : il jaillit au premier tir et
+  court droit sur l'engin (une seule idée : le pillard et le seau d'eau).
+- **Des pillards qui pressent** : le saboteur et l'ogre chargent l'engin,
+  échelles et ponts se dressent plus vite (2 s et 2,5 s au lieu de 3 et 4),
+  on grimpe plus vite et l'on se laisse glisser pour descendre. Le pillard
+  atteint désormais l'engin vers le troisième tir (le quatrième pour l'ogre
+  qui franchit la montagne au niveau 98) ; il lui en fallait jusqu'à six, si
+  bien qu'aux niveaux 32, 37, 71 et 95 la menace ne se faisait jamais sentir.
+
+### Interface
+- **Barres de vie** (`HealthBar.js`), les mêmes pour les défenseurs, les
+  généraux et l'engin : une pilule de verre découpée en cellules (on compte
+  les coups qu'il reste), du vert à l'ambre puis au rouge, teintée par le
+  poison, le feu ou le gel. Un coup se voit : éclair, sursaut, petite
+  secousse, le morceau perdu se détache et tombe, et la traînée claire se
+  vide en douceur. En danger, la barre bat en rouge ; un défenseur en armure
+  a un liseré d'acier. Rien de tout cela ne bouge en mouvement réduit.
+- **Infos en haut de l'écran** : les sous-titres et l'astuce de visée passent
+  sous le bandeau (sous la barre du général pendant un grand siège), trois au
+  plus à la fois : le bas de l'écran, où se joue la partie, reste dégagé.
+- **La caméra ne suit plus un boulet qui roule au loin** : après l'impact,
+  elle ne suit un tir que tant qu'il laboure le château. Un boulet qui file
+  au-delà du château, repart vers l'engin ou survit à la dernière cible
+  s'efface dans un petit nuage de poussière, au lieu de retenir le tour.
+
+### Repères des défenseurs
+- **Le dernier défenseur debout** est désigné par un chevron d'or qui flotte
+  au-dessus de lui, où qu'il soit.
+- **Un défenseur au bord de l'écran** : pendant la visée, quand un défenseur
+  atteint la marge droite de la scène visible, ou passe au-delà, une pastille
+  au bord de l'écran, à sa hauteur, pointe vers lui (d'or si c'est le
+  dernier, double chevron quand plusieurs sont proches).
+- Chevron et pastilles battent doucement, immobiles en mouvement réduit, et
+  passent au jaune vif en contraste élevé. Ni l'un ni l'autre au face-à-face.
+
+### Décor
+- **Montagnes redessinées** (`mountains.js`) : une crête fractale (sommets,
+  épaulements, cols), des versants éclairés côté soleil et à l'ombre de
+  l'autre, une neige découpée dans la silhouette même (elle ne déborde plus),
+  et des panaches de neige, de sable ou de poussière que le vent arrache aux
+  crêtes, dans son sens et à sa force (aucun en mouvement réduit).
+- **Fonds peints** : un paysage réaliste par chapitre, calé sur la ligne de
+  sol du jeu (2560 px de large, WebP, 1,7 Mo pour les dix), dans la version
+  web seulement : les versions des portails et la démo gardent le décor
+  dessiné. `npm run backgrounds` rogne et encode les peintures
+  (`art/backgrounds/`, non versionnées), et y efface les oiseaux peints
+  (34, figés dans sept chapitres) : le jeu dessine les siens, qui volent.
+  Le Fort de pierre a sa propre peinture (ce n'était qu'une variante plus
+  grise de la vallée du chapitre 1) : des hautes terres de granit après
+  l'averse, bruyère et herbe dorée, chaos de rochers, une cascade, un vieux
+  pont de pierre au loin et une trouée de lumière dans les nuages.
+  Chaque oiseau est comblé depuis son entourage (ciel, nuage, crête,
+  pluie), les peintures d'origine restent intactes. Elle efface aussi ce
+  qui doublait l'animation : la pluie de l'orage (chapitre 9) et les flocons
+  de l'hiver (chapitre 8, 25, sur le ciel uni seulement : les sommets
+  enneigés restent), que le jeu fait tomber, et les étoiles filantes figées
+  de la nuit (chapitre 4, la lune épargnée). Chaque trait est repéré à son
+  sens et repeint de la couleur du ciel, de part et d'autre.
+
+### Maîtrise du royaume
+- **Toutes les étoiles et tous les succès** (300 de chaque) font du joueur le
+  **Grand Ingénieur du Royaume** : un titre et un écusson d'or sur le profil
+  et l'accueil, et des récompenses qui ne s'achètent pas.
+- **L'Engin d'or** (catapulte, trébuchet et baliste dorés, bannière royale à
+  liseré et couronne d'or) et **la Comète d'or**, une traînée d'étincelles
+  derrière le tir.
+- **La Légende du Grand Ingénieur** : une page cachée de la Chronique,
+  l'épilogue du royaume.
+- **Les Terres du Duc** : un chapitre secret de cinq châteaux à médailles
+  (bronze, argent, or) : le Gué du Duc, la Forge Royale, le Palais de Glace,
+  les Aiguilles et la Citadelle de Mordrac, où le duc attend au sommet. La
+  jauge de destruction y donne sa pierre de plus, comme dans la campagne.
+- **Campagne héroïque** (nouvelle partie +) : la même campagne, plus dure,
+  avec ses propres médailles. Châteaux plus solides (blocs +35 %, défenseurs
+  +25 %, jonctions +50 %, renforts et rempart de glace des généraux compris),
+  un tir de moins (jamais moins de deux), un
+  pillard de plus dès le niveau 4 (de givre en hiver, trois au plus), vent
+  plus fort (×1,3). Elle ouvre les **paliers héroïques de l'atelier**, un de
+  plus pour le Bras renforcé, les Boulets lestés, la Poix, la Poudre fine, la
+  Réserve de munitions, le Stratège et l'Éclaireur ; l'atelier les montre,
+  fermés, tant qu'elle n'a pas commencé.
+
+### Succès
+- **Chute libre** se valide enfin : il suffit qu'un défenseur tombe de plus
+  de 120 px sous son poste et touche durement le sol ; s'il meurt dans les
+  1,5 s qui suivent, sous les débris ou d'un coup, la chute compte.
+
+### Niveaux
+- **Tous les niveaux se gagnent avec la pierre de départ** : le contrôle des
+  niveaux le vérifie (`--ammo stone`, voir plus bas).
+- **L'aiguille de roche** (un niveau sur trois à partir du 57, sauf le 96) se dresse de
+  nouveau contre les murs, son baril au-dessus du donjon : l'aile arrière
+  l'en éloignait. La roche ne tombe jamais : un défenseur posté derrière s'y
+  mettait à l'abri de toute pierre, et s'y réfugiait même quand un tir
+  arrivait sur lui. Elle tient donc l'arrière : plus personne ne s'y poste
+  (jusqu'à deux gardes et un éclaireur de moins, l'aile arrière passe devant), et
+  aucun baril dans son ombre.
+- **Niveau 84** (la crypte du chevalier noir) : la tour d'à côté est en
+  brique, sur ses planchers de fer. Toute de fer, et rivetée par
+  l'assemblage, aucune pierre ne l'ouvrait.
+- **Niveau 92** (la galerie des glaces) : un tir de plus (six) ; à la seule
+  pierre, il restait un défenseur.
+- **Niveau 96** (l'escalier d'honneur) : cinq marches serrées, d'un à cinq
+  étages (trois à sept auparavant), et plus d'aiguille de roche. Au fond du
+  champ, le sommet de sept étages était hors de portée de la pierre, même
+  l'engin avancé jusqu'aux archers ; l'aiguille, collée à la plus haute tour,
+  la calait. Le roi se tient désormais sur la terrasse du dernier gradin, à
+  découvert : sous son toit de pierre, comme le garde du deuxième étage, il
+  était emmuré dans le fer et le marbre. Les gardes que cette tour abritait se
+  postent devant, comme au niveau 78.
+- **La Citadelle de Mordrac** (Terres du Duc) : le rez-de-chaussée du donjon
+  n'est plus que sa poudrière. Sous cinq étages de marbre et de fer, le garde
+  qui s'y tenait était hors d'atteinte de la pierre ; le baril y reste pour
+  les bombes. Et l'escalier de Mordrac a six tirs au lieu de quatre : Mordrac
+  a quatre vies et n'en perd qu'une par tir ; à la seule pierre, ses renforts
+  finissaient par l'emporter. Le par ne change pas : l'or reste à quatre tirs.
+- **Résultats mesurés** (joueur automatique) :
+  - **à la seule pierre de départ**, en Normal et sans amélioration : les 100
+    niveaux de la campagne se gagnent (2,4 tirs en moyenne, 42 d'un seul
+    tir), les niveaux 38, 73 et 92 sans rouler ; les cinq châteaux des Terres
+    du Duc aussi, la Citadelle de Mordrac en visant d'abord le chef ;
+  - **en Difficile**, toutes munitions : 100/100 et 5/5. La tolérance médiane
+    des premiers tirs passe de 1,6 % à 0,4 % (moyenne : de 10,2 % à 5,1 %), et
+    le joueur automatique a besoin de plus d'un tir sur 29 niveaux (26
+    auparavant) : assemblés, les châteaux ne cèdent plus à un tir chanceux ;
+  - **au trébuchet**, en Difficile : 100/100 (1,9 tir en moyenne, 65 d'un
+    seul tir ; tolérance médiane des premiers tirs 0,6 %, moyenne 6,6 %) ;
+  - **en Campagne héroïque** : les grands sièges des niveaux 70, 80 et 100,
+    les plus durs, se gagnent en quatre ou cinq tirs.
+
+### Outils
+- **Profil de test** (développement seulement) : `npm run dev:unlocked`, ou
+  `?unlock=all` dans l'adresse, ouvre toute la campagne sur un profil
+  « Test » (sans étoile ni or, les vrais records restent) ; `?unlock=complete`
+  le rend maître du royaume, pour essayer ses récompenses.
+- `npm run check:levels` : `--ammo stone` (le joueur automatique ne tire que
+  la pierre de départ), `--track heroic|duke` (Campagne héroïque, Terres du
+  Duc). Le joueur automatique prépare chaque tir à l'instant où il part
+  (défenseurs en marche, bras gelé qui lance moins loin : il s'arrêtait,
+  croyant tout hors de portée), et roule comme un joueur : à chaque tour, il
+  pèse aussi l'avance de l'engin jusqu'à la portée des archers et les tirs de
+  là-bas ; s'il perd après avoir roulé, il rejoue le niveau sans rouler. Face
+  à un général, s'il perd encore, il le rejoue en visant d'abord le chef (une
+  vie de général pèse alors plus que trois défenseurs ; `--boss` : d'emblée).
+  `--workers 4` : au plus quatre cœurs à la fois, plus lent, mais l'ordinateur
+  chauffe moins. Tous les cœurs partagent une file de rejeux : les tirs essayés
+  d'un même tour se répartissent entre eux, et les niveaux les plus longs
+  passent devant, au lieu d'un cœur par niveau. Mêmes choix, mêmes résultats
+  (vérifié niveau par niveau), environ trois fois plus vite sur une machine
+  déjà chargée (la Citadelle de Mordrac : 6 min au lieu de 18).
+
+### Technique
+- Sauvegarde v11 (maîtrise, Campagne héroïque, Terres du Duc), migrée depuis
+  la v10 et contrôlée comme les autres champs : un record héroïque exige une
+  campagne héroïque commencée, l'Engin d'or la maîtrise.
+- Un défenseur projeté au-delà du bord du monde quitte le champ de bataille et
+  compte comme tombé (il y restait hors champ, hors d'atteinte) ; un général
+  aussi, sans revenir.
+- Une étape compte jusqu'à 24 défenseurs (20 auparavant) : la Campagne
+  héroïque ajoute un pillard aux étapes déjà pleines.
+- Lighthouse (mobile, version web) : Performance 98, Accessibilité 100,
+  Bonnes pratiques 100, SEO 100. Le module des niveaux, préchargé au
+  démarrage, passe de 169 à 78 Ko : l'accueil et les menus ne chargent plus
+  Matter.js, qui arrive avec la première partie.
+
+### Architecture : dessin, logique et règles séparés
+- **GameSession** ne garde que la logique de la partie : le déplacement de
+  l'engin passe dans `drive/` (EngineDrive, ses règles, son affichage), les
+  effets (particules, sons, sous-titres, répliques) dans
+  `effects/SessionEffects.js`, la sensation de jeu (arrêts sur image, ralenti,
+  gros plan) dans `feel/GameFeel.js`. Les modes disent ce qu'ils permettent
+  (deux camps, aides de la campagne) au lieu d'être reconnus à leur nom.
+- **Courbe de la campagne** : l'algorithme de placement seul dans
+  `LevelCurve.js` ; les règles (selon le rang) dans `campaignRules.js`, les
+  plans des ailes dans `wingBlueprints.js` (une table au lieu d'une cascade de
+  conditions).
+- **Physique** : `PhysicsWorld.js` garde la simulation ; les réactions des
+  éléments (feu, gel, vapeur, foudre) passent dans `ElementReactions.js`, les
+  contacts des défenseurs (coups, chutes, renversements) dans
+  `DefenderContacts.js`, les réglages dans `physicsRules.js` (réexportés sous
+  les mêmes noms), et tous les combos dans `ElementCombos.js`. Un seul modèle
+  d'événement « blessure » pour les coups, les chutes et les décharges.
+- **Règles sans moteur physique** : celles de l'assemblage des châteaux
+  (`castleRules.js`) et des créatures volantes (au catalogue). La géométrie de
+  la catapulte vit avec la catapulte : la physique ne dépend plus du dessin.
+- **Rendu** : `Renderer.js` ne fait plus qu'ordonner les calques (environ
+  200 lignes) ; chacun a son peintre : décor, lumière, ouvrages et jonctions,
+  états (clé de voûte, fer rougi, givre), nuages, engins, repères au-dessus
+  des personnages, visée. `EntityViewAdapter` dit ce que le dessin lit de
+  chaque entité. Les particules se dessinent à part (`ParticlePainter.js`),
+  les palettes des chapitres sont des données (`themes.js`, `palette.js`), et
+  chaque son est une recette (`soundRecipes.js`) faite de briques de synthèse
+  (`SynthVoices.js`), au lieu d'un grand `switch`. Les entités ne lisent plus
+  l'horloge du navigateur : le sursaut d'un défenseur touché suit le temps du
+  jeu (pause, ralenti).
+- **Interface** : l'écran de jeu affiche, il ne décide plus. La préparation
+  d'une partie (`MatchSetup.js`), la fin de partie de chaque mode
+  (`EndOfMatch.js`, une stratégie par mode), la vue du profil
+  (`ProfilePresenter.js`), les mises en forme (`Formats.js`), les touches
+  (`useGameKeyboard.js`), les parcours (`Tracks.js`), le front de la
+  campagne et les records du défi du jour (`Frontier.js`, `DailyRecords.js`),
+  le partage et le brouillon de l'atelier de châteaux (`ShareService.js`,
+  `CastleDraftService.js`) ont chacun leur module ; l'offre d'une amélioration
+  n'a plus qu'une règle (`SaveSlot.upgradeOffer`). Les couleurs des médailles,
+  de l'écusson et des barres de vie sont des jetons des thèmes, et chaque
+  commande tactile fait au moins 44 × 44 px.
+- **Preuve que rien ne change** : une empreinte de 131 parties scriptées
+  (score, survivants et leurs points de vie, château, jonctions, engin,
+  interface, scène, chaque événement émis, particules, caméra), sur tous les
+  modes et parcours, et des 215 niveaux générés, identique avant et après
+  chaque étape de la réorganisation ; seuls les correctifs ci-dessous la
+  changent, là où on l'attend. Des tests gardent les frontières
+  (`separation.test.js`, `v62-physics.test.js`).
+
+### Corrigé
+- **Contraste élevé** : le réglage atteint enfin le jeu lui-même (visée,
+  trajectoire et repères en jaune vif, barres de vie sur fond noir, sans
+  poussières d'ambiance) ; il ne changeait que les menus.
+- **Le pillard de feu qu'engage un général** porte sa torche, comme les
+  autres : on le reconnaît, elle éclaire la nuit, et elle met le feu autour
+  de lui quand il tombe.
+- **Les renforts d'un général** ont la solidité des autres défenseurs : le
+  coup de pouce après des défaites répétées (premier chapitre) les oubliait.
+- **Victoire sans tir** (le feu ou un séisme achève le dernier défenseur
+  pendant la visée) : la relecture conclut au même instant ; elle s'arrêtait à
+  la visée, et un défi « Bats mon tir » ne comptait pas la victoire.
+- **L'état de l'engin** (feu, gel, rouille) avance au pas de la physique, et
+  non à chaque image : une partie et sa relecture restent les mêmes, quelle
+  que soit la cadence de l'écran.
+- **À deux et au siège sans fin**, une sauvegarde refusée (stockage plein,
+  navigation privée) n'empêche plus le bilan de s'afficher, avec son
+  avertissement.
+- **Angle et puissance** s'écrivent dans la langue du joueur (« 45,5° » en
+  français, « 45.5° » en anglais), à l'écran comme pour les lecteurs d'écran.
+
+## [6.1.0] – 2026-10-15
+### Des défenseurs qui encaissent, des chocs qui portent
+- **Points de vie pour tous les défenseurs**, comme les généraux : soldat 30,
+  chevalier 70, roi 40, éclaireur 20, pavoisier 50, porte-étendard et sapeur
+  30, ogre 420. Blessé, un défenseur porte une barre de vie (crantée, la perte
+  s'efface avec un temps de retard) et chaque coup affiche ses dégâts, de la
+  couleur de leur cause (choc, feu, poison, foudre…). Réglage « Barres de
+  vie », activé par défaut. Il lui arrive de crier quand il encaisse
+  (« Ouille ! »).
+- **Module des chutes** (`FallingObjects.js`, pur et testé) : vitesse d'un
+  objet qui tombe et vitesse au contact (√(v² + 2gh)), images avant le
+  contact, énergie et dégâts d'un choc, dégâts d'une chute, capacité de
+  poussée d'un défenseur.
+- **Des chocs qui comptent** : un coup coûte selon son énergie et la dureté de
+  ce qui frappe (paille 0,3, verre 0,8, bois 1, pierre 1,2, fer 1,4) ; une
+  chute, au-delà de 4 px par image à l'arrivée, selon la vitesse (l'armure
+  amortit) ; renversé, un défenseur perd 35 % de ses points et se relève ;
+  écrasé sous une lourde charge ou coincé entre deux blocs, il succombe.
+- **Impact et puissance** : le survivant d'un coup recule et chancelle, la
+  caméra encaisse le choc, et un gros coup projette le bloc frappé dans le
+  sens du tir.
+- **Repousser ce qui tombe** : un défenseur voit venir une planche, un
+  tonneau ou un bloc qui tombe lentement, s'arc-boute et le rejette de côté
+  (« Hop là ! »), s'il en a la force (un chevalier repousse plus lourd qu'un
+  éclaireur). Sonné, il n'y peut rien ; un tablier sur sa charnière ou une
+  charge à sa corde, il ne les soulève pas.
+
+### Munitions
+- **Botte de paille** (niveau 29, qui l'enseigne) : elle ne casse rien, ne
+  blesse personne et ne fait jamais sauter un baril : elle pousse. Le baril
+  perché sur le mur d'enceinte du monastère tombe sur la garde de la porte…
+  Au contact d'une flamme, elle s'enflamme.
+- **Orbe d'orage** (niveau 22) : la décharge frappe ce qu'il touche, puis
+  saute de défenseur en défenseur (quatre sauts, de plus en plus faibles) ;
+  le fer la relaie, l'armure la conduit (chevaliers, pavoisiers, généraux),
+  l'eau aussi (défenseurs trempés, pluie de l'Orage). Les défenseurs frappés
+  restent sonnés et ne repoussent plus rien ; un baril saute, ce qui est
+  gelé éclate en vapeur.
+- **Pot de poison** (niveau 37) : un nuage qui dérive au vent et ronge ceux
+  qui le respirent (ils toussent, et le poison agit encore un peu après) ;
+  une flamme le fait exploser, le givre le fige.
+- **Munitions élémentaires moins écrasantes** : un coup direct de feu, de
+  givre, d'orage ou de poison ôte au plus un quart des points d'un défenseur.
+  Ce sont leurs effets qui comptent, et on les voit enfin.
+- Le clavier choisit les munitions de 1 à 9 (de 1 à 6 auparavant : les trois
+  nouvelles restaient hors d'atteinte).
+- Les liens « Défier un ami » et l'atelier de châteaux connaissent les
+  nouvelles munitions ; les liens et les châteaux déjà partagés restent
+  valides.
+
+### Ouvrages
+- **Moulin** (niveaux 13, 49, 56, 63 et 76) : ses ailes s'emballent (une
+  seconde de préavis), puis une rafale souffle vers l'engin et dévie les
+  tirs ; gelé ou abattu, il se tait.
+- Et d'autres ouvrages de siège : **forge** (niveaux 25 et 94 : ses flammes
+  enflamment ce qui les traverse, la rafale d'un moulin en fait un jet de
+  feu, la citerne l'éteint en vapeur), **citerne** (niveaux 38 et 87 :
+  crevée, elle inonde ce qui est dessous : feu éteint, défenseurs trempés,
+  gelés en Hiver), **ruche** (niveau 18 : l'essaim fond sur les gardes, les
+  pique et les fait fuir ; la fumée le disperse), **sacs de farine** (niveau
+  43 : le nuage de farine explose à la première flamme).
+
+### Souffle du monde
+- **Chaque chapitre a son vent**, et ce vent fait quelque chose : rafales à
+  toutes les difficultés (Fort de pierre), braises qui portent le feu plus
+  loin sous le vent (Forteresse), poches de miasmes qui dérivent sur le
+  château et explosent au feu du joueur (Marais), sable qui étouffe le feu
+  des tirs et les freine (Désert), colonnes d'air chaud qui portent les tirs
+  (Montagne), bise qui givre le tir : il cogne deux fois moins les murs et
+  éclate à l'impact, le feu s'y éteint (Hiver), vent d'orage qui charge le
+  tir, qui se décharge sur les défenseurs proches (Orage), vent de feu qui
+  enflamme le tir : feu grégeois offert, le givre y fond (Trône). La
+  Palissade et la Citadelle gardent une simple brise. Rien ne s'embrase
+  avant le premier tir, et les miasmes ne craignent pas les torches des
+  veilleurs : seul le feu du joueur les allume.
+- **Exposition** : un tir s'imprègne du vent qu'il traverse, trois fois plus
+  vite dans la rafale d'un moulin ; l'aide à la visée marque le point où
+  l'élément le saisira. Les effets se cumulent avec les ouvrages et entre eux
+  (feu et givre s'annulent en vapeur, le feu embrase le gaz, l'eau conduit
+  la foudre).
+- Le nom du vent remplace « Vent » dans le bandeau, avec une pastille de sa
+  couleur à côté de sa force (visible aussi sur téléphone) ; une carte le
+  présente au premier niveau de son chapitre.
+- Le trébuchet en tient compte : son projectile arrive sur le fanion,
+  colonnes d'air chaud et rafale du moment comprises.
+
+### Niveaux
+- **Niveau 29** (le monastère, tutoriel de la botte de paille) : un baril
+  perché sur le mur d'enceinte, au-dessus des gardes de la porte, à côté de
+  la nef de verre.
+- **Niveau 78** (l'escalier gelé) : la bise émousse les pierres ; deux
+  boulets explosifs de plus, et les gardes qui se postaient derrière le
+  dernier gradin, à l'abri de tout tir (ils ne mouraient que de
+  l'effondrement, qu'ils encaissent désormais), se postent devant.
+- `npm run check:levels` : le joueur automatique vise avec la courbe de
+  l'aide à la visée (rafales des moulins, colonnes d'air chaud, sable).
+- Résultat mesuré en Difficile : les 100 niveaux restent gagnables, et la
+  tolérance médiane des premiers tirs passe de 3,4 % à 1,6 % (moyenne : de
+  13,4 % à 10,2 %), surtout parce que les niveaux les plus larges se
+  resserrent (niveau 8 : de 46 % à 11 %, niveau 13 : de 51 % à 20 %) ; le
+  joueur automatique a besoin de plus d'un tir sur 26 niveaux (22
+  auparavant).
+
+### Corrigé
+- **Dans le vent, un tir ne réveillait pas ce qu'il touchait** : Matter ne
+  recalcule pas le mouvement d'un corps soumis à une force, si bien qu'un
+  bloc ou un baril endormi restait de marbre et que le tir rebondissait
+  comme sur un mur (sauf à le briser). Les tirs poussent et renversent
+  désormais autant par vent que par temps calme.
+- Grands sièges : le tour du général se compte en pas de simulation ; un
+  rejeu pouvait diverger d'un pas après son ordre.
+- Sur téléphone et tablette, les intitulés du bandeau (score, cibles, tirs,
+  vent) sont de nouveau lus par les lecteurs d'écran ; la barre des
+  munitions signale par un fondu celles qui sont cachées, et ramène en vue
+  la munition choisie ou montrée par le tutoriel.
+- README : tableaux des tutoriels et des pouvoirs remis à jour.
+
+## [6.0.0] – 2026-10-15
+### Les généraux de Mordrac et les grands sièges
+- **Grands sièges** : chaque fin de chapitre (niveaux 10 à 100) se joue en
+  plusieurs étapes. Le premier château pris, le donjon du général arrive sur le
+  même terrain, avec quelques tirs en plus ; le Trône (niveau 100) en compte
+  trois. La caméra, le score maximal et les étoiles tiennent compte des étapes.
+- **Dix généraux**, un par chapitre, chacun avec son nom, son titre, sa devise
+  et son caractère : Rufus Grosbois, Sire Galeran, Bertille Salpêtre
+  (l'ancienne apprentie de Gontran), la comtesse Morgane, le baron Anselme,
+  Ilsa la Rouge, Hugues de l'Aire, le margrave Ulric, Baudouin le Tonnant, et
+  le duc Mordrac lui-même. Ils ont **plusieurs vies** (une au plus par tir,
+  même sous un effondrement qui dure) et, entre deux tirs, donnent un
+  **ordre annoncé à l'avance** : réparer, cri de guerre, mur de boucliers,
+  saboteur, mercenaire, bombe, pot de feu, couvre-feu, flèches enflammées,
+  repli, tempête de sable, faucons, éboulis, souffle glacé, rempart de glace,
+  foudre, ouragan (17 ordres).
+- **Dessinés en détail** sur la scène (casque, barbe, cape à fibule d'or,
+  arme : hache, épée, bombe à mèche, bâton à orbe, dagues, cimeterre, faucon
+  qui bat des ailes, marteau d'orage, lame noire) ; ils brandissent leur arme
+  quand ils donnent un ordre, et leurs vies s'affichent en cœurs.
+- **Interface** : barre du général (buste, nom, vies, prochain ordre, qui
+  s'embrase quand il agit), bannières (étape prise, entrée en scène, ordre,
+  vie perdue, chute), étape en cours dans le bandeau, fiche du général dans
+  l'introduction du niveau, voile du couvre-feu, cor de guerre.
+- **La Chronique** : chaque général se présente à l'ouverture de son chapitre
+  et nargue la troupe avant son grand siège, avec son portrait pixel art tiré
+  de son illustration (116 lignes, 52 couleurs au plus, comme les autres
+  personnages). Un personnage à mi-corps (le roi Aubert, Bertille, Hugues)
+  touche désormais le bas de la scène au lieu d'y flotter.
+
+### Coup de grâce, défenseurs et mécanismes
+- **Coup de grâce** : quand un tir file vers la dernière cible, le temps
+  ralentit, la caméra se rapproche et le tambour roule. Puis « Victoire ! »,
+  et chaque tir restant éclate en points au-dessus de l'engin, le score
+  montant à mesure (sans ralenti ni gros plan en mouvement réduit).
+- **Défenseurs assommés** : ils basculent et tournoient avant de disparaître.
+  **Répliques en bulles** : un défenseur voit venir le tir, pleure un
+  camarade, nargue après un tir manqué ; le général crie quand il perd une vie.
+- **Mécanismes** : **potence** (une charge pendue à une corde : tranchez-la,
+  elle tombe ; niveau 15) et **pont-levis** (brisez sa chaîne, le tablier
+  s'abat sur la garde de la porte ; niveau 28). Cordes et chaînes se
+  tranchent au tir ou à l'explosion.
+- **Jauge de destruction** (à partir du niveau 6) : abattre la moitié d'un
+  château donne une pierre de plus, une par étape ; elle évite une défaite et
+  ne compte jamais pour les étoiles.
+
+### Modes
+- **Siège sans fin : la main de trois cartes.** Après chaque château pris, on
+  garde une carte parmi trois (munitions, renforts, intendant, fortune),
+  tirées de la graine du siège.
+- **Coupe de la semaine** : cinq châteaux, les mêmes pour tous pendant la
+  semaine (Normal, catapulte, sans pouvoirs), à rejouer à volonté ; la
+  médaille (bronze, argent, or) dépend des étoiles ; on défie ses amis par un
+  lien.
+- **Moments forts** : le plus beau tir de la partie est filmé et proposé à la
+  fin, à enregistrer ou partager (réglage ; rien n'est envoyé ; désactivé sur
+  les portails).
+- **Coup de pouce** : au premier chapitre, en Facile et Normal, après deux
+  défaites d'affilée, les défenseurs encaissent un peu moins et le vent
+  faiblit, sans le dire. Après trois défaites d'affilée, on peut **passer le
+  niveau** (sans étoile) et revenir le prendre plus tard.
+
+### Technique
+- Relectures exactes même avec des pillards en marche : la fin de chaque tour
+  est notée au pas près (liens « Bats mon tir » de 120 gestes au plus).
+- Sauvegarde v10 (coupe de la semaine, défaites au front, niveaux passés),
+  migrée depuis la v9 et contrôlée comme les autres champs.
+- Portraits : encodeur en Node sans dépendance (`npm run portraits`), à la
+  place du script Python.
+- Contrôle des niveaux : les grands sièges sont jugés étape par étape, et
+  `--levels` accepte une liste (`10,20,30`).
+
+### Corrigé
+- Un général au-delà de deux vies ne pouvait pas avoir trois étoiles : le par
+  de son étape vaut au moins ses vies.
+- Une sauvegarde refusée ne bloque plus la fin de partie : le bilan s'affiche
+  avec l'avis « non enregistré ».
+- Un tout petit château (atelier) pouvait recevoir un défi vide et faire
+  échouer la fin de partie.
+
 ## [5.9.0] – 2026-10-15
 ### Interface 2026 : « Verre & Or »
 L'identité ne change pas (or héraldique, bleu guède, capitales Cinzel) ; la

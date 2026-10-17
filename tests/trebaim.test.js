@@ -125,6 +125,19 @@ for (const g of [0.1, 0.5, 0.9]) {
   })
 }
 
+test('trébuchet en partie (v6.1) : une colonne d’air chaud sur la course, il arrive quand même sur le fanion', () => {
+  const s = session('normal')
+  untilAiming(s)
+  const pt = openGround(s)
+  // Une colonne d'air chaud (Montagne) à mi-chemin : sans elle dans la visée, l'impact tombait à 40 px.
+  s.world.thermals = [{ x: Math.round((s.catapult.x + pt.x) / 2) }]
+  assert.equal(s.placeTrebTarget(pt.x, pt.y), true)
+  assert.equal(s.fire(0, { arc: 0.5 }), true)
+  const x = landing(s)
+  assert.ok(x !== null && Math.abs(x - pt.x) < 12, `impact ${x} pour une cible en ${pt.x}`)
+  s.destroy()
+})
+
 test('trébuchet en partie : cible par défaut, bornée devant l’engin et jamais sous le sol', () => {
   const s = session('normal')
   untilAiming(s)

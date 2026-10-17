@@ -55,9 +55,10 @@ export class ScoreKeeper {
 
   /**
    * Une entité vient d'être détruite.
+   * @param {{ fell?: boolean }} [how] fell : défenseur tombé de haut juste avant (v6.2)
    * @returns {number} points gagnés (avant multiplicateur de difficulté)
    */
-  registerDestroyed(entity, cause = null) {
+  registerDestroyed(entity, cause = null, { fell = false } = {}) {
     if (this.#finalized) return 0
     let base = 0
     if (entity.kind === 'target') {
@@ -65,6 +66,8 @@ export class ScoreKeeper {
       this.#stats.targetsKilled++
       const family = killFamily(cause)
       if (family) this.#run.kills[family]++
+      // Tombé de haut, achevé par les débris : la chute compte aussi (v6.2).
+      if (fell && family !== 'fall') this.#run.kills.fall++
       if (this.#run.firstKill === null) this.#run.firstKill = entity.type
       this.#shotKills++
       this.#run.maxShotKills = Math.max(this.#run.maxShotKills, this.#shotKills)
@@ -87,6 +90,27 @@ export class ScoreKeeper {
     const gained = Math.round(base * mult)
     this.#points += gained
     return Math.round(gained * this.factor)
+  }
+
+  /**
+   * Grand siège (v6.0) : une étape est prise avant la dernière.
+   * @returns {number} points gagnés (difficulté comprise)
+   */
+  registerStage() {
+    if (this.#finalized) return 0
+    this.#points += SCORE.STAGE_BONUS
+    return Math.round(SCORE.STAGE_BONUS * this.factor)
+  }
+
+  /**
+   * Général (v6.0) : il vient de perdre une vie (sa mort, elle, est comptée
+   * comme celle d'une cible).
+   * @returns {number} points gagnés (difficulté comprise)
+   */
+  registerGeneralHurt() {
+    if (this.#finalized) return 0
+    this.#points += SCORE.GENERAL_HURT
+    return Math.round(SCORE.GENERAL_HURT * this.factor)
   }
 
   /** Coût d'un pouvoir spécial. */
@@ -123,6 +147,7 @@ export class ScoreKeeper {
       won,
       shotsUsed,
       difficulty: this.#difficulty,
+      track: this.#level.track ?? 'campaign',
       ...this.#stats,
     })
   }

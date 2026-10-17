@@ -20,13 +20,6 @@ export const WORLD = deepFreeze({
   /** Vitesse de choc (px/pas à 60 Hz) sous laquelle un contact ne fait pas de dégâts. */
   IMPACT_THRESHOLD: 1.6,
   /**
-   * Personnages fragiles (v3) : après le premier tir, la MOINDRE collision avec
-   * un objet en mouvement (bloc, projectile, baril) tue. Seuils très bas : seul
-   * un frôlement quasi immobile est ignoré. Ce sont les châteaux qui protègent.
-   */
-  CONTACT_KILL_SPEED: 0.5,
-  CONTACT_KILL_REL: 0.5,
-  /**
    * Coincement : une cible sur laquelle repose un bloc (mur, plancher, toit),
    * ou prise en étau entre deux blocs, meurt écrasée. Distance (px) des points
    * de contrôle autour de la cible et intervalle de contrôle (pas de simulation).
@@ -38,8 +31,29 @@ export const WORLD = deepFreeze({
    * rien sous lui est réveillé et retombe. Rien ne flotte jamais dans le vide.
    */
   SUPPORT_CHECK_EVERY: 30,
-  /** Une cible qui retombe à cette vitesse (ou plus) sur un obstacle meurt de sa chute. */
-  TARGET_FALL_SPEED: 3,
+  /**
+   * Points de vie des défenseurs (v6.1, voir FallingObjects.js) : un contact
+   * plus lent que SAFE ne fait rien ; au-delà, le coup vaut
+   * K × dureté × ½·min(masse, MASS_CAP)·(vitesse − SAFE)².
+   */
+  HIT: { SAFE: 0.7, K: 4, MASS_CAP: 60 },
+  /**
+   * Repousser (v6.1) : ce qui arrive plus lentement que SPEED, et dont la
+   * quantité de mouvement ne dépasse pas la force du défenseur, est renvoyé
+   * (SHOVE : vitesse donnée à un objet de masse 8, moins pour plus lourd).
+   * Un défenseur ne repousse qu'une fois par COOLDOWN_MS.
+   */
+  PUSH: { SPEED: 1.8, COOLDOWN_MS: 500, SHOVE: 5.5 },
+  /** Chute (v6.1) : sans dommage jusqu'à SAFE ; mortelle à SAFE + LETHAL_DV (× √résistance). */
+  FALL: { SAFE: 4, LETHAL_DV: 4.5 },
+  /**
+   * Coup encaissé (v6.1) : le défenseur est repoussé (KNOCK × part de ses
+   * points de vie perdue, au plus KNOCK_MAX) et sonné STAGGER_MS (il ne
+   * repousse plus rien).
+   */
+  STAGGER_MS: 600,
+  KNOCK: 7,
+  KNOCK_MAX: 4.5,
   /** Une cible renversée (inclinaison > 70°) pendant ce délai est mise hors de combat. */
   KNOCKOUT_ANGLE: 1.2,
   KNOCKOUT_MS: 1500,
@@ -47,6 +61,13 @@ export const WORLD = deepFreeze({
   SETTLE_MS: 900,
   /** Hors de ces limites, un corps est considéré comme sorti du monde. */
   KILL_MARGIN: 400,
+  /**
+   * Un défenseur projeté à plus de FIELD_MARGIN au-delà du bord droit du monde
+   * quitte le champ de bataille (v6.2) : il compte comme tombé. Il y restait
+   * hors champ et hors d'atteinte (relevé par scripts/check-levels.mjs).
+   * Les rondes s'arrêtent avant : un garde posté au plus loin ne s'en approche pas.
+   */
+  FIELD_MARGIN: 80,
 })
 
 /** Catégories de collision (masques Matter.js). */

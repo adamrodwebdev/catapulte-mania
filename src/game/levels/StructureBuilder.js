@@ -1,6 +1,7 @@
 import { Guard } from '../../core/utils/Guard.js'
 import { MATERIALS } from '../entities/materials.js'
 import { TARGET_TYPES } from '../entities/catalog.js'
+import { PROP_TYPES } from '../entities/props.js'
 import { WORLD } from '../physics/constants.js'
 
 /**
@@ -19,6 +20,13 @@ export class StructureBuilder {
   /** Terrains (lacs, lave, neige) et créatures volantes (v5.0, voir LevelCurve). */
   zones = []
   flyers = []
+  /**
+   * Mécanismes (v6.0) : liens (corde, chaîne) et charnières. Ils désignent les
+   * blocs eux-mêmes (les données de `blocks`), pas leur rang : la courbe de la
+   * campagne peut décaler les blocs ou ajouter de la roche devant.
+   */
+  tethers = []
+  hinges = []
   ground = WORLD.GROUND_Y
 
   #mat(m) {
@@ -40,7 +48,9 @@ export class StructureBuilder {
     this.block(mat, x - px, floorY - h / 2, t, h)
     this.block(mat, x + px, floorY - h / 2, t, h)
     this.block(slab, x, floorY - h - t / 2, w + 10, t)
-    return { x, floorY, topY: floorY - h - t, w }
+    const n = this.blocks.length
+    // Piliers et dalle (v6.0) : pour y accrocher une corde ou une chaîne.
+    return { x, floorY, topY: floorY - h - t, w, posts: [this.blocks[n - 3], this.blocks[n - 2]], slab: this.blocks[n - 1] }
   }
 
   /**
@@ -59,6 +69,76 @@ export class StructureBuilder {
     }
     if (roof) this.roof(x, y, { mat: roof, w: w + 10 })
     return rooms
+  }
+
+  /**
+   * Potence (v6.0) : deux poteaux et une traverse ; sous la traverse pend une
+   * charge lourde, à une corde. Tranchez la corde : elle tombe sur ce qui est
+   * dessous. Abattez un poteau : tout s'écroule.
+   * @returns la place sous la potence (pour y poster des défenseurs)
+   */
+  gallows(x, floorY = this.ground, { w = 120, h = 190, t = 16, mat = 'wood', load = 'stone', lw = 44, lh = 40, drop = 34 } = {}) {
+    const frame = this.room(x, floorY, { mat, w, h, t })
+    this.block(load, x, floorY - h + drop + lh / 2, lw, lh)
+    this.tethers.push({ kind: 'rope', a: frame.slab, ax: 0, ay: t / 2, b: this.blocks.at(-1), bx: 0, by: -lh / 2 })
+    return frame
+  }
+
+  /**
+   * Pont-levis (v6.0) : un tablier dressé devant la porte, au pied épinglé
+   * côté château, retenu en haut par une chaîne accrochée au mur
+   * (`anchor` : le bloc et le point, dans le monde). Brisez la chaîne : il
+   * s'abat vers l'extérieur, sur ceux qui gardent la porte.
+   */
+  drawbridge(x, anchor, { h = 150, w = 18, mat = 'wood', floorY = this.ground } = {}) {
+    // Tablier un peu au-dessus du sol (il pivote sans racler la terre), déjà
+    // légèrement penché vers l'extérieur : libéré, il tombe toujours de ce côté.
+    const lift = w + 4
+    this.blocks.push({ material: this.#mat(mat), x, y: floorY - lift - h / 2, w, h, shape: 'rect', angle: -0.06 })
+    const deck = this.blocks.at(-1)
+    // Charnière juste derrière le pied, côté château (repère du tablier, avant inclinaison).
+    this.hinges.push({ b: deck, dx: w / 2 + 3, dy: h / 2 })
+    this.tethers.push({ kind: 'chain', a: anchor.block, ax: anchor.x - anchor.block.x, ay: anchor.y - anchor.block.y, b: deck, bx: w / 2 - 2, by: -h / 2 + 6 })
+    return { x, floorY, topY: floorY - lift - h, w }
+  }
+
+  /**
+   * Ouvrage (v6.1, voir entities/props.js) posé dans une pièce ou sur un appui.
+   * @param {'windmill'|'forge'|'cistern'|'hive'|'flour'} kind
+   */
+  prop(kind, room, dx = 0) {
+    const p = PROP_TYPES[Guard.oneOf(kind, Object.keys(PROP_TYPES), 'prop')]
+    this.blocks.push({ material: p.material, x: room.x + dx, y: room.floorY - p.h / 2, w: p.w, h: p.h, shape: 'rect', prop: kind })
+    return this
+  }
+
+  /**
+   * Moulin à vent (v6.1) : une tour (pierre par défaut) coiffée de la cabine
+   * aux ailes. Ses rafales soufflent vers l'engin, au niveau de la cabine.
+   * @returns {Array<{x:number,floorY:number,topY:number,w:number}>} les étages de la tour
+   */
+  windmill(x, { floors = 2, mat = 'stone', w = 90, h = 90, floorY = this.ground } = {}) {
+    const rooms = this.tower(x, { floors, mat, w, h, floorY })
+    this.prop('windmill', this.spot(x, rooms.at(-1).topY))
+    return rooms
+  }
+
+  /**
+   * Citerne (v6.1) : un réservoir de bois sur pilotis. Crevée, elle inonde ce
+   * qui est dessous (feu éteint, défenseurs trempés ; gel en Hiver).
+   * @returns la plateforme des pilotis
+   */
+  cistern(x, { h = 90, mat = 'wood', floorY = this.ground } = {}) {
+    const deck = this.stilts(x, { legs: 2, mat, deck: mat, w: 90, h, floorY })
+    this.prop('cistern', deck)
+    return deck
+  }
+
+  /** Sacs de farine (v6.1) : deux sacs l'un sur l'autre (le second, plus petit, est décalé). */
+  flour(room, dx = 0, count = 2) {
+    const p = PROP_TYPES.flour
+    for (let i = 0; i < count; i++) this.blocks.push({ material: p.material, x: room.x + dx + (i % 2) * 6, y: room.floorY - p.h / 2 - i * p.h, w: p.w, h: p.h, shape: 'rect', prop: 'flour' })
+    return this
   }
 
   /** Toit triangulaire posé sur `topY`. */
@@ -131,6 +211,18 @@ export class StructureBuilder {
   watchman(room, dx = 0) {
     this.target(room, 'soldier', dx)
     this.targets[this.targets.length - 1].torch = true
+    return this
+  }
+
+  /**
+   * Général de Mordrac (v6.0) : le maître du donjon, plusieurs vies et ses
+   * propres ordres entre les tirs (voir bosses/WarCouncil.js).
+   * @param {{ x: number, floorY: number }} room
+   * @param {string} id voir bosses/generals.js
+   */
+  general(room, id, dx = 0) {
+    const t = TARGET_TYPES.general
+    this.targets.push({ type: 'general', general: id, x: room.x + dx, y: room.floorY - t.h / 2 - 1 })
     return this
   }
 

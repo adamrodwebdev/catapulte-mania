@@ -38,7 +38,7 @@ export class Entity {
     /**
      * Gel restant (ms), posé par un boulet de givre (v5.0) : l'objet devient
      * cassant (voir FROST.BRITTLE) et ne peut plus brûler. Le feu qui le touche
-     * le fait fondre d'un coup : vapeur et eau bouillante (PhysicsWorld#steam).
+     * le fait fondre d'un coup : vapeur et eau bouillante (ElementReactions#steam).
      */
     this.frozenMs = 0
     /** Cause de la destruction, connue une fois l'entité morte. */
@@ -96,6 +96,11 @@ export class Entity {
   /** L'entité est-elle gelée ? */
   get frozen() {
     return this.frozenMs > 0
+  }
+
+  /** Il éclaire alentour comme un feu (v6.2, lu par le dessin) : il brûle, et il est encore là. */
+  get alight() {
+    return this.alive !== false && this.burning > 0
   }
 
   /**

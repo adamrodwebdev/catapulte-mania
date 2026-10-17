@@ -14,6 +14,8 @@ import { ASSET_MANIFEST } from './assets.config.js'
  * @property {number} [seed] graine visuelle stable par objet
  * @property {number} [pixel] taille d'un pixel écran en unités monde
  * @property {object} [extra] paramètres propres à la clé (angle du bras, thème…)
+ * @property {Map<number, object>} [memory] mémoire de rendu de l'appelant (v6.2), gardée
+ *   d'une image à l'autre : vigilance lissée des personnages, par graine
  */
 
 /**

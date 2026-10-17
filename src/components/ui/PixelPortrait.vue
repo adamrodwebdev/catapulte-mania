@@ -8,7 +8,7 @@ import { useApp } from '../../app/AppContext.js'
  * portrait affiché, pour ne pas alourdir l'écran d'accueil.
  */
 const props = defineProps({
-  /** ysolde | aubert | gontran | mordrac */
+  /** Identifiant d'un personnage (CHARACTERS, Portraits.meta.js). */
   id: { type: String, required: true },
   /** Hauteur affichée (CSS), la largeur suit les proportions. */
   height: { type: String, default: '8rem' },

@@ -58,6 +58,36 @@
   --elev-3: 0 8px 16px rgb(30 26 43 / 0.12), 0 28px 72px rgb(30 26 43 / 0.28);
   --shadow: var(--elev-2);
   --grad-gold: linear-gradient(180deg, #f3d57a 0%, #dcab3d 55%, #b98a1f 100%);
+  /* Médailles de la coupe de la semaine (v6.0) : mêmes métaux dans les deux thèmes. */
+  --medal-silver: linear-gradient(135deg, #f4f6f8, #aab3bd 55%, #e3e7eb);
+  --medal-bronze: linear-gradient(135deg, #f0c49a, #a5683a 55%, #e2a877);
+  --on-medal: #3a2a10;
+  /* Maîtrise du royaume (v6.2) : pastilles des médailles (Campagne héroïque, Terres du Duc),
+     écu des Terres du Duc, éclat du bilan et écusson du Grand Ingénieur. Mêmes métaux dans les deux thèmes. */
+  --medal-dot-gold: radial-gradient(circle at 35% 30%, #fff6c9, #e8b934 45%, #9c6a12);
+  --medal-dot-silver: radial-gradient(circle at 35% 30%, #ffffff, #c4ccd6 45%, #6f7a88);
+  --medal-dot-bronze: radial-gradient(circle at 35% 30%, #ffe0bf, #c27c3e 45%, #6e3d16);
+  --duke-tile: linear-gradient(165deg, #3a2a52 0 50%, #22183a 50%);
+  /* Texte de cet écu : clair dans les deux thèmes (contraste AA sur le violet). */
+  --on-duke-tile: #f6f3ea;
+  --mastery-glow: rgb(232 185 52 / 0.35);
+  --mastery-glow-off: rgb(232 185 52 / 0);
+  --crest-gold-hi: #fff3b0;
+  --crest-gold: #e8b934;
+  --crest-gold-lo: #9c6a12;
+  --crest-field-hi: #2f4b7c;
+  --crest-field-lo: #1b2c4d;
+  --crest-edge: #6b4508;
+  --crest-shine: #ffffff;
+  --crest-glow: rgb(232 185 52 / 0.35);
+  /* Jauge de l'engin (v6.2) : teinte du rouge (0) au vert (à 60 % et plus), reflet,
+     traînée claire qui suit après un temps, quarts marqués. */
+  --hp-hue: 118deg;
+  --hp-saturation: 70%;
+  --hp-lightness: 48%;
+  --hp-gloss: rgb(255 255 255 / 0.3);
+  --hp-lag: #fff3d6;
+  --hp-ticks: rgb(18 14 28 / 0.7);
   --grad-action: linear-gradient(180deg, #4a6ba3 0%, #2f4b7c 100%);
   --gold-glow: 0 0 0 1px rgb(107 79 14 / 0.35), 0 6px 18px rgb(212 165 55 / 0.35);
   --ring: 0 0 0 2px var(--surface-2), 0 0 0 5px var(--focus);
@@ -177,6 +207,28 @@
   --on-danger: #000;
   --scrim: #000;
   --on-scrim: #fff;
+  /* Maîtrise (v6.2) : métaux en aplats francs (cerclés de noir, voir mastery.css). */
+  --medal-dot-gold: linear-gradient(#ffd400, #ffd400);
+  --medal-dot-silver: linear-gradient(#e6e6e6, #e6e6e6);
+  --medal-dot-bronze: linear-gradient(#ff9e4a, #ff9e4a);
+  --duke-tile: linear-gradient(#ffd400, #ffd400);
+  --on-duke-tile: #000;
+  --mastery-glow: transparent;
+  --mastery-glow-off: transparent;
+  --crest-gold-hi: #ffd400;
+  --crest-gold: #ffd400;
+  --crest-gold-lo: #ffd400;
+  --crest-field-hi: #000;
+  --crest-field-lo: #000;
+  --crest-edge: #fff;
+  --crest-shine: transparent;
+  --crest-glow: transparent;
+  /* Jauge de l'engin : teintes vives sur le noir (proches de --success et --danger), sans reflet. */
+  --hp-saturation: 100%;
+  --hp-lightness: 72%;
+  --hp-gloss: transparent;
+  --hp-lag: #fff;
+  --hp-ticks: #000;
 }
 
 :root[data-motion='reduced'] {

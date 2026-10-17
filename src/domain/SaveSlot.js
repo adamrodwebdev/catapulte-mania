@@ -9,6 +9,10 @@ import { DAY_KEY, dayNumber, DailyChallenge } from '../game/daily/DailyChallenge
 import { EndlessRun } from './EndlessRun.js'
 import { eventFor, EVENTS } from '../game/events/Season.js'
 import { emptyLogin, loginStatus, claimLogin, checkLogin, LOGIN_CYCLE } from '../game/progression/LoginRewards.js'
+import { WEEK_KEY, WeeklyCup, CUP } from '../game/daily/WeeklyCup.js'
+import { MASTERY_TOTAL, MASTERY_COSMETICS, DUKE_COUNT } from '../game/progression/Mastery.js'
+import * as Frontier from '../game/progression/Frontier.js'
+import { DAILY_HISTORY } from '../game/progression/DailyRecords.js'
 
 /** Nom de profil : lettres (toutes langues), chiffres, espaces, tirets. */
 export const PROFILE_NAME = /^[\p{L}\p{N}][\p{L}\p{N} _'-]{0,15}$/u
@@ -26,8 +30,10 @@ const COOP_RECORD = Schema.object({
   attempts: Schema.int({ min: 1, max: 1e6 }),
 })
 
-/** Défi du jour : jours gardés en mémoire (les plus récents). */
-export const DAILY_HISTORY = 14
+/** Terres du Duc (v6.2) : le chapitre secret de la maîtrise (clés « 1 » à DUKE_COUNT, neuf au plus). */
+const DUKE_KEY = new RegExp(`^[1-${DUKE_COUNT}]$`)
+
+/** Défi du jour : série, records des derniers jours (voir DailyRecords). */
 const DAILY = Schema.object({
   // Dernier jour réussi (AAAA-MM-JJ), '' si aucun.
   last: Schema.string({ minLength: 0, maxLength: 10, pattern: /^(?:|\d{4}-\d{2}-\d{2})$/ }),
@@ -37,7 +43,23 @@ const DAILY = Schema.object({
   days: Schema.record(DAY_KEY, Schema.int({ min: 0, max: GAME.MAX_LEVEL_SCORE }), { maxKeys: DAILY_HISTORY }),
 })
 
-/** Schéma de la sauvegarde (version 8). Toute clé inconnue est refusée. */
+/**
+ * Coupe de la semaine (v10) : la semaine en cours, le meilleur de chaque
+ * château (1 à 5), la médaille de la semaine ; les médailles gagnées en tout.
+ */
+const CUP_SAVE = Schema.object({
+  week: Schema.string({ minLength: 0, maxLength: 8, pattern: /^(?:|\d{4}-W\d{2})$/ }),
+  castles: Schema.record(/^[1-5]$/, Schema.object({ best: Schema.int({ min: 0, max: GAME.MAX_LEVEL_SCORE }), stars: Schema.int({ min: 1, max: 3 }) }), { maxKeys: CUP.CASTLES }),
+  medal: Schema.enum(['', 'bronze', 'silver', 'gold']),
+  trophies: Schema.object({ bronze: COUNTER, silver: COUNTER, gold: COUNTER }),
+})
+
+/** Coupe vide (nouveau profil, ou profil d'avant la v10). */
+export function emptyCup() {
+  return { week: '', castles: {}, medal: '', trophies: { bronze: 0, silver: 0, gold: 0 } }
+}
+
+/** Schéma de la sauvegarde (version 11). Toute clé inconnue est refusée. */
 export const saveSchema = Schema.object({
   version: Schema.enum([GAME.SAVE_VERSION]),
   name: Schema.string({ minLength: 1, maxLength: 16, pattern: PROFILE_NAME }),
@@ -54,6 +76,8 @@ export const saveSchema = Schema.object({
       shots: Schema.int({ min: 0, max: 100 }),
       // v3 : succès obtenus (masque de 3 bits)
       ach: Schema.int({ min: 0, max: 7 }),
+      // v10 : niveau passé après trois défaites (0 étoile, à reprendre plus tard).
+      skipped: Schema.optional(Schema.boolean()),
     }),
     { maxKeys: GAME.LEVEL_COUNT },
   ),
@@ -69,7 +93,8 @@ export const saveSchema = Schema.object({
   goldEarned: GOLD_INT,
   // v3 : or gagné avec l'ancien barème (profils migrés), contrôlé séparément.
   legacyGold: GOLD_INT,
-  upgrades: Schema.record(/^[a-z]{2,12}$/, Schema.int({ min: 0, max: 5 }), { maxKeys: 10 }),
+  // v11 : jusqu'à 8 paliers (paliers héroïques de la v6.2).
+  upgrades: Schema.record(/^[a-z]{2,12}$/, Schema.int({ min: 0, max: 8 }), { maxKeys: 10 }),
   cosmetics: Schema.object({
     owned: Schema.array(Schema.enum(COSMETIC_IDS), { maxLength: COSMETIC_IDS.length }),
     skin: Schema.enum(COSMETIC_IDS),
@@ -90,6 +115,13 @@ export const saveSchema = Schema.object({
     claims: Schema.int({ min: 0, max: 100000 }),
     gold: GOLD_INT,
   }),
+  // v10 : coupe de la semaine.
+  cup: CUP_SAVE,
+  // v10 : défaites d'affilée au premier niveau pas encore réussi (coup de pouce, niveau à passer).
+  frontier: Schema.object({ level: Schema.int({ min: 0, max: GAME.LEVEL_COUNT }), fails: Schema.int({ min: 0, max: 1e6 }) }),
+  // v11 : Campagne héroïque (commencée ou non, ses médailles) et Terres du Duc, après la maîtrise.
+  heroic: Schema.object({ started: Schema.boolean(), levels: Schema.record(LEVEL_KEY, COOP_RECORD, { maxKeys: GAME.LEVEL_COUNT }) }),
+  duke: Schema.record(DUKE_KEY, COOP_RECORD, { maxKeys: DUKE_COUNT }),
 })
 
 /**
@@ -104,6 +136,8 @@ export const saveSchema = Schema.object({
  * v6 → v7 : défi du jour, vide.
  * v7 → v8 : siège sans fin, vide.
  * v8 → v9 : récompenses de connexion, vides.
+ * v9 → v10 : coupe de la semaine, vide ; aucune défaite au front.
+ * v10 → v11 : Campagne héroïque et Terres du Duc, vides.
  * @param {any} raw
  */
 export function migrateSave(raw) {
@@ -131,6 +165,10 @@ export function migrateSave(raw) {
   if (save && typeof save === 'object' && save.version === 6) save = { ...save, version: 7, daily: { last: '', streak: 0, bestStreak: 0, days: {} } }
   if (save && typeof save === 'object' && save.version === 7) save = { ...save, version: 8, endless: { best: 0, bestWave: 0, sieges: 0 } }
   if (save && typeof save === 'object' && save.version === 8) save = { ...save, version: 9, login: emptyLogin() }
+  if (save && typeof save === 'object' && save.version === 9) save = { ...save, version: 10, cup: emptyCup(), frontier: { level: 0, fails: 0 } }
+  // Version de développement de la v10 (coupe sans le front) : le champ manquant est ajouté, vide.
+  if (save && typeof save === 'object' && save.version === 10 && save.frontier === undefined) save = { ...save, frontier: { level: 0, fails: 0 } }
+  if (save && typeof save === 'object' && save.version === 10) save = { ...save, version: 11, heroic: { started: false, levels: {} }, duke: {} }
   return save
 }
 
@@ -140,6 +178,15 @@ export function migrateSave(raw) {
  * jamais stockées : elles sont recalculées à partir des niveaux réussis.
  */
 export class SaveSlot {
+  /**
+   * Parcours à médailles (v6.2) : où vivent leurs records dans la sauvegarde,
+   * et ce qui ouvre chacun de leurs niveaux.
+   */
+  static #MEDAL_TRACKS = Object.freeze({
+    heroic: Object.freeze({ records: (data) => data.heroic.levels, isUnlocked: (slot, id) => slot.isHeroicUnlocked(id) }),
+    duke: Object.freeze({ records: (data) => data.duke, isUnlocked: (slot, id) => slot.isDukeUnlocked(id) }),
+  })
+
   #index
   #data
   /** Or doublable par une vidéo : résultat authentique → or gagné (usage unique). */
@@ -174,6 +221,10 @@ export class SaveSlot {
       daily: { last: '', streak: 0, bestStreak: 0, days: {} },
       endless: { best: 0, bestWave: 0, sieges: 0 },
       login: emptyLogin(),
+      cup: emptyCup(),
+      frontier: { level: 0, fails: 0 },
+      heroic: { started: false, levels: {} },
+      duke: {},
     })
     return new SaveSlot(index, data)
   }
@@ -194,11 +245,14 @@ export class SaveSlot {
       if (id !== i + 1) throw new ValidationError(`save.levels.${id}`, 'progression gap')
       const rec = data.levels[id]
       if (rec.attempts < 1) throw new ValidationError(`save.levels.${id}`, 'no attempt recorded')
-      if (checkRecord) {
+      if (rec.skipped && (rec.stars > 0 || rec.best > 0 || rec.shots > 0)) throw new ValidationError(`save.levels.${id}`, 'skipped level with a result')
+      if (checkRecord && !rec.skipped) {
         const stars = checkRecord(id, { best: rec.best, stars: rec.stars, shots: rec.shots })
         if (Number.isInteger(stars)) rec.stars = stars
       }
     })
+    // Front : un niveau pas encore réussi (ou aucun).
+    if (data.frontier.level && data.levels[data.frontier.level]) throw new ValidationError('save.frontier.level', 'already completed')
     // Campagne à deux : progression continue elle aussi, étoiles recalculées.
     Object.keys(data.coop).map(Number).sort((a, b) => a - b).forEach((id, i) => {
       if (id !== i + 1) throw new ValidationError(`save.coop.${id}`, 'progression gap')
@@ -209,6 +263,24 @@ export class SaveSlot {
       }
     })
     if (data.updatedAt < data.createdAt) throw new ValidationError('save.updatedAt', 'before creation')
+    // v11 : ce que la maîtrise ouvre (Campagne héroïque, Terres du Duc, Engin d'or) l'exige.
+    // v6.2 : jugée sur les succès, jamais recalculés (voir #masteryReached) : un nouveau
+    // barème d'étoiles ne rend pas « corrompu » le profil d'un Grand Ingénieur.
+    const reached = SaveSlot.#masteryReached(data)
+    if (!reached && (data.heroic.started || Object.keys(data.duke).length)) throw new ValidationError('save.heroic', 'mastery required')
+    if (!reached && data.cosmetics.owned.some((id) => MASTERY_COSMETICS.includes(id))) throw new ValidationError('save.cosmetics.owned', 'mastery required')
+    if (!data.heroic.started && Object.keys(data.heroic.levels).length) throw new ValidationError('save.heroic.levels', 'heroic campaign not started')
+    for (const [track, medals] of Object.entries(SaveSlot.#MEDAL_TRACKS)) {
+      const records = medals.records(data)
+      Object.keys(records).map(Number).sort((a, b) => a - b).forEach((id, i) => {
+        if (id !== i + 1) throw new ValidationError(`save.${track}.${id}`, 'progression gap')
+        const rec = records[id]
+        if (checkRecord) {
+          const stars = checkRecord(id, { best: rec.best, stars: rec.stars, shots: rec.shots }, track)
+          if (Number.isInteger(stars)) rec.stars = Math.max(1, stars)
+        }
+      })
+    }
     SaveSlot.#checkEconomy(data)
     // Défi du jour : série cohérente.
     const daily = data.daily
@@ -220,6 +292,13 @@ export class SaveSlot {
     // Coffres de connexion : au plus un par jour depuis la création du profil.
     const loginError = checkLogin(data.login, data.createdAt)
     if (loginError) throw new ValidationError('save.login', loginError)
+    // Coupe de la semaine : semaine valide, médaille conforme aux étoiles, et comptée.
+    const cup = data.cup
+    if (cup.week && !WEEK_KEY.test(cup.week)) throw new ValidationError('save.cup.week', 'invalid week')
+    if (!cup.week && (Object.keys(cup.castles).length || cup.medal)) throw new ValidationError('save.cup.week', 'results without a week')
+    const cupStars = Object.values(cup.castles).reduce((sum, c) => sum + c.stars, 0)
+    if ((WeeklyCup.medalFor(cupStars) ?? '') !== cup.medal) throw new ValidationError('save.cup.medal', 'medal does not match the stars')
+    if (cup.medal && cup.trophies[cup.medal] < 1) throw new ValidationError('save.cup.trophies', 'medal not counted')
     return new SaveSlot(index, data)
   }
 
@@ -235,7 +314,12 @@ export class SaveSlot {
     for (const [id, level] of Object.entries(data.upgrades)) {
       const u = UpgradeCatalog.upgrade(id)
       if (level > u.maxLevel) throw new ValidationError(`save.upgrades.${id}`, 'level above maximum')
-      if (level > 0 && u.stars[level - 1] > stars) throw new ValidationError(`save.upgrades.${id}`, 'not enough stars')
+      // Étoiles du dernier palier ordinaire acheté. Les paliers héroïques (v6.2) sont
+      // ouverts par la Campagne héroïque, donc par la maîtrise (contrôlée plus haut),
+      // et non par le compte d'étoiles du moment, qu'un nouveau barème peut baisser.
+      const ordinary = Math.min(level, u.base)
+      if (ordinary > 0 && u.stars[ordinary - 1] > stars) throw new ValidationError(`save.upgrades.${id}`, 'not enough stars')
+      if (u.isHeroic(level) && !data.heroic.started) throw new ValidationError(`save.upgrades.${id}`, 'heroic tier before the heroic campaign')
       spent += u.spentFor(level)
     }
     const owned = new Set(data.cosmetics.owned)
@@ -251,6 +335,24 @@ export class SaveSlot {
     // L'or des vidéos ne peut jamais dépasser l'or gagnable en jouant (au plus « doublé »).
     if (data.bonusGold > maxGoldFor(data.levels)) throw new ValidationError('save.bonusGold', 'more bonus than possible')
     if (data.goldEarned > data.legacyGold + maxGoldFor(data.levels) + data.bonusGold + data.login.gold) throw new ValidationError('save.goldEarned', 'more gold than possible')
+  }
+
+  /** Toutes les étoiles et tous les succès de la campagne (données déjà validées). */
+  static #masteredData(data) {
+    const recs = Object.values(data.levels)
+    return recs.reduce((sum, r) => sum + r.stars, 0) >= MASTERY_TOTAL && SaveSlot.#masteryReached(data)
+  }
+
+  /**
+   * La maîtrise a-t-elle été atteinte ? (contrôle au chargement, v6.2)
+   * Il a fallu toutes les étoiles et tous les succès. Les étoiles sont
+   * recalculées au barème du moment (voir fromJSON) : un réglage des niveaux
+   * peut en ôter une, et la sauvegarde suivante l'enregistre ainsi. Les
+   * succès, eux, restent acquis : ce sont eux qui prouvent la maîtrise passée.
+   * (Le titre, lui, suit les étoiles du moment : voir `mastered`.)
+   */
+  static #masteryReached(data) {
+    return Object.values(data.levels).reduce((sum, r) => sum + countAchievements(r.ach), 0) >= MASTERY_TOTAL
   }
 
   get index() {
@@ -293,23 +395,42 @@ export class SaveSlot {
   }
 
   /**
-   * Achète le niveau suivant d'une amélioration.
-   * @returns {boolean} faux si or ou étoiles insuffisants, ou maximum atteint
+   * Offre de l'atelier pour une amélioration (v6.2) : le palier suivant, son
+   * prix, les étoiles qu'il exige, et ce qui empêche de l'acheter. Seule source
+   * de la règle d'achat : `buyUpgrade`, l'atelier et son rappel (« votre or
+   * suffit… ») la lisent tous.
+   * @returns {{ id: string, level: number, cost: number | null, stars: number | null, starsOk: boolean, heroic: boolean, heroicLocked: boolean, maxed: boolean, affordable: boolean }}
+   *   level : palier acheté ; maxed : plus rien à acheter ; affordable : achat possible maintenant
    */
-  buyUpgrade(id) {
+  upgradeOffer(id) {
     const u = UpgradeCatalog.upgrade(id)
     const level = this.#data.upgrades[id] || 0
     const cost = u.nextCost(level)
-    if (cost === null || cost > this.#data.gold || u.nextStars(level) > this.starCount) return false
-    this.#data.gold -= cost
-    this.#data.upgrades[id] = level + 1
+    const stars = u.nextStars(level)
+    const maxed = cost === null
+    const starsOk = stars === null || stars <= this.starCount
+    // Palier héroïque (v6.2) : seulement une fois la Campagne héroïque commencée.
+    const heroic = !maxed && u.isHeroic(level + 1)
+    const heroicLocked = heroic && !this.#data.heroic.started
+    return { id, level, cost, stars, starsOk, heroic, heroicLocked, maxed, affordable: !maxed && starsOk && !heroicLocked && cost <= this.#data.gold }
+  }
+
+  /**
+   * Achète le niveau suivant d'une amélioration.
+   * @returns {boolean} faux si or ou étoiles insuffisants, palier héroïque fermé, ou maximum atteint
+   */
+  buyUpgrade(id) {
+    const offer = this.upgradeOffer(id)
+    if (!offer.affordable) return false
+    this.#data.gold -= offer.cost
+    this.#data.upgrades[id] = offer.level + 1
     return true
   }
 
   /** Achète une apparence. */
   buyCosmetic(id) {
     const c = UpgradeCatalog.cosmetic(id)
-    if (c.event || this.#data.cosmetics.owned.includes(id) || c.cost > this.#data.gold) return false
+    if (c.event || c.reward || this.#data.cosmetics.owned.includes(id) || c.cost > this.#data.gold) return false
     this.#data.gold -= c.cost
     this.#data.cosmetics.owned.push(id)
     return true
@@ -382,6 +503,7 @@ export class SaveSlot {
    */
   recordResult(result, now = Date.now()) {
     if (!LevelResult.isAuthentic(result)) throw new ValidationError('result', 'untrusted result rejected')
+    if (result.track !== 'campaign') throw new ValidationError('result', 'not a campaign result')
     if (!this.isUnlocked(result.levelId)) throw new ValidationError('result', 'level is locked')
     const s = this.#data.stats
     s.shots += result.shotsUsed
@@ -392,9 +514,19 @@ export class SaveSlot {
     this.#data.updatedAt = Math.max(now, this.#data.updatedAt)
 
     const prev = this.#data.levels[result.levelId]
+    const front = this.#data.frontier
     if (!result.won) {
       if (prev) prev.attempts += 1
+      // Défaites d'affilée au premier niveau pas encore réussi (v6.0).
+      else {
+        front.fails = front.level === result.levelId ? front.fails + 1 : 1
+        front.level = result.levelId
+      }
       return { newBest: false, firstClear: false, gold: 0, newAchievements: 0 }
+    }
+    if (front.level === result.levelId) {
+      front.level = 0
+      front.fails = 0
     }
     const firstClear = !prev
     const before = prev ?? { stars: 0, ach: 0 }
@@ -410,6 +542,8 @@ export class SaveSlot {
       return { newBest: true, firstClear: true, gold, newAchievements }
     }
     prev.attempts += 1
+    // Un niveau passé, enfin pris : il compte désormais comme les autres.
+    delete prev.skipped
     const newBest = result.score > prev.best
     if (newBest) prev.best = result.score
     prev.stars = Math.max(prev.stars, result.stars)
@@ -417,6 +551,129 @@ export class SaveSlot {
     prev.shots = prev.shots > 0 ? Math.min(prev.shots, shots) : shots
     prev.ach |= result.achievements
     return { newBest, firstClear: false, gold, newAchievements }
+  }
+
+  /* ---------- Maîtrise du royaume (v6.2) ---------- */
+
+  /** Toutes les étoiles et tous les succès de la campagne : le joueur est Grand Ingénieur du Royaume. */
+  get mastered() {
+    return SaveSlot.#masteredData(this.#data)
+  }
+
+  /**
+   * Offre les récompenses d'apparence de la maîtrise (Engin d'or, étincelles).
+   * @returns {string[]} cosmétiques nouvellement obtenus
+   */
+  grantMastery() {
+    if (!this.mastered) return []
+    const fresh = MASTERY_COSMETICS.filter((id) => !this.#data.cosmetics.owned.includes(id))
+    this.#data.cosmetics.owned.push(...fresh)
+    return fresh
+  }
+
+  /** Campagne héroïque : commencée, et ses médailles (copie). */
+  get heroic() {
+    return { started: this.#data.heroic.started, levels: structuredClone(this.#data.heroic.levels) }
+  }
+
+  /** Lance la Campagne héroïque (la maîtrise est exigée) : ses paliers d'atelier s'ouvrent. */
+  startHeroic(now = Date.now()) {
+    if (!this.mastered) return false
+    if (this.#data.heroic.started) return true
+    this.#data.heroic.started = true
+    this.#data.updatedAt = Math.max(now, this.#data.updatedAt)
+    return true
+  }
+
+  isHeroicUnlocked(levelId) {
+    Guard.int(levelId, 'levelId', { min: 1, max: GAME.LEVEL_COUNT })
+    return this.#data.heroic.started && (levelId === 1 || Boolean(this.#data.heroic.levels[levelId - 1]))
+  }
+
+  /** Terres du Duc : les cinq châteaux (records, copie). */
+  get duke() {
+    return structuredClone(this.#data.duke)
+  }
+
+  isDukeUnlocked(levelId) {
+    Guard.int(levelId, 'levelId', { min: 1, max: DUKE_COUNT })
+    return this.mastered && (levelId === 1 || Boolean(this.#data.duke[levelId - 1]))
+  }
+
+  /**
+   * Victoire de la Campagne héroïque ou des Terres du Duc (médailles seulement :
+   * ni or, ni succès). Une défaite n'est pas enregistrée.
+   * @param {LevelResult} result
+   * @param {'heroic' | 'duke'} track
+   * @returns {{ newBest: boolean, firstClear: boolean, stars: number, before: number }}
+   */
+  #recordMedal(result, track, now) {
+    if (!LevelResult.isAuthentic(result)) throw new ValidationError('result', 'untrusted result rejected')
+    if (result.track !== track) throw new ValidationError('result', `not a ${track} result`)
+    const medals = SaveSlot.#MEDAL_TRACKS[track]
+    if (!medals.isUnlocked(this, result.levelId)) throw new ValidationError('result', 'level is locked')
+    const records = medals.records(this.#data)
+    const prev = records[result.levelId]
+    if (!result.won) return { newBest: false, firstClear: false, stars: prev?.stars ?? 0, before: prev?.stars ?? 0 }
+    const shots = Math.max(1, result.shotsUsed)
+    this.#data.updatedAt = Math.max(now, this.#data.updatedAt)
+    if (!prev) {
+      records[result.levelId] = { stars: Math.max(1, result.stars), best: result.score, shots, attempts: 1 }
+      return { newBest: true, firstClear: true, stars: Math.max(1, result.stars), before: 0 }
+    }
+    const before = prev.stars
+    prev.attempts += 1
+    const newBest = result.score > prev.best
+    if (newBest) prev.best = result.score
+    prev.stars = Math.max(prev.stars, result.stars)
+    prev.shots = Math.min(prev.shots, shots)
+    return { newBest, firstClear: false, stars: prev.stars, before }
+  }
+
+  recordHeroic(result, now = Date.now()) {
+    return this.#recordMedal(result, 'heroic', now)
+  }
+
+  recordDuke(result, now = Date.now()) {
+    return this.#recordMedal(result, 'duke', now)
+  }
+
+  /* ---------- Coup de pouce et niveau passé (v6.0) ---------- */
+
+  /** Défaites d'affilée sur ce niveau (s'il n'est pas encore réussi). */
+  failsAt(levelId) {
+    const f = this.#data.frontier
+    return f.level === levelId && !this.isCompleted(levelId) ? f.fails : 0
+  }
+
+  /** Après trois défaites d'affilée (Frontier.SKIP_AFTER), on peut passer le niveau (jamais le dernier). */
+  canSkip(levelId) {
+    return levelId < GAME.LEVEL_COUNT && this.isUnlocked(levelId) && !this.isCompleted(levelId) && this.failsAt(levelId) >= Frontier.SKIP_AFTER
+  }
+
+  /**
+   * Passe un niveau : il compte comme fait (le suivant s'ouvre), sans étoile,
+   * sans or ni score ; on peut revenir le prendre pour de bon.
+   */
+  skipLevel(levelId, now = Date.now()) {
+    if (!this.canSkip(levelId)) throw new ValidationError('skip', 'level cannot be skipped')
+    this.#data.levels[levelId] = { stars: 0, best: 0, attempts: Math.max(1, this.failsAt(levelId)), shots: 0, ach: 0, skipped: true }
+    this.#data.frontier = { level: 0, fails: 0 }
+    this.#data.updatedAt = Math.max(now, this.#data.updatedAt)
+  }
+
+  /** Niveau passé (sans l'avoir pris) ? */
+  isSkipped(levelId) {
+    return Boolean(this.#data.levels[levelId]?.skipped)
+  }
+
+  /**
+   * Coup de pouce discret du premier chapitre (règle : Frontier.luckFor),
+   * selon les défaites d'affilée sur ce niveau. Rien ne l'annonce.
+   * (Profils de test du serveur de développement : voir app/devUnlock.js.)
+   */
+  luckFor(levelId, difficulty) {
+    return Frontier.luckFor(levelId, difficulty, this.failsAt(levelId))
   }
 
   /**
@@ -547,7 +804,7 @@ export class SaveSlot {
     const prev = d.days[today]
     const newBest = prev === undefined || result.score > prev
     if (newBest) d.days[today] = result.score
-    // Ne garder que les jours les plus récents.
+    // Ne garder que les jours les plus récents (DailyRecords).
     const keys = Object.keys(d.days).sort()
     while (keys.length > DAILY_HISTORY) delete d.days[keys.shift()]
     let extended = false
@@ -561,6 +818,52 @@ export class SaveSlot {
     }
     this.#data.updatedAt = Math.max(this.#data.updatedAt, Date.now())
     return { newBest, streak: d.streak, extended }
+  }
+
+  /* ---------- Coupe de la semaine ---------- */
+
+  /** La coupe (copie) : semaine, meilleur de chaque château, médaille, médailles gagnées. */
+  get cup() {
+    return structuredClone(this.#data.cup)
+  }
+
+  /**
+   * Enregistre un château de la coupe (résultat authentifié, château de la
+   * coupe de la semaine `week`). Une nouvelle semaine remet la coupe à zéro ;
+   * les médailles gagnées restent. Pas d'or : la récompense est la médaille.
+   * @param {LevelResult} result
+   * @param {string} week AAAA-Www
+   * @param {number} index château (1 à 5)
+   * @returns {{ newBest: boolean, stars: number, medal: string | null, medalUp: boolean }}
+   */
+  recordCup(result, week, index) {
+    if (!LevelResult.isAuthentic(result)) throw new ValidationError('result', 'not issued by the game engine')
+    Guard.int(index, 'cup castle', { min: 1, max: CUP.CASTLES })
+    const cup = WeeklyCup.forWeek(week)
+    if (result.levelId !== cup.levels[index - 1] || result.difficulty !== cup.difficulty) throw new ValidationError('result', 'not this week\'s cup')
+    const c = this.#data.cup
+    const total = () => Object.values(c.castles).reduce((sum, r) => sum + r.stars, 0)
+    // Horloge reculée : une coupe plus ancienne que la dernière jouée ne change rien.
+    if (c.week && week < c.week) return { newBest: false, stars: total(), medal: c.medal || null, medalUp: false }
+    if (c.week !== week) {
+      c.week = week
+      c.castles = {}
+      c.medal = ''
+    }
+    if (!result.won) return { newBest: false, stars: total(), medal: c.medal || null, medalUp: false }
+    const prev = c.castles[index]
+    const newBest = !prev || result.score > prev.best
+    c.castles[index] = { best: Math.max(prev?.best ?? 0, result.score), stars: Math.max(prev?.stars ?? 0, result.stars) }
+    const stars = total()
+    const medal = WeeklyCup.medalFor(stars) ?? ''
+    const medalUp = medal !== c.medal
+    if (medalUp) {
+      if (c.medal) c.trophies[c.medal] -= 1
+      c.trophies[medal] += 1
+      c.medal = medal
+    }
+    this.#data.updatedAt = Math.max(this.#data.updatedAt, Date.now())
+    return { newBest, stars, medal: medal || null, medalUp }
   }
 
   /* ---------- Siège sans fin ---------- */

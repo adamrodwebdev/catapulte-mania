@@ -164,7 +164,8 @@ test("profil : seul le résultat du défi du jour est accepté pour ce jour", ()
   const slot = SaveSlot.create(0, 'Robin', 'normal')
   const key = '2026-10-04'
   const c = DailyChallenge.forDay(key)
-  const other = LevelRepository.get(c.levelId === 50 ? 51 : 50)
+  // Un château d'un seul tenant (pas une fin de chapitre en plusieurs étapes, v6.0).
+  const other = LevelRepository.get(c.levelId === 51 ? 52 : 51)
   const s = challenge('daily', other, 'catapult')
   for (const t of s.world.filter((e) => e.kind === 'target')) t.kill('fire')
   let result = null

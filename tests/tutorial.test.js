@@ -10,12 +10,16 @@ test('chaque munition et chaque pouvoir a son niveau tutoriel, un seul par nivea
   const tools = LevelRepository.all().map((l) => l.tutorial).filter(Boolean)
   assert.equal(tools[0], 'aim')
   assert.equal(new Set(tools).size, tools.length, 'pas de doublon')
-  for (const ammo of ['fire', 'boulder', 'frost', 'bomb', 'split']) assert.ok(tools.includes(`ammo:${ammo}`), ammo)
+  for (const ammo of ['fire', 'boulder', 'frost', 'bomb', 'split', 'thunder', 'bale', 'poison']) assert.ok(tools.includes(`ammo:${ammo}`), ammo)
   for (const p of PowerRegistry.all()) assert.ok(tools.includes(`power:${p.id}`), p.id)
   // v5.0 : les munitions arrivent tôt (feu 3, rocher 5, givre 7, bombe 10, mitraille 14).
   assert.equal(LevelRepository.tutorialFor(3), 'ammo:fire')
   assert.equal(LevelRepository.tutorialFor(7), 'ammo:frost')
   assert.equal(LevelRepository.tutorialFor(14), 'ammo:split')
+  // v6.1 : orbe d'orage 22, botte de paille 29, pot de poison 37.
+  assert.equal(LevelRepository.tutorialFor(22), 'ammo:thunder')
+  assert.equal(LevelRepository.tutorialFor(29), 'ammo:bale')
+  assert.equal(LevelRepository.tutorialFor(37), 'ammo:poison')
 })
 
 test('niveau tutoriel : la munition présentée reste disponible en Difficile', () => {

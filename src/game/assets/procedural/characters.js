@@ -62,10 +62,10 @@ export function limb(g, pts, width, base, { shade = true } = {}) {
   }
 }
 
-export function hand(g, x, y, r = 1.8) {
+export function hand(g, x, y, r = 1.8, skin = null) {
   const gr = g.createRadialGradient(x - r * 0.4, y - r * 0.4, 0.2, x, y, r)
-  gr.addColorStop(0, '#f2cfae')
-  gr.addColorStop(1, '#a8704c')
+  gr.addColorStop(0, skin ? tone(skin, 0.18) : '#f2cfae')
+  gr.addColorStop(1, skin ? tone(skin, -0.32) : '#a8704c')
   g.beginPath()
   g.ellipse(x, y, r, r * 0.9, 0, 0, TAU)
   g.fillStyle = gr
@@ -91,20 +91,20 @@ export function boot(g, x, y, toward = -1) {
  * Tête de profil trois-quarts tournée vers la gauche.
  * state : 'idle' | 'blink' | 'hurt'.
  */
-export function head(g, cx, cy, r, state, { old = false, stubble = true } = {}) {
+export function head(g, cx, cy, r, state, { old = false, stubble = true, skin: base = null } = {}) {
   // Oreille.
   g.beginPath()
   g.ellipse(cx + r * 0.62, cy + r * 0.05, r * 0.2, r * 0.3, 0.2, 0, TAU)
-  g.fillStyle = '#c98f69'
+  g.fillStyle = base ? tone(base, -0.12) : '#c98f69'
   g.fill()
   edge(g, 0.45)
-  // Visage.
+  // Visage (v6.0 : teint au choix pour les généraux).
   g.beginPath()
   g.ellipse(cx, cy, r * 0.86, r, 0, 0, TAU)
   const skin = g.createRadialGradient(cx - r * 0.4, cy - r * 0.35, r * 0.1, cx, cy, r * 1.1)
-  skin.addColorStop(0, old ? '#f3d2b6' : '#f6d4b0')
-  skin.addColorStop(0.55, old ? '#dca88a' : '#e0aa82')
-  skin.addColorStop(1, '#9c6646')
+  skin.addColorStop(0, base ? tone(base, 0.2) : old ? '#f3d2b6' : '#f6d4b0')
+  skin.addColorStop(0.55, base ?? (old ? '#dca88a' : '#e0aa82'))
+  skin.addColorStop(1, base ? tone(base, -0.38) : '#9c6646')
   g.fillStyle = skin
   g.fill()
   // Joues.
@@ -958,29 +958,85 @@ const smooth = (u) => u * u * (3 - 2 * u)
 /** Enveloppe d'un geste : monte, tient, redescend (u dans [0, 1]). */
 const envelope = (u, a = 0.12, b = 0.55) => (u < a || u > b ? 0 : u < a + 0.07 ? smooth((u - a) / 0.07) : u > b - 0.07 ? smooth((b - u) / 0.07) : 1)
 
-/** Vigilance lissée par personnage (ils se tournent vers le ciel puis se détendent). */
-const alertness = new Map()
-function alertLevel(id, alert, t) {
-  const prev = alertness.get(id)
+/**
+ * Vigilance lissée par personnage (ils se tournent vers le ciel puis se détendent).
+ * v6.2 : la mémoire appartient à qui dessine (`memory` de l'état de dessin : une
+ * Map par Renderer, une pour les défenseurs assommés), et non plus une Map du
+ * module partagée par la partie, l'atelier et les assommés. Sans mémoire : pas
+ * de lissage, la vigilance suit l'alerte.
+ * @param {Map<number, { v: number, t: number }> | undefined} memory
+ */
+export function alertLevel(memory, id, alert, t) {
+  if (!memory) return alert ? 1 : 0
+  const prev = memory.get(id)
   let v = alert ? 1 : 0
   if (prev && t >= prev.t && t - prev.t < 0.5) {
     const k = Math.min(1, (t - prev.t) * (alert ? 6 : 1.6))
     v = prev.v + ((alert ? 1 : 0) - prev.v) * k
   }
-  if (alertness.size > 400) alertness.clear()
-  alertness.set(id, { v, t })
+  if (memory.size > 400) memory.clear()
+  memory.set(id, { v, t })
   return v
 }
 
+/** Durée du geste de commandement d'un général (ms, v6.0). */
+const ORDER_MS = 1400
+/** Geste pour repousser (v6.1, ms) : on se ramasse, on pousse, on revient. */
+const PUSH_MS = 460
+
 /** Pose de chaque calque à l'instant t. */
-function pose(rig, type, t, seed, { hurt, alert, working = false, sprinting = false }) {
-  const P = { body: { dx: 0, dy: 0 }, head: { rot: 0, flip: 1, dy: 0 }, arm: { rot: 0, dy: 0 }, shield: { rot: 0, dx: 0, dy: 0 } }
+function pose(rig, type, t, seed, { hurt, alert, working = false, sprinting = false, walking = false, order = Infinity, push = Infinity, brace = false, stun = null, poisoned = false }) {
+  const P = { body: { dx: 0, dy: 0 }, head: { rot: 0, flip: 1, dy: 0 }, arm: { rot: 0, dy: 0 }, shield: { rot: 0, dx: 0, dy: 0 }, cape: { rot: 0 } }
   // Report du poids d'une jambe sur l'autre.
   P.body.dx = Math.sin(t * 0.7 + seed * 3) * 0.35
+  // Cape des généraux (v6.0) : elle ondule à peine au repos, flotte derrière lui quand il court.
+  P.cape.rot = sprinting ? -0.32 + Math.sin(t * 17 + seed) * 0.05 : walking ? -0.1 + Math.sin(t * 9 + seed) * 0.03 : Math.sin(t * 1.3 + seed * 2) * 0.03
+  // v6.1 : électrisé, il tressaute de partout ; sonné, il vacille, bras ballants.
+  if (stun === 'shock') {
+    P.body.dx = Math.sin(t * 95 + seed) * 0.9
+    P.head.rot = Math.sin(t * 77 + seed * 2) * 0.22
+    P.arm.rot = -0.35 + Math.sin(t * 83 + seed) * 0.3
+    P.shield.dy = Math.sin(t * 71) * 1.2
+    return P
+  }
+  // Il repousse ce qui lui arrive dessus : il se ramasse (anticipation), pousse
+  // bras tendus vers le haut en se penchant dedans, puis revient en douceur.
+  if (push >= 0 && push < PUSH_MS) {
+    const u = push / PUSH_MS
+    const load = u < 0.16 ? smooth(u / 0.16) : 0
+    const thrust = u < 0.16 ? 0 : u < 0.42 ? smooth((u - 0.16) / 0.26) : 1 - smooth((u - 0.42) / 0.58)
+    P.body.dx += -1.1 * load + 1.6 * thrust
+    P.body.dy = 0.8 * load
+    P.arm.rot = 0.22 * load - 0.95 * thrust
+    P.arm.dy = -2.8 * thrust
+    P.shield.dx = 1.8 * thrust
+    P.shield.dy = -2.2 * thrust
+    P.head.rot = -0.12 * thrust
+    P.cape.rot += 0.1 * thrust
+    return P
+  }
+  if (stun === 'hit') {
+    P.body.dx = Math.sin(t * 13 + seed) * 0.9
+    P.head.rot = -0.18 + Math.sin(t * 11 + seed) * 0.12
+    P.arm.rot = 0.28 + Math.sin(t * 9 + seed) * 0.08
+    P.shield.dy = 1.5
+    return P
+  }
   if (hurt) {
     P.head.rot = -0.22 + Math.sin(t * 31 + seed) * 0.08
     P.arm.rot = Math.sin(t * 24 + seed) * 0.25
     P.shield.dy = -2
+    P.cape.rot = Math.sin(t * 21 + seed) * 0.09
+    return P
+  }
+  // Un général donne son ordre (v6.0) : arme brandie haut, tête levée, il crie.
+  if (order >= 0 && order < ORDER_MS) {
+    const e = envelope(order / ORDER_MS, 0, 0.92)
+    P.arm.dy = -3.4 * e
+    P.arm.rot = (-0.42 + Math.sin(order / 55) * 0.04) * e
+    P.head.rot = 0.2 * e
+    P.shield.dy = -2 * e
+    P.cape.rot += -0.12 * e
     return P
   }
   // Geste du moment : un par cycle, choisi d'après l'identité du personnage.
@@ -1040,6 +1096,22 @@ function pose(rig, type, t, seed, { hurt, alert, working = false, sprinting = fa
       P.arm.rot += -0.08 * e
       break
   }
+  // Empoisonné (v6.1) : il tousse, plié en deux, par quintes.
+  if (poisoned) {
+    const fit = Math.max(0, Math.sin(t * 5.5 + seed))
+    P.head.rot = 0.26 * fit
+    P.body.dx += 0.7 * fit
+    P.arm.rot = 0.2 * fit
+  }
+  // Bras levés (v6.1) : ce qui lui tombe dessus arrive lentement, il va le renvoyer.
+  if (brace) {
+    P.arm.dy = -3.2
+    P.arm.rot = -0.62
+    P.head.rot = 0.22
+    P.shield.dy = -3
+    P.body.dy = 0.6
+    return P
+  }
   // Un projectile en vol : tous lèvent les yeux et se préparent.
   if (alert > 0) {
     P.head.rot = P.head.rot * (1 - alert) + 0.15 * alert
@@ -1052,6 +1124,13 @@ function pose(rig, type, t, seed, { hurt, alert, working = false, sprinting = fa
     if (type === 'king') {
       P.arm.dy += -2.5 * alert
       P.arm.rot += -0.12 * alert
+    }
+    // Généraux (v6.0) : arme levée, écu en garde.
+    if (rig.brace) {
+      P.arm.dy += rig.brace.arm[0] * alert
+      P.arm.rot += rig.brace.arm[1] * alert
+      P.shield.dy += rig.brace.shield * alert
+      P.shield.dx += -1 * alert
     }
   }
   return P
@@ -1075,8 +1154,13 @@ export function animated(type, rig = RIGS[type]) {
     const period = 3.4 + (seed % 1.6)
     const state = ex.hurt ? 'hurt' : !ex.still && (t + seed * 3) % period < 0.13 ? 'blink' : 'idle'
     const still = Boolean(ex.still)
-    const alert = still ? 0 : alertLevel(s.seed ?? 0, Boolean(ex.alert), t)
-    const P = still ? null : pose(rig, type, t, seed, { hurt: Boolean(ex.hurt), alert, working: Boolean(ex.working), sprinting: Boolean(ex.sprinting) })
+    const alert = still ? 0 : alertLevel(s.memory, s.seed ?? 0, Boolean(ex.alert), t)
+    const P = still
+      ? null
+      : pose(rig, type, t, seed, {
+          hurt: Boolean(ex.hurt), alert, working: Boolean(ex.working), sprinting: Boolean(ex.sprinting), walking: Boolean(ex.walking), order: ex.order ?? Infinity,
+          push: ex.push ?? Infinity, brace: Boolean(ex.brace), stun: ex.stun ?? null, poisoned: Boolean(ex.poisoned),
+        })
     ctx.save()
     ctx.scale(s.w / W, s.h / H)
     // Ronde (v5.1) : le personnage se tourne dans le sens de la marche et
@@ -1096,9 +1180,11 @@ export function animated(type, rig = RIGS[type]) {
       if (ex.hurt) ctx.translate(Math.sin(t * 55 + seed) * 0.7, 0)
       else {
         // Respiration : le buste se soulève très légèrement, les pieds restent au sol.
+        // Il se ramasse (v6.1, repousser, bras levés) : écrasé depuis les pieds, jamais sous le sol.
         const b = Math.sin(t * 2.3 + seed * 5) * 0.014
+        const crouch = ((P.body.dy ?? 0) / H) * 1.2
         ctx.translate(P.body.dx, H / 2)
-        ctx.scale(1 - b * 0.4, 1 + b)
+        ctx.scale(1 - b * 0.4 + crouch * 0.3, 1 + b - crouch)
         ctx.translate(0, -H / 2)
       }
     }

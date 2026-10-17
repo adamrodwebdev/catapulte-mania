@@ -1,6 +1,7 @@
 import { Guard } from '../../core/utils/Guard.js'
 import { PROFILE_NAME } from '../../domain/SaveSlot.js'
 import { NO_EFFECTS } from '../progression/UpgradeCatalog.js'
+import { DRIVE } from '../drive/driveRules.js'
 
 /**
  * Règles d'une façon de jouer (patron Stratégie).
@@ -24,6 +25,57 @@ export class GameMode {
   coupDeGrace = false
   /** Un seul score pour l'équipe (campagne à deux) ? */
   sharedScore = false
+  /**
+   * Grands sièges (v6.0) : jouer les étapes suivantes d'une fin de chapitre
+   * (et leur général). Le siège sans fin ne joue que le premier château.
+   */
+  grandSiege = true
+  /**
+   * Jauge de destruction (v6.0) : abattre la moitié d'un château donne une
+   * pierre de plus. Pas au face-à-face (chacun son camp).
+   */
+  destructionGauge = true
+  /**
+   * Châteaux renforcés (v6.2, Campagne héroïque) : multiplicateurs des points
+   * de vie des blocs et des défenseurs, et de la solidité des jonctions ; null sinon.
+   * @type {{ blocks: number, targets: number, joints: number } | null}
+   */
+  fortify = null
+  /** Force du vent (v6.2, Campagne héroïque : plus fort). */
+  windFactor = 1
+  /**
+   * Deux camps face à face (v6.2 : le mode le dit, au lieu de son nom) : deux
+   * châteaux et deux engins en miroir ; ni pillards ni avaries de l'engin, ni
+   * suspense du dernier tir, ni répliques, ni fête de victoire.
+   */
+  twoCamps = false
+  /**
+   * Aides de la campagne (v6.2) : la trajectoire montrée aux premiers niveaux,
+   * les récompenses contre une vidéo (indice, pouvoir offert, dernier tir) et un
+   * premier niveau où l'engin ne roule pas encore. La campagne seule : ni ses
+   * variantes (héroïque, Terres du Duc, à deux, sans fin), ni les autres modes.
+   */
+  campaignAids = false
+
+  /** Trajectoire montrée aux premiers niveaux. */
+  get aimAssist() {
+    return this.campaignAids
+  }
+
+  /** Indice et pouvoir offerts contre une vidéo. */
+  get rewardVideos() {
+    return this.campaignAids
+  }
+
+  /** Dernier tir offert contre une vidéo, à la défaite. */
+  get lastShotOffer() {
+    return this.campaignAids
+  }
+
+  /** Premier niveau où l'engin roule (0 : partout). */
+  get driveFromLevel() {
+    return this.campaignAids ? DRIVE.FROM_LEVEL : 0
+  }
 
   /**
    * @param {{ players?: string[], effects?: object, completedLevels?: number }} [opts]

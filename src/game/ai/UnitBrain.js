@@ -36,13 +36,26 @@ export const REPAIR = Object.freeze({ WORK_MS: 1500, AMOUNT: 0.6, MIN_DAMAGE: 0.
 /**
  * Pillards (v5.8) : ce qu'ils portent, combien de coups ils donnent avant que
  * les servants de l'engin ne les repoussent, à quel rythme (ms), et leur allure.
+ * v6.1 : le saboteur et l'ogre chargent aussi ; ils n'avancent que pendant les
+ * tours (vol et retombées d'un tir, 5 s environ) et doivent arriver vers le
+ * troisième tir, sinon la menace ne se fait jamais sentir.
  */
 export const RAID = Object.freeze({
   STRIKES: { fire: 1, frost: 1, blow: 3, smash: 3 },
   EVERY_MS: { fire: 1100, frost: 1100, blow: 1300, smash: 1600 },
-  GAIT: { scout: 'charge', soldier: 'sprint', engineer: 'sprint', ogre: 'heavy' },
+  GAIT: { scout: 'charge', soldier: 'sprint', engineer: 'charge', ogre: 'stampede' },
+  /**
+   * Étape de course accordée par chaque tir (ms de monde, v6.2) : courue pendant
+   * le tour, puis au début de la visée si le tour a été bref. Le pillard arrive
+   * vers le troisième tir, quelle que soit la durée des tours.
+   */
+  LEG_MS: 5000,
   /** Chemin coupé (éboulis) : on réessaie un peu plus tard (ms). */
   RETRY_MS: 2500,
+  /** L'engin a roulé (v6.2) : au-delà de cet écart (px), le pillard recalcule sa course. */
+  REPLAN: 40,
+  /** Portée de ses coups : l'engin qui s'éloigne davantage met fin à l'assaut (px). */
+  REACH: 36,
 })
 /** Fuite devant le feu : distance d'alerte (px). */
 const FIRE_ALERT = 95
@@ -56,6 +69,8 @@ export const BEHAVIOURS = Object.freeze({
   scout: ['panic', 'raid', 'dodge', 'flee', 'patrol'],
   shieldbearer: ['panic', 'guard'],
   bannerman: ['panic', 'flee'],
+  // v6.0 : un général se replie sur ordre, s'abrite des tirs qu'il voit venir.
+  general: ['panic', 'retreat', 'cover', 'flee'],
   engineer: ['panic', 'raid', 'cover', 'flee', 'repair', 'patrol'],
 })
 
@@ -122,7 +137,10 @@ export class UnitBrain {
     // les servants le repoussent. S'il a été bousculé, il revient.
     if (this.#assault) {
       const a = this.#assault
-      if (Math.abs(u.x - a.x) > 30) {
+      // L'engin a roulé hors de portée (v6.2) : l'assaut cesse, il faudra le rattraper.
+      const engine = ctx.engines[0]
+      const gone = engine && Math.abs(engine.front + engine.dir * (u.width / 2 + 8) - u.x) > RAID.REACH
+      if (Math.abs(u.x - a.x) > 30 || gone) {
         this.#assault = null
       } else {
         u.facing = Math.sign(a.engineX - u.x) || u.facing
@@ -164,8 +182,10 @@ export class UnitBrain {
     const next = wp.ledge === ledge.id ? null : ctx.nav.ledge(wp.ledge)
     const span = next ? { x0: Math.min(ledge.x0, next.x0), x1: Math.max(ledge.x1, next.x1) } : ledge
     const goalX = next ? wp.x + Math.sign(wp.x - u.x || 1) * (u.width / 2 + 4) : wp.x
+    // Un pillard qui charge, un général qui se replie : ils passent entre leurs camarades.
+    const pushing = plan.kind === 'raid' || plan.kind === 'retreat'
     const r = steer({ x: u.x, vx: ctx.vx(u), halfW: u.width / 2 }, goalX, span, GAITS[plan.gait], {
-      allies: plan.kind === 'raid' ? [] : ctx.alliesOn(ledge.id, u),
+      allies: pushing ? [] : ctx.alliesOn(ledge.id, u),
       blocked: (dir) => ctx.blocked(u, dir),
       speedScale: plan.gait === 'walk' ? this.speedScale : 1,
     })
@@ -222,6 +242,9 @@ export class UnitBrain {
     } else if (plan.kind === 'raid') {
       const engine = ctx.engines[0]
       this.#assault = { x: this.unit.x, engineX: engine?.x ?? this.unit.x - 1, count: 0, nextAt: ctx.time + 350 }
+    } else if (plan.kind === 'retreat') {
+      this.unit.retreat = null
+      ctx.solid(this.unit)
     } else if (plan.kind === 'repair' && plan.data?.alive) {
       this.#workOn = plan.data
       this.#workUntil = ctx.time + REPAIR.WORK_MS
@@ -257,7 +280,8 @@ export class UnitBrain {
   /** En feu : course éperdue vers le bout le plus éloigné de sa corniche. */
   propose_panic(ctx, ledge) {
     const u = this.unit
-    if (!(u.burning > 0)) return null
+    // En feu, ou piqué par un essaim (v6.1) : il court droit devant lui.
+    if (!(u.burning > 0) && !(u.panicUntil > ctx.time)) return null
     const x = u.x - ledge.x0 > ledge.x1 - u.x ? ledge.x0 : ledge.x1
     return { kind: 'panic', goal: { x, ledge: ledge.id }, gait: 'sprint' }
   }
@@ -272,8 +296,9 @@ export class UnitBrain {
     if (!u.raid || !ctx.armed || ctx.time < this.#raidBlockedUntil) return null
     const engine = ctx.engines[0]
     if (!engine) return null
-    if (this.plan?.kind === 'raid') return this.plan
     const x = engine.front + engine.dir * (u.width / 2 + 8)
+    // En route : on garde sa course, sauf si l'engin a roulé (v6.2).
+    if (this.plan?.kind === 'raid' && Math.abs(this.plan.goal.x - x) <= RAID.REPLAN) return this.plan
     const goal = ctx.nav.ledgeAt(x, ctx.groundY)
     if (!goal || !findPath(ctx.nav, { x: u.x, ledge: ledge.id }, { x, ledge: goal.id }, { build: true })) {
       this.#raidBlockedUntil = ctx.time + RAID.RETRY_MS
@@ -286,6 +311,21 @@ export class UnitBrain {
       ctx.emit('raid', { entity: u })
     }
     return { kind: 'raid', goal: { x, ledge: goal.id }, gait: RAID.GAIT[u.type] ?? 'sprint' }
+  }
+
+  /** Général (v6.0) : sur son propre ordre de repli, il court à l'autre bout de son château. */
+  propose_retreat(ctx) {
+    const u = this.unit
+    if (!u.retreat) return null
+    if (this.plan?.kind === 'retreat') return this.plan
+    const goal = ctx.nav.ledgeAt(u.retreat.x, u.retreat.y)
+    if (!goal) {
+      u.retreat = null
+      return null
+    }
+    // Il se faufile entre ses gardes le temps du repli (voir #arrive).
+    ctx.passThrough(u)
+    return { kind: 'retreat', goal: { x: u.retreat.x, ledge: goal.id }, gait: 'sprint' }
   }
 
   /** Éclaireur : le projectile tombe près de lui → il file à l'endroit sûr le plus proche. */

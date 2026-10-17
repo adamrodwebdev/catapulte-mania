@@ -6,6 +6,9 @@ import { PROJECTILE_TYPES, PROJECTILE_NAMES } from './catalog.js'
 
 export { PROJECTILE_TYPES, PROJECTILE_NAMES }
 
+/** Vitesse (px par image) sous laquelle un boulet qui a touché ne fait plus que rouler (v6.2). */
+const ROLL_OUT_SPEED = 1.2
+
 /**
  * Projectile tiré par la catapulte.
  * Les pouvoirs spéciaux s'appliquent comme des modificateurs (composition) :
@@ -41,6 +44,19 @@ export class Projectile extends Entity {
     this.splittable = Boolean(t.splits || mods.splits)
     /** Boulet de givre : gèle ce qui l'entoure à l'impact (v5.0). */
     this.frost = Boolean(t.frost || mods.frost)
+    /** Orbe d'orage (v6.1) : décharge qui saute de défenseur en défenseur (voir THUNDER). */
+    this.thunder = Boolean(t.thunder || mods.thunder)
+    /** Pot de poison (v6.1) : il éclate en un nuage qui dérive au vent (voir POISON). */
+    this.poison = Boolean(t.poison || mods.poison)
+    /** Botte de paille (v6.1) : elle pousse sans rien casser ni blesser ; elle peut prendre feu. */
+    this.soft = Boolean(t.soft || mods.soft)
+    if (this.soft) this.impactFactor = 0
+    /**
+     * Tir élémentaire (v6.1) : il frappe mou, c'est l'élément qui agit (voir
+     * ELEMENT_HIT_CAP). Un carreau de baliste chargé d'un élément perd aussi de sa force.
+     */
+    this.element = t.element ?? (mods.ignites ? 'fire' : mods.frost ? 'frost' : mods.thunder ? 'thunder' : mods.poison ? 'poison' : null)
+    if (this.element && !t.element) this.impactFactor *= 0.35
     /** Carreau de baliste (v5.1) : traverse la roche des montagnes. */
     this.bolt = Boolean(t.bolt)
     /** Pouvoirs (v5.0) : Pierre d'aimant (attiré par les défenseurs), Météore (piqué au toucher). */
@@ -69,6 +85,19 @@ export class Projectile extends Entity {
     if (this.ignites) this.burning = Infinity
   }
 
+  /**
+   * Il prend feu (v6.1) : la botte de paille au contact des flammes, ou tout
+   * projectile dans le vent de braises (feu grégeois offert, voir WorldWinds).
+   * @returns {boolean} vrai s'il vient de s'enflammer
+   */
+  kindle() {
+    if (this.ignites || !this.alive || this.spent) return false
+    this.ignites = true
+    this.burning = Infinity
+    if (this.hasImpacted) this.heatMs = Math.max(this.heatMs, 4500)
+    return true
+  }
+
   /** Le joueur peut-il déclencher l'action spéciale en vol ? */
   get canActivate() {
     if (!this.alive || this.hasImpacted) return false
@@ -80,6 +109,15 @@ export class Projectile extends Entity {
     return false
   }
 
+  /**
+   * Il éclaire alentour (v6.2, lu par le dessin) : en feu, enflammé et encore en
+   * vol, ou toujours brûlant après le choc. Ce n'est pas `hot` (assez chaud pour
+   * enflammer ce qu'il touche) : un boulet usé éclaire encore.
+   */
+  get alight() {
+    return this.alive !== false && (this.burning > 0 || (this.ignites && !this.hasImpacted) || this.heatMs > 0)
+  }
+
   /** Le boulet est-il encore assez chaud pour enflammer ce qu'il touche ? */
   get hot() {
     return this.ignites && this.alive && !this.spent && (!this.hasImpacted || this.heatMs > 0)
@@ -87,7 +125,9 @@ export class Projectile extends Entity {
 
   update(dtMs) {
     this.ageMs += dtMs
-    if (this.speed < 0.45) this.restMs += dtMs
+    // Après l'impact (v6.2), un boulet qui ne fait plus que rouler doucement est
+    // retiré comme un boulet arrêté (la boule de neige qui grossit, elle, reste).
+    if (this.speed < (this.hasImpacted ? ROLL_OUT_SPEED : 0.45)) this.restMs += dtMs
     else this.restMs = 0
     if (this.hasImpacted && this.heatMs > 0) {
       this.heatMs = Math.max(0, this.heatMs - dtMs)

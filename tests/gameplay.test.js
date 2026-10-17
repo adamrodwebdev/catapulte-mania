@@ -48,7 +48,9 @@ test('l’aide à la trajectoire prédit exactement le vol réel', () => {
 
 test('étoiles : 3 en par tirs, puis de moins en moins avec les tirs', () => {
   for (const l of LevelRepository.all()) {
-    assert.ok(l.par >= 1 && l.par <= 2 && l.par <= l.star2 && l.star2 <= l.shots, `niveau ${l.id}`)
+    // Grand siège (v6.0) : le par de chaque étape s'ajoute à celui du premier château.
+    const stagePar = (l.stages ?? []).reduce((s, st) => s + st.par, 0)
+    assert.ok(l.par - stagePar >= 1 && l.par - stagePar <= 2 && l.par <= l.star2 && l.star2 <= l.shots, `niveau ${l.id}`)
     let prev = 3
     for (let n = 1; n <= l.shots + 3; n++) {
       const st = starsFor(l, n)
@@ -187,7 +189,8 @@ test('premiers pas : niveau 1 réglé pour toucher, trajectoire montrée jusqu�
 
 test('étoiles au nombre de tirs : 3 en un tir (deux pour les grands châteaux)', () => {
   for (const l of LevelRepository.all()) {
-    assert.ok(l.par === 1 || l.par === 2, `niveau ${l.id}`)
+    const stagePar = (l.stages ?? []).reduce((s, st) => s + st.par, 0)
+    assert.ok(l.par - stagePar === 1 || l.par - stagePar === 2, `niveau ${l.id}`)
     assert.ok(l.star2 >= l.par && l.star2 <= l.shots, `niveau ${l.id}`)
     assert.equal(l.achievements.length, 3, `niveau ${l.id}`)
     assert.equal(new Set(l.achievements).size, 3, `niveau ${l.id} : succès distincts`)
@@ -215,11 +218,15 @@ test('démo : vitrine des meilleures mécaniques, chacune présentée à sa prem
 })
 
 test('courbe de difficulté : châteaux plus loin, plus de décor, de barils et de défenseurs', () => {
-  const castleLeft = (l) => Math.min(...l.blocks.filter((b) => b.material !== 'rock').map((b) => b.x - b.w / 2))
+  // v6.2 : une aile s'accole devant le château ; on mesure donc son milieu (bloc médian), pas son premier bloc.
+  const castleMiddle = (l) => {
+    const xs = l.blocks.filter((b) => b.material !== 'rock').map((b) => b.x).sort((p, q) => p - q)
+    return xs[Math.floor(xs.length / 2)]
+  }
   const avg = (ids, f) => ids.reduce((s, id) => s + f(LevelRepository.get(id)), 0) / ids.length
   const early = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
   const late = [91, 92, 93, 94, 95, 96, 97, 98, 99, 100]
-  assert.ok(avg(late, castleLeft) > avg(early, castleLeft) + 300, 'plus éloignés')
+  assert.ok(avg(late, castleMiddle) > avg(early, castleMiddle) + 300, 'plus éloignés')
   assert.ok(avg(late, (l) => l.barrels.length) > avg(early, (l) => l.barrels.length) + 2, 'plus de barils')
   assert.ok(avg(late, (l) => l.targets.length) > avg(early, (l) => l.targets.length) + 3, 'plus de défenseurs')
   assert.ok(late.every((id) => LevelRepository.get(id).blocks.some((b) => b.material === 'rock')), 'décor rocheux en fin de partie')

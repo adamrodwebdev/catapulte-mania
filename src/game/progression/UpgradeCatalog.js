@@ -1,4 +1,5 @@
 import { Guard, deepFreeze } from '../../core/utils/Guard.js'
+import { MASTERY_TOTAL } from './Mastery.js'
 
 /**
  * Améliorations achetables à l'atelier avec l'or gagné en jouant.
@@ -12,21 +13,30 @@ import { Guard, deepFreeze } from '../../core/utils/Guard.js'
  */
 export class Upgrade {
   /**
-   * @param {{ id: string, icon: string, costs: number[], stars: number[], effect: (level: number) => object }} def
-   *   `stars[i]` : étoiles de campagne exigées pour acheter le niveau i+1
+   * @param {{ id: string, icon: string, costs: number[], stars: number[], heroic?: number[], effect: (level: number) => object }} def
+   *   `stars[i]` : étoiles de campagne exigées pour acheter le niveau i+1 ;
+   *   `heroic` (v6.2) : prix des paliers héroïques, au-delà des paliers ordinaires,
+   *   ouverts seulement par la Campagne héroïque (toutes les étoiles exigées)
    */
-  constructor({ id, icon, costs, stars, effect }) {
+  constructor({ id, icon, costs, stars, heroic = [], effect }) {
     this.id = Guard.string(id, 'upgrade id', { pattern: /^[a-z]+$/ })
     this.icon = icon
-    this.costs = Object.freeze(costs.map((c) => Guard.int(c, 'cost', { min: 1, max: 100000 })))
-    this.stars = Object.freeze(stars.map((n) => Guard.int(n, 'stars', { min: 0, max: 300 })))
-    if (this.stars.length !== this.costs.length) throw new Error(`upgrade ${id}: stars/costs mismatch`)
+    if (stars.length !== costs.length) throw new Error(`upgrade ${id}: stars/costs mismatch`)
+    /** Nombre de paliers ordinaires (les suivants sont héroïques). */
+    this.base = costs.length
+    this.costs = Object.freeze([...costs, ...heroic].map((c) => Guard.int(c, 'cost', { min: 1, max: 100000 })))
+    this.stars = Object.freeze([...stars, ...heroic.map(() => MASTERY_TOTAL)].map((n) => Guard.int(n, 'stars', { min: 0, max: MASTERY_TOTAL })))
     this.effect = effect
     Object.freeze(this)
   }
 
   get maxLevel() {
     return this.costs.length
+  }
+
+  /** Le palier `level` (1 = premier) est-il héroïque ? */
+  isHeroic(level) {
+    return level > this.base
   }
 
   /** Prix du prochain niveau, ou null si le maximum est atteint. */
@@ -46,13 +56,15 @@ export class Upgrade {
 }
 
 export class Cosmetic {
-  /** @param {{ id: string, slot: 'skin' | 'trail', cost: number, event?: string | null }} def */
-  constructor({ id, slot, cost, event = null }) {
+  /** @param {{ id: string, slot: 'skin' | 'trail', cost: number, event?: string | null, reward?: string | null }} def */
+  constructor({ id, slot, cost, event = null, reward = null }) {
     this.id = Guard.string(id, 'cosmetic id', { pattern: /^[a-z]+$/ })
     this.slot = Guard.oneOf(slot, ['skin', 'trail'], 'cosmetic slot')
     this.cost = Guard.int(cost, 'cost', { min: 0, max: 100000 })
     /** Cosmétique d'événement (v4.0) : ne s'achète pas, il se gagne pendant l'événement. */
     this.event = event === null ? null : Guard.oneOf(event, ['halloween', 'winter'], 'cosmetic event')
+    /** Récompense (v6.2) : offerte à la maîtrise du royaume, jamais vendue. */
+    this.reward = reward === null ? null : Guard.oneOf(reward, ['mastery'], 'cosmetic reward')
     Object.freeze(this)
   }
 }
@@ -64,21 +76,24 @@ export class Cosmetic {
  * bien qu'on ne peut pas tout acheter : il faut choisir son style de jeu
  * (puissance brute, munitions, feu, poudre, tactique).
  */
+// v6.2 : un palier héroïque de plus par amélioration (Campagne héroïque), payé avec
+// l'or des défis : une campagne parfaite en rapporte 42 500, l'atelier ordinaire
+// en coûte 26 870, les paliers héroïques 15 600 (tout reste à la portée du perfectionniste).
 const UPGRADES = Object.freeze([
   // Bras renforcé : vitesse de lancer +7 % par niveau (énergie de choc +15 % environ).
-  new Upgrade({ id: 'arm', icon: 'fist', costs: [300, 700, 1300, 2200], stars: [0, 30, 90, 180], effect: (l) => ({ speedFactor: 1 + 0.07 * l }) }),
+  new Upgrade({ id: 'arm', icon: 'fist', costs: [300, 700, 1300, 2200], stars: [0, 30, 90, 180], heroic: [2400], effect: (l) => ({ speedFactor: 1 + 0.07 * l }) }),
   // Boulets lestés : projectiles +20 % plus lourds par niveau.
-  new Upgrade({ id: 'ballast', icon: 'target', costs: [250, 600, 1100, 1900], stars: [0, 25, 80, 170], effect: (l) => ({ massFactor: 1 + 0.2 * l }) }),
+  new Upgrade({ id: 'ballast', icon: 'target', costs: [250, 600, 1100, 1900], stars: [0, 25, 80, 170], heroic: [2000], effect: (l) => ({ massFactor: 1 + 0.2 * l }) }),
   // Poix : le feu grégeois embrase une zone plus large (+35 % par niveau).
-  new Upgrade({ id: 'pitch', icon: 'flame', costs: [350, 900, 1600], stars: [10, 50, 120], effect: (l) => ({ fireFactor: 1 + 0.35 * l }) }),
+  new Upgrade({ id: 'pitch', icon: 'flame', costs: [350, 900, 1600], stars: [10, 50, 120], heroic: [1600], effect: (l) => ({ fireFactor: 1 + 0.35 * l }) }),
   // Poudre fine : explosions plus larges et plus destructrices (+15 % par niveau).
-  new Upgrade({ id: 'powder', icon: 'bomb', costs: [450, 1100, 2000], stars: [20, 70, 150], effect: (l) => ({ blastFactor: 1 + 0.15 * l }) }),
+  new Upgrade({ id: 'powder', icon: 'bomb', costs: [450, 1100, 2000], stars: [20, 70, 150], heroic: [2200], effect: (l) => ({ blastFactor: 1 + 0.15 * l }) }),
   // Réserve : +1 munition spéciale de chaque type proposé par le niveau.
-  new Upgrade({ id: 'quiver', icon: 'volley', costs: [500, 1200, 2200], stars: [15, 60, 140], effect: (l) => ({ extraAmmo: l }) }),
+  new Upgrade({ id: 'quiver', icon: 'volley', costs: [500, 1200, 2200], stars: [15, 60, 140], heroic: [2400], effect: (l) => ({ extraAmmo: l }) }),
   // Stratège : les pouvoirs coûtent 15 % de points en moins par niveau.
-  new Upgrade({ id: 'tactics', icon: 'crown', costs: [400, 1000], stars: [10, 60], effect: (l) => ({ powerCostFactor: 1 - 0.15 * l }) }),
+  new Upgrade({ id: 'tactics', icon: 'crown', costs: [400, 1000], stars: [10, 60], heroic: [1200], effect: (l) => ({ powerCostFactor: 1 - 0.15 * l }) }),
   // Éclaireur : un tir supplémentaire à chaque niveau.
-  new Upgrade({ id: 'scout', icon: 'map', costs: [1500, 3500], stars: [60, 200], effect: (l) => ({ extraShots: l }) }),
+  new Upgrade({ id: 'scout', icon: 'map', costs: [1500, 3500], stars: [60, 200], heroic: [3800], effect: (l) => ({ extraShots: l }) }),
 ])
 
 const COSMETICS = Object.freeze([
@@ -92,6 +107,9 @@ const COSMETICS = Object.freeze([
   // Événements saisonniers (v4.0) : offerts, jamais vendus.
   new Cosmetic({ id: 'pumpkin', slot: 'trail', cost: 0, event: 'halloween' }),
   new Cosmetic({ id: 'snow', slot: 'trail', cost: 0, event: 'winter' }),
+  // Maîtrise du royaume (v6.2) : l'Engin d'or et la Comète d'or (traînée d'étincelles).
+  new Cosmetic({ id: 'gold', slot: 'skin', cost: 0, reward: 'mastery' }),
+  new Cosmetic({ id: 'comet', slot: 'trail', cost: 0, reward: 'mastery' }),
 ])
 
 /** Effets neutres (aucune amélioration). */
@@ -118,7 +136,7 @@ export class UpgradeCatalog {
 
   /** Cosmétiques possédés d'office. */
   static defaults() {
-    return COSMETICS.filter((c) => c.cost === 0 && !c.event).map((c) => c.id)
+    return COSMETICS.filter((c) => c.cost === 0 && !c.event && !c.reward).map((c) => c.id)
   }
 
   /**

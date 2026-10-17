@@ -126,7 +126,8 @@ export function achievementsFor(level) {
     // Choix pseudo-aléatoire mais fixe (hachage du numéro de niveau) : les défis
     // varient d'un niveau à l'autre et restent les mêmes d'une partie à l'autre.
     const h = (Math.imul(level.id * 31 + f * 101 + 7, 2654435761) >>> 0) >>> 8
-    picked.push(pool[h % pool.length])
+    // Un tout petit château (atelier, tests) peut n'offrir aucun défi de plus.
+    if (pool.length) picked.push(pool[h % pool.length])
   })
   return picked
 }

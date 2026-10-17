@@ -11,10 +11,12 @@
  * projectile part toujours exactement du godet ou de la poche.
  */
 import { TREBUCHET_GEOMETRY } from '../../Trebuchet.js'
+import { CATAPULT_GEOMETRY, REST_ANGLE } from '../../Catapult.js'
 import { TAU, roundRect, edge, lightOver, timber, strap, rivet, rope, lashing, cached, resolution, sprite, blit, woodPattern, metalGradient } from './realism.js'
+import { ENGINE_GOLD } from './palette.js'
 
-/** Repère : origine au centre de la base, au sol. */
-export const CATAPULT_GEOMETRY = Object.freeze({ pivotX: 6, pivotY: -78, armLength: 118 })
+/** Géométrie du bras : celle de la physique (Catapult.js). */
+export { CATAPULT_GEOMETRY }
 
 /**
  * Apparences (atelier) : teinte posée sur le bois, ferrures, couleur du fanion.
@@ -25,9 +27,10 @@ export const CATAPULT_SKINS = Object.freeze({
   royal: { tint: 'rgba(47,75,124,0.32)', metal: '#d4a537', flag: '#2f4b7c' },
   ebony: { tint: 'rgba(20,16,30,0.5)', metal: '#b9b3a6', flag: '#1e1a2b' },
   dragon: { tint: 'rgba(163,50,43,0.32)', metal: '#ffb347', flag: '#a3322b' },
+  // Maîtrise du royaume (v6.2) : l'Engin d'or, sa bannière royale (liseré et couronne d'or).
+  gold: { tint: ENGINE_GOLD.tint, metal: ENGINE_GOLD.metal, flag: '#1f3a75', royal: true },
 })
 
-const REST_ANGLE = Math.PI - 0.25
 const FAR = 'rgba(12,8,6,0.38)'
 
 /** Voiles du bois : teinte de l'apparence, puis assombrissement du flanc éloigné. */
@@ -176,7 +179,7 @@ function endGrain(g, x, y, s, look) {
 
 /* ---------- Fanion (animé) ---------- */
 
-function pennant(ctx, x, yTop, yBase, color, time, px, dir = -1, length = 32) {
+function pennant(ctx, x, yTop, yBase, color, time, px, dir = -1, length = 32, { royal = false } = {}) {
   // Hampe.
   ctx.beginPath()
   ctx.moveTo(x, yBase)
@@ -224,6 +227,26 @@ function pennant(ctx, x, yTop, yBase, color, time, px, dir = -1, length = 32) {
   ctx.lineWidth = Math.max(0.5, 0.7 * px)
   ctx.strokeStyle = 'rgba(30,20,16,0.85)'
   ctx.stroke()
+  if (royal) {
+    // Bannière royale (v6.2) : liseré d'or, couronne d'or près de la hampe.
+    ctx.lineWidth = Math.max(1, 1.3 * px)
+    ctx.strokeStyle = '#f2c94c'
+    ctx.stroke()
+    const u = 0.3
+    const cx = x + dir * u * length
+    const cy = yTop + 1 + 7 * (1 - u * 0.92) + Math.sin(t * 6.5 - u * 5.2) * (1 + u * 4.2)
+    ctx.beginPath()
+    ctx.moveTo(cx - 3.6, cy + 2.2)
+    ctx.lineTo(cx - 3.6, cy - 1.6)
+    ctx.lineTo(cx - 1.8, cy)
+    ctx.lineTo(cx, cy - 2.8)
+    ctx.lineTo(cx + 1.8, cy)
+    ctx.lineTo(cx + 3.6, cy - 1.6)
+    ctx.lineTo(cx + 3.6, cy + 2.2)
+    ctx.closePath()
+    ctx.fillStyle = '#f2c94c'
+    ctx.fill()
+  }
 }
 
 /* ---------- Catapulte (mangonneau à torsion) ---------- */
@@ -232,11 +255,33 @@ const CAT_BOX_BACK = { x: -122, y: -150, w: 244, h: 160 }
 const CAT_BOX_FRONT = { x: -84, y: -102, w: 168, h: 112 }
 const CAT_BOX_ARM = { x: -20, y: -34, w: 166, h: 50 }
 
+/** Roues de la catapulte (v6.2) : elles tournent quand l'engin roule (x, y, flanc, graine). */
+const CAT_WHEELS = Object.freeze([
+  { x: -53, y: -15, far: true, seed: 11 },
+  { x: 63, y: -15, far: true, seed: 17 },
+  { x: -58, y: -12, far: false, seed: 41 },
+  { x: 58, y: -12, far: false, seed: 47 },
+])
+const WHEEL_R = 18
+const WHEEL_BOX = { x: -WHEEL_R - 2, y: -WHEEL_R - 2, w: WHEEL_R * 2 + 4, h: WHEEL_R * 2 + 4 }
+
+/** Une paire de roues (flanc éloigné ou proche), tournée de `roll` radians. */
+function drawWheels(ctx, look, skin, far, roll) {
+  const res = resolution(ctx, 3)
+  for (const w of CAT_WHEELS) {
+    if (w.far !== far) continue
+    const img = sprite(`cat.wheel.${skin}.${far ? 'far' : 'near'}.${w.seed}`, WHEEL_BOX, res, (g) => spokedWheel(g, 0, 0, WHEEL_R, look, far, w.seed))
+    ctx.save()
+    ctx.translate(w.x, w.y)
+    if (roll) ctx.rotate(roll)
+    blit(ctx, img, WHEEL_BOX, res)
+    ctx.restore()
+  }
+}
+
 function catapultBack(g, look) {
   const { pivotX, pivotY } = CATAPULT_GEOMETRY
-  // Flanc éloigné : roues et montants, décalés et assombris.
-  spokedWheel(g, -53, -15, 18, look, true, 11)
-  spokedWheel(g, 63, -15, 18, look, true, 17)
+  // Flanc éloigné : montants, décalés et assombris (les roues sont dessinées à part, v6.2).
   const far = woodTint(look, true)
   timber(g, -36, -28, pivotX + 4, pivotY - 3, 11, { w2: 10, tint: far, seed: 3 })
   timber(g, 56, -28, pivotX + 6, pivotY - 3, 11, { w2: 10, tint: far, seed: 4 })
@@ -322,9 +367,6 @@ function catapultFront(g, look) {
   g.restore()
   // Levier de serrage (barre carrée passée dans la rondelle).
   timber(g, cx - 16, cy + 9, cx + 17, cy - 10, 3.6, { tint: look.tint, seed: 33 })
-  // Roues du flanc proche.
-  spokedWheel(g, -58, -12, 18, look, false, 41)
-  spokedWheel(g, 58, -12, 18, look, false, 47)
 }
 
 function catapultArm(g, look) {
@@ -382,10 +424,11 @@ function catapultArm(g, look) {
 }
 
 function catapult(ctx, s) {
-  const { armAngle = REST_ANGLE, load = null, loadRadius = 16, registry = null, skin = 'oak', flag = null, armSpeed = 0, still = false } = s.extra ?? {}
+  const { armAngle = REST_ANGLE, load = null, loadRadius = 16, registry = null, skin = 'oak', flag = null, armSpeed = 0, still = false, roll = 0 } = s.extra ?? {}
   const look = CATAPULT_SKINS[skin] || CATAPULT_SKINS.oak
   const { pivotX, pivotY, armLength } = CATAPULT_GEOMETRY
   const px = s.pixel ?? 1
+  drawWheels(ctx, look, skin, true, roll)
   cached(ctx, `cat.back.${skin}`, CAT_BOX_BACK, (g) => catapultBack(g, look), 3)
   // Corde de rappel : tendue entre le treuil et le bras tant qu'il est armé.
   if (Math.abs(armSpeed) < 1.5 && armAngle > REST_ANGLE - 0.04 && armAngle < REST_ANGLE + 0.45) {
@@ -419,8 +462,9 @@ function catapult(ctx, s) {
     ctx.restore()
   }
   cached(ctx, `cat.front.${skin}`, CAT_BOX_FRONT, (g) => catapultFront(g, look), 3)
+  drawWheels(ctx, look, skin, false, roll)
   const banner = flag || look.flag
-  if (banner) pennant(ctx, pivotX + 32, -178, -134, banner, still ? 0 : s.time, px)
+  if (banner) pennant(ctx, pivotX + 32, -178, -134, banner, still ? 0 : s.time, px, -1, look.royal ? 40 : 32, { royal: look.royal && !flag })
 }
 
 /* ---------- Trébuchet à contrepoids ---------- */
@@ -663,7 +707,7 @@ function trebuchet(ctx, s) {
 
   cached(ctx, `treb.front.${skin}`, TB_BOX_FRONT, (g) => trebuchetFront(g, look), 3)
   const banner = flag || look.flag
-  if (banner) pennant(ctx, -100, -98, -26, banner, still ? 0 : s.time, px)
+  if (banner) pennant(ctx, -100, -98, -26, banner, still ? 0 : s.time, px, -1, look.royal ? 40 : 32, { royal: look.royal && !flag })
 }
 
 export { catapult, trebuchet }

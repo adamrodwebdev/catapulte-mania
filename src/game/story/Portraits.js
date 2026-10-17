@@ -8,10 +8,11 @@ export { CHARACTERS }
  * Les personnages de la Chronique, dessinés par le code.
  *
  * Aucun fichier image : chaque portrait est une palette et une suite de pixels
- * compressée (voir scripts/portraits/encode.py), décodée une seule fois puis
+ * compressée (voir scripts/portraits/encode.mjs), décodée une seule fois puis
  * peinte dans un <canvas>. L'agrandissement se fait en CSS avec
  * `image-rendering: pixelated` : le pixel art reste net à toutes les tailles,
- * pour 16 Ko compressés au total (contre 14 Mo pour les illustrations d'origine).
+ * pour moins de 50 Ko compressés pour les treize personnages, chargés au premier
+ * portrait affiché (contre plus de 14 Mo pour les illustrations d'origine).
  */
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'

@@ -3,8 +3,11 @@ import { computed, onBeforeUnmount, onMounted, ref, markRaw } from 'vue'
 import { useApp } from '../../app/AppContext.js'
 import AppIcon from '../ui/AppIcon.vue'
 import ModalPanel from '../ui/ModalPanel.vue'
-import { emptyDesign, placePart, removeAt, CastleCode, PARTS, LIMITS, STORAGE_KEYS } from '../../game/editor/CastleDesign.js'
+import { placePart, removeAt, CastleCode, PARTS, LIMITS, DESIGN_AMMO } from '../../game/editor/CastleDesign.js'
 import { BUILD_MATERIALS } from '../../game/entities/materials.js'
+import { CastleDraftService } from '../../services/CastleDraftService.js'
+import { PROFILE_NAME } from '../../domain/SaveSlot.js'
+import { GAME } from '../../config/gameConfig.js'
 
 /**
  * Atelier de châteaux (v4.0) : construire, tester, partager.
@@ -16,10 +19,14 @@ import { BUILD_MATERIALS } from '../../game/entities/materials.js'
 const app = useApp()
 const { state, t } = app
 const TOOLS = ['room', 'wall', 'plank', 'base', 'roof', 'soldier', 'knight', 'king', 'barrel', 'erase']
+/** Décors possibles : ceux des chapitres de la campagne. */
+const THEMES = GAME.LEVEL_COUNT / GAME.LEVELS_PER_CHAPTER
+/** Brouillon et château vérifié, gardés sur l'appareil (v6.2 : un service, plus l'écran). */
+const drafts = new CastleDraftService(app.services.storage)
 const canvas = ref(null)
 let view = null
 let ro = null
-const design = ref(loadDraft())
+const design = ref(drafts.loadDraft())
 const tool = ref('room')
 const material = ref('wood')
 const history = []
@@ -27,23 +34,6 @@ const cursorX = ref(1500)
 const showSettings = ref(false)
 const share = ref({ state: 'idle', url: '' })
 const message = ref('')
-
-function loadDraft() {
-  try {
-    const code = app.services.storage.readJson(STORAGE_KEYS.draft)
-    if (typeof code === 'string') return CastleCode.decode(code, { draft: true })
-  } catch {
-    /* brouillon illisible : on repart d'un château vide */
-  }
-  return emptyDesign()
-}
-function saveDraft() {
-  try {
-    app.services.storage.writeJson(STORAGE_KEYS.draft, CastleCode.encode(design.value))
-  } catch {
-    /* sans stockage : le brouillon vit le temps de la session */
-  }
-}
 
 const code = computed(() => {
   try {
@@ -57,14 +47,7 @@ const counts = computed(() => ({
   targets: design.value.parts.filter((p) => PARTS[p.kind].target).length,
 }))
 // Château déjà pris par son auteur (dans cette session, ou mémorisé sur l'appareil).
-if (!state.editorVerified) {
-  try {
-    const saved = app.services.storage.readJson(STORAGE_KEYS.verified)
-    if (typeof saved === 'string' && saved.length <= 4000) state.editorVerified = saved
-  } catch {
-    /* rien de mémorisé */
-  }
-}
+app.restoreVerifiedCastle()
 const verified = computed(() => Boolean(code.value) && state.editorVerified === code.value)
 const playable = computed(() => counts.value.targets > 0)
 
@@ -72,7 +55,7 @@ function changed() {
   design.value = { ...design.value, parts: [...design.value.parts] }
   share.value = { state: 'idle', url: '' }
   view?.setDesign(design.value)
-  saveDraft()
+  drafts.saveDraft(design.value)
 }
 function snapshot() {
   history.push(JSON.stringify(design.value))
@@ -163,7 +146,8 @@ function setAmmo(type, value) {
   design.value = { ...design.value, ammo: { ...design.value.ammo, [type]: Math.max(0, Math.min(5, value)) } }
   changed()
 }
-const nameError = computed(() => design.value.name !== '' && !/^[\p{L}\p{N}][\p{L}\p{N} _'-]{0,15}$/u.test(design.value.name))
+/** Nom du château : la règle des noms de profil (SaveSlot.PROFILE_NAME). */
+const nameError = computed(() => design.value.name !== '' && !PROFILE_NAME.test(design.value.name))
 
 onMounted(async () => {
   const { assets } = await import('../../game/GameController.js')
@@ -236,7 +220,7 @@ onBeforeUnmount(() => ro?.disconnect())
         <label class="field">
           <span class="field__label">{{ t('editor.theme') }}</span>
           <select class="input" :value="design.theme" @change="setting('theme', Number($event.target.value))">
-            <option v-for="n in 10" :key="n" :value="n">{{ t(`levels.chapters.${n}`) }}</option>
+            <option v-for="n in THEMES" :key="n" :value="n">{{ t(`levels.chapters.${n}`) }}</option>
           </select>
         </label>
         <label class="field">
@@ -250,9 +234,9 @@ onBeforeUnmount(() => ro?.disconnect())
         <fieldset class="field">
           <legend class="field__label">{{ t('game.ammoTitle') }}</legend>
           <div class="editor__ammo">
-            <label v-for="a in ['boulder', 'fire', 'frost', 'bomb', 'split']" :key="a" class="editor__ammo-item">
+            <label v-for="a in DESIGN_AMMO" :key="a" class="editor__ammo-item">
               <span>{{ t(`game.ammo.${a}`) }}</span>
-              <input class="input" type="number" min="0" max="5" :value="design.ammo[a]" @change="setAmmo(a, Number($event.target.value) || 0)">
+              <input class="input" type="number" min="0" max="5" :value="design.ammo[a] ?? 0" @change="setAmmo(a, Number($event.target.value) || 0)">
             </label>
           </div>
         </fieldset>

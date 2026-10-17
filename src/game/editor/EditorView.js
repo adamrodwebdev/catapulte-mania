@@ -12,6 +12,10 @@ import { buildInto, PARTS, ZONE, surfaceAt } from './CastleDesign.js'
  * Vue de l'atelier de châteaux : le château dessiné avec les mêmes visuels
  * que le jeu (aucune physique : la construction est immobile), la zone
  * constructible et la silhouette de la pièce sur le point d'être posée.
+ *
+ * v6.2 : le décor est celui de la partie, fond peint du chapitre compris. La vue
+ * est immobile (son horloge reste à 0) : la peinture paraît d'un coup, sans
+ * fondu, et la vue se redessine dès qu'elle est chargée.
  */
 export class EditorView {
   #canvas
@@ -21,10 +25,12 @@ export class EditorView {
   #entities = []
   #theme = 1
   #ghost = null
+  /** Chapitre dont on attend le fond peint (v6.2). */
+  #artPending = null
 
   constructor(canvas, assets) {
     this.#canvas = canvas
-    this.#renderer = new Renderer(canvas, assets)
+    this.#renderer = new Renderer(canvas, assets, { artFadeMs: 0 })
     this.#camera.follow = false
     this.#camera.shakeEnabled = false
     this.#camera.setFocus(ZONE.left - 120, ZONE.right + 80, ZONE.top - 60)
@@ -42,7 +48,17 @@ export class EditorView {
     buildInto(b, design)
     this.#entities = [...b.blocks.map((x) => new Block(x)), ...b.barrels.map((x) => new Barrel(x)), ...b.targets.map((x) => new Target(x))]
     this.#theme = design.theme
+    this.#awaitArt(design.theme)
     this.render()
+  }
+
+  /** Le fond peint du chapitre arrive après coup (v6.2) : on redessine dès qu'il est prêt. */
+  #awaitArt(theme) {
+    if (this.#artPending === theme) return
+    this.#artPending = theme
+    this.#renderer.art.whenReady(theme).then((ok) => {
+      if (ok && this.#theme === theme) this.render()
+    })
   }
 
   /** Coordonnées monde d'un point de l'écran (pointeur). */

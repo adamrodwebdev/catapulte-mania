@@ -9,6 +9,10 @@ import { AimInput } from './aim/AimInput.js'
 import { TREB_TUNING, TrebuchetInput } from './aim/TrebuchetInput.js'
 import { BALLISTA_AIM } from './Ballista.js'
 import { AIM } from './aim.js'
+import { ClipRecorder } from '../services/ClipRecorder.js'
+
+/** Moments forts (v6.0) : la prise continue un instant après le retour au calme (ms). */
+const CLIP_POST_ROLL_MS = 900
 
 const TAP_MAX_MS = 320
 
@@ -44,6 +48,8 @@ export class GameController extends EventBus {
   #drag = null
   /** Relâcher après avoir tiré vers l'arrière déclenche le tir (sauf « visée précise »). */
   #releaseToFire = true
+  /** Contraste élevé (réglage, v6.2) : le rendu du canevas s'y adapte aussi. */
+  #highContrast = false
   #hudTimer = 0
   /** Durée moyenne d'une image (ms), pour alléger les effets sur un appareil lent. */
   #frameAvg = 16.7
@@ -58,6 +64,11 @@ export class GameController extends EventBus {
   #trebPress = null
   /** Sifflement du projectile en vol (v5.7). */
   #flight = null
+  /** Moments forts (v6.0) : caméra du canevas, état précédent, bilan du tir filmé. */
+  #clips = null
+  #clipState = null
+  #clipStart = null
+  #clipTimer = null
 
   /**
    * @param {HTMLCanvasElement} canvas
@@ -70,12 +81,14 @@ export class GameController extends EventBus {
     return c
   }
 
-  constructor(canvas, level, { difficulty, completedLevels, settings, reducedMotion, audio, haptics, effects, mode, continueOffer = false, engine = 'catapult', replay = null, season = null, translate = null }, registry) {
+  constructor(canvas, level, { difficulty, completedLevels, settings, reducedMotion, audio, haptics, effects, mode, continueOffer = false, engine = 'catapult', replay = null, season = null, translate = null, luck = 0 }, registry) {
     super()
     this.#canvas = canvas
     this.#audio = audio
     this.#haptics = haptics
     this.#renderer = new Renderer(canvas, registry)
+    // Fond peint du chapitre (v6.2) : chargé dès l'ouverture, pendant l'introduction du niveau.
+    this.#renderer.art.preload(level.chapter)
     this.session = new GameSession(level, {
       difficulty,
       completedLevels,
@@ -84,6 +97,7 @@ export class GameController extends EventBus {
       screenShake: settings.screenShake,
       blood: settings.blood,
       screams: settings.screams !== false,
+      healthBars: settings.healthBars !== false,
       startPower: settings.startPower,
       effects,
       continueOffer,
@@ -91,20 +105,31 @@ export class GameController extends EventBus {
       slowSwing: settings.slowSwing === true,
       replay: Array.isArray(replay),
       season,
+      luck,
     }, mode)
     if (Array.isArray(replay)) this.#replayer = new ReplayPlayer(this.session, replay)
     const bounds = this.session.engine === 'ballista' ? BALLISTA_AIM : AIM
     this.#aim = new AimInput({ minAngle: bounds.MIN_ANGLE, maxAngle: bounds.MAX_ANGLE, dir: this.session.catapult.dir })
     this.#aim.set(this.session.catapult.angle, this.session.catapult.power)
     this.#releaseToFire = settings.preciseAim !== true
+    this.#highContrast = settings.contrast === 'high'
     const focus = this.session.focus
+    // Moments forts : seulement si le réglage le permet et que le navigateur sait filmer.
+    if (settings.highlights === true && !Array.isArray(replay) && ClipRecorder.supported(canvas)) this.#clips = new ClipRecorder(canvas)
     this.session.camera.setFocus(focus.left, focus.right, focus.top)
     this.session.on('hud', (h) => this.emit('hud', h))
     this.session.on('announce', (a) => this.emit('announce', a))
     this.session.on('end', (e) => this.emit('end', e))
     this.session.on('turn', (e) => this.emit('turn', e))
     this.session.on('offer', (e) => this.emit('offer', e))
+    // Grands sièges et généraux (v6.0) : bannières, barre du général.
+    this.session.on('stage', (e) => this.emit('stage', e))
+    this.session.on('general', (e) => this.emit('general', e))
     this.session.on('feedback', (f) => this.#feedback(f))
+    // Répliques des défenseurs et des généraux (v6.0) : bulles traduites, dans la scène.
+    this.session.on('bark', ({ key, x, y, tone }) => {
+      this.session.particles.bubble(x, y, translate ? translate(key) : key, { tone })
+    })
     // Enchaînements : titre traduit, dessiné dans la scène (v5.7).
     this.session.on('callout', ({ key, tier, x, y }) => {
       const text = translate ? translate(`game.callout.${key}`) : key
@@ -117,6 +142,11 @@ export class GameController extends EventBus {
     this.session.camera.setInsets(Number(top), Number(bottom))
   }
 
+  /** Fonds peints (v6.2) : pour les outils et les essais (voir BackgroundArt.add). */
+  get backgroundArt() {
+    return this.#renderer.art
+  }
+
   get paused() {
     return this.#paused
   }
@@ -126,6 +156,7 @@ export class GameController extends EventBus {
     // Les niveaux de premiers pas gardent la trajectoire visible quel que soit le réglage.
     this.session.options.trajectoryAid = settings.trajectoryAid || this.session.assist
     this.#releaseToFire = settings.preciseAim !== true
+    this.#highContrast = settings.contrast === 'high'
     this.session.options.reducedMotion = reducedMotion
     this.session.camera.shakeEnabled = settings.screenShake && !reducedMotion
     this.session.options.blood = settings.blood
@@ -171,6 +202,7 @@ export class GameController extends EventBus {
         this.#tickAim(dt)
       }
       this.#flightSound()
+      this.#watchClip()
       this.#renderer.render(this.#sceneWithAim())
       this.#hudTimer += dt
       // En vol (et en visée quand le vent souffle en rafales), le HUD suit en continu.
@@ -187,6 +219,7 @@ export class GameController extends EventBus {
 
   #sceneWithAim() {
     const scene = this.session.scene()
+    scene.highContrast = this.#highContrast
     if (this.session.state === STATE.AIMING && this.session.engine !== 'trebuchet') {
       const c = this.session.catapult
       const bounds = this.session.engine === 'ballista' ? BALLISTA_AIM : AIM
@@ -220,6 +253,17 @@ export class GameController extends EventBus {
   /** Une relecture est-elle en cours ? */
   get replaying() {
     return this.#replayer !== null && !this.#replayer.done
+  }
+
+  /**
+   * Avancer (1), reculer (-1) ou s'arrêter (0) (v6.2). L'arrêt passe toujours,
+   * même en pause : un bouton relâché pendant la pause n'emmène pas l'engin.
+   * @param {-1|0|1} dir
+   */
+  drive(dir) {
+    if (this.#replayer || (dir !== 0 && this.#paused)) return false
+    if (dir !== 0) this.#audio.unlock()
+    return this.session.drive(dir)
   }
 
   trigger() {
@@ -446,6 +490,40 @@ export class GameController extends EventBus {
     return { dragging: true, fine: a.fine, cancelling: a.cancelling, anchor, pointer }
   }
 
+  /* ---------- Moments forts (v6.0) ---------- */
+
+  /**
+   * Filme chaque tir : départ au vol, arrêt un instant après le retour au
+   * calme. Sa valeur : défenseurs abattus, vies ôtées au général, coup de grâce.
+   */
+  #watchClip() {
+    if (!this.#clips) return
+    const s = this.session
+    const st = s.state
+    if (st === STATE.FLYING && this.#clipState !== STATE.FLYING && !this.#clips.recording) {
+      clearTimeout(this.#clipTimer)
+      this.#clipStart = { targets: s.targetsLeft, stage: s.stage, lives: s.council?.general.lives ?? 0 }
+      this.#clips.start()
+    } else if (this.#clipState === STATE.FLYING && st !== STATE.FLYING && this.#clipStart) {
+      const from = this.#clipStart
+      this.#clipStart = null
+      const stageWon = s.stage > from.stage || st === STATE.STAGE
+      const kills = stageWon ? from.targets : Math.max(0, from.targets - s.targetsLeft)
+      const hurt = s.stage === from.stage ? Math.max(0, from.lives - (s.council?.general.lives ?? from.lives)) : 0
+      const value = kills * 10 + hurt * 25 + (st === STATE.ENDED && s.targetsLeft === 0 ? 40 : 0) + (stageWon ? 15 : 0)
+      this.#clipTimer = setTimeout(() => this.#clips?.stop(value), CLIP_POST_ROLL_MS)
+    }
+    this.#clipState = st
+  }
+
+  /** La plus belle prise de la partie (une fois écrite), ou null. */
+  async highlight() {
+    if (!this.#clips) return null
+    // Une prise encore en cours (fin de partie) s'arrête maintenant.
+    await new Promise((r) => setTimeout(r, CLIP_POST_ROLL_MS + 50))
+    return this.#clips?.best() ?? null
+  }
+
   /* ---------- Retours sensoriels ---------- */
 
   #feedback({ sound, x = WORLD.WIDTH / 2, intensity = 1, caption, haptic }) {
@@ -487,6 +565,9 @@ export class GameController extends EventBus {
   destroy() {
     this.#flight?.stop()
     this.#flight = null
+    clearTimeout(this.#clipTimer)
+    this.#clips?.dispose()
+    this.#clips = null
     cancelAnimationFrame(this.#raf)
     this.#resizeObs?.disconnect()
     const cv = this.#canvas

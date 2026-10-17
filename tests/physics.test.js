@@ -160,21 +160,19 @@ test('un bloc en mouvement qui touche une cible la tue', () => {
   assert.ok(['crush', 'pinned'].includes(t.deathCause))
 })
 
-test('la moindre collision avec un objet en mouvement tue un personnage', () => {
+test('v6.1 : ce qui arrive lentement est repoussé, sans une égratignure', () => {
   const w = new PhysicsWorld(new EventBus())
   const t = w.add(new Target({ type: 'soldier', x: 1440, y: G - 25 }))
-  const k = w.add(new Target({ type: 'knight', x: 1800, y: G - 27 }))
   settle(w, 200)
   w.add(new Projectile('stone', 200, 200))
-  // Une simple botte de paille qui glisse doucement contre le soldat… et contre le chevalier.
+  // Une botte de paille qui glisse doucement contre le soldat : il la renvoie.
   const twig = w.add(new Block({ material: 'straw', x: 1463, y: G - 20, w: 16, h: 40 }))
   Matter.Body.setVelocity(twig.body, { x: -1.5, y: 0 })
-  const twig2 = w.add(new Block({ material: 'straw', x: 1828, y: G - 20, w: 16, h: 40 }))
-  Matter.Body.setVelocity(twig2.body, { x: -0.6, y: 0 })
-  settle(w, 200)
-  assert.equal(t.alive, false)
-  // v5.0 : le chevalier en armure encaisse un frôlement.
-  assert.equal(k.alive, true)
+  settle(w, 120)
+  assert.equal(t.alive, true)
+  assert.equal(t.hp, t.maxHp)
+  assert.ok(t.pushAt > 0, 'il a repoussé la paille')
+  assert.ok(twig.x > 1470, `la paille repart (x ${twig.x.toFixed(0)})`)
 })
 
 test('un personnage immobile au milieu de blocs immobiles reste en vie', () => {
@@ -247,17 +245,27 @@ test('un personnage endormi sur une planche retombe quand la planche disparaît'
   assert.ok(!t.alive || t.y > y0 + 100, `le personnage ne doit pas flotter (avant ${y0.toFixed(0)}, après ${t.y.toFixed(0)})`)
 })
 
-test('un personnage renversé trop longtemps est mis hors de combat', () => {
-  const w = new PhysicsWorld(new EventBus())
-  const t = w.add(new Target({ type: 'knight', x: 1440, y: G - 16, angle: 0 }))
-  Matter.Body.setAngle(t.body, Math.PI / 2)
-  Matter.Body.setPosition(t.body, { x: 1440, y: G - 16 })
-  t.damage(t.maxHp * 0.4) // déjà blessé
-  settle(w, 100)
-  w.add(new Projectile('stone', -300, 0))
-  settle(w, 400)
-  assert.equal(t.alive, false)
-  assert.equal(t.deathCause, 'knockout')
+test('v6.1 : renversé, un personnage perd des points de vie puis se relève ; trop blessé, il reste à terre', () => {
+  const lying = (hurt) => {
+    const w = new PhysicsWorld(new EventBus())
+    const t = w.add(new Target({ type: 'knight', x: 1440, y: G - 16, angle: 0 }))
+    Matter.Body.setAngle(t.body, Math.PI / 2)
+    Matter.Body.setPosition(t.body, { x: 1440, y: G - 16 })
+    t.damage(t.maxHp * hurt)
+    settle(w, 100)
+    w.add(new Projectile('stone', -300, 0))
+    return { w, t }
+  }
+  const a = lying(0)
+  settle(a.w, 260)
+  assert.equal(a.t.alive, true)
+  assert.ok(a.t.hp < a.t.maxHp * 0.7, `la chute lui a coûté (${a.t.hp.toFixed(0)} / ${a.t.maxHp})`)
+  settle(a.w, 500)
+  assert.ok(Math.abs(Math.sin(a.t.angle)) < 0.3, `il s'est relevé (angle ${a.t.angle.toFixed(2)})`)
+  const b = lying(0.7)
+  settle(b.w, 400)
+  assert.equal(b.t.alive, false)
+  assert.equal(b.t.deathCause, 'knockout')
 })
 
 test('le fer encaisse les boulets de pierre bien mieux que le bois', () => {

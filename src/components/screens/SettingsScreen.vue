@@ -1,4 +1,5 @@
 <script setup>
+import { ClipRecorder } from '../../services/ClipRecorder.js'
 import { computed } from 'vue'
 import { useApp } from '../../app/AppContext.js'
 import { GAME } from '../../config/gameConfig.js'
@@ -20,6 +21,8 @@ function onVolume(e, key = 'volume') {
   const v = Number(e.target.value) / 100
   if (Number.isFinite(v)) app.setSetting(key, Math.min(1, Math.max(0, v)))
 }
+/** Moments forts (v6.0) : réglage proposé seulement si le navigateur sait filmer le jeu. */
+const clipsSupported = typeof document !== 'undefined' && ClipRecorder.supported(document.createElement('canvas'))
 </script>
 
 <template>
@@ -49,6 +52,8 @@ function onVolume(e, key = 'volume') {
         <ToggleSwitch id="opt-shake" :model-value="s.screenShake" :label="t('settings.screenShake')" @update:model-value="set('screenShake')($event)" />
         <ToggleSwitch id="opt-blood" :model-value="s.blood" :label="t('settings.blood')" :description="t('settings.bloodDesc')" @update:model-value="set('blood')($event)" />
         <ToggleSwitch id="opt-screams" :model-value="s.screams !== false" :label="t('settings.screams')" :description="t('settings.screamsDesc')" @update:model-value="set('screams')($event)" />
+        <ToggleSwitch id="opt-health-bars" :model-value="s.healthBars !== false" :label="t('settings.healthBars')" :description="t('settings.healthBarsDesc')" @update:model-value="set('healthBars')($event)" />
+        <ToggleSwitch v-if="clipsSupported" id="opt-highlights" :model-value="s.highlights === true" :label="t('settings.highlights')" :description="t('settings.highlightsDesc')" @update:model-value="set('highlights')($event)" />
         <ToggleSwitch id="opt-haptics" :model-value="s.haptics" :label="t('settings.haptics')" :description="t('settings.hapticsDesc')" @update:model-value="set('haptics')($event)" />
       </section>
 

@@ -110,7 +110,7 @@ test('une ancienne sauvegarde (v1) est migrée sans perte', () => {
   assert.equal(slot.completedCount, 1)
   assert.equal(slot.gold, 0)
   assert.equal(slot.starCount, 3)
-  assert.equal(slot.toJSON().version, 9)
+  assert.equal(slot.toJSON().version, 11)
 })
 
 test('sauvegarde v2 : améliorations remboursées, or et étoiles conservés', () => {
@@ -146,7 +146,7 @@ test('v3 → v4 : succès renouvelés remis à zéro, or conservé', () => {
   // Or gagné au barème v3.1 (150 par niveau au plus) : 3 niveaux parfaits.
   const legacy = { ...v3, version: 3, legacyGold: 0, gold: 450, goldEarned: 450 }
   const slot = SaveSlot.fromJSON(0, legacy)
-  assert.equal(slot.toJSON().version, 9)
+  assert.equal(slot.toJSON().version, 11)
   assert.equal(slot.achievementCount, 0)
   assert.equal(slot.gold, 450)
   assert.equal(slot.starCount, 9)
@@ -155,11 +155,14 @@ test('v3 → v4 : succès renouvelés remis à zéro, or conservé', () => {
 test('le perfectionniste peut tout acheter à l’atelier', () => {
   const levels = Object.fromEntries(Array.from({ length: 100 }, (_, i) => [i + 1, { attempts: 1 }]))
   const upgrades = UpgradeCatalog.upgrades().reduce((sum, u) => sum + u.spentFor(u.maxLevel), 0)
+  const regular = UpgradeCatalog.upgrades().reduce((sum, u) => sum + u.spentFor(u.base), 0)
   const cosmetics = UpgradeCatalog.cosmetics().reduce((sum, c) => sum + c.cost, 0)
   const all = maxGoldFor(levels) - 100 * GOLD.REPLAY
+  // v6.2 : la campagne parfaite paie tout, paliers héroïques compris.
   assert.ok(all >= upgrades + cosmetics, `${all} < ${upgrades + cosmetics}`)
-  // Même sans les défis les plus durs (70 % relevés), l'atelier complet reste accessible.
+  // Même sans les défis les plus durs (70 % relevés), l'atelier ordinaire complet reste accessible
+  // (les paliers héroïques, eux, demandent la maîtrise).
   const most = 100 * (GOLD.FIRST_CLEAR + 3 * GOLD.PER_STAR) + Math.floor(300 * 0.7) * GOLD.PER_ACHIEVEMENT
-  assert.ok(most >= upgrades + cosmetics, `${most} < ${upgrades + cosmetics}`)
+  assert.ok(most >= regular + cosmetics, `${most} < ${regular + cosmetics}`)
   assert.ok(UpgradeCatalog.upgrades().every((u) => u.stars.every((n) => n <= 300)))
 })

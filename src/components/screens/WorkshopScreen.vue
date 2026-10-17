@@ -10,10 +10,11 @@ import ScreenHeader from '../ui/ScreenHeader.vue'
 /**
  * Atelier : dépenser l'or gagné en campagne.
  * Toutes les règles (prix, plafonds, solde) sont vérifiées par SaveSlot ;
- * l'écran ne fait qu'afficher et transmettre les demandes.
+ * l'écran ne fait qu'afficher ses offres (SaveSlot.upgradeOffer, v6.2) et
+ * transmettre les demandes.
  */
 const app = useApp()
-const { state, t } = app
+const { state, t, n } = app
 const profile = computed(() => state.profile)
 const message = ref('')
 
@@ -21,15 +22,8 @@ onMounted(() => {
   if (!profile.value) app.go('profiles', { replace: true })
 })
 
-const upgrades = computed(() =>
-  UpgradeCatalog.upgrades().map((u) => {
-    const level = profile.value?.upgrades[u.id] || 0
-    const cost = u.nextCost(level)
-    const stars = u.nextStars(level)
-    const starsOk = stars === null || stars <= (profile.value?.stars ?? 0)
-    return { id: u.id, icon: u.icon, level, max: u.maxLevel, cost, stars, starsOk, affordable: cost !== null && starsOk && cost <= (profile.value?.gold ?? 0) }
-  }),
-)
+/** Une offre par amélioration : palier, prix, étoiles exigées, palier héroïque fermé (voir ProfilePresenter). */
+const upgrades = computed(() => profile.value?.workshop ?? [])
 
 const cosmetics = computed(() =>
   ['skin', 'trail'].map((slot) => ({
@@ -40,6 +34,7 @@ const cosmetics = computed(() =>
         id: c.id,
         cost: c.cost,
         event: c.event,
+        reward: c.reward,
         owned: profile.value?.cosmetics.owned.includes(c.id),
         equipped: profile.value?.cosmetics[slot] === c.id,
         affordable: c.cost <= (profile.value?.gold ?? 0),
@@ -61,8 +56,9 @@ const storeEnabled = StoreService.enabled
 <template>
   <main v-if="profile" class="screen workshop">
     <ScreenHeader :title="t('workshop.title')" @back="app.go('levels')">
-      <p class="gold-badge" :aria-label="t('workshop.balance', { gold: profile.gold })">
-        <AppIcon name="coin" :size="20" />{{ profile.gold.toLocaleString(state.locale) }}
+      <p class="gold-badge">
+        <AppIcon name="coin" :size="20" /><span aria-hidden="true">{{ n(profile.gold) }}</span>
+        <span class="visually-hidden">{{ t('workshop.balance', { gold: profile.gold }) }}</span>
       </p>
     </ScreenHeader>
     <figure class="interlude workshop__host">
@@ -85,11 +81,17 @@ const storeEnabled = StoreService.enabled
           <div class="shop-item__text">
             <h3 class="shop-item__name">{{ t(`workshop.names.${u.id}`) }}</h3>
             <p class="shop-item__desc">{{ t(`workshop.desc.${u.id}`) }}</p>
-            <p class="pips" :aria-label="t('workshop.level', { n: u.level, max: u.max })">
-              <span v-for="i in u.max" :key="i" :class="['pips__pip', { 'pips__pip--on': i <= u.level }]" aria-hidden="true" />
+            <p class="pips">
+              <span v-for="i in u.max" :key="i" :class="['pips__pip', { 'pips__pip--on': i <= u.level, 'pips__pip--heroic': i > u.base }]" aria-hidden="true" />
+              <span class="visually-hidden">{{ t('workshop.level', { n: u.level, max: u.max }) }}</span>
             </p>
           </div>
-          <div v-if="u.cost !== null" class="shop-item__buy">
+          <!-- Palier héroïque fermé (v6.2) : on dit au joueur ce qui l'ouvre. -->
+          <p v-if="u.heroicLocked" class="shop-item__heroic">
+            <AppIcon name="lock" :size="16" />{{ profile.mastered ? t('workshop.heroicLocked') : t('workshop.heroicMastery') }}
+          </p>
+          <div v-else-if="u.cost !== null" class="shop-item__buy">
+            <span v-if="u.heroic" class="shop-item__tier"><AppIcon name="crown" :size="14" />{{ t('workshop.heroicTier') }}</span>
             <button type="button" class="btn btn--primary" :disabled="!u.affordable" @click="act('upgrade', u.id)">
               <AppIcon :name="u.starsOk ? 'coin' : 'lock'" :size="18" />{{ t('workshop.buy', { cost: u.cost }) }}
             </button>
@@ -111,6 +113,7 @@ const storeEnabled = StoreService.enabled
           <span v-if="c.equipped" class="look__state"><AppIcon name="check" :size="16" />{{ t('workshop.equipped') }}</span>
           <button v-else-if="c.owned" type="button" class="btn" @click="act('equip', c.id)">{{ t('workshop.equip') }}</button>
           <span v-else-if="c.event" class="look__state look__state--event">{{ t(`workshop.event.${c.event}`) }}</span>
+          <span v-else-if="c.reward" class="look__state look__state--event"><AppIcon name="lock" :size="14" />{{ t('workshop.reward') }}</span>
           <button v-else type="button" class="btn btn--primary" :disabled="!c.affordable" @click="act('cosmetic', c.id)">
             <AppIcon name="coin" :size="16" />{{ c.cost }}
           </button>

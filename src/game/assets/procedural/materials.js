@@ -9,6 +9,7 @@
  */
 import { SeededRandom } from '../../../core/utils/SeededRandom.js'
 import { TAU, EDGE, roundRect, lightOver, metalGradient, rivet, rope, woodPattern, ironPattern, noise, fbm, tile, pattern, cachedBudget } from './realism.js'
+import { THEMES } from './themes.js'
 
 /* ---------- Textures de base (256 × 256 pixels = 128 unités) ---------- */
 
@@ -405,32 +406,125 @@ const PAINT = {
     sh.addColorStop(1, 'rgba(20,14,8,0.4)')
     g.fillStyle = sh
     g.fillRect(-w / 2, -h / 2, w, h)
-    // Herbe et mousse : sur le dessus d'un plateau, le long des pentes d'un talus.
+    // v6.2 : relief et climat. Le soleil est à droite : flanc gauche à l'ombre,
+    // arête brisée depuis le sommet, corniches, éboulis au pied ; neige avec ses
+    // coulées en montagne et en hiver, sable au désert, touffes d'herbe ailleurs.
+    const theme = s.extra?.theme ?? 0
+    const rock = THEMES[theme]?.rock
+    const snowy = rock === 'snow'
+    const arid = rock === 'sand'
     g.lineCap = 'round'
     if (s.shape === 'triangle') {
-      g.beginPath()
-      g.moveTo(-w / 2, h / 2)
-      g.lineTo(0, -h / 2)
-      g.lineTo(w / 2, h / 2)
-      g.lineWidth = 7
-      g.strokeStyle = '#4f7a34'
-      g.stroke()
-      g.lineWidth = 2.5
-      g.strokeStyle = '#6c9a46'
-      g.stroke()
-    } else if (!s.spire) {
-      const grass = g.createLinearGradient(0, -h / 2, 0, -h / 2 + 7)
-      grass.addColorStop(0, '#6c9a46')
-      grass.addColorStop(1, '#3f6328')
-      g.fillStyle = grass
-      g.fillRect(-w / 2, -h / 2, w, 6)
-      g.strokeStyle = '#5d8a3b'
-      g.lineWidth = 0.9
-      for (let x = -w / 2 + 2; x < w / 2; x += r.range(2.5, 5)) {
+      const apexY = -h / 2
+      // Sable du désert : un voile chaud et des rides de vent.
+      if (arid) {
+        g.fillStyle = 'rgba(214,176,112,0.32)'
+        g.fillRect(-w / 2, -h / 2, w, h)
+        g.strokeStyle = 'rgba(255,236,196,0.25)'
+        g.lineWidth = 1
+        for (let y = -h / 2 + 14; y < h / 2; y += r.range(9, 15)) {
+          g.beginPath()
+          for (let x = -w / 2; x <= w / 2; x += 10) g.lineTo(x, y + Math.sin(x / 9 + y) * 1.4)
+          g.stroke()
+        }
+      }
+      // Corniches : un rebord clair, une ombre dessous.
+      for (let i = 0; i < Math.max(2, Math.round(h / 45)); i++) {
+        const y = r.range(apexY + h * 0.2, h / 2 - 12)
+        const half = ((y - apexY) / h) * (w / 2)
+        const x = r.range(-half * 0.7, half * 0.7)
+        const len = r.range(10, 26)
+        g.lineWidth = 1.6
+        g.strokeStyle = 'rgba(255,238,214,0.28)'
         g.beginPath()
-        g.moveTo(x, -h / 2 + 4)
-        g.lineTo(x + r.range(-1.5, 1.5), -h / 2 + 4 + r.range(2, 6))
+        g.moveTo(x, y)
+        g.lineTo(x + len, y - len * 0.12)
         g.stroke()
+        g.strokeStyle = 'rgba(22,16,10,0.45)'
+        g.lineWidth = 1.2
+        g.beginPath()
+        g.moveTo(x + 1, y + 2)
+        g.lineTo(x + len - 2, y + 2 - len * 0.12)
+        g.stroke()
+      }
+      // Neige : au-dessus d'une ligne déchiquetée, des coulées dans les ravines (découpée dans le rocher).
+      if (snowy && h >= 90) {
+        const line = apexY + h * (THEMES[theme]?.rockSnowLine ?? 0.3)
+        g.beginPath()
+        g.moveTo(-w / 2, apexY - 2)
+        for (let x = -w / 2; x <= w / 2; x += 6) {
+          const drip = r.next() < 0.3 ? r.range(6, 22) : 0
+          g.lineTo(x, line + Math.sin(x / 11) * 4 + drip)
+        }
+        g.lineTo(w / 2, apexY - 2)
+        g.closePath()
+        g.fillStyle = 'rgba(247,250,253,0.97)'
+        g.fill()
+      }
+      // Flanc à l'ombre : de l'arête au pied gauche.
+      g.beginPath()
+      g.moveTo(0, apexY)
+      let sx = 0
+      for (let k = 1; k <= 6; k++) {
+        sx += r.range(-0.03, 0.05) * w
+        g.lineTo(sx, apexY + (h * k) / 6)
+      }
+      g.lineTo(-w / 2, h / 2)
+      g.closePath()
+      g.fillStyle = 'rgba(20,24,40,0.24)'
+      g.fill()
+      // Éboulis au pied.
+      for (let i = 0; i < Math.round(w / 22); i++) {
+        const bx = r.range(-w / 2 + 6, w / 2 - 6)
+        const br = r.range(2.5, 6)
+        g.beginPath()
+        g.ellipse(bx, h / 2 - br * 0.6, br, br * 0.7, 0, 0, TAU)
+        g.fillStyle = r.next() < 0.5 ? 'rgba(120,108,96,0.9)' : 'rgba(84,74,64,0.9)'
+        g.fill()
+      }
+      // Touffes d'herbe et de mousse, éparses sur les pentes (ni neige, ni désert).
+      if (!snowy && !arid) {
+        for (let i = 0; i < Math.round((w + h) / 14); i++) {
+          const t = r.range(0.15, 0.95)
+          const side = r.next() < 0.5 ? -1 : 1
+          const ex = side * (w / 2) * t
+          const ey = apexY + h * t
+          g.strokeStyle = r.next() < 0.5 ? '#5d8a3b' : '#4a7230'
+          g.lineWidth = 1.4
+          for (let k = -1; k <= 1; k++) {
+            g.beginPath()
+            g.moveTo(ex - side * 2 + k * 1.6, ey + 1)
+            g.lineTo(ex - side * 4 + k * 2.4, ey - r.range(3, 7))
+            g.stroke()
+          }
+        }
+      }
+    } else if (!s.spire) {
+      if (snowy) {
+        g.fillStyle = 'rgba(247,250,253,0.97)'
+        g.fillRect(-w / 2, -h / 2, w, 7)
+        for (let x = -w / 2; x < w / 2; x += r.range(8, 16)) {
+          g.beginPath()
+          g.ellipse(x, -h / 2 + 7, r.range(3, 7), r.range(2, 4), 0, 0, TAU)
+          g.fill()
+        }
+      } else if (arid) {
+        g.fillStyle = 'rgba(222,190,130,0.9)'
+        g.fillRect(-w / 2, -h / 2, w, 5)
+      } else {
+        const grass = g.createLinearGradient(0, -h / 2, 0, -h / 2 + 7)
+        grass.addColorStop(0, '#6c9a46')
+        grass.addColorStop(1, '#3f6328')
+        g.fillStyle = grass
+        g.fillRect(-w / 2, -h / 2, w, 6)
+        g.strokeStyle = '#5d8a3b'
+        g.lineWidth = 0.9
+        for (let x = -w / 2 + 2; x < w / 2; x += r.range(2.5, 5)) {
+          g.beginPath()
+          g.moveTo(x, -h / 2 + 4)
+          g.lineTo(x + r.range(-1.5, 1.5), -h / 2 + 4 + r.range(2, 6))
+          g.stroke()
+        }
       }
     }
   },
@@ -525,7 +619,9 @@ function boxOf(s) {
 export function drawBlockBody(ctx, material, s) {
   const variant = Math.abs(Math.round(s.seed ?? 0)) % 4
   const shapeKey = s.vertices && s.shape === 'triangle' ? s.vertices.map((v) => `${v.x.toFixed(1)},${v.y.toFixed(1)}`).join(';') : 'rect'
-  const key = `blk.${material}.${Math.round(s.w * 10)}x${Math.round(s.h * 10)}.${shapeKey}.${variant}`
+  // La roche du décor suit le climat du chapitre (v6.2) : neige, sable ou herbe.
+  const climate = material === 'rock' ? `.t${s.extra?.theme ?? 0}` : ''
+  const key = `blk.${material}.${Math.round(s.w * 10)}x${Math.round(s.h * 10)}.${shapeKey}.${variant}${climate}`
   cachedBudget(ctx, key, boxOf(s), (g) => paintBlock(g, material, s, variant), 3)
 }
 

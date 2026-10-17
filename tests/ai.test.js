@@ -249,7 +249,8 @@ test('veilleur : sa torche met le feu au bois et à la poudre en tombant', () =>
 /* ---------- Campagne ---------- */
 
 test('campagne : chaque nouveau défenseur est présenté seul, puis revient', () => {
-  const first = (type) => LevelRepository.all().find((l) => l.targets.some((t) => t.type === type))?.id
+  // Les pillards ont leur propre présentation (v6.2 : le premier, au niveau 8, est un éclaireur).
+  const first = (type) => LevelRepository.all().find((l) => l.targets.some((t) => t.type === type && !t.raid))?.id
   assert.equal(first('scout'), 9)
   assert.equal(first('shieldbearer'), 19)
   assert.equal(first('engineer'), 26)
