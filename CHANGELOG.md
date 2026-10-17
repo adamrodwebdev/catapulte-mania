@@ -46,6 +46,11 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), num
   relectures et l'empreinte des parties ne changent pas.
 - Version web seulement (les portails et la démo n'ont pas de fond peint).
 
+### Retiré
+- **Le verrou d'accès du site Netlify** (v4.0.1) : le site est ouvert à tous,
+  sans clé. La fonction edge et sa logique sont supprimées ; les variables
+  `ACCESS_KEYS` et `GATE_SECRET` ne servent plus.
+
 ### Corrigé
 - **Page de confidentialité** : elle a son icône, comme l'accueil ; le
   navigateur ne réclame plus un `favicon.ico` absent (erreur dans la console,

@@ -357,19 +357,7 @@ Pour tester sur un téléphone connecté au même Wi-Fi : utilisez l'adresse « 
 2. « Add new site » → « Import an existing project » → choisissez le dépôt GitHub.
 3. Netlify lit la configuration tout seul et publie le site. À chaque nouveau commit sur GitHub, le site se met à jour.
 
-**Accès limité à quelques appareils (verrou du site Netlify)** :
-
-Notre site Netlify n'est ouvert qu'aux appareils autorisés (deux aujourd'hui). La démo et les versions pour portails n'ont pas de verrou.
-
-- Chaque appareil reçoit sa propre **clé d'accès**. La première fois qu'on ouvre le site, une page demande la clé : une fois saisie, elle est **liée à cet appareil** (à ce navigateur) et ne fonctionne plus ailleurs.
-- Les clés se règlent dans Netlify : *Project configuration → Environment variables*.
-  - `ACCESS_KEYS` : les clés, séparées par des virgules (une par appareil, au moins 20 caractères : lettres, chiffres, `-` ou `_`) ;
-  - `GATE_SECRET` : un texte secret d'au moins 32 caractères (il signe le « badge » enregistré dans le navigateur).
-- **Ajouter un appareil** : ajouter une clé à `ACCESS_KEYS`, puis redéployer.
-- **Retirer ou remplacer un appareil** (appareil perdu, données du navigateur effacées) : remplacer sa clé par une nouvelle, puis redéployer. L'ancienne clé ne fonctionne plus.
-- Sans ces deux variables, le site reste fermé (sécurité par défaut) et affiche « verrou non configuré ». Après avoir ajouté ou modifié une variable, il faut **redéployer** (Deploys → Trigger deploy → Deploy site) pour qu'elle soit prise en compte.
-
-Le code du verrou se trouve dans `netlify/gate/AccessGate.js` (logique, testée) et `netlify/edge-functions/gate.js` (branchement sur Netlify).
+**Site ouvert à tous (v6.3)** : le verrou d'accès par clés de la v4.0.1 (une clé par appareil) est retiré. Les variables `ACCESS_KEYS` et `GATE_SECRET` ne servent plus : on peut les effacer dans Netlify (*Project configuration → Environment variables*).
 
 Tout autre hébergeur de fichiers statiques convient (GitHub Pages, Cloudflare Pages, OVH…) : il suffit d'envoyer le contenu du dossier `dist/`.
 
