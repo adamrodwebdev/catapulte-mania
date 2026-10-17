@@ -21,7 +21,7 @@ export const TARGET_TYPES = deepFreeze({
   knight: { w: 30, h: 54, hp: 70, push: 24, density: 0.0018, score: 800, toughness: 2.2 },
   king: { w: 32, h: 58, hp: 40, push: 10, density: 0.0014, score: 1500, toughness: 1.4 },
   // v5.1 : l'ogre, unité lourde. Il renvoie d'un revers les projectiles légers
-  // et repousse les blocs qui lui tombent dessus (voir PhysicsWorld#ogre…) :
+  // et repousse les blocs qui lui tombent dessus (voir DefenderContacts#ogreReacts) :
   // il faut l'explosion, le feu, le givre ou un boulet lourd pour l'abattre.
   ogre: { w: 46, h: 76, hp: 420, push: 200, density: 0.0032, score: 2000, toughness: 4 },
   // v5.8 : quatre défenseurs aux capacités propres (voir ../ai/UnitBrain.js).
@@ -105,3 +105,20 @@ export const POISON = deepFreeze({ RADIUS: 110, MS: 7000, DRIFT: 1.1, DPS: 14, L
 export const FROST = deepFreeze({ RADIUS: 120, MS: 16000, BRITTLE: 3, STEAM_RADIUS: 95, SHOCK: 0.6 })
 
 export const PROJECTILE_NAMES = Object.freeze(Object.keys(PROJECTILE_TYPES))
+
+/**
+ * Créatures volantes (v5.0 ; v6.2 : au catalogue, sans moteur physique).
+ *  - corbeau : une nuée qui patrouille devant le château. Un projectile qui la
+ *    traverse est stoppé net (il retombe), le corbeau y laisse des plumes ;
+ *  - vouivre : un petit dragon qui porte un pot de feu grégeois. Abattue, elle
+ *    lâche son pot, qui s'écrase en flammes sur ce qui se trouve dessous :
+ *    un tir d'adresse qui peut incendier tout un château.
+ *
+ * - radius : rayon de collision ; brake : part de la vitesse que garde le
+ *   projectile qui la heurte ; score : points accordés.
+ */
+export const FLYER_TYPES = deepFreeze({
+  crow: { radius: 20, brake: 0.12, score: 150, w: 54, h: 40 },
+  wyvern: { radius: 32, brake: 0.25, score: 400, w: 110, h: 76 },
+})
+export const FLYER_NAMES = Object.freeze(Object.keys(FLYER_TYPES))

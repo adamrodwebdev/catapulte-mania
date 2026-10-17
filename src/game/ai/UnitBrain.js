@@ -36,13 +36,26 @@ export const REPAIR = Object.freeze({ WORK_MS: 1500, AMOUNT: 0.6, MIN_DAMAGE: 0.
 /**
  * Pillards (v5.8) : ce qu'ils portent, combien de coups ils donnent avant que
  * les servants de l'engin ne les repoussent, à quel rythme (ms), et leur allure.
+ * v6.1 : le saboteur et l'ogre chargent aussi ; ils n'avancent que pendant les
+ * tours (vol et retombées d'un tir, 5 s environ) et doivent arriver vers le
+ * troisième tir, sinon la menace ne se fait jamais sentir.
  */
 export const RAID = Object.freeze({
   STRIKES: { fire: 1, frost: 1, blow: 3, smash: 3 },
   EVERY_MS: { fire: 1100, frost: 1100, blow: 1300, smash: 1600 },
-  GAIT: { scout: 'charge', soldier: 'sprint', engineer: 'sprint', ogre: 'heavy' },
+  GAIT: { scout: 'charge', soldier: 'sprint', engineer: 'charge', ogre: 'stampede' },
+  /**
+   * Étape de course accordée par chaque tir (ms de monde, v6.2) : courue pendant
+   * le tour, puis au début de la visée si le tour a été bref. Le pillard arrive
+   * vers le troisième tir, quelle que soit la durée des tours.
+   */
+  LEG_MS: 5000,
   /** Chemin coupé (éboulis) : on réessaie un peu plus tard (ms). */
   RETRY_MS: 2500,
+  /** L'engin a roulé (v6.2) : au-delà de cet écart (px), le pillard recalcule sa course. */
+  REPLAN: 40,
+  /** Portée de ses coups : l'engin qui s'éloigne davantage met fin à l'assaut (px). */
+  REACH: 36,
 })
 /** Fuite devant le feu : distance d'alerte (px). */
 const FIRE_ALERT = 95
@@ -124,7 +137,10 @@ export class UnitBrain {
     // les servants le repoussent. S'il a été bousculé, il revient.
     if (this.#assault) {
       const a = this.#assault
-      if (Math.abs(u.x - a.x) > 30) {
+      // L'engin a roulé hors de portée (v6.2) : l'assaut cesse, il faudra le rattraper.
+      const engine = ctx.engines[0]
+      const gone = engine && Math.abs(engine.front + engine.dir * (u.width / 2 + 8) - u.x) > RAID.REACH
+      if (Math.abs(u.x - a.x) > 30 || gone) {
         this.#assault = null
       } else {
         u.facing = Math.sign(a.engineX - u.x) || u.facing
@@ -280,8 +296,9 @@ export class UnitBrain {
     if (!u.raid || !ctx.armed || ctx.time < this.#raidBlockedUntil) return null
     const engine = ctx.engines[0]
     if (!engine) return null
-    if (this.plan?.kind === 'raid') return this.plan
     const x = engine.front + engine.dir * (u.width / 2 + 8)
+    // En route : on garde sa course, sauf si l'engin a roulé (v6.2).
+    if (this.plan?.kind === 'raid' && Math.abs(this.plan.goal.x - x) <= RAID.REPLAN) return this.plan
     const goal = ctx.nav.ledgeAt(x, ctx.groundY)
     if (!goal || !findPath(ctx.nav, { x: u.x, ledge: ledge.id }, { x, ledge: goal.id }, { build: true })) {
       this.#raidBlockedUntil = ctx.time + RAID.RETRY_MS

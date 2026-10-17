@@ -123,7 +123,8 @@
 
 .home__footer .lang__select {
   width: auto;
-  min-height: 38px;
+  /* Cible tactile de 44 px (v6.2). */
+  min-height: var(--hud-size);
   border-radius: var(--radius-pill);
   background: rgb(255 255 255 / 0.1);
   border-color: rgb(255 255 255 / 0.18);
@@ -989,7 +990,8 @@
 
 .settings__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  /* v6.2 : jamais plus large que l'écran (téléphone de 320 px). */
+  grid-template-columns: repeat(auto-fit, minmax(min(19rem, 100%), 1fr));
   gap: var(--space-5);
   align-items: start;
 }
@@ -1010,6 +1012,12 @@
 
 .help__card p {
   max-width: 60ch;
+}
+
+/* Lien dans un texte (adresse de contact) : cible tactile de 44 px de haut (v6.2),
+   sans changer l'interligne (le remplissage d'un élément en ligne ne le modifie pas). */
+.privacy .help__card a {
+  padding-block: 0.75rem;
 }
 
 @media (max-width: 40rem) {

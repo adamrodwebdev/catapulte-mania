@@ -110,6 +110,11 @@ function play(id, { shots = 6, bucket = false, onTurn = null } = {}) {
       if (bucket && s.condition.fireLevel > 0) s.useBucket()
     }
     onTurn?.(s)
+    // Le temps de viser (v6.2 : les pillards finissent leur étape de course).
+    for (let k = 0; k < 150 && s.state === 'aiming'; k++) {
+      s.update(1000 / 30)
+      if (bucket && s.condition.fireLevel > 0) s.useBucket()
+    }
   }
   return { s, captions }
 }
@@ -135,6 +140,8 @@ test('pillard : il n’avance pas pendant que l’on vise', () => {
   g = 0
   while (s.state !== 'aiming' && g++ < 2000) s.update(1000 / 30)
   const raider = s.world.filter((e) => e.raid)[0]
+  // v6.2 : il finit son étape de course (5 s de monde), puis s'arrête.
+  for (let i = 0; i < 200; i++) s.update(1000 / 30)
   if (raider?.alive) {
     const x = raider.x
     for (let i = 0; i < 300; i++) s.update(1000 / 30)
@@ -169,8 +176,14 @@ test('pillards : placés selon le tableau, seaux là où il y a des torches, ouv
     assert.equal(level.buckets, raids.includes('fire') ? 2 : 0)
   }
   const first = (key) => LevelRepository.all().find((l) => LevelRepository.novelties(l.id).includes(key))?.id
-  assert.equal(first('build:ladder'), 32)
-  assert.equal(first('build:bridge'), 34)
+  // v6.2 : la marche sur chaque général présente plus tôt les pillards et leurs ouvrages.
+  assert.equal(first('raid:fire'), 8)
+  assert.equal(first('build:bridge'), 9)
+  assert.equal(first('build:ladder'), 20)
+  // Les trois niveaux qui mènent à chaque général, boss compris, ont leurs pillards.
+  for (let boss = 10; boss <= 100; boss += 10) {
+    for (const rank of [boss - 2, boss - 1, boss]) assert.ok(RAIDS[rank]?.length, `niveau ${rank}`)
+  }
 })
 
 test('niveau 32 : l’échelle renversée sous le pillard, il tombe au lieu de rester collé à la montagne', () => {

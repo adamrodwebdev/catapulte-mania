@@ -432,6 +432,29 @@ test('v6.1 : les ouvrages et les nouvelles munitions arrivent chacun dans leur n
   }
 })
 
+test('v6.1 : les pillards pressent : l’ogre charge, le saboteur court, l’engin est frappé dès le troisième tir perdu', () => {
+  for (const id of [95, 36]) {
+    const s = new GameSession(LevelRepository.get(id), { difficulty: 'normal', completedLevels: 0, reducedMotion: true })
+    let guard = 0
+    while (s.state !== STATE.AIMING && guard++ < 300) s.update(1000 / 30)
+    let struck = 0
+    // Des tirs perdus, au-delà du château. Chaque tir accorde une étape de course
+    // (v6.2), courue pendant le tour puis pendant la visée suivante.
+    for (let shot = 1; shot <= 3 && !struck; shot++) {
+      s.aim(45, 1)
+      s.fire()
+      guard = 0
+      while (s.state !== STATE.AIMING && guard++ < 600) s.update(1000 / 30)
+      for (let i = 0; i < 160 && !struck; i++) {
+        s.update(1000 / 30)
+        if (s.condition.hp < s.condition.maxHp) struck = shot
+      }
+    }
+    assert.ok(struck > 0, `niveau ${id} : l’engin n’a rien subi en trois tirs`)
+    s.destroy()
+  }
+})
+
 test('v6.1 : chaque munition se partage (lien de défi) et l’atelier les propose toutes', () => {
   for (const a of AMMO_ORDER) {
     const code = ReplayCode.encode({ levelId: 29, engine: 'catapult', log: [{ k: 'f', d: 30, a, ang: 45, pow: 0.7, l: 0 }] })

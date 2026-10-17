@@ -20,13 +20,6 @@ export const WORLD = deepFreeze({
   /** Vitesse de choc (px/pas à 60 Hz) sous laquelle un contact ne fait pas de dégâts. */
   IMPACT_THRESHOLD: 1.6,
   /**
-   * Personnages fragiles (v3) : après le premier tir, la MOINDRE collision avec
-   * un objet en mouvement (bloc, projectile, baril) tue. Seuils très bas : seul
-   * un frôlement quasi immobile est ignoré. Ce sont les châteaux qui protègent.
-   */
-  CONTACT_KILL_SPEED: 0.5,
-  CONTACT_KILL_REL: 0.5,
-  /**
    * Coincement : une cible sur laquelle repose un bloc (mur, plancher, toit),
    * ou prise en étau entre deux blocs, meurt écrasée. Distance (px) des points
    * de contrôle autour de la cible et intervalle de contrôle (pas de simulation).
@@ -38,8 +31,6 @@ export const WORLD = deepFreeze({
    * rien sous lui est réveillé et retombe. Rien ne flotte jamais dans le vide.
    */
   SUPPORT_CHECK_EVERY: 30,
-  /** Une cible qui retombe à cette vitesse (ou plus) sur un obstacle meurt de sa chute (jusqu'à la v6.0). */
-  TARGET_FALL_SPEED: 3,
   /**
    * Points de vie des défenseurs (v6.1, voir FallingObjects.js) : un contact
    * plus lent que SAFE ne fait rien ; au-delà, le coup vaut
@@ -70,6 +61,13 @@ export const WORLD = deepFreeze({
   SETTLE_MS: 900,
   /** Hors de ces limites, un corps est considéré comme sorti du monde. */
   KILL_MARGIN: 400,
+  /**
+   * Un défenseur projeté à plus de FIELD_MARGIN au-delà du bord droit du monde
+   * quitte le champ de bataille (v6.2) : il compte comme tombé. Il y restait
+   * hors champ et hors d'atteinte (relevé par scripts/check-levels.mjs).
+   * Les rondes s'arrêtent avant : un garde posté au plus loin ne s'en approche pas.
+   */
+  FIELD_MARGIN: 80,
 })
 
 /** Catégories de collision (masques Matter.js). */

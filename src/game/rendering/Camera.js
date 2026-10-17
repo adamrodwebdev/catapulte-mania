@@ -65,6 +65,14 @@ export class Camera {
     this.overview(true)
   }
 
+  /**
+   * Bord gauche de la zone d'intérêt (v6.2) : il suit l'engin qui roule. Pas de
+   * saut : la vue d'ensemble y glisse à son rythme habituel.
+   */
+  setFocusLeft(left) {
+    if (Number.isFinite(left)) this.#focus = { ...this.#focus, left }
+  }
+
   #fitScale() {
     const { left, right, top } = this.#focus
     const w = right - left

@@ -6,6 +6,9 @@ import { PROJECTILE_TYPES, PROJECTILE_NAMES } from './catalog.js'
 
 export { PROJECTILE_TYPES, PROJECTILE_NAMES }
 
+/** Vitesse (px par image) sous laquelle un boulet qui a touché ne fait plus que rouler (v6.2). */
+const ROLL_OUT_SPEED = 1.2
+
 /**
  * Projectile tiré par la catapulte.
  * Les pouvoirs spéciaux s'appliquent comme des modificateurs (composition) :
@@ -106,6 +109,15 @@ export class Projectile extends Entity {
     return false
   }
 
+  /**
+   * Il éclaire alentour (v6.2, lu par le dessin) : en feu, enflammé et encore en
+   * vol, ou toujours brûlant après le choc. Ce n'est pas `hot` (assez chaud pour
+   * enflammer ce qu'il touche) : un boulet usé éclaire encore.
+   */
+  get alight() {
+    return this.alive !== false && (this.burning > 0 || (this.ignites && !this.hasImpacted) || this.heatMs > 0)
+  }
+
   /** Le boulet est-il encore assez chaud pour enflammer ce qu'il touche ? */
   get hot() {
     return this.ignites && this.alive && !this.spent && (!this.hasImpacted || this.heatMs > 0)
@@ -113,7 +125,9 @@ export class Projectile extends Entity {
 
   update(dtMs) {
     this.ageMs += dtMs
-    if (this.speed < 0.45) this.restMs += dtMs
+    // Après l'impact (v6.2), un boulet qui ne fait plus que rouler doucement est
+    // retiré comme un boulet arrêté (la boule de neige qui grossit, elle, reste).
+    if (this.speed < (this.hasImpacted ? ROLL_OUT_SPEED : 0.45)) this.restMs += dtMs
     else this.restMs = 0
     if (this.hasImpacted && this.heatMs > 0) {
       this.heatMs = Math.max(0, this.heatMs - dtMs)

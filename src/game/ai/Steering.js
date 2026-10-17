@@ -19,6 +19,8 @@ export const GAITS = Object.freeze({
   // v5.8 : charge des pillards (terrain dégagé, ils ne croisent aucun mur) et pas lourd de l'ogre.
   charge: { maxSpeed: 2, accel: 0.1 },
   heavy: { maxSpeed: 1.1, accel: 0.05 },
+  // v6.1 : l'ogre pillard qui charge : lent à s'élancer, puis il fonce.
+  stampede: { maxSpeed: 2, accel: 0.05 },
 })
 
 /** Distance (px) sous laquelle on considère le but atteint. */

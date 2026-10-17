@@ -3,7 +3,7 @@ import { Block } from '../entities/Block.js'
 import { Flyer } from '../entities/Flyer.js'
 import { TARGET_TYPES } from '../entities/catalog.js'
 import { WORLD } from '../physics/constants.js'
-import { RAIDER_TYPE } from '../levels/LevelCurve.js'
+import { RAIDER_TYPE, raiderTorch } from '../levels/campaignRules.js'
 import { reachable } from '../ai/Pathfinder.js'
 import { SKILL_ICONS } from './generals.js'
 
@@ -88,7 +88,7 @@ function sendRaider(ctx, skill, raid) {
   const type = RAIDER_TYPE[raid] ?? 'soldier'
   const spot = raiderSpot(ctx, type)
   if (!spot) return false
-  const unit = summon(ctx, skill, { type, x: spot.x, y: spot.y, raid })
+  const unit = summon(ctx, skill, { type, x: spot.x, y: spot.y, raid, ...(raiderTorch(raid) ? { torch: true } : {}) })
   unit.facing = -1
   return true
 }
@@ -302,6 +302,11 @@ export const SKILLS = Object.freeze({
       const floor = surfaceAt(ctx.port.world, x)
       for (let i = 0; i < RAMPART.COUNT; i++) {
         const b = ctx.port.world.add(new Block({ material: 'ice', x, y: floor - RAMPART.H / 2 - i * RAMPART.H, w: RAMPART.W, h: RAMPART.H, shape: 'rect' }))
+        // Campagne héroïque (v6.2) : un rempart aussi solide que le château.
+        if (ctx.port.blockHpFactor !== 1) {
+          b.maxHp *= ctx.port.blockHpFactor
+          b.hp = b.maxHp
+        }
         ctx.council.remember('iceRampart', b)
       }
       ctx.port.particles.frost(x, floor - 80, 90)

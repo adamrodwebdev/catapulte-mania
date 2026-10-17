@@ -9,6 +9,8 @@ coverage/
 .idea/
 *.local
 .scratch/
+# Peintures d'origine des fonds (lourdes) : seuls les WebP encodés sont versionnés.
+art/backgrounds/*.png
 .netlify/
 dist-crazygames/
 dist-poki/

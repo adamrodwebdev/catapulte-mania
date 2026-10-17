@@ -4,6 +4,7 @@ import { useApp } from '../../app/AppContext.js'
 import { PROFILE_NAME } from '../../domain/SaveSlot.js'
 import { GAME } from '../../config/gameConfig.js'
 import AppIcon from '../ui/AppIcon.vue'
+import MasteryCrest from '../ui/MasteryCrest.vue'
 import ScreenHeader from '../ui/ScreenHeader.vue'
 import SegmentedControl from '../ui/SegmentedControl.vue'
 
@@ -77,6 +78,8 @@ async function remove(index) {
         <!-- Profil existant -->
         <template v-if="slot.status === 'ok'">
           <p class="slot__name">{{ slot.name }}</p>
+          <!-- Grand Ingénieur du Royaume (v6.2). -->
+          <p v-if="slot.mastered" class="mastery-title"><MasteryCrest :size="22" />{{ t('mastery.title') }}</p>
           <p class="slot__meta">{{ t(`difficulty.${slot.difficulty}`) }}</p>
           <p class="slot__meta">{{ t('profiles.progress', { done: slot.completed, total: GAME.LEVEL_COUNT, stars: slot.stars }) }}</p>
           <p class="slot__meta">{{ t('profiles.score', { score: slot.score }) }}</p>

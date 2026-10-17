@@ -156,7 +156,9 @@ export const LEVEL_SPECS_2 = [
   // 83. Le pont-levis de fer.
   { shots: 5, wind: 0.65, ammo: { boulder: 2, bomb: 2, fire: 1 }, build: (b) => BP.drawbridge(b, { floors: 5, m: 'brick', s: 'iron', hall: 'wood' }) },
   // 84. La crypte du chevalier noir.
-  { shots: 5, wind: 0.7, ammo: { boulder: 2, bomb: 3 }, build: (b) => BP.crypt(b, { vault: 'iron', hall: 'brick', floors: 4, barrels: 3, sideMat: 'iron' }) },
+  // v6.2 : la tour d'à côté en brique (planchers de fer) : toute de fer et rivetée,
+  // aucune pierre ne l'ouvrait (relevé par scripts/check-levels.mjs --ammo stone).
+  { shots: 5, wind: 0.7, ammo: { boulder: 2, bomb: 3 }, build: (b) => BP.crypt(b, { vault: 'iron', hall: 'brick', floors: 4, barrels: 3, sideMat: 'brick' }) },
   // 85. Les dominos de fer.
   { shots: 5, wind: 0.4, ammo: { boulder: 4, bomb: 2 }, build: (b) => BP.dominoes(b, { count: 5, floors: 5, m: 'brick', s: 'iron', h: 92 }) },
   // 86. Le manoir foudroyé, sur pilotis de verre.
@@ -183,7 +185,9 @@ export const LEVEL_SPECS_2 = [
   // 91. La tour de marbre.
   { shots: 5, wind: 0.6, ammo: { boulder: 2, bomb: 2 }, build: (b) => BP.keep(b, { x: 1520, floors: 5, m: 'marble', top: 'glass', split: 3, s: 'marble', king: true, knights: 1 }) },
   // 92. La galerie des glaces.
-  { shots: 5, wind: 0.65, ammo: { boulder: 2, bomb: 2, split: 1 }, build: (b) => BP.rampart(b, { rooms: 4, m: 'marble', s: 'glass', gallery: 'marble' }) },
+  // v6.2 : un tir de plus : treize défenseurs, dont deux à l'abri des ailes ; à la
+  // seule pierre, il en restait un (relevé par scripts/check-levels.mjs --ammo stone).
+  { shots: 6, wind: 0.65, ammo: { boulder: 2, bomb: 2, split: 1 }, build: (b) => BP.rampart(b, { rooms: 4, m: 'marble', s: 'glass', gallery: 'marble' }) },
   // 93. Les jumelles royales.
   { shots: 5, wind: 0.65, ammo: { boulder: 2, bomb: 2 }, build: (b) => BP.twins(b, { gap: 340, floors: 6, m: 'marble', top: 'brick', split: 3, s: 'marble', plank: 'marble', watchers: 2, h: 90 }) },
   // 94. Le trésor royal : crypte de fer, salle de marbre.
@@ -196,8 +200,12 @@ export const LEVEL_SPECS_2 = [
   },
   // 95. Le belvédère du roi, sur pilotis de verre.
   { shots: 4, wind: 0.7, ammo: { boulder: 2, bomb: 1 }, build: (b) => BP.stiltCastle(b, { legs: 3, legMat: 'glass', deck: 'marble', m: 'marble', s: 'marble', floors: 3, twin: false }) },
-  // 96. L'escalier d'honneur.
-  { shots: 8, wind: 0.25, ammo: { boulder: 4, bomb: 6, split: 1 }, build: (b) => BP.stairs(b, { count: 5, start: 3, m: 'marble', top: 'iron', s: 'marble', powder: true }) },
+  // 96. L'escalier d'honneur. v6.2 : cinq marches serrées, d'un à cinq étages (trois à sept
+  // auparavant) : au fond du champ, le sommet de sept étages était hors de portée de la pierre,
+  // même l'engin avancé jusqu'aux archers, et rien ne renversait ses tours de marbre et de fer.
+  // Le roi se tient sur la terrasse du dernier gradin, à découvert : sous son toit de pierre,
+  // comme le garde du deuxième étage, il était emmuré dans le fer et le marbre.
+  { shots: 8, wind: 0.25, ammo: { boulder: 4, bomb: 6, split: 1 }, build: (b) => BP.stairs(b, { count: 5, start: 1, step: 120, m: 'marble', top: 'iron', s: 'marble', powder: true, crown: 'terrace', inner: false }) },
   // 97. Le pont du sacre.
   { shots: 5, wind: 0.75, ammo: { boulder: 2, bomb: 3, fire: 1 }, build: (b) => BP.drawbridge(b, { floors: 5, gap: 420, m: 'marble', s: 'iron', hall: 'brick' }) },
   // 98. La poudrière de la couronne.

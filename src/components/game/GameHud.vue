@@ -1,6 +1,7 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useApp } from '../../app/AppContext.js'
+import { windKmh as kmhOf, formatKmh } from '../../app/Formats.js'
 import AppIcon from '../ui/AppIcon.vue'
 
 /**
@@ -16,14 +17,14 @@ const props = defineProps({
   coach: { type: String, default: '' },
 })
 const emit = defineEmits(['pause', 'powers'])
-const { t, state } = useApp()
+const { t, n } = useApp()
 
 /** Vent ressenti à la catapulte (rafale comprise en Difficile), en km/h réels. */
 const windNow = computed(() => props.hud.windNow ?? props.hud.wind)
-const windKmh = computed(() => props.hud.windKmh ?? Math.round(Math.abs(windNow.value) * 30))
+const windKmh = computed(() => kmhOf(props.hud, windNow.value))
 /** Rafale en cours (Difficile) : affichée au-delà d'un seuil. */
 const gusting = computed(() => props.hud.windDynamic && props.hud.gust > 0.35 && windKmh.value > 0)
-/** Souffle du monde (v6.1) : son nom et son effet (infobulle), sinon « Vent » / « Vent en rafales ». */
+/** Souffle du monde (v6.1) : son nom et son effet (infobulle, et texte lu : v6.2), sinon « Vent » / « Vent en rafales ». */
 const worldWindId = computed(() => props.hud.worldWind?.id ?? 'breeze')
 const windLabel = computed(() => (worldWindId.value !== 'breeze' ? t(`game.worldWind.${worldWindId.value}`) : props.hud.windDynamic && windKmh.value > 0 ? t('game.windGusty') : t('game.wind')))
 const worldWindDesc = computed(() => (worldWindId.value !== 'breeze' ? t(`game.worldWindDesc.${worldWindId.value}`) : undefined))
@@ -36,6 +37,17 @@ const STATE_ICON = Object.freeze({ fire: 'flame', frost: 'snowflake', crack: 'cr
 const cond = computed(() => props.hud.condition)
 const hpRatio = computed(() => (cond.value ? Math.max(0, Math.min(1, cond.value.hp / cond.value.maxHp)) : 1))
 /** Alerte : engin en feu ou à moins d'un tiers de ses points de vie. */
+// v6.2 : la jauge sursaute quand l'engin encaisse un coup (sa traînée claire suit en CSS).
+const engineHit = ref(false)
+let hitTimer = 0
+watch(hpRatio, (now, before) => {
+  if (now >= before - 1e-6) return
+  engineHit.value = false
+  clearTimeout(hitTimer)
+  requestAnimationFrame(() => (engineHit.value = true))
+  hitTimer = setTimeout(() => (engineHit.value = false), 420)
+})
+onBeforeUnmount(() => clearTimeout(hitTimer))
 const engineAlarm = computed(() => Boolean(cond.value && (cond.value.states.some((s) => s.id === 'fire') || hpRatio.value < 0.34)))
 const stateLabel = (s) => t(`game.condition.${s.id}`, { level: s.level })
 const engineText = computed(() => {
@@ -67,7 +79,7 @@ const infinite = computed(() => props.hud.shotsTotal === null)
         <dd class="hud-stat__value">
           <template v-if="hud.mode === 'versus'"><AppIcon name="crown" :size="14" />{{ p.defenders }}<span class="visually-hidden"> {{ t('mp.defenders') }}</span></template>
           <template v-else-if="hud.mode === 'duel' || hud.mode === 'coop'"><AppIcon name="trophy" :size="14" />{{ p.renown }}<span class="visually-hidden"> {{ t('mp.renown') }}</span></template>
-          <template v-else>{{ p.score.toLocaleString(state.locale) }}</template>
+          <template v-else>{{ n(p.score) }}</template>
           <span class="hud-player__shots">· {{ p.shotsLeft }} <span class="visually-hidden">{{ t('game.shots') }}</span></span>
         </dd>
       </div>
@@ -76,7 +88,7 @@ const infinite = computed(() => props.hud.shotsTotal === null)
     <dl class="hud-stats" :class="{ 'hud-stats--compact': duo }">
       <div v-if="!duo" class="hud-stat">
         <dt>{{ t('game.score') }}</dt>
-        <dd class="hud-stat__value hud-stat__value--score">{{ hud.score.toLocaleString(state.locale) }}</dd>
+        <dd class="hud-stat__value hud-stat__value--score">{{ n(hud.score) }}</dd>
       </div>
       <div v-if="hud.mode !== 'versus'" class="hud-stat">
         <dt>{{ t('game.targets') }}</dt>
@@ -112,7 +124,8 @@ const infinite = computed(() => props.hud.shotsTotal === null)
       <div v-if="cond?.show && !duo" :class="['hud-stat hud-stat--engine', { 'hud-stat--alarm': engineAlarm }]">
         <dt>{{ t('game.engineHp') }}</dt>
         <dd class="hud-stat__value">
-          <span class="engine-hp" role="meter" :aria-label="t('game.engineHp')" aria-valuemin="0" :aria-valuemax="cond.maxHp" :aria-valuenow="cond.hp" :aria-valuetext="engineText">
+          <span :class="['engine-hp', { 'engine-hp--hit': engineHit }]" role="meter" :aria-label="t('game.engineHp')" aria-valuemin="0" :aria-valuemax="cond.maxHp" :aria-valuenow="cond.hp" :aria-valuetext="engineText">
+            <span class="engine-hp__lag" :style="{ '--hp': hpRatio }" />
             <span class="engine-hp__bar" :style="{ '--hp': hpRatio }" />
           </span>
           <span class="engine-hp__value" aria-hidden="true">{{ cond.hp }}</span>
@@ -124,13 +137,13 @@ const infinite = computed(() => props.hud.shotsTotal === null)
       </div>
       <div :class="['hud-stat hud-stat--wind', `hud-stat--wind-${hud.windLevel || 'calm'}`, { 'hud-stat--gust': gusting }]">
         <!-- v6.1 : le souffle du monde prend le nom du vent quand il porte quelque chose. -->
-        <dt :title="worldWindDesc" :class="worldWindClass">{{ windLabel }}</dt>
+        <dt :title="worldWindDesc" :class="worldWindClass">{{ windLabel }}<span v-if="worldWindDesc" class="visually-hidden">, {{ worldWindDesc }}</span></dt>
         <dd class="hud-stat__value">
           <span v-if="worldWindClass" :class="['wind-element', ...worldWindClass]" aria-hidden="true" />
           <template v-if="windKmh === 0">{{ t('game.windCalm') }}</template>
           <template v-else>
             <AppIcon name="arrow" :size="18" :class="['wind-arrow', { 'wind-arrow--left': windNow < 0 }]" />
-            {{ windKmh }} km/h
+            {{ formatKmh(t, windKmh) }}
             <span class="visually-hidden">{{ windNow < 0 ? t('a11y.windLeft') : t('a11y.windRight') }}, {{ t(`game.windLevels.${hud.windLevel || 'breeze'}`) }}</span>
           </template>
           <span v-if="gusting" class="wind-gust" aria-hidden="true">{{ t('game.gust') }}</span>

@@ -87,7 +87,7 @@ export class Props {
 
   /** Forge : une colonne de flammes ; dans une rafale, un jet de feu dans son sens. */
   #forge(e, time) {
-    if (e.frozenMs > 0 || (e.quenchedUntil ?? 0) > time) return
+    if (e.frozenMs > 0 || e.quenchedAt(time)) return
     const top = e.y - e.height / 2
     this.flames.push({ x0: e.x - FORGE.HALF_W, x1: e.x + FORGE.HALF_W, y0: top - FORGE.HEIGHT, y1: top, source: e })
     const g = this.gustAt(e.x, top - 40)
@@ -160,6 +160,8 @@ export class Props {
         if (port.winter) o.freeze(5000)
         else o.wetMs = Math.max(o.wetMs ?? 0, CISTERN.WET_MS)
       }
+      // Fer rougi sous l'eau : la trempe (v6.2).
+      if (o.kind === 'block') port.quench?.(o)
     }
   }
 }

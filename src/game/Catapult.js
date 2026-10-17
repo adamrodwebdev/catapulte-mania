@@ -1,5 +1,4 @@
 import { WORLD } from './physics/constants.js'
-import { CATAPULT_GEOMETRY } from './assets/procedural/painters.js'
 import { clamp, toRad } from '../core/utils/math.js'
 import { Guard } from '../core/utils/Guard.js'
 
@@ -8,7 +7,14 @@ import { AIM } from './aim.js'
 /** Bornes de visée (voir aim.js). */
 export { AIM }
 
-const REST_ANGLE = Math.PI - 0.25
+/**
+ * Géométrie du bras (repère : origine au centre de la base, au sol) : celle de la
+ * physique, que le dessin reprend (v6.2 : elle vivait dans le dessin). Le
+ * projectile part ainsi exactement du godet dessiné.
+ */
+export const CATAPULT_GEOMETRY = Object.freeze({ pivotX: 6, pivotY: -78, armLength: 118 })
+/** Bras au repos (rad). */
+export const REST_ANGLE = Math.PI - 0.25
 const RELEASE_ANGLE = 2 * Math.PI - 1.1
 const SWING_MS = 170
 const RECOIL_MS = 900
@@ -23,6 +29,8 @@ export class Catapult {
   y = WORLD.GROUND_Y
   /** Sens de tir : 1 vers la droite, -1 vers la gauche (face-à-face). */
   dir = 1
+  /** Angle des roues (radians, v6.2) : elles tournent avec le chemin parcouru. */
+  roll = 0
   /** Multiplicateur de vitesse (amélioration « Bras renforcé »). */
   speedFactor = 1
   /** Angle de tir en degrés (0 = horizontal, 90 = vertical). */

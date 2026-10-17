@@ -24,6 +24,7 @@ export class I18nService extends EventBus {
   #fallback
   #plural = new Map()
   #numberFormat = new Map()
+  #dateFormat = new Map()
   #available
   #loader
   #pending = new Map()
@@ -174,5 +175,19 @@ export class I18nService extends EventBus {
       this.#numberFormat.set(this.#locale, new Intl.NumberFormat(this.intlLocale))
     }
     return this.#numberFormat.get(this.#locale).format(n)
+  }
+
+  /**
+   * Date dans la langue courante (v6.2), avec le code complet de la langue
+   * (« en-GB », jamais « en » seul : le jour avant le mois, comme au Royaume-Uni).
+   * @param {Date} date
+   * @param {Intl.DateTimeFormatOptions} [options]
+   * @returns {string}
+   * @throws {RangeError} si la date est invalide
+   */
+  formatDate(date, options = {}) {
+    const key = `${this.#locale}|${JSON.stringify(options)}`
+    if (!this.#dateFormat.has(key)) this.#dateFormat.set(key, new Intl.DateTimeFormat(this.intlLocale, options))
+    return this.#dateFormat.get(key).format(date)
   }
 }

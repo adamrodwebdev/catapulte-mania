@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useApp } from '../../app/AppContext.js'
 import AppIcon from '../ui/AppIcon.vue'
+import { PowerRegistry } from '../../game/powers/PowerRegistry.js'
 
 defineProps({
   powers: { type: Array, required: true },
@@ -13,7 +14,8 @@ defineProps({
 })
 const emit = defineEmits(['use', 'use-free', 'close'])
 const { t } = useApp()
-const ICONS = { falcon: 'eye', titan: 'fist', lodestone: 'magnet', meteor: 'meteor', firestorm: 'flame', lightning: 'bolt', quake: 'quake' }
+/** Icône d'un pouvoir : celle de sa définition (powers.js), seule source. */
+const iconOf = (id) => PowerRegistry.get(id).icon
 const panel = ref(null)
 onMounted(() => panel.value?.querySelector('button:not([disabled])')?.focus())
 </script>
@@ -36,7 +38,7 @@ onMounted(() => panel.value?.querySelector('button:not([disabled])')?.focus())
           :disabled="!p.available"
           @click="emit('use', p.id)"
         >
-          <AppIcon :name="p.unlocked ? ICONS[p.id] : 'lock'" :size="22" />
+          <AppIcon :name="p.unlocked ? iconOf(p.id) : 'lock'" :size="22" />
           <span class="power-btn__text">
             <span class="power-btn__name">{{ t(`powers.${p.id}`) }}</span>
             <span class="power-btn__desc">

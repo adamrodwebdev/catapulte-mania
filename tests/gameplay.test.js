@@ -218,11 +218,15 @@ test('démo : vitrine des meilleures mécaniques, chacune présentée à sa prem
 })
 
 test('courbe de difficulté : châteaux plus loin, plus de décor, de barils et de défenseurs', () => {
-  const castleLeft = (l) => Math.min(...l.blocks.filter((b) => b.material !== 'rock').map((b) => b.x - b.w / 2))
+  // v6.2 : une aile s'accole devant le château ; on mesure donc son milieu (bloc médian), pas son premier bloc.
+  const castleMiddle = (l) => {
+    const xs = l.blocks.filter((b) => b.material !== 'rock').map((b) => b.x).sort((p, q) => p - q)
+    return xs[Math.floor(xs.length / 2)]
+  }
   const avg = (ids, f) => ids.reduce((s, id) => s + f(LevelRepository.get(id)), 0) / ids.length
   const early = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
   const late = [91, 92, 93, 94, 95, 96, 97, 98, 99, 100]
-  assert.ok(avg(late, castleLeft) > avg(early, castleLeft) + 300, 'plus éloignés')
+  assert.ok(avg(late, castleMiddle) > avg(early, castleMiddle) + 300, 'plus éloignés')
   assert.ok(avg(late, (l) => l.barrels.length) > avg(early, (l) => l.barrels.length) + 2, 'plus de barils')
   assert.ok(avg(late, (l) => l.targets.length) > avg(early, (l) => l.targets.length) + 3, 'plus de défenseurs')
   assert.ok(late.every((id) => LevelRepository.get(id).blocks.some((b) => b.material === 'rock')), 'décor rocheux en fin de partie')

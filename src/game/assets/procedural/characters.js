@@ -958,17 +958,24 @@ const smooth = (u) => u * u * (3 - 2 * u)
 /** Enveloppe d'un geste : monte, tient, redescend (u dans [0, 1]). */
 const envelope = (u, a = 0.12, b = 0.55) => (u < a || u > b ? 0 : u < a + 0.07 ? smooth((u - a) / 0.07) : u > b - 0.07 ? smooth((b - u) / 0.07) : 1)
 
-/** Vigilance lissée par personnage (ils se tournent vers le ciel puis se détendent). */
-const alertness = new Map()
-function alertLevel(id, alert, t) {
-  const prev = alertness.get(id)
+/**
+ * Vigilance lissée par personnage (ils se tournent vers le ciel puis se détendent).
+ * v6.2 : la mémoire appartient à qui dessine (`memory` de l'état de dessin : une
+ * Map par Renderer, une pour les défenseurs assommés), et non plus une Map du
+ * module partagée par la partie, l'atelier et les assommés. Sans mémoire : pas
+ * de lissage, la vigilance suit l'alerte.
+ * @param {Map<number, { v: number, t: number }> | undefined} memory
+ */
+export function alertLevel(memory, id, alert, t) {
+  if (!memory) return alert ? 1 : 0
+  const prev = memory.get(id)
   let v = alert ? 1 : 0
   if (prev && t >= prev.t && t - prev.t < 0.5) {
     const k = Math.min(1, (t - prev.t) * (alert ? 6 : 1.6))
     v = prev.v + ((alert ? 1 : 0) - prev.v) * k
   }
-  if (alertness.size > 400) alertness.clear()
-  alertness.set(id, { v, t })
+  if (memory.size > 400) memory.clear()
+  memory.set(id, { v, t })
   return v
 }
 
@@ -1147,7 +1154,7 @@ export function animated(type, rig = RIGS[type]) {
     const period = 3.4 + (seed % 1.6)
     const state = ex.hurt ? 'hurt' : !ex.still && (t + seed * 3) % period < 0.13 ? 'blink' : 'idle'
     const still = Boolean(ex.still)
-    const alert = still ? 0 : alertLevel(s.seed ?? 0, Boolean(ex.alert), t)
+    const alert = still ? 0 : alertLevel(s.memory, s.seed ?? 0, Boolean(ex.alert), t)
     const P = still
       ? null
       : pose(rig, type, t, seed, {

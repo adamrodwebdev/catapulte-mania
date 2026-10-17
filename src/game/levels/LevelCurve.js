@@ -10,223 +10,41 @@
  *    tombe ne se relève pas. À partir du niveau 57, une aiguille de roche
  *    derrière certains châteaux porte un baril : le faire tomber écrase le donjon ;
  *  - GARNISON : davantage de barils et de défenseurs, devant et derrière les
- *    murs, à mesure que l'on avance.
+ *    murs, à mesure que l'on avance ;
+ *  - AILES (v6.2) : une annexe de caractère accolée au château, deux à partir
+ *    du niveau 40 (remise de paille, bastion de glace, poudrière, galerie de
+ *    verre, casemate de fer, baril perché). Chacune appelle son outil : le
+ *    château n'est plus symétrique, tout l'arsenal sert. Elle abrite un des
+ *    gardes (autant de défenseurs qu'avant) et se prend aussi à la pierre.
  *
  * Tout est déterministe (même niveau ⇒ même château) et validé ensuite par le
  * schéma du niveau, puis par scripts/check-levels.mjs (stabilité, faisabilité).
+ *
+ * v6.2 : ce module ne garde que l'algorithme de placement ; les règles de la
+ * courbe (selon le rang) sont dans campaignRules.js, les plans des ailes dans
+ * wingBlueprints.js.
  */
 import { WORLD } from '../physics/constants.js'
 import { TARGET_TYPES } from '../entities/catalog.js'
+import {
+  MAX_RIGHT, BARREL, SPIRE, ROCK_MAX_W, SENTRY_SKIP, GUARDS_FRONT, REACH_RIGHT, REAR_SHELTERED, FIELD_LEFT, MOUNTAIN_LEFT, GATE_GUARD_FROM, KEG_AT_GATE, PATROL_FROM, PATROL_INSIDE_FROM, AMBUSH, RAIDER_TYPE, raiderTorch,
+  wingsFor, distanceFor, plateauFor, ogresFor, rosterFor, raidFor, garrisonFor, terrainFor,
+} from './campaignRules.js'
+import { WING_BUILDERS } from './wingBlueprints.js'
+
+// Règles de la courbe, toujours publiées ici (v6.2 : définies dans campaignRules.js).
+export {
+  SPIRE, WINGS, GATE_GUARD_FROM, PATROL_FROM, PATROL_INSIDE_FROM, RAIDS, AMBUSH, RAIDER_TYPE, AMMO_UNLOCK,
+  wingsFor, distanceFor, plateauFor, ogresFor, rosterFor, raidFor, garrisonFor, ammoFor, terrainFor,
+} from './campaignRules.js'
 
 const G = WORLD.GROUND_Y
-/** Le château ne recule jamais au-delà (la catapulte doit pouvoir l'atteindre). */
-const MAX_RIGHT = WORLD.WIDTH - 40
-const BARREL = { w: 34, h: 42 }
-/** Largeur maximale d'un bloc de roche (au-delà, le plateau est découpé). */
-const ROCK_MAX_W = 560
-/**
- * Niveaux sans sentinelle sur le toit : leur toit oscille en se mettant en place
- * et la sentinelle tomberait seule (relevé par scripts/check-levels.mjs).
- */
-const SENTRY_SKIP = new Set([28, 68])
-/**
- * Niveaux où un garde posé derrière le château serait hors de portée du
- * trébuchet (au-delà de REACH_RIGHT) : il se poste devant (relevé par
- * scripts/check-levels.mjs --engine trebuchet).
- */
-const GUARDS_FRONT = new Set([66, 99])
-const REACH_RIGHT = WORLD.WIDTH - 340
-/**
- * Niveaux en escalier (v6.1) : le dernier gradin, le plus haut, abrite la place
- * derrière le château, qu'aucun tir n'atteint. Un garde posté là ne mourait que
- * de l'effondrement ; avec ses points de vie, il y survit : il se poste devant
- * (relevé par scripts/check-levels.mjs).
- */
-const REAR_SHELTERED = new Set([78])
-/** Les terrains commencent au-delà de cette abscisse (la catapulte reste sur la terre ferme). */
-const FIELD_LEFT = 480
-/** Pied gauche minimal d'une montagne. */
-const MOUNTAIN_LEFT = 380
 
-/** Recul du château selon le rang du niveau. */
-export function distanceFor(rank) {
-  return rank <= 10 ? 0 : Math.round(Math.min(520, ((rank - 10) * 520) / 90))
-}
-
-/** Hauteur du plateau rocheux (0 = château au sol). */
-export function plateauFor(rank) {
-  if (rank <= 20) return 0
-  if (rank <= 40) return rank % 2 ? 60 + ((rank * 7) % 31) : 0
-  if (rank <= 70) return rank % 3 === 0 ? 0 : 80 + ((rank * 11) % 61)
-  return 110 + ((rank * 13) % 71)
-}
-
-/** Garde de la porte (v5.8) : dès ce niveau, un pavoisier tient la porte et les barils passent derrière le château. */
-export const GATE_GUARD_FROM = 19
-/**
- * Exceptions : niveaux dont le baril de devant est la pièce maîtresse (il lance
- * les dominos de fer du 85). Relevé par check:levels : sans lui, le niveau
- * n'était plus faisable en Difficile.
- */
-const KEG_AT_GATE = new Set([85])
-
-/** Rondes (v5.1) : les gardes au sol patrouillent dès ce niveau, ceux du château à partir du second. */
-export const PATROL_FROM = 6
-export const PATROL_INSIDE_FROM = 12
-
-/** Ogres (v5.1) : un niveau sur trois à partir du 35, tous les niveaux à partir du 85. */
-export function ogresFor(rank) {
-  if (rank >= 85) return 1
-  return rank >= 35 && rank % 3 === 2 ? 1 : 0
-}
-
-/**
- * Défenseurs spéciaux (v5.8), introduits un par un selon le principe
- * « présenter, développer, retourner » :
- *  - éclaireur : seul au sol au niveau 9 (il esquive un tir direct : il faut
- *    viser large ou faire tomber le château), puis un niveau sur trois ; à
- *    partir du 27, certains sont postés DANS le château, où l'esquive ne les
- *    sauve plus (le retournement) ;
- *  - pavoisier : devant les murs au niveau 19 (il apprend le tir en cloche),
- *    puis un niveau sur quatre, deux à partir du 61 ;
- *  - sapeur : derrière le château au niveau 26 (il apprend à finir le travail
- *    d'un coup), puis un niveau sur cinq ; à l'intérieur à partir du 71 ;
- *  - porte-étendard : sur le toit au niveau 33 (abattre le chef d'abord), puis
- *    un niveau sur six et chaque fin de chapitre à partir du 40 ;
- *  - veilleurs : la nuit (chapitres 4 et 10), rondes et sentinelles portent une torche.
- */
-export function rosterFor(rank) {
-  const chapter = Math.ceil(rank / 10)
-  return {
-    scouts: rank === 9 || (rank >= 12 && rank % 3 === 0) ? (rank >= 45 ? 2 : 1) : 0,
-    scoutInside: rank >= 27 && rank % 4 === 3,
-    shields: rank === 19 || (rank >= 21 && rank % 4 === 1) ? (rank >= 61 ? 2 : 1) : 0,
-    engineers: rank === 26 || (rank >= 31 && rank % 5 === 1) ? 1 : 0,
-    engineerInside: rank >= 71 && rank % 5 === 1,
-    banner: rank === 33 || (rank >= 39 && rank % 6 === 3) || (rank >= 40 && rank % 10 === 0),
-    torches: chapter === 4 || chapter === 10,
-  }
-}
-
-/**
- * Pillards (v5.8) : des défenseurs qui, dès le premier tir, courent attaquer
- * l'engin du joueur (pendant le vol des tirs seulement). Abattez-les en
- * chemin, ou éteignez le feu avec un seau d'eau. Quand le terrain leur barre
- * la route, ils jettent un pont (lac, lave, glace) ou dressent une échelle
- * (montagne, plateau, douves au pied d'un plateau) : abattez l'ouvrage, et
- * ceux qui sont dessus tombent. Niveaux choisis à la main (une idée à la fois) :
- *
- *  présenter   17  une torche, seule, avec les premiers seaux d'eau
- *              32  l'échelle par-dessus une montagne
- *              34  le pont sur un lac
- *              36  le saboteur au marteau
- *              71  le pot de givre (hiver)   95  l'ogre qui charge
- *  développer  22, 28, 37 (descente d'un plateau), 42, 45 (pont sur la lave),
- *              51, 55, 63, 69, 72 (pont sur la glace), 77, 82, 84, 85…
- *  retourner   38  pont sur la lave ET échelle sur la montagne
- *              46  torche et saboteur ensemble ; 98 l'ogre par-dessus la montagne
- *  finales     40, 50, 60, 90 : deux torches à la fois ; 100 : deux torches et l'ogre
- */
-export const RAIDS = Object.freeze({
-  17: ['fire'],
-  22: ['fire'],
-  28: ['fire'],
-  32: ['fire'],
-  34: ['fire'],
-  36: ['blow'],
-  37: ['fire'],
-  38: ['fire'],
-  40: ['fire', 'fire'],
-  42: ['fire'],
-  45: ['fire'],
-  46: ['fire', 'blow'],
-  50: ['fire', 'fire'],
-  51: ['fire'],
-  55: ['fire'],
-  57: ['blow'],
-  60: ['fire', 'fire'],
-  63: ['fire'],
-  69: ['fire'],
-  71: ['frost'],
-  72: ['frost'],
-  76: ['blow'],
-  77: ['frost'],
-  81: ['blow'],
-  82: ['fire'],
-  84: ['fire'],
-  85: ['fire'],
-  90: ['fire', 'fire'],
-  95: ['smash'],
-  98: ['smash'],
-  100: ['fire', 'fire', 'smash'],
-})
-
-/** @returns {('fire' | 'frost' | 'blow' | 'smash')[]} */
-export function raidFor(rank) {
-  return RAIDS[rank] ?? []
-}
-
-/** Type du pillard selon ce qu'il porte. */
-export const RAIDER_TYPE = Object.freeze({ fire: 'scout', frost: 'scout', blow: 'engineer', smash: 'ogre' })
-
-/**
- * Barils et défenseurs supplémentaires (v5.0 : plus tôt et plus nombreux).
- * Des sentinelles montent aussi sur le toit plat le plus haut à partir du niveau 18.
- */
-export function garrisonFor(rank) {
-  return {
-    barrels: rank < 6 ? 0 : Math.min(4, 1 + Math.floor((rank - 6) / 20)),
-    guards: rank < 3 ? 0 : Math.min(5, 1 + Math.floor((rank - 3) / 12)),
-    sentries: rank < 18 ? 0 : Math.min(2, 1 + Math.floor((rank - 18) / 40)),
-    spire: rank >= 57 && rank % 3 === 0,
-  }
-}
-
-/**
- * Munitions (v5.0) : chaque munition se débloque tôt dans la campagne (rang du
- * niveau) et reste ensuite disponible au moins en un exemplaire.
- */
-// v6.1 : orbe d'orage (chevaliers et fer, niveau 22), botte de paille (barils perchés, 29), pot de poison (37).
-export const AMMO_UNLOCK = Object.freeze({ fire: 3, boulder: 5, frost: 7, bomb: 10, split: 14, thunder: 22, bale: 29, poison: 37 })
-
-/**
- * @param {number} rank
- * @param {Record<string, number>} ammo munitions prévues par le niveau
- * @param {{ cold?: boolean }} [terrain] terrain gelé ou brûlant : un givre de plus
- */
-export function ammoFor(rank, ammo, { cold = false } = {}) {
-  const out = { ...ammo }
-  for (const [type, at] of Object.entries(AMMO_UNLOCK)) {
-    if (rank < at) continue
-    let base = 1
-    if (type === 'boulder' && rank >= 20) base = 2
-    if (type === 'frost' && cold) base = 2
-    out[type] = Math.min(10, Math.max(out[type] ?? 0, base))
-  }
-  return out
-}
-
-/**
- * Terrains du niveau (v5.0), selon son rang et son chapitre :
- * lac (douves) dès le niveau 4, montagne dès le 8, corbeaux dès le 12, neige dès
- * le 16, lave dès le 24, vouivre dès le 27 ; chaque chapitre a ensuite sa
- * dominante (Marais : lacs, Désert : lave, Montagne : montagnes et lave,
- * Hiver : neige et lacs gelés, Tempête : corbeaux, Trône : un peu de tout).
- */
-export function terrainFor(rank) {
-  const c = Math.ceil(rank / 10)
-  const lava = (rank >= 24 && rank % 7 === 3) || (c === 6 && rank % 2 === 0) || (c === 7 && rank % 3 === 1) || (c === 10 && rank % 3 === 0)
-  const lake = !lava && ((rank >= 4 && rank % 5 === 4) || (c === 5 && rank % 2 === 1) || (c === 8 && rank % 3 === 0) || (c === 10 && rank % 4 === 1))
-  const snow = c === 8 || (rank >= 16 && rank % 9 === 7)
-  return {
-    lava,
-    lake,
-    frozenLake: lake && c === 8,
-    snow,
-    mountain: (rank >= 8 && rank % 6 === 2) || (c === 7 && rank % 2 === 0) || (c >= 9 && rank % 5 === 3),
-    crows: (rank >= 12 && rank % 4 === 0) || c === 9 ? Math.min(3, 1 + Math.floor(rank / 35)) : 0,
-    wyvern: (rank >= 27 && rank % 6 === 3) || (c === 10 && rank % 2 === 0),
-  }
+/** Matériau qui occupe le plus de surface dans le château (hors roche). */
+function dominantMaterial(blocks) {
+  const area = {}
+  for (const k of blocks) if (k.material !== 'rock') area[k.material] = (area[k.material] ?? 0) + k.w * k.h
+  return Object.entries(area).sort((p, q) => q[1] - p[1])[0]?.[0] ?? 'wood'
 }
 
 function extentOf(items) {
@@ -244,7 +62,7 @@ function extentOf(items) {
  * @param {{ blocks: object[], targets: object[], barrels: object[] }} b sortie du StructureBuilder (modifiée sur place)
  * @param {number} rank rang du niveau dans la campagne (1 à 100)
  */
-export function applyCurve(b, rank) {
+export function applyCurve(b, rank, { heroic = false } = {}) {
   const all = () => [...b.blocks, ...b.targets.map((t) => ({ ...t, w: TARGET_TYPES[t.type].w })), ...b.barrels.map((x) => ({ ...x, w: BARREL.w }))]
   // 1. Distance (bornée pour rester à portée).
   const ext0 = extentOf(all())
@@ -267,39 +85,87 @@ export function applyCurve(b, rank) {
     .map((it) => ({ l: it.x - (it.w ?? 30) / 2, r: it.x + (it.w ?? 30) / 2 }))
   const take = (x, w) => occupied.push({ l: x - w / 2, r: x + w / 2 })
   const free = (x, w) => occupied.every((o) => x + w / 2 + 6 <= o.l || x - w / 2 - 6 >= o.r)
+  // Aiguille de roche derrière le château (v6.2) : voir plus bas.
+  let rearSpire = false
+  // Emplacement libre au niveau du château, au plus près ; null s'il n'y en a plus
+  // (v6.2 : on renonçait au bout de 480 px en rendant une place déjà prise).
   const slot = (side, w, { guard = false } = {}) => {
     let x = side < 0 ? castle.left - w / 2 - 10 : castle.right + w / 2 + 10
-    for (let i = 0; i < 40 && !free(x, w); i++) x += side * 12
+    for (let i = 0; i < 120 && !free(x, w); i++) x += side * 12
     // Trop loin derrière le château (hors de portée du trébuchet), ou à l'abri de
     // tout tir (un défenseur, v6.1) : devant, alors.
     if (side > 0 && ((GUARDS_FRONT.has(rank) && x + w / 2 > REACH_RIGHT) || (guard && REAR_SHELTERED.has(rank)))) return slot(-1, w, { guard })
+    // Derrière l'aiguille de roche (v6.2), un défenseur s'abriterait de toute pierre :
+    // la roche tient l'arrière, personne ne s'y poste.
+    if (side > 0 && guard && rearSpire) return null
+    // Jamais sur le camp de l'engin, ni hors du monde.
+    if (!free(x, w) || x - w / 2 < FIELD_LEFT + 60 || x + w / 2 > MAX_RIGHT) return null
     take(x, w)
     return x
   }
   const extra = []
-  // Aiguille rocheuse derrière le château, un baril en équilibre au sommet.
+  // Le tablier d'un pont-levis s'abat vers l'engin : aucune aile là où il tombe
+  // (les gardes, eux, peuvent s'y tenir : c'est tout l'intérêt du pont-levis).
+  const landing = (b.hinges ?? []).map((h) => {
+    const hx = h.b.x + h.dx
+    return { l: hx - h.b.h - 16, r: hx }
+  })
+  occupied.push(...landing)
+  // Aiguille de roche, au plus près des murs : le baril qui tombe (ou explose)
+  // atteint le donjon. v6.2 : posée avant les ailes (l'aile arrière l'éloignait du
+  // donjon). La roche ne tombe jamais : un défenseur derrière elle s'y mettait à
+  // l'abri de toute pierre (il s'y réfugie même quand un tir arrive sur lui).
+  // Elle tient donc l'arrière : personne ne s'y poste (l'aile arrière, dont le
+  // garde la quitterait, passe devant), et rien dans son ombre : des barils, au-delà.
   let spireRock = null
   if (spire) {
     const castleTop = Math.min(...b.blocks.map((k) => k.y - k.h / 2))
     const h = Math.max(120, Math.min(320, Math.round((surface - castleTop) * 0.6)))
-    // Au plus près des murs : le baril qui tombe (ou explose) atteint le donjon.
-    const x = slot(1, 48)
-    spireRock = { material: 'rock', x, y: surface - h / 2, w: 48, h, shape: 'rect' }
-    extra.push({ kind: 'barrel', x, y: surface - h - BARREL.h / 2 - 1 })
+    const x = slot(1, SPIRE.W)
+    if (x !== null) {
+      spireRock = { material: 'rock', x, y: surface - h / 2, w: SPIRE.W, h, shape: 'rect' }
+      extra.push({ kind: 'barrel', x, y: surface - h - BARREL.h / 2 - 1 })
+      occupied.push({ l: x + SPIRE.W / 2, r: x + SPIRE.W / 2 + Math.round(h * SPIRE.SHADOW) })
+      rearSpire = x > castle.right
+    }
   }
+  // Ailes (v6.2) : accolées au château, devant (la seconde derrière, si on l'atteint).
+  // Chacune abrite un des gardes : autant de défenseurs qu'avant.
+  const wings = wingsFor(rank, dominantMaterial(b.blocks))
+  let wingGuards = 0
+  wings.forEach((wing, k) => {
+    let side = k === 0 ? -1 : 1
+    let x = side > 0 && !REAR_SHELTERED.has(rank) && !rearSpire ? slot(side, wing.w) : null
+    if (side > 0 && x !== null && x + wing.w / 2 > REACH_RIGHT) {
+      occupied.pop()
+      x = null
+    }
+    if (x === null) {
+      side = -1
+      x = slot(side, wing.w)
+    }
+    if (x === null) return
+    const type = rank >= 40 && k === 1 ? 'knight' : 'soldier'
+    // Baril perché : son garde se tient au pied du mur, côté château.
+    const guard = WING_BUILDERS[wing.id](b, x, surface, type, side)
+    if (guard) extra.push({ kind: 'target', type, ...guard })
+    wingGuards++
+  })
+  for (const zone of landing) occupied.splice(occupied.indexOf(zone), 1)
   const roster = rosterFor(rank)
   // Garde de la porte (v5.8) : dès le niveau 19, le premier garde posté devant
   // les murs est un pavoisier (son pavois arrête les tirs tendus).
   const special = (type, side, patrol, more = {}) => {
     const t = TARGET_TYPES[type]
-    extra.push({ kind: 'target', type, x: slot(side, t.w, { guard: true }), y: surface - t.h / 2 - 1, patrol, ...more })
+    const x = slot(side, t.w, { guard: true })
+    if (x !== null) extra.push({ kind: 'target', type, x, y: surface - t.h / 2 - 1, patrol, ...more })
   }
   const gateGuard = rank >= GATE_GUARD_FROM && roster.shields === 0
   for (let i = 0; i < roster.shields + (gateGuard ? 1 : 0); i++) special('shieldbearer', -1, 0)
   let replaced = gateGuard ? 1 : 0
   // Gardes : d'abord à l'abri derrière les murs, puis devant.
   const ogres = ogresFor(rank)
-  for (let i = 0; i < guards; i++) {
+  for (let i = 0; i < guards - wingGuards; i++) {
     // Chevaliers en armure parmi les gardes dès le niveau 15 (un sur deux) ;
     // ogres (v5.1) devant les murs, à la place des premiers gardes postés devant.
     let type = (rank >= 40 && i === guards - 1) || (rank >= 15 && i % 2 === 1) ? 'knight' : 'soldier'
@@ -310,6 +176,7 @@ export function applyCurve(b, rank) {
     }
     const t = TARGET_TYPES[type]
     const x = slot(i % 2 === 0 ? 1 : -1, t.w, { guard: true })
+    if (x === null) continue
     extra.push({ kind: 'target', type, x, y: surface - t.h / 2 - 1, patrol: rank >= PATROL_FROM ? (type === 'ogre' ? 40 : 60) : 0 })
   }
   // Défenseurs spéciaux (v5.8) : éclaireurs et sapeurs derrière (le second éclaireur devant).
@@ -334,15 +201,21 @@ export function applyCurve(b, rank) {
     const side = rank >= GATE_GUARD_FROM && !KEG_AT_GATE.has(rank) ? 1 : i % 2 === 0 ? -1 : 1
     let x = slot(side, BARREL.w)
     // Hors de portée du trébuchet derrière le château : devant, alors.
-    if (side > 0 && x + BARREL.w / 2 > REACH_RIGHT) {
-      occupied.pop()
+    if (side > 0 && (x === null || x + BARREL.w / 2 > REACH_RIGHT)) {
+      if (x !== null) occupied.pop()
       x = slot(-1, BARREL.w)
     }
+    if (x === null) continue
     extra.push({ kind: 'barrel', x, y: surface - BARREL.h / 2 - 1 })
   }
   // Pillards (v5.8) : postés devant, au plus loin, après les barils (rien ne leur
   // barre la route ; le terrain, eux, le franchissent : ponts et échelles).
-  for (const raid of raidFor(rank)) special(RAIDER_TYPE[raid], -1, 0, { raid, torch: raid === 'fire' })
+  // Embusqués (v6.2) : placés dans le champ une fois le terrain connu (étape 5).
+  const ambush = []
+  for (const raid of raidFor(rank, { heroic })) {
+    if (AMBUSH.has(rank)) ambush.push(raid)
+    else special(RAIDER_TYPE[raid], -1, 0, { raid, torch: raiderTorch(raid) })
+  }
   // Sentinelles : sur les dalles les plus hautes et assez larges (rien au-dessus).
   const roofs = b.blocks
     .filter((k) => k.shape === 'rect' && k.w >= 60 && k.w > k.h * 2 && k.material !== 'rock')
@@ -447,6 +320,14 @@ export function applyCurve(b, rank) {
   }
   b.zones.push(...zones)
   b.flyers.push(...flyers)
+  // Embuscade (v6.2) : dans le champ, devant la montagne et les douves, à bonne distance de l'engin.
+  ambush.forEach((raid, i) => {
+    const type = RAIDER_TYPE[raid]
+    const t = TARGET_TYPES[type]
+    const stop = Math.min(front, ...zones.map((z) => z.x0), ...rocks.filter((r) => r.shape === 'triangle' && r.x < front).map((r) => r.x - r.w / 2))
+    const x = Math.max(FIELD_LEFT, stop - 90 - i * 40)
+    b.targets.push({ type, x: Math.round(x), y: Math.round(G - t.h / 2 - 1), patrol: 0, raid, ...(raiderTorch(raid) ? { torch: true } : {}) })
+  })
   // La roche passe en premier : elle est posée avant le château.
   b.blocks.unshift(...rocks)
   for (const k of b.blocks) {

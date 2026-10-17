@@ -45,6 +45,11 @@ export class General extends Target {
     this.burnDps = this.maxHp * 0.9
   }
 
+  /** Où il en est de se relever (v6.2, lu par le dessin) : de 0 (il vient de tomber) à 1 (debout). */
+  get guardProgress() {
+    return this.guardMs > 0 ? 1 - this.guardMs / GUARD_MS : 1
+  }
+
   /** Il se relève, ou il a déjà perdu une vie pendant ce tir : intouchable (v6.1 : plus aucun dégât). */
   damage(amount, cause) {
     if (this.guardMs > 0 || this.shielded) return false
@@ -54,8 +59,8 @@ export class General extends Target {
   /** Coup mortel : une vie de moins, tant qu'il en reste. */
   kill(cause) {
     if (!this.alive) return
-    // Tombé hors du monde : rien ne le ramène.
-    const lost = this.y > WORLD.BOTTOM + WORLD.KILL_MARGIN
+    // Tombé hors du monde, ou projeté hors du champ de bataille (v6.2) : rien ne le ramène.
+    const lost = this.y > WORLD.BOTTOM + WORLD.KILL_MARGIN || this.x > WORLD.WIDTH + WORLD.FIELD_MARGIN
     if (!lost && (this.guardMs > 0 || this.shielded)) return
     if (!lost && this.lives > 1) {
       this.lives--

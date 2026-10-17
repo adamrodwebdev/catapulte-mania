@@ -5,6 +5,7 @@ import { PROFILE_NAME } from '../../domain/SaveSlot.js'
 import { ArenaRepository } from '../../game/levels/ArenaRepository.js'
 import { DuelRepository } from '../../game/levels/DuelRepository.js'
 import { HotSeatMatch } from '../../game/modes/HotSeatMatch.js'
+import { GAME } from '../../config/gameConfig.js'
 import StarRow from '../ui/StarRow.vue'
 import AppIcon from '../ui/AppIcon.vue'
 import ScreenHeader from '../ui/ScreenHeader.vue'
@@ -15,6 +16,9 @@ import ScreenHeader from '../ui/ScreenHeader.vue'
  */
 const app = useApp()
 const { state, t } = app
+/** Chapitres de la campagne à deux : ceux de la campagne. */
+const PER_CHAPTER = GAME.LEVELS_PER_CHAPTER
+const CHAPTERS = GAME.LEVEL_COUNT / PER_CHAPTER
 
 const FORMATS = [
   { id: 'coop', icon: 'map' },
@@ -43,10 +47,10 @@ const readySlots = computed(() => state.slots.filter((x) => x.status === 'ok'))
 async function pickProfile(index) {
   await app.openProfile(index)
   coopLevel.value = state.profile?.coop?.next ?? 1
-  coopChapter.value = Math.ceil(coopLevel.value / 10)
+  coopChapter.value = Math.ceil(coopLevel.value / PER_CHAPTER)
 }
-const coopChapter = ref(Math.ceil((state.profile?.coop?.next ?? 1) / 10))
-const coopLevels = computed(() => Array.from({ length: 10 }, (_, i) => (coopChapter.value - 1) * 10 + i + 1).filter((id) => coop.value?.levels[id]))
+const coopChapter = ref(Math.ceil((state.profile?.coop?.next ?? 1) / PER_CHAPTER))
+const coopLevels = computed(() => Array.from({ length: PER_CHAPTER }, (_, i) => (coopChapter.value - 1) * PER_CHAPTER + i + 1).filter((id) => coop.value?.levels[id]))
 
 const nameError = (i) => names.value[i].trim() !== '' && !PROFILE_NAME.test(names.value[i].trim())
 const canStart = computed(() => !nameError(0) && !nameError(1) && (format.value !== 'coop' || (coop.value && coop.value.levels[coopLevel.value]?.unlocked)))
@@ -105,11 +109,11 @@ function start() {
           <p class="field__desc">{{ t('mp.coopProfile') }} <strong>{{ state.profile.name }}</strong> · {{ t('mp.coopProgress', { done: coop.completed, stars: coop.stars }) }}</p>
           <div class="coop-chapters" role="group" :aria-label="t('mp.chaptersLabel')">
             <button
-              v-for="c in 10"
+              v-for="c in CHAPTERS"
               :key="c"
               type="button"
               :class="['btn', 'btn--chip', { 'btn--chip-on': coopChapter === c }]"
-              :disabled="!coop.levels[(c - 1) * 10 + 1]?.unlocked"
+              :disabled="!coop.levels[(c - 1) * PER_CHAPTER + 1]?.unlocked"
               :aria-pressed="coopChapter === c ? 'true' : 'false'"
               @click="coopChapter = c"
             >{{ t('mp.chapterShort', { n: c }) }}</button>

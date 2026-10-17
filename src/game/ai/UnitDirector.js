@@ -34,9 +34,13 @@ export const TORCH = Object.freeze({ RADIUS: 80, BURN_MS: 7000 })
  * deux fois plus vite), vitesse d'escalade (px par pas), largeur de prise
  * d'une échelle (un projectile qui passe plus près la renverse), et poussée
  * qui jette le grimpeur loin de la paroi quand l'échelle bascule (px par pas,
- * sous CONTACT_KILL_SPEED × 3 : la chute est visible avant l'impact).
+ * sous 1,5 px par pas : la chute est visible avant l'impact).
+ * v6.1 : ponts et échelles plus vite dressés, escalade plus rapide, et l'on
+ * descend en se laissant glisser le long des montants (DESCEND × la vitesse
+ * d'escalade) : le pillard qui franchissait une montagne, ou descendait d'un
+ * plateau, arrivait après la fin des tirs.
  */
-export const WORKS_TIMING = Object.freeze({ BUILD_MS: { bridge: 4000, ladder: 3000 }, CLIMB_SPEED: 0.55, LADDER_HIT: 12, FALL_PUSH: { x: 1.1, y: 0.7 } })
+export const WORKS_TIMING = Object.freeze({ BUILD_MS: { bridge: 2500, ladder: 2000 }, CLIMB_SPEED: 0.9, DESCEND: 1.8, LADDER_HIT: 12, FALL_PUSH: { x: 1.1, y: 0.7 } })
 /** Délai (ms) avant qu'un pont commandé soit bien posé dans le monde. */
 const BRIDGE_SPAWN_MS = 500
 /** Pillard qui se relève : rotation vers la verticale, par pas de simulation (≈ 1,4 rad/s). */
@@ -98,8 +102,28 @@ export class UnitDirector {
   #bridges = new Map()
   /** Engins du joueur que les pillards peuvent attaquer (fourni par la partie). */
   #engines = () => []
-  /** Vrai pendant le vol des tirs : les pillards avancent (fixé par la partie). */
-  marching = false
+  /**
+   * Course des pillards (v6.2) : chaque tir leur accorde une étape (voir
+   * RAID.LEG_MS) qu'ils courent pendant le tour puis, s'il a été bref, au début
+   * de la visée suivante ; leur rythme ne dépend plus de la durée du tour. Les
+   * outils et les tests peuvent aussi forcer la marche (`marching = true`).
+   */
+  #marchMs = 0
+  #forcedMarch = false
+  get marching() {
+    return this.#forcedMarch || this.#marchMs > 0
+  }
+  set marching(on) {
+    this.#forcedMarch = Boolean(on)
+  }
+  /** Un tir part : une étape de course de plus (tirer vite ne la raccourcit pas). */
+  grantMarch(ms) {
+    this.#marchMs += ms
+  }
+  /** Nouvelle étape du siège : plus de course en cours. */
+  resetMarch() {
+    this.#marchMs = 0
+  }
   /** Défenseurs au contact du sol pendant ce pas (vitesse appliquée), pour l'arrêt propre. */
   #vx = new WeakMap()
 
@@ -174,6 +198,7 @@ export class UnitDirector {
 
   /** Un pas de simulation (structure en place). */
   step() {
+    if (this.#marchMs > 0) this.#marchMs = Math.max(0, this.#marchMs - WORLD.STEP_MS)
     const port = this.#port
     // Un seul passage sur les entités : défenseurs, projectiles, feux.
     const units = []
@@ -529,12 +554,14 @@ export class UnitDirector {
         const dx = t.x - c.pos.x
         const dy = t.y - c.pos.y
         const d = Math.hypot(dx, dy)
-        if (d <= left) {
+        // En descente, il glisse le long des montants (v6.1).
+        const k = dy > 0 ? WORKS_TIMING.DESCEND : 1
+        if (d <= left * k) {
           c.pos = { x: t.x, y: t.y }
           c.seg++
-          left -= d
+          left -= d / k
         } else {
-          c.pos = { x: c.pos.x + (dx / d) * left, y: c.pos.y + (dy / d) * left }
+          c.pos = { x: c.pos.x + (dx / d) * left * k, y: c.pos.y + (dy / d) * left * k }
           if (Math.abs(dx) > 0.5) u.facing = Math.sign(dx)
           left = 0
         }

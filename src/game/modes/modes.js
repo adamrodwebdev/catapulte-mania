@@ -2,10 +2,12 @@ import { GameMode } from './GameMode.js'
 import { NO_EFFECTS } from '../progression/UpgradeCatalog.js'
 import { LevelRepository } from '../levels/LevelRepository.js'
 import { renownSum, COUP_DE_GRACE } from './Renown.js'
+import { HEROIC } from '../progression/Mastery.js'
 
 /** Mode histoire : un joueur, résultat enregistré (or, étoiles, déblocages). */
 export class StoryMode extends GameMode {
   id = 'story'
+  campaignAids = true
   recordsResult = true
 
   /**
@@ -24,6 +26,34 @@ export class StoryMode extends GameMode {
     }
     return out
   }
+}
+
+/**
+ * Campagne héroïque (v6.2, « nouvelle partie + ») : la campagne pour qui la
+ * maîtrise. Châteaux plus solides, un tir de moins (jamais moins de deux),
+ * vent plus fort ; les niveaux ont un pillard de plus (LevelRepository.heroic).
+ * Le résultat donne des médailles (Campagne héroïque), ni or ni succès.
+ */
+export class HeroicMode extends StoryMode {
+  id = 'heroic'
+  // Pour qui maîtrise déjà la campagne : sans ses aides de débutant.
+  campaignAids = false
+  /** Points de vie des blocs et des défenseurs, solidité des jonctions (voir GameSession). */
+  fortify = HEROIC.FORTIFY
+  windFactor = HEROIC.WIND
+
+  shotsFor(level, difficulty) {
+    return Math.max(2, super.shotsFor(level, difficulty) + HEROIC.SHOTS)
+  }
+}
+
+/**
+ * Terres du Duc (v6.2) : le chapitre secret de la maîtrise, cinq châteaux.
+ * Règles de la campagne ; le résultat donne des médailles.
+ */
+export class DukeMode extends StoryMode {
+  id = 'duke'
+  campaignAids = false
 }
 
 /**
@@ -124,6 +154,7 @@ export class HotSeatMode extends GameMode {
  */
 export class CoopMode extends StoryMode {
   id = 'coop'
+  campaignAids = false
   coupDeGrace = true
   sharedScore = true
 
@@ -162,6 +193,7 @@ export class CoopMode extends StoryMode {
  */
 export class VersusMode extends GameMode {
   id = 'versus'
+  twoCamps = true
   powersEnabled = false
   destructionGauge = false
 
@@ -247,6 +279,7 @@ export class CustomMode extends ChallengeMode {
  */
 export class EndlessMode extends StoryMode {
   id = 'endless'
+  campaignAids = false
   // Un château par vague : pas d'étapes ni de général (voir GameMode#grandSiege).
   grandSiege = false
 
@@ -279,6 +312,10 @@ export function createMode(id, opts) {
   switch (id) {
     case 'story':
       return new StoryMode(opts)
+    case 'heroic':
+      return new HeroicMode(opts)
+    case 'duke':
+      return new DukeMode(opts)
     case 'free':
       return new FreeMode(opts)
     case 'duel':

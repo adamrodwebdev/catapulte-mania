@@ -7,15 +7,23 @@ import { SeededRandom } from '../../core/utils/SeededRandom.js'
 import { StructuralIntegrity } from './StructuralIntegrity.js'
 import { TerrainZones, TERRAIN } from './Terrain.js'
 import { Block } from '../entities/Block.js'
-import { FROST, ELEMENT_HIT_CAP, THUNDER, POISON, TARGET_TYPES } from '../entities/catalog.js'
-import { Clouds, CLOUD_KINDS } from './Clouds.js'
+import { FROST, THUNDER } from '../entities/catalog.js'
+import { Clouds } from './Clouds.js'
 import { Props } from './Props.js'
+import { CastleJoints } from './CastleJoints.js'
+import { KEYSTONE } from './castleRules.js'
+import { ElementCombos } from './ElementCombos.js'
 import { MILL } from '../entities/props.js'
 import { WORLD_WINDS, EXPOSURE_ELEMENTS, THERMAL, exposureStep, applyElement } from './WorldWinds.js'
 import { Tethers } from './Tethers.js'
-import { canPush, hitDamage, fallDamage } from './FallingObjects.js'
+import { HOT_BALL_MS, BREACH_DAMPING, BREACH_LIGHT_HP, BREACH_HEAVY_MASS, POWER } from './physicsRules.js'
+import { DefenderContacts } from './DefenderContacts.js'
+import { ElementReactions } from './ElementReactions.js'
 
-const { Engine, Composite, Bodies, Body, Events, Sleeping, Query, Vertices } = Matter
+const { Engine, Composite, Bodies, Body, Events, Sleeping, Vertices } = Matter
+
+/** Règles physiques (v6.2 : voir physicsRules.js), réexportées sous leurs noms d'origine. */
+export { HOT_BALL_MS, BREACH_DAMPING, BREACH_LIGHT_HP, BREACH_HEAVY_MASS, OGRE_SWAT_MS, PUSHED_SAFE_MS, KNOCKDOWN_SHARE, POWER } from './physicsRules.js'
 
 /**
  * Monde physique : encapsule Matter.js et applique les règles du jeu.
@@ -44,39 +52,14 @@ const { Engine, Composite, Bodies, Body, Events, Sleeping, Query, Vertices } = M
  *    cible emmurée ;
  *  - un mur porteur frappé assez fort cède et fait s'effondrer ce qu'il soutient ;
  *  - rien ne reste suspendu dans le vide quand son appui disparaît.
+ *
+ * Organisation (v6.2) : le monde garde l'ordre du pas de simulation, l'aiguillage
+ * des contacts, le registre des entités et le nettoyage. Les règles vivent dans
+ * des collaborateurs, chacun avec un port étroit vers le monde :
+ * physicsRules.js (seuils et délais), DefenderContacts.js (défenseurs au contact),
+ * ElementReactions.js (feu, givre, vapeur, foudre, nuages) et ElementCombos.js
+ * (combos d'éléments).
  */
-/** Durée pendant laquelle un boulet enflammé reste brûlant après son premier choc (ms). */
-export const HOT_BALL_MS = 4500
-
-/**
- * Percée (v5.0) : un projectile dont le choc suffit à détruire le bloc qu'il
- * frappe le traverse au lieu de s'y arrêter, en gardant l'énergie qui reste
- * (vitesse × √(1 − résistance / choc), un peu amortie). Un boulet lourd perce
- * ainsi plusieurs murs d'affilée ; une pierre légère s'arrête au premier.
- */
-export const BREACH_DAMPING = 0.9
-/** Matériaux légers (résistance ≤ ce seuil) : n'importe quel projectile peut les percer. */
-export const BREACH_LIGHT_HP = 300
-/** Masse à partir de laquelle un projectile perce aussi la pierre (rocher : ≈ 29, pierre : ≈ 8). */
-export const BREACH_HEAVY_MASS = 20
-
-/** Délai entre deux revers de l'ogre (ms). La marche des défenseurs : voir ../ai/. */
-export const OGRE_SWAT_MS = 900
-
-/** Un objet repoussé par un défenseur ne blesse personne pendant ce délai (ms, v6.1). */
-export const PUSHED_SAFE_MS = 700
-/** Même objet, même défenseur : un seul coup par contact prolongé dans ce délai (ms). */
-const RESTRIKE_MS = 250
-/** Renversé (v6.1) : part de ses points de vie qu'il perd en tombant, avant de se relever. */
-export const KNOCKDOWN_SHARE = 0.35
-/**
- * Puissance d'un tir (v6.1) : au-delà de MIN_ENERGY, le bloc frappé reçoit en
- * plus SHARE de la quantité de mouvement du projectile, dans le sens du tir (les
- * murs encaissent le coup, les blocs volent). Jamais vers le bas : un tir en
- * cloche n'enfonce pas le bloc dans le sol.
- */
-export const POWER = Object.freeze({ MIN_ENERGY: 150, SHARE: 0.3 })
-
 export class PhysicsWorld {
   /** @type {Map<number, import('../entities/Entity.js').Entity>} */
   #entities = new Map()
@@ -88,10 +71,21 @@ export class PhysicsWorld {
   #rng
   /** Vrai dès le premier tir : avant, la structure se met en place sans conséquence. */
   #armed = false
+  /** Clés de voûte du château en place (v6.2), surveillées à chaque pas. */
+  #keystones = []
+  /** Assemblage (v6.2) : demandé par la partie, et à faire au pas où le château est posé. */
+  #jointsEnabled = false
+  #jointsPending = false
+  /** Solidité des jonctions (v6.2 : châteaux renforcés de la Campagne héroïque). */
+  #jointToughness = 1
+  /** Le monde a-t-il reçu des défenseurs ? (voir #retireStrays) */
+  #hadTargets = false
   /** Début de la stabilisation en cours (0 au départ ; une nouvelle étape la relance, v6.0). */
   #settleFrom = 0
   /** Appelé avant chaque pas de simulation (effets programmés de la partie, v6.0). */
   beforeStep = null
+  /** Appelé à la fin de chaque pas (v6.2 : état de l'engin, au pas, en partie comme en relecture). */
+  afterStep = null
   #pinTick = 0
   #supportTick = 0
   #ground
@@ -102,19 +96,17 @@ export class PhysicsWorld {
   terrain
   /** Objets créés pendant un pas (pot lâché par une vouivre, croûte de lave) : ajoutés après le pas. */
   #spawns = []
-  /** Vapeur en chaîne : blocs gelés voisins qui éclatent à leur tour, avec un court délai. */
-  #steamQueue = []
-  /** Dernier coup reçu par chaque défenseur (contacts prolongés) : { o, at }. */
-  #struckAt = new WeakMap()
-  /** Pas depuis la dernière mise à feu par un jet de forge (v6.1). */
-  #flameTick = 0
+  /** Règles des défenseurs au contact (v6.2, voir DefenderContacts.js). */
+  #defenders
+  /** Réactions des éléments (v6.2) : feu, givre, vapeur, foudre, nuages (voir ElementReactions.js). */
+  #reactions
 
   /**
    * @param {import('../../core/utils/EventBus.js').EventBus} events
    * @param {{ wind?: number, seed?: number, windProfile?: object }} [opts] wind ∈ [-1, 1] ;
    *   graine du hasard (feu, éclats, rafales) ; profil de vent de la difficulté
    */
-  constructor(events, { wind = 0, seed = 1, windProfile = WIND_PROFILES.normal, zones = [] } = {}) {
+  constructor(events, { wind = 0, seed = 1, windProfile = WIND_PROFILES.normal, zones = [], joints = false, jointToughness = 1 } = {}) {
     this.#events = events
     this.terrain = new TerrainZones(zones)
     this.#rng = new SeededRandom(seed)
@@ -129,7 +121,7 @@ export class PhysicsWorld {
       groundY: WORLD.GROUND_Y,
       width: WORLD.WIDTH,
       blockedAt: (x, y, self, withTargets = true) => this.#blocked(x, y, self, withTargets),
-      heat: (e, ms) => this.#heat(e, ms),
+      heat: (e, ms) => this.#reactions.heat(e, ms),
       emit: (name, data) => this.#events.emit(name, data),
       armed: () => this.#armed,
       left: () => Math.min(-300, this.leftLimit - 100),
@@ -164,6 +156,16 @@ export class PhysicsWorld {
     this.#ground = ground
     /** Mécanismes des châteaux (v6.0) : cordes, chaînes, charnières. */
     this.tethers = new Tethers(this.engine.world, events)
+    /** Assemblage du château (v6.2) : jonctions, clés de voûte (voir CastleJoints.js). */
+    this.joints = new CastleJoints(this.engine.world, events)
+    /** Combos d'éléments (v6.2) : fer rougi, trempe, fer électrisé, eau électrisée, éclats de glace (voir ElementCombos.js). */
+    this.combos = new ElementCombos(this.#makeComboPort())
+    this.#defenders = new DefenderContacts(this.#makeDefenderPort())
+    this.#reactions = new ElementReactions(this.#makeReactionPort())
+    // Soudé au pas où le château est posé (horloge du monde : relectures identiques).
+    this.#jointsEnabled = Boolean(joints)
+    this.#jointsPending = this.#jointsEnabled
+    this.#jointToughness = Math.max(1, Number(jointToughness) || 1)
     /** Nuages (v6.1) : poison, miasmes, farine, essaims (voir Clouds.js). */
     this.clouds = new Clouds()
     /** Ouvrages (v6.1) : moulins, forges, citernes, ruches, farine (voir Props.js). */
@@ -178,6 +180,12 @@ export class PhysicsWorld {
     /** Souffle du monde (v6.1, voir WorldWinds.js) et colonnes d'air chaud (Montagne). */
     this.worldWind = WORLD_WINDS.breeze
     this.thermals = []
+    /**
+     * Zone de jeu (v6.2), fixée par la partie à l'arrivée du château : un boulet
+     * qui roule au-delà, après l'impact, n'a plus rien à y faire (voir #retireStrays).
+     * @type {{ left: number, right: number } | null}
+     */
+    this.playZone = null
 
     this._onCollision = (e) => this.#handleCollisions(e.pairs)
     this._onActive = (e) => this.#handleActiveContacts(e.pairs)
@@ -250,8 +258,121 @@ export class PhysicsWorld {
     return this.#armed
   }
 
+  /**
+   * Assemblage (v6.2, voir CastleJoints.js) : soude le château posé. Fait de
+   * lui-même au pas où le monde est posé (option `joints` de la partie).
+   */
+  buildJoints() {
+    this.#keystones = this.filter((e) => e.kind === 'block' && e.keystone && e.alive)
+    this.joints.build(this.#entities.values(), { groundY: WORLD.GROUND_Y, keystones: new Set(this.#keystones), toughness: this.#jointToughness })
+  }
+
+  /**
+   * Ce que les combos d'éléments peuvent faire au monde (v6.2, voir
+   * ElementCombos.js : leurs règles et leurs effets y sont tous).
+   * @returns {import('./ElementCombos.js').ComboPort}
+   */
+  #makeComboPort() {
+    const world = this
+    return {
+      get time() {
+        return world.#time
+      },
+      get armed() {
+        return world.#armed
+      },
+      entities: () => world.#entities.values(),
+      queryRadius: (x, y, r) => world.queryRadius(x, y, r),
+      ignite: (e) => world.#reactions.heat(e, 6000),
+      burn: (t, dmg) => {
+        if (world.#armed) world.#defenders.hurt(t, dmg, 'fire', 0, { knock: false })
+      },
+      shock: (t, dmg) => {
+        if (world.#armed) world.#reactions.shock(t, dmg)
+      },
+      hurt: (t, dmg, cause, dir) => world.#defenders.hurt(t, dmg, cause, dir),
+      emit: (name, data) => world.#events.emit(name, data),
+    }
+  }
+
+  /**
+   * Ce que les règles des défenseurs peuvent lire et faire du monde (v6.2,
+   * voir DefenderContacts.js).
+   * @returns {import('./DefenderContacts.js').DefenderPort}
+   */
+  #makeDefenderPort() {
+    const world = this
+    return {
+      get time() {
+        return world.#time
+      },
+      entities: () => world.#entities.values(),
+      filter: (predicate) => world.filter(predicate),
+      entityOf: (body) => world.#entityOf(body),
+      emit: (name, data) => world.#events.emit(name, data),
+    }
+  }
+
+  /**
+   * Ce que les réactions des éléments peuvent lire et faire du monde (v6.2,
+   * voir ElementReactions.js). Le hasard est celui du monde (même suite de tirages).
+   * @returns {import('./ElementReactions.js').ReactionPort}
+   */
+  #makeReactionPort() {
+    const world = this
+    return {
+      get time() {
+        return world.#time
+      },
+      get armed() {
+        return world.#armed
+      },
+      get rng() {
+        return world.#rng
+      },
+      entities: () => world.#entities.values(),
+      filter: (predicate) => world.filter(predicate),
+      queryRadius: (x, y, r) => world.queryRadius(x, y, r),
+      queueExplosion: (x, y, spec) => world.#pendingExplosions.push({ at: world.#time, x, y, spec }),
+      emit: (name, data) => world.#events.emit(name, data),
+      get clouds() {
+        return world.clouds
+      },
+      get props() {
+        return world.props
+      },
+      get windField() {
+        return world.windField
+      },
+      get weather() {
+        return world.weather
+      },
+      get worldWind() {
+        return world.worldWind
+      },
+      get combos() {
+        return world.combos
+      },
+    }
+  }
+
+  /**
+   * Point sensible (v6.2) : une clé de voûte entamée (KEYSTONE.GIVE de sa vie) se
+   * désagrège ; tout ce qu'elle portait s'effondre.
+   */
+  #checkKeystones() {
+    for (const e of this.#keystones) {
+      if (!e.alive || e.keystoneGone || e.hp > e.maxHp * (1 - KEYSTONE.GIVE)) continue
+      e.keystoneGone = true
+      this.joints.release(e)
+      this.#events.emit('keystone', { entity: e, x: e.x, y: e.y, material: e.material })
+      e.kill('crumble')
+    }
+  }
+
   add(entity) {
     if (entity.kind === 'projectile') this.arm()
+    if (entity.kind === 'target') this.#hadTargets = true
     this.#entities.set(entity.body.id, entity)
     Composite.add(this.engine.world, entity.body)
     return entity
@@ -280,6 +401,10 @@ export class PhysicsWorld {
     this.structure.clear()
     this.units.reset()
     this.tethers.clear()
+    this.joints.clear()
+    this.combos.clear()
+    this.#keystones = []
+    this.#jointsPending = this.#jointsEnabled
     this.clouds.clear()
     this.props.clear()
   }
@@ -308,32 +433,62 @@ export class PhysicsWorld {
     this.#time += WORLD.STEP_MS
     for (const e of this.#entities.values()) e.update(WORLD.STEP_MS)
     this.tethers.step(this.#entities.values(), this.#time)
+    // Assemblage (v6.2) : soudure du château posé, usure des jonctions, clés de voûte.
+    if (this.#jointsPending && this.settled) {
+      this.#jointsPending = false
+      this.buildJoints()
+    }
+    this.joints.step(WORLD.STEP_MS)
+    if (this.#keystones.length) this.#checkKeystones()
+    this.combos.step(WORLD.STEP_MS)
     // Ouvrages (v6.1) : rafales des moulins, flammes des forges.
     this.props.step(this.#entities.values(), this.#time, WORLD.STEP_MS, { engineX: () => this.engineX, emit: (name, data) => this.#events.emit(name, data) })
-    if (this.props.flames.length) this.#stepFlames()
+    if (this.props.flames.length) this.#reactions.stepFlames()
     this.#flushSpawns()
     this.#rollSnowballs()
-    this.#processSteam()
+    this.#reactions.processSteam()
     // Défenseurs (v5.8) : navigation, esquives, réparations (voir ../ai/UnitDirector.js).
     if (this.settled) this.units.step()
     // Nuages et poison (v6.1).
-    this.#stepClouds()
+    this.#reactions.stepClouds()
     this.#fireTick += WORLD.STEP_MS
     if (this.#fireTick >= 400) {
       this.#fireTick = 0
-      this.#spreadFire()
+      this.#reactions.spreadFire()
     }
     this.#processExplosions()
     if (this.#armed && ++this.#pinTick >= WORLD.PIN_CHECK_EVERY) {
       this.#pinTick = 0
-      this.#checkPinned()
-      this.#checkKnockouts(WORLD.STEP_MS * WORLD.PIN_CHECK_EVERY)
+      this.#defenders.checkPinned()
+      this.#defenders.checkKnockouts(WORLD.STEP_MS * WORLD.PIN_CHECK_EVERY)
     }
     if (++this.#supportTick >= WORLD.SUPPORT_CHECK_EVERY) {
       this.#supportTick = 0
       this.#checkSupports()
     }
+    this.#retireStrays()
     this.#cleanup()
+    this.afterStep?.()
+  }
+
+  /**
+   * Boulets hors jeu (v6.2) : après l'impact, un tir qui file au-delà du château,
+   * repart vers l'engin ou survit à la dernière cible ne fait plus rien pour la
+   * partie. Il s'efface (petit nuage de poussière) au lieu de retenir la caméra
+   * et le tour jusqu'à ce qu'il s'arrête. Décidé au pas de simulation : les
+   * relectures restent identiques.
+   */
+  #retireStrays() {
+    const zone = this.playZone
+    let standing = null
+    for (const e of this.#entities.values()) {
+      if (e.kind !== 'projectile' || !e.alive || e.spent || !e.hasImpacted) continue
+      // « Plus personne debout » ne vaut que pour un château qui avait des défenseurs.
+      standing ??= !this.#hadTargets || this.filter((t) => t.kind === 'target' && t.alive).length > 0
+      const vx = Body.getVelocity(e.body).x
+      const away = zone && ((e.x > zone.right && vx >= 0) || (e.x < zone.left && vx < -0.3))
+      if (!standing || away) e.spent = true
+    }
   }
 
   /**
@@ -361,59 +516,6 @@ export class PhysicsWorld {
       const o = e.body.bounds
       const overlapX = Math.min(o.max.x, bounds.max.x + 30) - Math.max(o.min.x, bounds.min.x - 30)
       if (overlapX > 0 && o.min.y <= bounds.max.y + 5) Sleeping.set(e.body, false)
-    }
-  }
-
-  /**
-   * Cible renversée (v6.1) : au bout de KNOCKOUT_MS à terre, elle perd une part
-   * de ses points de vie (KNOCKDOWN_SHARE), puis se relève (UnitDirector) ; si
-   * c'était de trop, elle est hors de combat.
-   */
-  #checkKnockouts(dtMs) {
-    for (const t of this.#entities.values()) {
-      if (t.kind !== 'target' || !t.alive || t.climbing) continue
-      const tilt = Math.abs(Math.atan2(Math.sin(t.angle), Math.cos(t.angle)))
-      t.downMs = tilt > WORLD.KNOCKOUT_ANGLE ? (t.downMs || 0) + dtMs : 0
-      if (tilt <= WORLD.KNOCKOUT_ANGLE * 0.6) t.knockedDown = false
-      if (t.downMs >= WORLD.KNOCKOUT_MS && !t.knockedDown) {
-        t.knockedDown = true
-        this.#hurt(t, t.maxHp * KNOCKDOWN_SHARE, 'knockout', 0, { knock: false })
-      }
-    }
-  }
-
-  /**
-   * Cibles coincées. On place des points de contrôle juste au-dessus et de part
-   * et d'autre de chaque cible (dans le repère du monde) :
-   *  - un bloc qui occupe un point du dessus repose sur la cible → écrasée ;
-   *  - des blocs qui occupent à la fois la gauche et la droite → prise en étau.
-   */
-  #checkPinned() {
-    const blocks = this.filter((e) => e.kind === 'block' && e.alive).map((e) => e.body)
-    if (!blocks.length) return
-    const d = WORLD.PIN_PROBE
-    // À l'échelle (v5.8), un défenseur longe la roche : il n'y est pas coincé.
-    for (const t of this.filter((e) => e.kind === 'target' && e.alive && e.type !== 'ogre' && !e.climbing)) {
-      const b = t.body.bounds
-      const w = b.max.x - b.min.x
-      const h = b.max.y - b.min.y
-      const near = Query.region(blocks, { min: { x: b.min.x - d * 2, y: b.min.y - d * 2 }, max: { x: b.max.x + d * 2, y: b.max.y + d * 2 } })
-      if (!near.length) continue
-      const hit = (pts) => near.some((body) => pts.some((p) => Vertices.contains(body.vertices, p)))
-      const top = [0.3, 0.5, 0.7].map((k) => ({ x: b.min.x + w * k, y: b.min.y - d }))
-      const left = [0.35, 0.65].map((k) => ({ x: b.min.x - d, y: b.min.y + h * k }))
-      const right = [0.35, 0.65].map((k) => ({ x: b.max.x + d, y: b.min.y + h * k }))
-      const load = near.find((body) => top.some((p) => Vertices.contains(body.vertices, p)))
-      if (load) {
-        // Une charge assez légère (v6.1) : il la soulève et la rejette de côté (sonné,
-        // il attend d'avoir repris ses esprits ; elle ne l'écrase pas pour autant).
-        const e = this.#entityOf(load)
-        // Un tablier sur sa charnière, une charge à sa corde : on ne les soulève pas.
-        const liftable = e && e.mass <= t.pushCapacity && !e.hinged && !(e.tethered > 0) && !e.body.isStatic
-        if (liftable) {
-          if (t.ableAt(this.#time)) this.#push(t, e, null)
-        } else t.kill('pinned')
-      } else if (hit(left) && hit(right)) t.kill('squeezed')
     }
   }
 
@@ -460,10 +562,13 @@ export class PhysicsWorld {
     this.#events.emit('explosion', { x, y, radius, source })
     // Un nuage de gaz ou de farine pris dans le souffle s'embrase à son tour (v6.1).
     for (const c of this.clouds.list) {
-      if (Math.hypot(c.x - x, c.y - y) <= radius + this.clouds.radiusAt(c, this.#time) * 0.6) this.#cloudBlast(c)
+      if (Math.hypot(c.x - x, c.y - y) <= radius + this.clouds.radiusAt(c, this.#time) * 0.6) this.#reactions.cloudBlast(c)
     }
     this.units.onBlast(x, y, radius)
     this.tethers.blast(x, y, radius, this.#time)
+    this.joints.blast(x, y, radius)
+    // Éclats de glace (v6.2) : la glace et ce qui est gelé, pris dans le souffle, volent en éclats.
+    const icy = this.combos.brittleIn(x, y, radius)
     for (const e of this.queryRadius(x, y, radius + 30)) {
       if (e === source) continue
       const dx = e.x - x
@@ -483,9 +588,10 @@ export class PhysicsWorld {
       Body.setAngularVelocity(e.body, e.body.angularVelocity + (this.#rng.next() - 0.5) * 0.2 * falloff)
       if (e.kind !== 'projectile') {
         e.damage(damage * falloff, 'explosion')
-        if (falloff > 0.35) this.#heat(e, 5000)
+        if (falloff > 0.35) this.#reactions.heat(e, 5000)
       }
     }
+    if (icy.length) this.combos.shards(icy)
   }
 
   /**
@@ -536,12 +642,12 @@ export class PhysicsWorld {
       this.#events.emit('lightning', { x: e.x, y: top, entity: e })
       if (e.kind === 'target') e.kill('lightning')
       else if (e.kind === 'barrel') e.kill('explosion')
-      else if (e.frozenMs > 0) this.#steam(e)
+      else if (e.frozenMs > 0) this.#reactions.steam(e)
       else e.damage((e.material === 'iron' ? 0.55 : 1.05) * e.maxHp, 'explosion')
       for (const near of this.queryRadius(e.x, top + 30, 60)) {
         if (near === e || near.kind === 'flyer' || near.kind === 'projectile') continue
         near.damage(near.kind === 'target' ? 999 : 160, 'explosion')
-        this.#heat(near, 6000)
+        this.#reactions.heat(near, 6000)
         Sleeping.set(near.body, false)
       }
     }
@@ -617,31 +723,6 @@ export class PhysicsWorld {
   }
 
   /**
-   * Flammes des ouvrages (v6.1) : un projectile qui traverse la colonne de feu
-   * d'une forge s'enflamme (le givre, lui, y fond) ; le jet craché dans une
-   * rafale met le feu à ce qu'il lèche (toutes les 0,3 s).
-   */
-  #stepFlames() {
-    const jetTick = ++this.#flameTick >= 36
-    if (jetTick) this.#flameTick = 0
-    for (const e of this.#entities.values()) {
-      if (!e.alive) continue
-      if (e.kind === 'projectile') {
-        if (e.spent || !this.props.flameAt(e.x, e.y, e.radius * 0.5)) continue
-        if (e.frost) {
-          e.frost = false
-          this.#events.emit('steam', { x: e.x, y: e.y, radius: 30, entity: null })
-        } else if (e.kindle()) this.#events.emit('fire:start', { entity: e })
-        continue
-      }
-      if (!jetTick || e.kind === 'flyer' || e.burning > 0) continue
-      const b = e.body.bounds
-      const licked = this.props.flames.some((f) => f.jet && b.max.x >= f.x0 && b.min.x <= f.x1 && b.max.y >= f.y0 && b.min.y <= f.y1)
-      if (licked) this.#heat(e, 5000)
-    }
-  }
-
-  /**
    * Pierre d'aimant : avant son premier choc, le projectile infléchit sa course
    * vers le défenseur vivant le plus proche devant lui (virage borné à chaque
    * pas : on peut encore le rater si on vise trop mal).
@@ -693,10 +774,10 @@ export class PhysicsWorld {
 
       // Ogre : il renvoie les projectiles légers et repousse les blocs qui lui tombent dessus.
       const ogre = a?.type === 'ogre' ? a : b?.type === 'ogre' ? b : null
-      if (ogre && this.#ogreReacts(ogre, ogre === a ? b : a, pair)) continue
+      if (ogre && this.#defenders.ogreReacts(ogre, ogre === a ? b : a, pair)) continue
       // Pavoisier (v5.8) : son pavois arrête les tirs tendus qui le frappent de face.
       const shield = a?.shield ? a : b?.shield ? b : null
-      if (shield && this.#shieldReacts(shield, shield === a ? b : a, pair)) continue
+      if (shield && this.#defenders.shieldReacts(shield, shield === a ? b : a, pair)) continue
 
       // Créature volante : elle stoppe le projectile (capteur, pas de rebond).
       if (a?.kind === 'flyer' || b?.kind === 'flyer') {
@@ -711,7 +792,7 @@ export class PhysicsWorld {
 
       // Défenseurs (v6.1) : repousser, encaisser, chuter. Avant les effets du
       // projectile : le givre ne rend pas cassant celui qu'il vient de frapper.
-      if (this.#armed && (a?.kind === 'target' || b?.kind === 'target')) this.#targetContact(a, b, rel, pair)
+      if (this.#armed && (a?.kind === 'target' || b?.kind === 'target')) this.#defenders.contact(a, b, rel, pair)
 
       // Premier contact d'un projectile : effets spéciaux (feu, givre, explosion).
       for (const [p, other] of [[a, b], [b, a]]) {
@@ -720,22 +801,21 @@ export class PhysicsWorld {
         if (p && p.kind === 'projectile' && !p.hasImpacted && p.alive) {
           p.hasImpacted = true
           // Orbe d'orage et pot de poison (v6.1). Un tir chargé par l'orage décharge à l'impact.
-          if (p.thunder || p.charged) this.#discharge(p, other, { hops: p.thunder ? THUNDER.HOPS + (p.charged ? this.worldWind.hops ?? 2 : 0) : this.worldWind.hops ?? 2, scale: p.thunder ? 1 : 0.6 })
+          if (p.thunder || p.charged) this.#reactions.discharge(p, other, { hops: p.thunder ? THUNDER.HOPS + (p.charged ? this.worldWind.hops ?? 2 : 0) : this.worldWind.hops ?? 2, scale: p.thunder ? 1 : 0.6 })
           if (p.poison) {
-            const c = this.clouds.spawn('poison', p.x, p.y, this.#time, { scale: p.fireFactor ?? 1 })
-            this.#events.emit('cloud', { kind: 'poison', x: c.x, y: c.y, r: c.r, event: 'spawn' })
+            const c = this.#reactions.spawnCloud('poison', p.x, p.y, { scale: p.fireFactor ?? 1 })
             // Un pot qui brûle (vent de braises, forge) : le gaz s'embrase aussitôt.
-            if (p.ignites) this.#cloudBlast(c)
+            if (p.ignites) this.#reactions.cloudBlast(c)
             p.kill('shatter')
           }
           if (p.ignites) p.heatMs = HOT_BALL_MS * p.fireFactor
-          if (p.ignites && other) this.#heat(other, 7000)
+          if (p.ignites && other) this.#reactions.heat(other, 7000)
           if (p.ignites) {
             for (const near of this.queryRadius(p.x, p.y, 95 * p.fireFactor)) {
-              if (near !== p && near !== other) this.#heat(near, 6000)
+              if (near !== p && near !== other) this.#reactions.heat(near, 6000)
             }
           }
-          if (p.frost) this.#frostBurst(p)
+          if (p.frost) this.#reactions.frostBurst(p)
           // Météore : le piqué s'achève en onde de choc.
           if (p.diving) this.#pendingExplosions.push({ at: this.#time, x: p.x, y: p.y, spec: { radius: 135, power: 10, damage: 900, source: p } })
           if (p.explodes) {
@@ -744,7 +824,7 @@ export class PhysicsWorld {
           }
         } else if (p && p.kind === 'projectile' && p.hasImpacted && p.hot && other && (other.flammable || other.frozenMs > 0)) {
           // Boulet encore brûlant qui rebondit, roule ou retombe sur du bois, de la paille… ou sur de la glace.
-          this.#heat(other, 6000)
+          this.#reactions.heat(other, 6000)
         }
       }
 
@@ -760,7 +840,7 @@ export class PhysicsWorld {
       // Givré par la bise (v6.1) : il cogne moins les murs, puis éclate.
       if (projectile?.rimed) {
         energy *= this.worldWind.wall ?? 0.5
-        if (projectile.alive) this.#shatter(projectile)
+        if (projectile.alive) this.#reactions.shatter(projectile)
       }
       if (energy < 1) continue
 
@@ -769,9 +849,11 @@ export class PhysicsWorld {
       const struck = projectile && (a === projectile ? b : a)
       if (struck?.kind === 'block' && struck.alive && !struck.terrain && projectile.alive && this.#breach(projectile, struck, energy, projectile === a ? va : vb, pair, contact)) continue
       for (const [e, other] of [[a, b], [b, a]]) {
-        // Les défenseurs ont leurs propres règles (#targetContact).
+        // Les défenseurs ont leurs propres règles (DefenderContacts#contact).
         if (!e || !e.alive || e.kind === 'target') continue
         e.receiveImpact(energy, other)
+        // Le choc use les jonctions du bloc, et un peu celles de ses voisins (v6.2).
+        if (e.kind === 'block' && !e.terrain) this.joints.hit(e, energy)
         if (energy > 8) {
           this.#events.emit('impact', { entity: e, energy, x: contact.x, y: contact.y, material: e.material || e.kind })
         }
@@ -820,82 +902,6 @@ export class PhysicsWorld {
     return true
   }
 
-  /**
-   * Feu au contact d'un objet : il s'enflamme… sauf s'il est gelé, auquel cas
-   * il éclate en vapeur (voir #steam).
-   * @returns {boolean} vrai si un feu ou une vapeur a été déclenché
-   */
-  #heat(e, ms) {
-    if (!e || !e.alive) return false
-    if (e.frozenMs > 0) {
-      this.#steam(e)
-      return true
-    }
-    if (e.ignite(ms)) {
-      this.#events.emit('fire:start', { entity: e })
-      return true
-    }
-    return false
-  }
-
-  /**
-   * Givre à l'impact : tout ce qui est proche gèle (devient cassant). Ce qui
-   * brûlait s'éteint dans un jet de vapeur brûlante.
-   */
-  #frostBurst(p) {
-    const radius = FROST.RADIUS * (p.fireFactor ?? 1)
-    this.#events.emit('frost', { x: p.x, y: p.y, radius })
-    // Le givre fige les nuages (v6.1) : ils retombent en poussière gelée.
-    for (const c of this.clouds.list) {
-      if (Math.hypot(c.x - p.x, c.y - p.y) <= radius + c.r * 0.5) {
-        this.clouds.remove(c)
-        this.#events.emit('cloud', { kind: c.kind, x: c.x, y: c.y, r: c.r, event: 'freeze' })
-      }
-    }
-    for (const e of this.queryRadius(p.x, p.y, radius)) {
-      if (e === p || e.kind === 'projectile' || e.kind === 'flyer' || e.terrain) continue
-      if (e.burning > 0) {
-        e.burning = 0
-        this.#scald(e.x, e.y, e)
-      }
-      e.freeze(FROST.MS)
-    }
-  }
-
-  /**
-   * Vapeur : le feu touche un objet gelé. Il dégèle d'un coup, le choc thermique
-   * le fend (FROST.SHOCK de sa résistance), l'eau bouillante ébouillante les
-   * défenseurs proches, et les blocs gelés voisins éclatent à leur tour.
-   */
-  #steam(e) {
-    if (!e.alive || !(e.frozenMs > 0)) return
-    e.frozenMs = 0
-    e.burning = 0
-    if (e.kind === 'block' && Number.isFinite(e.maxHp)) e.damage(e.maxHp * FROST.SHOCK, 'impact')
-    this.#scald(e.x, e.y, e)
-    const reach = Math.max(e.width, e.height) / 2 + 34
-    for (const near of this.queryRadius(e.x, e.y, reach + 30)) {
-      if (near !== e && near.frozenMs > 0 && near.kind !== 'projectile') this.#steamQueue.push({ e: near, at: this.#time + 90 })
-    }
-  }
-
-  /** Nuage de vapeur et eau bouillante autour de (x, y). */
-  #scald(x, y, source) {
-    this.#events.emit('steam', { x, y, radius: FROST.STEAM_RADIUS, entity: source })
-    if (!this.#armed) return
-    for (const t of this.queryRadius(x, y, FROST.STEAM_RADIUS)) {
-      if (t.kind === 'target' && t.alive) t.kill('scald')
-    }
-  }
-
-  #processSteam() {
-    if (!this.#steamQueue.length) return
-    const due = this.#steamQueue.filter((s) => s.at <= this.#time)
-    if (!due.length) return
-    this.#steamQueue = this.#steamQueue.filter((s) => s.at > this.#time)
-    for (const s of due) this.#steam(s.e)
-  }
-
   /** Un bloc, un baril ou (au choix) un autre défenseur occupe-t-il ce point ? */
   #blocked(x, y, self, withTargets = true) {
     for (const e of this.#entities.values()) {
@@ -905,67 +911,6 @@ export class PhysicsWorld {
       if (Vertices.contains(e.body.vertices, { x, y })) return true
     }
     return false
-  }
-
-  /**
-   * L'ogre (v5.1) réagit à ce qui le heurte :
-   *  - un projectile LÉGER (pierre, mitraille ; ni bombe, ni feu, ni givre, ni
-   *    boulet lourd) est renvoyé d'un revers, sans lui faire de mal ;
-   *  - un bloc qui lui tombe dessus est repoussé de côté (il ne meurt pas écrasé).
-   * Gelé, il ne réagit plus. Un revers par OGRE_SWAT_MS.
-   * @returns {boolean} vrai si le contact est entièrement traité ici
-   */
-  #ogreReacts(ogre, other, pair) {
-    if (!ogre.alive || !other || !other.alive || ogre.frozenMs > 0 || this.#time < ogre.swatReady) return false
-    if (other.kind === 'projectile') {
-      if (other.explodes || other.ignites || other.frost || other.diving || other.mass >= BREACH_HEAVY_MASS) return false
-      const v = Body.getVelocity(other.body)
-      const side = Math.sign(other.x - ogre.x) || -1
-      pair.isActive = false
-      Body.setVelocity(other.body, { x: side * Math.max(5, Math.abs(v.x) * 0.75), y: -Math.max(4, Math.abs(v.y) * 0.45) })
-      other.hasImpacted = true
-      this.#swatted(ogre, 'swat', other)
-      return true
-    }
-    if (other.kind === 'block' && !other.terrain && other.y < ogre.y - ogre.height * 0.25 && other.speed > 0.3) {
-      const side = Math.sign(other.x - ogre.x) || 1
-      pair.isActive = false
-      Sleeping.set(other.body, false)
-      Body.setVelocity(other.body, { x: side * Math.max(3, 9 / Math.sqrt(Math.max(1, other.mass / 20))), y: -2.5 })
-      Body.setAngularVelocity(other.body, side * 0.08)
-      this.#swatted(ogre, 'shove', other)
-      return true
-    }
-    return false
-  }
-
-  /**
-   * Pavois (v5.8) : un projectile léger (pierre, mitraille) qui frappe le
-   * pavoisier DE FACE et de biais (moins de 50° sous l'horizontale) ricoche
-   * sur le pavois. Un tir plongeant, un tir dans le dos, un boulet lourd, la
-   * poudre, le feu ou le givre passent : il faut le prendre par le haut.
-   * @returns {boolean} vrai si le choc est entièrement traité ici
-   */
-  #shieldReacts(bearer, other, pair) {
-    if (!bearer.alive || bearer.frozenMs > 0 || other?.kind !== 'projectile' || !other.alive) return false
-    if (other.explodes || other.ignites || other.frost || other.diving || other.mass >= BREACH_HEAVY_MASS) return false
-    const v = Body.getVelocity(other.body)
-    const front = bearer.facing || -1
-    const fromFront = Math.sign(other.x - bearer.x) === front && Math.sign(v.x) === -front
-    const flat = Math.abs(v.y) < Math.abs(v.x) * Math.tan((50 * Math.PI) / 180)
-    if (!fromFront || !flat) return false
-    pair.isActive = false
-    Body.setVelocity(other.body, { x: front * Math.max(2, Math.abs(v.x) * 0.3), y: -Math.max(1.5, Math.abs(v.y) * 0.3) })
-    other.hasImpacted = true
-    this.#events.emit('unit', { kind: 'shieldBlock', entity: bearer, x: bearer.x + front * bearer.width * 0.5, y: bearer.y - bearer.height * 0.15 })
-    return true
-  }
-
-  #swatted(ogre, kind, other) {
-    ogre.swatAt = this.#time
-    ogre.swatReady = this.#time + OGRE_SWAT_MS
-    ogre.facing = Math.sign(other.x - ogre.x) || -1
-    this.#events.emit('ogre', { kind, entity: ogre, other, x: ogre.x, y: ogre.y - ogre.height / 2 })
   }
 
   /** Une créature volante est touchée : elle tombe et stoppe le projectile. */
@@ -1007,7 +952,7 @@ export class PhysicsWorld {
     }
     if (e.kind === 'projectile') return this.#projectileOnTerrain(e, zone, pair)
     if (e.kind === 'target' && this.#armed && (zone.kind === 'lake' || zone.kind === 'lava')) e.kill(zone.kind === 'lake' ? 'drown' : 'burn')
-    else if (zone.kind === 'lava' && (e.kind === 'block' || e.kind === 'barrel') && e.flammable) this.#heat(e, 8000)
+    else if (zone.kind === 'lava' && (e.kind === 'block' || e.kind === 'barrel') && e.flammable) this.#reactions.heat(e, 8000)
     return false
   }
 
@@ -1120,267 +1065,9 @@ export class PhysicsWorld {
   }
 
   /**
-   * Nuages (v6.1) : ils dérivent au vent, rongent les défenseurs (le poison
-   * agit encore POISON.LINGER_MS après qu'ils en sont sortis) et s'embrasent
-   * au contact d'une flamme.
-   */
-  #stepClouds() {
-    const time = this.#time
-    if (this.clouds.size) {
-      const targets = [...this.#entities.values()].filter((e) => e.kind === 'target' && e.alive)
-      this.clouds.step(WORLD.STEP_MS, {
-        time,
-        // Dérive : le vent du moment à cet endroit (1 = vent de base maximal ≈ 1 px par image),
-        // et la rafale d'un moulin, qui pousse fort (v6.1).
-        drift: (x, y) => this.windField.at(x, y, time) + this.props.gustAt(x, y) * 2.2,
-        targets,
-        // Rien ne s'embrase avant le premier tir, et les miasmes des marais ne
-        // craignent pas les torches des veilleurs : seul le feu du joueur les allume.
-        flameNear: (x, y, r, kind) => this.#armed && this.#flameNear(x, y, r, { torches: kind !== 'miasma' }),
-        blast: (c, r) => this.#cloudBlast(c, r),
-        affect: (t, kind, dps, dtMs) => {
-          if (!this.#armed) return
-          if (kind === 'bees') {
-            // Piqûres : des points de vie en moins, et il fuit en courant.
-            t.damage(dps * (dtMs / 1000), 'sting')
-            t.panicUntil = time + 1500
-            return
-          }
-          const still = t.poisonUntil > time
-          t.poisonDps = Math.max(still ? t.poisonDps ?? 0 : 0, dps)
-          t.poisonUntil = time + POISON.LINGER_MS
-        },
-      })
-    }
-    // Le poison ronge ceux qui l'ont respiré, encore un peu après qu'ils en sont sortis.
-    for (const t of this.#entities.values()) {
-      if (t.kind !== 'target' || !t.alive || !(t.poisonUntil > time)) continue
-      t.damage((t.poisonDps ?? POISON.DPS) * (WORLD.STEP_MS / 1000), 'poison')
-    }
-  }
-
-  /** Ce qu'un ouvrage brisé libère (voir Props#destroyed). */
-  #propDestroyed(e) {
-    this.props.destroyed(e, {
-      time: this.#time,
-      winter: this.weather.winter === true,
-      queryRadius: (x, y, r) => this.queryRadius(x, y, r),
-      heat: (o, ms) => this.#heat(o, ms),
-      scald: (x, y, source) => this.#scald(x, y, source),
-      cloud: (kind, x, y) => {
-        const c = this.clouds.spawn(kind, x, y, this.#time)
-        this.#events.emit('cloud', { kind, x: c.x, y: c.y, r: c.r, event: 'spawn' })
-      },
-      emit: (name, data) => this.#events.emit(name, data),
-    })
-  }
-
-  /** Une flamme dans ce disque ? (objet qui brûle, boulet ardent, forge ; torche d’un veilleur si `torches`) */
-  #flameNear(x, y, r, { torches = true } = {}) {
-    if (this.props.flameAt(x, y, r * 0.7)) return true
-    const r2 = r * r
-    for (const e of this.#entities.values()) {
-      if (!e.alive) continue
-      const hot = (e.kind === 'projectile' && e.hot) || (e.kind !== 'projectile' && e.burning > 0)
-      if (hot && (e.x - x) ** 2 + (e.y - y) ** 2 <= r2) return true
-      if (torches && e.kind === 'target' && e.torch && !e.torchDropped) {
-        const tip = e.torchTip
-        if ((tip.x - x) ** 2 + (tip.y - y) ** 2 <= r2) return true
-      }
-    }
-    return false
-  }
-
-  /** Le nuage s'embrase (gaz, farine) : un souffle de sa taille, qui met le feu au bois. */
-  #cloudBlast(c, r = this.clouds.radiusAt(c, this.#time)) {
-    if (c.blasted) return
-    c.blasted = true
-    this.clouds.remove(c)
-    // Un essaim ne s'embrase pas : la fumée le disperse.
-    this.#events.emit('cloud', { kind: c.kind, x: c.x, y: c.y, r, event: c.kind === 'bees' ? 'disperse' : 'blast' })
-    const spec = CLOUD_KINDS[c.kind]?.blast
-    if (spec) this.#pendingExplosions.push({ at: this.#time, x: c.x, y: c.y, spec: { radius: r * 1.1, ...spec, source: null } })
-  }
-
-  /**
-   * Orbe d'orage (v6.1, voir THUNDER) : la décharge frappe ce que l'orbe
-   * touche, puis saute vers le défenseur le plus proche (au plus REACH px),
-   * et ainsi de suite ; un bloc de fer la relaie sans compter comme un saut.
-   * Elle fait sauter un baril, peut enflammer le bois, fait éclater la glace
-   * en vapeur, et embrase les nuages qu'elle traverse.
-   */
-  #discharge(p, first, { hops: baseHops = THUNDER.HOPS, scale = 1 } = {}) {
-    const wet = this.weather.wet === true
-    const hops = baseHops + (wet ? THUNDER.RAIN_HOPS : 0)
-    const reach = THUNDER.REACH * (wet ? THUNDER.RAIN_REACH : 1)
-    if (first?.alive) {
-      if (first.kind === 'barrel') first.kill('explosion')
-      else if (first.frozenMs > 0 && first.kind !== 'target') this.#steam(first)
-      else if (first.kind === 'block' && first.flammable && this.#rng.chance(0.45)) this.#heat(first, 5000)
-    }
-    const path = []
-    const struck = new Set()
-    const relays = new Set()
-    let from = { x: p.x, y: p.y }
-    let hop = 0
-    for (let guard = 0; hop < hops && guard < 12; guard++) {
-      let best = null
-      let bestD = reach
-      for (const e of this.#entities.values()) {
-        if (e.kind !== 'target' || !e.alive || struck.has(e)) continue
-        const d = Math.hypot(e.x - from.x, e.y - from.y)
-        if (d < bestD) {
-          bestD = d
-          best = e
-        }
-      }
-      if (!best) {
-        // Relais : un bloc de fer à portée prolonge la décharge (trois au plus).
-        let iron = null
-        let ironD = reach
-        for (const e of this.#entities.values()) {
-          if (e.kind !== 'block' || e.material !== 'iron' || !e.alive || relays.has(e)) continue
-          const d = Math.hypot(e.x - from.x, e.y - from.y)
-          if (d < ironD) {
-            ironD = d
-            iron = e
-          }
-        }
-        if (!iron || relays.size >= 3) break
-        relays.add(iron)
-        path.push({ x0: from.x, y0: from.y, x1: iron.x, y1: iron.y, relay: true })
-        from = { x: iron.x, y: iron.y }
-        continue
-      }
-      struck.add(best)
-      path.push({ x0: from.x, y0: from.y, x1: best.x, y1: best.y - best.height * 0.2 })
-      if (best.frozenMs > 0) this.#steam(best)
-      // Trempé (pluie, citerne) : l'eau conduit, le coup porte plus fort.
-      const soaked = wet || best.wetMs > 0
-      const dmg = THUNDER.DAMAGE[Math.min(hop, THUNDER.DAMAGE.length - 1)] * TARGET_TYPES.soldier.hp * (THUNDER.CONDUCT[best.type] ?? 1) * (soaked ? 1.35 : 1) * scale
-      if (this.#armed) this.#shock(best, dmg)
-      from = { x: best.x, y: best.y }
-      hop++
-    }
-    for (const seg of path) {
-      for (const c of this.clouds.at((seg.x0 + seg.x1) / 2, (seg.y0 + seg.y1) / 2, this.#time)) this.#cloudBlast(c)
-    }
-    for (const c of this.clouds.at(p.x, p.y, this.#time)) this.#cloudBlast(c)
-    this.#events.emit('thunder', { x: p.x, y: p.y, path })
-  }
-
-  /** Un tir givré éclate à l'impact (v6.1) : éclats de glace, ce qu'il touche est saisi par le froid. */
-  #shatter(p) {
-    p.kill('shatter')
-    this.#events.emit('element', { kind: 'shatter', element: 'frost', x: p.x, y: p.y, entity: p })
-    for (const e of this.queryRadius(p.x, p.y, 45)) {
-      if (e !== p && e.kind !== 'projectile' && e.kind !== 'flyer' && !e.terrain) e.freeze(4000)
-    }
-  }
-
-  /** Décharge électrique : des points de vie en moins, et sonné (il tressaute). */
-  #shock(t, dmg) {
-    const before = t.hp
-    const died = t.damage(dmg, 'shock')
-    if (t.alive) {
-      t.stunUntil = Math.max(t.stunUntil, this.#time + THUNDER.STUN_MS)
-      t.stunKind = 'shock'
-    }
-    this.#events.emit('hurt', { entity: t, amount: died ? before : Math.max(0, before - Math.max(0, t.hp)), cause: 'shock', lethal: died || !t.alive, x: t.x, y: t.y - t.height * 0.35, dir: 0 })
-  }
-
-
-  /**
-   * Contact d'un défenseur (v6.1, voir FallingObjects.js), après le premier tir.
-   * Celui qui va le plus vite frappe : un objet qui arrive sur le défenseur le
-   * blesse (ou il le repousse, s'il est lent) ; un défenseur projeté contre un
-   * obstacle immobile (sol, mur, roche) encaisse sa chute.
-   */
-  #targetContact(a, b, rel, pair) {
-    if (rel <= WORLD.HIT.SAFE) return
-    for (const [t, o] of [[a, b], [b, a]]) {
-      if (t?.kind !== 'target' || !t.alive) continue
-      // Défenseur contre défenseur, ou contre une créature volante : rien.
-      if (o?.kind === 'target' || o?.kind === 'flyer') continue
-      const striker = o && o.alive !== false && !o.body.isStatic && o.speed >= t.speed * 0.6
-      if (striker) this.#struck(t, o, rel, pair)
-      else this.#slam(t, rel)
-    }
-  }
-
-  /** Un objet frappe un défenseur : il le repousse s'il le peut, sinon il encaisse. */
-  #struck(t, o, rel, pair) {
-    // Rejeté par un camarade il y a un instant : il ne blesse personne.
-    if (this.#time - (o.pushedAt ?? -Infinity) < PUSHED_SAFE_MS) return
-    const last = this.#struckAt.get(t)
-    if (last && last.o === o && this.#time - last.at < RESTRIKE_MS) return
-    this.#struckAt.set(t, { o, at: this.#time })
-    if (canPush(t, o, rel, this.#time)) {
-      this.#push(t, o, pair)
-      return
-    }
-    let dmg = hitDamage(o, rel)
-    // Tir élémentaire : il frappe mou, c'est l'élément qui agit (et on le voit).
-    if (o.kind === 'projectile' && o.element) dmg = Math.min(dmg, t.maxHp * ELEMENT_HIT_CAP)
-    if (dmg < 1) return
-    const v = Body.getVelocity(o.body)
-    this.#hurt(t, dmg, 'crush', Math.sign(t.x - o.x) || Math.sign(v.x) || 1)
-  }
-
-  /** Défenseur projeté contre un obstacle immobile, ou qui retombe : dégâts de chute. */
-  #slam(t, rel) {
-    const dmg = fallDamage(t, rel)
-    if (dmg >= 1) this.#hurt(t, dmg, 'fall', 0, { knock: false })
-  }
-
-  /**
-   * Blessure d'un défenseur : points de vie, puis (s'il tient debout) il est
-   * repoussé dans le sens du coup et sonné un instant.
-   * @param {number} dir sens du recul (-1, 0, 1)
-   */
-  #hurt(t, dmg, cause, dir, { knock = true } = {}) {
-    const before = t.hp
-    const lives = t.lives
-    const died = t.damage(dmg, cause)
-    const lost = before - Math.max(0, t.hp)
-    if (!died && lost <= 0 && t.lives === lives) return
-    this.#events.emit('hurt', { entity: t, amount: died ? before : lost > 0 ? lost : dmg, cause, lethal: died || !t.alive, x: t.x, y: t.y - t.height * 0.35, dir })
-    if (died || !t.alive || t.lives !== lives) return
-    t.stunUntil = Math.max(t.stunUntil, this.#time + WORLD.STAGGER_MS)
-    t.stunKind = 'hit'
-    if (!knock || !dir) return
-    const kick = Math.min(WORLD.KNOCK_MAX, WORLD.KNOCK * Math.min(1, dmg / t.maxHp))
-    if (kick < 0.3) return
-    Sleeping.set(t.body, false)
-    const v = Body.getVelocity(t.body)
-    Body.setVelocity(t.body, { x: v.x + dir * kick, y: Math.min(v.y, 0) - kick * 0.45 })
-  }
-
-  /**
-   * Le défenseur repousse un objet lent (v6.1) : il le rejette de côté (et
-   * vers le haut s'il lui tombait dessus), sans dégâts ; l'objet ne blessera
-   * personne pendant PUSHED_SAFE_MS.
-   * @param {Matter.Pair | null} pair contact à ignorer pour ce pas
-   */
-  #push(t, o, pair) {
-    if (pair) pair.isActive = false
-    const dir = Math.sign(o.x - t.x) || t.facing || 1
-    const above = o.y < t.y - t.height * 0.25
-    const k = WORLD.PUSH.SHOVE / Math.sqrt(Math.max(1, o.mass / 8))
-    const v = Body.getVelocity(o.body)
-    Sleeping.set(o.body, false)
-    Body.setVelocity(o.body, { x: dir * Math.max(Math.abs(v.x) * 0.4, k), y: above ? Math.min(v.y * 0.2, -k * 0.55) : Math.min(v.y, -k * 0.2) })
-    Body.setAngularVelocity(o.body, dir * Math.min(0.12, 0.6 / Math.sqrt(Math.max(1, o.mass))))
-    o.pushedAt = this.#time
-    t.pushReady = this.#time + WORLD.PUSH.COOLDOWN_MS
-    t.pushAt = this.#time
-    t.facing = dir
-    this.#events.emit('unit', { kind: 'push', entity: t, other: o, x: (t.x + o.x) / 2, y: Math.min(t.y - t.height * 0.3, o.y) })
-  }
-
-  /**
    * Contacts prolongés : un objet déjà au contact qui se met à bouger frappe
-   * aussi ; s'il presse doucement, le défenseur le repousse.
+   * aussi ; s'il presse doucement, le défenseur le repousse (v6.2 : règles dans
+   * DefenderContacts#activeContact).
    */
   #handleActiveContacts(pairs) {
     if (!this.#armed) return
@@ -1388,66 +1075,13 @@ export class PhysicsWorld {
       const a = this.#entityOf(pair.bodyA)
       const b = this.#entityOf(pair.bodyB)
       if (!a || !b || (a.kind !== 'target' && b.kind !== 'target')) continue
-      const t = a.kind === 'target' ? a : b
-      const o = t === a ? b : a
-      if (!t.alive || !o.alive || o.kind === 'target' || o.kind === 'flyer' || o.speed < 0.6) continue
-      const va = Body.getVelocity(pair.bodyA.parent || pair.bodyA)
-      const vb = Body.getVelocity(pair.bodyB.parent || pair.bodyB)
-      const n = pair.collision.normal
-      const rel = Math.abs((va.x - vb.x) * n.x + (va.y - vb.y) * n.y)
-      if (rel <= WORLD.HIT.SAFE) {
-        // Il presse doucement : le défenseur le repousse, s'il le peut.
-        if (o.speed <= WORLD.PUSH.SPEED && this.#time - (o.pushedAt ?? -Infinity) >= PUSHED_SAFE_MS && canPush(t, o, o.speed, this.#time)) this.#push(t, o, pair)
-        continue
-      }
-      if (o.speed >= t.speed * 0.6) this.#struck(t, o, rel, pair)
+      this.#defenders.activeContact(a, b, pair)
     }
   }
-
 
   /** Réveille les corps proches d'un point (appui disparu, choc). */
   #wakeAround(x, y, radius) {
     for (const e of this.queryRadius(x, y, radius)) Sleeping.set(e.body, false)
-  }
-
-  /**
-   * Propagation du feu. En Difficile, le vent l'attise : sous le vent, le feu
-   * va plus loin et prend plus facilement ; contre le vent, il peine.
-   */
-  #spreadFire() {
-    // Boulet brûlant immobilisé contre (ou sous) un matériau inflammable.
-    for (const p of this.filter((e) => e.kind === 'projectile' && e.hasImpacted && e.hot)) {
-      for (const near of this.queryRadius(p.x, p.y, p.radius + 22)) {
-        if (near === p || near.burning !== 0) continue
-        if (near.frozenMs > 0) this.#heat(near, 6000)
-        else if (near.flammable && this.#rng.chance(0.7)) this.#heat(near, 6000)
-      }
-    }
-    const burning = this.filter((e) => e.burning > 0 && e.alive && e.kind !== 'projectile')
-    // Forteresse (v6.1) : le vent porte les braises, quelle que soit la difficulté.
-    const embers = this.worldWind.fireReach ?? 0
-    const base = this.windField.profile.fire || embers ? this.windField.base : 0
-    for (const src of burning) {
-      // La rafale d'un moulin (v6.1) attise le feu et le pousse dans son sens.
-      const wind = Math.max(-1.5, Math.min(1.5, base + this.props.gustAt(src.x, src.y) * 1.5))
-      const reach = Math.max(src.width, src.height) / 2 + 26 + Math.abs(wind) * 45 * (embers || 1)
-      for (const near of this.queryRadius(src.x, src.y, reach + 30)) {
-        // Un objet gelé au contact des flammes éclate en vapeur.
-        if (near !== src && near.frozenMs > 0 && near.kind !== 'projectile' && Math.hypot(near.x - src.x, near.y - src.y) <= reach) {
-          this.#heat(near, 0)
-          continue
-        }
-        if (near === src || !near.flammable || near.burning !== 0) continue
-        let chance = near.catchChance ?? 0.3
-        if (wind !== 0) {
-          const downwind = Math.sign(near.x - src.x) === Math.sign(wind)
-          chance = downwind ? Math.min(0.95, chance * (1 + Math.abs(wind) * 1.4)) : chance * (1 - Math.abs(wind) * 0.6)
-          // Contre le vent, la portée habituelle seulement.
-          if (!downwind && Math.hypot(near.x - src.x, near.y - src.y) > Math.max(src.width, src.height) / 2 + 56) continue
-        }
-        if (this.#rng.chance(chance)) this.#heat(near, 5500)
-      }
-    }
   }
 
   #processExplosions() {
@@ -1460,7 +1094,7 @@ export class PhysicsWorld {
   /** Retire les entités détruites, sorties du monde ou épuisées, et déclenche les barils. */
   #cleanup() {
     for (const e of [...this.#entities.values()]) {
-      const out = e.y > WORLD.BOTTOM + WORLD.KILL_MARGIN || e.x < this.leftLimit - WORLD.KILL_MARGIN || e.x > WORLD.WIDTH + WORLD.KILL_MARGIN
+      const out = e.y > WORLD.BOTTOM + WORLD.KILL_MARGIN || e.x < this.leftLimit - WORLD.KILL_MARGIN || e.x > WORLD.WIDTH + (e.kind === 'target' ? WORLD.FIELD_MARGIN : WORLD.KILL_MARGIN)
       if (out && e.alive) e.kill(e.kind === 'projectile' ? 'out' : 'fall')
       if (e.kind === 'projectile' && e.alive && e.spent) {
         this.remove(e)
@@ -1475,7 +1109,7 @@ export class PhysicsWorld {
           this.structure.onRemoved(e)
           this.#wakeAround(e.x, e.y, Math.max(e.width, e.height) + 80)
           // Un ouvrage cède (v6.1) : inondation, essaim, farine, braises.
-          if (e.prop) this.#propDestroyed(e)
+          if (e.prop) this.#reactions.propDestroyed(e)
         }
         if (e.kind === 'target') this.units.onDown(e)
         if (e.kind === 'barrel') {

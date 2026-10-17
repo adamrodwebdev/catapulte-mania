@@ -10,6 +10,9 @@ import { GAME } from '../config/gameConfig.js'
  */
 const issued = new WeakSet()
 
+/** Parcours d'un niveau (v6.2) : la campagne, la Campagne héroïque, les Terres du Duc. */
+export const TRACKS = Object.freeze(['campaign', 'heroic', 'duke'])
+
 export class LevelResult {
   /**
    * @param {{ levelId: number, score: number, stars: number, won: boolean,
@@ -29,6 +32,8 @@ export class LevelResult {
     /** Masque des succès du niveau obtenus pendant cette partie (bit i = i-ème succès). */
     this.achievements = Guard.int(data.achievements ?? 0, 'achievements', { min: 0, max: 7 })
     this.difficulty = Guard.oneOf(data.difficulty, GAME.DIFFICULTIES, 'difficulty')
+    /** Campagne, Campagne héroïque ou Terres du Duc (v6.2) : chacune ses records. */
+    this.track = Guard.oneOf(data.track ?? 'campaign', TRACKS, 'track')
     deepFreeze(this)
   }
 

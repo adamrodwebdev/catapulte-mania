@@ -283,9 +283,12 @@ test('potence : la charge pend sans bouger, un tir dans la corde la fait tomber 
   for (let i = 0; i < 360; i++) s.update(1000 / 60)
   assert.ok(Math.abs(load.y - y0) < 2, 'la charge reste pendue')
   const before = s.targetsLeft
-  // Un boulet lancé à travers la corde, juste sous la traverse.
+  // Un carreau lancé à travers la corde, entre la traverse et la charge (v6.2 :
+  // sans toucher ni l'une ni l'autre, ni le montant de la potence).
   s.world.arm()
-  const p = new Projectile('stone', rope.a.x - 60, rope.a.y + 22)
+  const A = Matter.Constraint.pointAWorld(rope.c)
+  const B = Matter.Constraint.pointBWorld(rope.c)
+  const p = new Projectile('bolt', A.x - 32, (A.y + B.y) / 2)
   s.world.add(p)
   Matter.Body.setVelocity(p.body, { x: 9, y: 0 })
   for (let i = 0; i < 240; i++) s.update(1000 / 60)
@@ -520,7 +523,8 @@ test('moments forts : on garde la prise qui vaut le plus, rien sans navigateur c
 /* ---------- Coup de pouce et niveau passé ---------- */
 
 test('trois défaites d’affilée : le niveau peut être passé, sans étoile, et repris plus tard', async () => {
-  const { SaveSlot, SKIP_AFTER } = await import('../src/domain/SaveSlot.js')
+  const { SaveSlot } = await import('../src/domain/SaveSlot.js')
+  const { SKIP_AFTER } = await import('../src/game/progression/Frontier.js')
   const { LevelResult } = await import('../src/domain/LevelResult.js')
   const slot = SaveSlot.create(0, 'Aube', 'normal')
   const base = { targetsKilled: 0, blocksDestroyed: 0, barrelsExploded: 0, powersUsed: 0, achievements: 0, difficulty: 'normal' }
@@ -547,7 +551,8 @@ test('trois défaites d’affilée : le niveau peut être passé, sans étoile, 
 })
 
 test('coup de pouce discret : premier chapitre, Facile et Normal, après deux défaites', async () => {
-  const { SaveSlot, LUCK } = await import('../src/domain/SaveSlot.js')
+  const { SaveSlot } = await import('../src/domain/SaveSlot.js')
+  const { LUCK } = await import('../src/game/progression/Frontier.js')
   const { LevelResult } = await import('../src/domain/LevelResult.js')
   const slot = SaveSlot.create(0, 'Aube', 'normal')
   const lose = () => slot.recordResult(LevelResult.issue({ levelId: 1, score: 0, stars: 0, won: false, shotsUsed: 3, targetsKilled: 0, blocksDestroyed: 0, barrelsExploded: 0, powersUsed: 0, achievements: 0, difficulty: 'normal' }))
@@ -569,7 +574,11 @@ test('coup de pouce discret : premier chapitre, Facile et Normal, après deux d�
 test('sauvegarde v10 de développement (sans le front) : relue, le front ajouté vide', async () => {
   const { SaveSlot } = await import('../src/domain/SaveSlot.js')
   const json = JSON.parse(JSON.stringify(SaveSlot.create(0, 'Aube', 'normal').toJSON()))
+  // Une vraie sauvegarde v10 (avant la Campagne héroïque de la v6.2), sans le front.
   delete json.frontier
+  delete json.heroic
+  delete json.duke
+  json.version = 10
   const slot = SaveSlot.fromJSON(0, json)
   assert.equal(slot.failsAt(1), 0)
 })

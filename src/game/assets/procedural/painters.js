@@ -16,30 +16,20 @@ import { CHARACTER_PAINTERS } from './characters.js'
 import { TROOP_PAINTERS } from './troops.js'
 import { GENERAL_PAINTERS } from './warlords.js'
 import { drawBlockBody, drawBarrelBody } from './materials.js'
+import { range, drawRange, spindrift } from './mountains.js'
 
 export { CATAPULT_GEOMETRY, CATAPULT_SKINS } from './engines.js'
+/** Palettes de décor par chapitre (v6.2 : voir themes.js). */
+export { THEMES } from './themes.js'
 import { CREATURE_PAINTERS } from './creatures.js'
 import { ELEMENT_PAINTERS } from './elements.js'
 import { STRUCTURE_PAINTERS } from './structures.js'
+import { THEMES } from './themes.js'
 import { celestial, distant, hasSunRays, near, skyGradient, stars, sunPosition, sunRays } from './scenery.js'
 
 const INK = '#1e1a2b'
 const TAU = Math.PI * 2
 
-/** Palettes de décor par chapitre : la progression se lit aussi dans le ciel. */
-export const THEMES = Object.freeze({
-  1: { skyTop: '#7fb2dc', skyBottom: '#f5dcae', sun: '#fff1c4', far: '#86a873', farDark: '#6b8c5c', grass: '#5c8a3b', dirt: '#7a5636', castle: '#8fa58a', night: false },
-  2: { skyTop: '#93acc4', skyBottom: '#e3e6e2', sun: '#fffdf0', far: '#8e97a6', farDark: '#727c8d', grass: '#5f7d45', dirt: '#6d5a48', castle: '#9097a4', night: false },
-  3: { skyTop: '#3f2c5c', skyBottom: '#ef9653', sun: '#ffd27a', far: '#5b3a5a', farDark: '#432a47', grass: '#4d5e32', dirt: '#5a3f2c', castle: '#4b2f4c', night: false },
-  4: { skyTop: '#0d1430', skyBottom: '#3c3c6e', sun: '#e9edf7', far: '#1f2446', farDark: '#161a36', grass: '#2f4a30', dirt: '#3b2e28', castle: '#262b52', night: true },
-  // v3 : chapitres 5 à 10, chacun avec son climat (brume, sable, neige, pluie…).
-  5: { skyTop: '#7f9a8f', skyBottom: '#d9e0c8', sun: '#f4f1d0', far: '#5f7a5a', farDark: '#4b6347', grass: '#4e6b3a', dirt: '#4a3d2e', castle: '#6f7f6a', night: false, weather: 'fog' },
-  6: { skyTop: '#4f93cf', skyBottom: '#f7e3b0', sun: '#fff5d6', far: '#d8b47a', farDark: '#c09a62', grass: '#c9ad6a', dirt: '#a9824f', castle: '#c9a36b', night: false, arid: true },
-  7: { skyTop: '#5f86b5', skyBottom: '#dfe8f0', sun: '#ffffff', far: '#8a96a8', farDark: '#5f6a7c', grass: '#6f8a5a', dirt: '#5d5248', castle: '#7c8597', night: false, peaks: true },
-  8: { skyTop: '#9db8d4', skyBottom: '#eef3f8', sun: '#ffffff', far: '#dfe7ef', farDark: '#c3cfdc', grass: '#f4f7fb', dirt: '#8a8f99', castle: '#aab6c6', night: false, arid: true, weather: 'snow' },
-  9: { skyTop: '#2f3646', skyBottom: '#7f8898', sun: '#c9cfda', far: '#4a5262', farDark: '#353c4a', grass: '#3f5a3a', dirt: '#3a312a', castle: '#2f3542', night: false, weather: 'rain' },
-  10: { skyTop: '#22132f', skyBottom: '#b8464f', sun: '#ffcc66', far: '#4a2440', farDark: '#331a30', grass: '#3d4a2c', dirt: '#3b2a22', castle: '#2b1a2e', night: true },
-})
 
 /* ---------- Outils communs ---------- */
 
@@ -295,25 +285,38 @@ function snowcap(ctx) {
  * étoiles qui scintillent, nuages qui dérivent (v5.7, voir scenery.js).
  */
 function sky(ctx, s) {
-  const { theme = 1, viewW, viewH, time = 0, animate = true, wind = 0 } = s.extra
+  // `overlay` (v6.2) : par-dessus un fond peint, seulement ce qui vit (météo, nuages
+  // qui montrent le vent, oiseaux) : ni dégradé, ni étoiles, ni brume, ni astre (la
+  // peinture a son soleil ou sa lune).
+  const { theme = 1, viewW, viewH, time = 0, animate = true, wind = 0, overlay = false } = s.extra
   const th = THEMES[theme]
-  ctx.fillStyle = skyGradient(ctx, th, theme, viewH)
-  ctx.fillRect(0, 0, viewW, viewH)
+  if (!overlay) {
+    ctx.fillStyle = skyGradient(ctx, th, theme, viewH)
+    ctx.fillRect(0, 0, viewW, viewH)
+  }
   const sun = sunPosition(theme, viewW, viewH)
-  if (th.night) stars(ctx, viewW, viewH, time, animate)
-  if (hasSunRays(th)) sunRays(ctx, th, sun, viewW, viewH, animate ? time : 0)
-  celestial(ctx, th, sun, th.skyTop)
+  if (th.night && !overlay) stars(ctx, viewW, viewH, time, animate)
+  if (!overlay) {
+    if (hasSunRays(th)) sunRays(ctx, th, sun, viewW, viewH, animate ? time : 0)
+    celestial(ctx, th, sun, th.skyTop)
+  }
   weather(ctx, th, viewW, viewH, animate ? time : 0)
-  // Brume claire à l'horizon : profondeur atmosphérique.
-  const haze = ctx.createLinearGradient(0, viewH * 0.45, 0, viewH)
-  haze.addColorStop(0, th.skyBottom + '00')
-  haze.addColorStop(1, th.skyBottom + (th.night ? '33' : '88'))
-  ctx.fillStyle = haze
-  ctx.fillRect(0, viewH * 0.45, viewW, viewH * 0.55)
+  // Brume claire à l'horizon : profondeur atmosphérique (la peinture a la sienne).
+  if (!overlay) {
+    const haze = ctx.createLinearGradient(0, viewH * 0.45, 0, viewH)
+    haze.addColorStop(0, th.skyBottom + '00')
+    haze.addColorStop(1, th.skyBottom + (th.night ? '33' : '88'))
+    ctx.fillStyle = haze
+    ctx.fillRect(0, viewH * 0.45, viewW, viewH * 0.55)
+  }
   const r = new SeededRandom(11 + theme)
   const light = th.night ? 'rgba(200,210,255,0.10)' : th.weather === 'rain' ? 'rgba(110,118,135,0.75)' : 'rgba(255,255,255,0.82)'
   const shade = th.night ? 'rgba(120,130,180,0.08)' : th.weather === 'rain' ? 'rgba(60,66,80,0.6)' : 'rgba(170,185,210,0.45)'
-  for (let i = 0; i < 7; i++) {
+  // Sur une peinture, quelques nuages légers suffisent à montrer le vent, et
+  // seulement dans un ciel clair (la nuit, la pluie et la brume ont les leurs).
+  if (overlay) ctx.globalAlpha = 0.55
+  const clouds = !overlay ? 7 : th.night || th.weather === 'rain' || th.weather === 'fog' ? 0 : 4
+  for (let i = 0; i < clouds; i++) {
     // Les nuages suivent le vent : sens et vitesse (brise lente par temps calme).
     const speed = r.range(0.004, 0.012) * (wind === 0 ? 1 : Math.sign(wind) * (0.6 + 4 * Math.abs(wind)))
     const span = viewW + 300
@@ -335,6 +338,7 @@ function sky(ctx, s) {
       ctx.fill()
     }
   }
+  ctx.globalAlpha = 1
   // Oiseaux au loin (jour, sans pluie) : quelques « v » qui battent des ailes.
   if (!th.night && th.weather !== 'rain' && animate !== false) {
     ctx.strokeStyle = 'rgba(40,38,52,0.55)'
@@ -391,74 +395,69 @@ function weather(ctx, th, viewW, viewH, time) {
   }
 }
 
-/** Lointain (repère monde, parallaxe) : collines et silhouette de château. */
+/**
+ * Lointain (repère monde, parallaxe) : la chaîne du fond, des contreforts
+ * boisés devant, et la silhouette d'un château. v6.2 : montagnes refaites
+ * (crêtes fractales, versants éclairés et à l'ombre, neige découpée dans la
+ * silhouette, panaches que le vent arrache aux crêtes ; voir mountains.js).
+ */
 function far(ctx, s) {
-  const { theme = 1, castle = true } = s.extra
+  const { theme = 1, castle = true, time = 0, animate = true, wind = 0 } = s.extra
   const th = THEMES[theme]
   const r = new SeededRandom(23 + theme)
   const left = -1200
   const right = WORLD.WIDTH + 1600
   const base = WORLD.GROUND_Y
-  const layers = th.peaks ? [[th.farDark, 620, 260], [th.far, 300, 150]] : [[th.farDark, 330, 170], [th.far, 210, 120]]
-  layers.forEach(([color, height, step], li) => {
-    const pts = []
-    for (let x = left; x <= right; x += step) pts.push([x, base - height * r.range(0.45, 1)])
-    ctx.beginPath()
-    ctx.moveTo(left, base)
-    for (const [x, y] of pts) ctx.lineTo(x, y)
-    ctx.lineTo(right, base)
-    ctx.closePath()
-    ctx.fillStyle = color
-    ctx.fill()
-    // Montagnes : sommets enneigés.
-    if (th.peaks && height > 400) {
-      ctx.fillStyle = 'rgba(245,248,252,0.9)'
-      for (const [x, y] of pts) {
-        if (base - y < height * 0.75) continue
-        ctx.beginPath()
-        ctx.moveTo(x, y)
-        ctx.lineTo(x - step * 0.22, y + 70)
-        ctx.lineTo(x + step * 0.22, y + 70)
-        ctx.closePath()
-        ctx.fill()
-      }
-    }
-    // Voile de brume sur la couche du fond : elle recule.
-    if (li === 0) {
-      const v = ctx.createLinearGradient(0, base - height, 0, base)
-      v.addColorStop(0, th.skyBottom + '00')
-      v.addColorStop(1, th.skyBottom + (th.night ? '22' : '55'))
-      ctx.fillStyle = v
-      ctx.fillRect(left, base - height, right - left, height)
-    }
-    // Rangée d'arbres sur la couche proche (sauf désert et neige).
-    if (li === layers.length - 1 && !th.arid) {
-      ctx.fillStyle = th.farDark
-      for (let i = 0; i < pts.length - 1; i++) {
-        const [x0, y0] = pts[i]
-        const [x1, y1] = pts[i + 1]
-        for (let k = 0; k < 3; k++) {
-          const f = r.range(0.1, 0.9)
-          const tx = x0 + (x1 - x0) * f
-          const ty = y0 + (y1 - y0) * f
-          const tr = r.range(10, 18)
-          if (th.peaks || th.weather === 'fog') {
-            ctx.beginPath()
-            ctx.moveTo(tx, ty - tr * 2.6)
-            ctx.lineTo(tx - tr, ty + 4)
-            ctx.lineTo(tx + tr, ty + 4)
-            ctx.closePath()
-            ctx.fill()
-          } else {
-            ctx.beginPath()
-            ctx.arc(tx, ty - tr * 0.6, tr, 0, TAU)
-            ctx.arc(tx + tr * 0.7, ty - tr * 0.2, tr * 0.75, 0, TAU)
-            ctx.fill()
-          }
+  const snowy = Boolean(th.peaks || th.weather === 'snow')
+  const shade = th.night ? 'rgba(6,8,20,0.32)' : 'rgba(22,28,48,0.26)'
+  const rim = th.night ? null : 'rgba(255,248,232,0.4)'
+  // La chaîne du fond : de vrais sommets en montagne, des collines ailleurs.
+  const back = range({ seed: 3.1 + theme, left, right, base, height: th.peaks ? 640 : th.arid ? 280 : 330, rough: th.peaks ? 2.6 : snowy ? 2 : th.arid ? 1.3 : 1.25 })
+  drawRange(ctx, back, {
+    body: th.farDark,
+    shade,
+    snow: snowy ? 'rgba(246,249,253,0.96)' : null,
+    snowLine: snowy ? base - back.height * (th.peaks ? 0.46 : 0.5) : null,
+    rim,
+    strata: th.peaks ? 'rgba(30,34,44,0.12)' : null,
+  })
+  // Voile de brume sur la chaîne du fond : elle recule.
+  const v = ctx.createLinearGradient(0, base - back.height, 0, base)
+  v.addColorStop(0, th.skyBottom + '00')
+  v.addColorStop(1, th.skyBottom + (th.night ? '22' : '55'))
+  ctx.fillStyle = v
+  ctx.fillRect(left, base - back.height, right - left, back.height)
+  // Panaches : neige sur les sommets, sable au désert, voile de brume ailleurs (par grand vent).
+  const plume = snowy ? { rgb: '250,252,255', alpha: 0.8 } : th.arid ? { rgb: '236,212,168', alpha: 0.5 } : Math.abs(wind) > 0.5 ? { rgb: '236,240,244', alpha: 0.22 } : null
+  if (plume) spindrift(ctx, back.peaks.filter((pk) => pk.y < base - back.height * 0.46), { time, wind, rgb: plume.rgb, animate, alpha: plume.alpha, reach: 260, size: 1.3 })
+  // Contreforts devant : plus bas, plus ronds, boisés (sauf désert et neige).
+  const front = range({ seed: 7.7 + theme, left, right, base, height: th.peaks ? 320 : 210, rough: th.peaks ? 1.7 : 1.05 })
+  drawRange(ctx, front, { body: th.far, shade, snow: th.weather === 'snow' ? 'rgba(244,247,251,0.9)' : null, snowLine: th.weather === 'snow' ? base - front.height * 0.55 : null, rim })
+  if (!th.arid) {
+    ctx.fillStyle = th.farDark
+    const pts = front.pts
+    for (let i = 0; i < pts.length - 2; i += 6) {
+      for (let k = 0; k < 2; k++) {
+        const f = r.range(0, 1)
+        const tx = pts[i] + (pts[i + 2] - pts[i]) * f * 3
+        const ty = pts[i + 1] + 3
+        const tr = r.range(9, 16)
+        if (th.peaks || th.weather === 'fog' || th.weather === 'snow') {
+          ctx.beginPath()
+          ctx.moveTo(tx, ty - tr * 2.6)
+          ctx.lineTo(tx - tr, ty + 4)
+          ctx.lineTo(tx + tr, ty + 4)
+          ctx.closePath()
+          ctx.fill()
+        } else {
+          ctx.beginPath()
+          ctx.arc(tx, ty - tr * 0.6, tr, 0, TAU)
+          ctx.arc(tx + tr * 0.7, ty - tr * 0.2, tr * 0.75, 0, TAU)
+          ctx.fill()
         }
       }
     }
-  })
+  }
   // Château lointain sur une colline (masqué en face-à-face : il prêterait à confusion).
   if (!castle) return
   const cx = 1450
@@ -617,8 +616,8 @@ export const PAINTERS = Object.freeze({
   'deco.snow': snowcap,
   'construct.bridge': bridge,
   'scene.sky': sky,
-  'scene.distant': (ctx, st) => distant(ctx, { ...st, extra: { th: THEMES[st.extra?.theme ?? 1] } }),
+  'scene.distant': (ctx, st) => distant(ctx, { ...st, extra: { th: THEMES[st.extra?.theme ?? 1], time: st.extra?.time ?? 0, animate: st.extra?.animate !== false, wind: st.extra?.wind ?? 0 } }),
   'scene.far': far,
-  'scene.near': (ctx, st) => near(ctx, { ...st, extra: { th: THEMES[st.extra?.theme ?? 1], versus: st.extra?.versus } }),
+  'scene.near': (ctx, st) => near(ctx, { ...st, extra: { th: THEMES[st.extra?.theme ?? 1], versus: st.extra?.versus, art: st.extra?.art } }),
   'scene.ground': ground,
 })

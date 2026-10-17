@@ -1,11 +1,13 @@
 <script setup>
 import { ref, shallowRef, computed, onMounted, onBeforeUnmount, watch, markRaw, nextTick } from 'vue'
 import { useApp } from '../../app/AppContext.js'
+import * as Setup from '../../app/MatchSetup.js'
+import { EndOfMatch } from '../../app/EndOfMatch.js'
+import { windText, formatDegrees, formatPercent, formatDayKey } from '../../app/Formats.js'
+import { useGameKeyboard } from '../../composables/useGameKeyboard.js'
 import { LevelRepository } from '../../game/levels/LevelRepository.js'
-import { ArenaRepository } from '../../game/levels/ArenaRepository.js'
-import { DuelRepository } from '../../game/levels/DuelRepository.js'
-import { createMode } from '../../game/modes/modes.js'
-import { GAME, IS_DEMO, PLAYABLE_LEVELS } from '../../config/gameConfig.js'
+import MasteryCrest from '../ui/MasteryCrest.vue'
+import { GAME, PLAYABLE_LEVELS } from '../../config/gameConfig.js'
 import GameHud from '../game/GameHud.vue'
 import AimPanel from '../game/AimPanel.vue'
 import AmmoBar from '../game/AmmoBar.vue'
@@ -20,7 +22,7 @@ import BossBar from '../game/BossBar.vue'
 import BossBanner from '../game/BossBanner.vue'
 import GeneralBust from '../game/GeneralBust.vue'
 import HighlightClip from '../game/HighlightClip.vue'
-import { GENERALS, SKILL_ICONS, livesFor } from '../../game/bosses/generals.js'
+import { SKILL_ICONS } from '../../game/bosses/generals.js'
 import StoryPanel from '../ui/StoryPanel.vue'
 import PixelPortrait from '../ui/PixelPortrait.vue'
 import { StoryRepository } from '../../game/story/StoryRepository.js'
@@ -28,17 +30,22 @@ import { TutorialCoach } from '../../game/tutorial/Tutorial.js'
 import { HotSeatMatch } from '../../game/modes/HotSeatMatch.js'
 import { EndlessRun } from '../../domain/EndlessRun.js'
 import { CARDS } from '../../domain/EndlessDeck.js'
-import { CastleCode, buildCustomLevel, STORAGE_KEYS } from '../../game/editor/CastleDesign.js'
+import { CastleCode, buildCustomLevel } from '../../game/editor/CastleDesign.js'
 import { eventFor } from '../../game/events/Season.js'
 import { dayKey } from '../../game/daily/DailyChallenge.js'
 import ToggleSwitch from '../ui/ToggleSwitch.vue'
 import SegmentedControl from '../ui/SegmentedControl.vue'
 import TrebuchetPanel from '../game/TrebuchetPanel.vue'
-import { TREBUCHET_UNLOCK } from '../../game/Trebuchet.js'
-import { ballistaUnlocked, BALLISTA_UNLOCK } from '../../game/Ballista.js'
+import DriveControl from '../game/DriveControl.vue'
+import { BALLISTA_UNLOCK } from '../../game/Ballista.js'
 
+/**
+ * Écran de jeu : affichage et câblage. Les règles vivent ailleurs (v6.2) :
+ * préparation de la partie (MatchSetup), fin de partie (EndOfMatch), parcours
+ * (Tracks), clavier (useGameKeyboard), mises en forme (Formats).
+ */
 const app = useApp()
-const { state, t } = app
+const { state, t, n } = app
 
 const canvas = ref(null)
 /** Le contrôleur de jeu n'est pas réactif (markRaw) : Vue n'observe que le HUD. */
@@ -55,12 +62,16 @@ let lastResult = null
 const offer = ref('idle')
 /** Or doublé : 'idle' | 'loading' | 'done' | 'failed'. */
 const doubling = ref('idle')
-/** Mode de la partie : histoire, libre, duel, chacun sa partie, face-à-face, campagne à deux. */
+/** Mode de la partie : histoire, libre, duel, chacun sa partie, face-à-face, campagne à deux… */
 const mode = computed(() => state.match.mode || 'story')
-const isMulti = computed(() => ['duel', 'hotseat', 'versus', 'coop'].includes(mode.value))
+const isMulti = computed(() => Setup.isMultiMode(mode.value))
 const isCoop = computed(() => mode.value === 'coop')
 /** Modes qui suivent la campagne (récit, répliques). */
-const isCampaign = computed(() => mode.value === 'story' || isCoop.value)
+const isCampaign = computed(() => Setup.isCampaignMode(mode.value))
+/** Campagne héroïque et Terres du Duc (v6.2) : les parcours de la maîtrise, à médailles. */
+const isHeroic = computed(() => mode.value === 'heroic')
+const isDuke = computed(() => mode.value === 'duke')
+const isMedal = computed(() => Setup.isMedalMode(mode.value))
 const isVersus = computed(() => mode.value === 'versus')
 const isDuel = computed(() => mode.value === 'duel')
 /** Défi du jour, et défi reçu par un lien « Bats mon tir ». */
@@ -68,7 +79,7 @@ const isDaily = computed(() => mode.value === 'daily')
 const isChallenge = computed(() => mode.value === 'challenge')
 /** Coupe de la semaine (v6.0) : mêmes règles que le défi du jour. */
 const isCup = computed(() => mode.value === 'cup')
-const isDefi = computed(() => isDaily.value || isChallenge.value || isCup.value)
+const isDefi = computed(() => Setup.isDefiMode(mode.value))
 /** Siège sans fin : la partie en cours (objet non réactif) et sa copie d'affichage. */
 const isEndless = computed(() => mode.value === 'endless')
 /** Château de l'atelier (le sien en essai, ou celui d'un ami). */
@@ -85,11 +96,9 @@ const challengeStage = ref('play')
 /** Journal de la dernière partie (pour la partager) et état du partage. */
 let lastLog = null
 const share = ref({ state: 'idle', url: '' })
-const level = computed(() =>
-  isCustom.value && customLevel.value
-    ? customLevel.value
-    : isVersus.value ? ArenaRepository.get(state.match.arenaId) : isDuel.value ? DuelRepository.get(state.match.duelId) : LevelRepository.get(state.levelId),
-)
+/** Parcours de la partie (campagne, à deux, héroïque, Terres du Duc) : ses niveaux et ses records. */
+const track = computed(() => Setup.trackFor(mode.value))
+const level = computed(() => Setup.levelFor(mode.value, { levelId: state.levelId, arenaId: state.match.arenaId, duelId: state.match.duelId, customLevel: customLevel.value }))
 const novelties = computed(() => (isCampaign.value ? LevelRepository.novelties(state.levelId) : []))
 /** Chacun sa partie : le tournoi en trois manches (objet non réactif) et sa copie d'affichage. */
 let tourney = null
@@ -97,10 +106,11 @@ const tourneyView = shallowRef(null)
 function refreshTourney() {
   tourneyView.value = tourney ? { round: tourney.round, player: tourney.player, wins: tourney.wins, table: tourney.table, finished: tourney.finished, winner: tourney.winner, totals: tourney.totals } : null
 }
+/** Noms des deux joueurs (modes à deux). */
+const players = () => Setup.playerNames(state.match.players, (i) => t('mp.defaultName', { n: i }))
 function newTourney() {
-  const names = state.match.players.length === 2 ? state.match.players : [t('mp.defaultName', { n: 1 }), t('mp.defaultName', { n: 2 })]
   const levels = state.match.levels?.length === 3 ? state.match.levels : HotSeatMatch.levelsFrom(state.levelId, app.multiplayerLevels())
-  tourney = markRaw(new HotSeatMatch(levels, names))
+  tourney = markRaw(new HotSeatMatch(levels, players()))
   refreshTourney()
 }
 /** Bandeau « Au tour de… » (modes à deux). */
@@ -133,44 +143,31 @@ function clearBossBanners() {
 /** Le général du grand siège en cours (barre du général), s'il y en a un. */
 const levelGeneral = computed(() => (hud.value?.stageCount > 1 ? (level.value?.general ?? null) : null))
 /** Difficulté de la partie (comme pour la session) : les vies du général en dépendent. */
-const matchDifficulty = computed(() => (isMulti.value ? 'hard' : isDefi.value || isCustom.value || !state.profile ? 'normal' : state.profile.difficulty))
+const matchDifficulty = computed(() => Setup.matchDifficulty(mode.value, state.profile))
 /** Introduction d'un grand siège : le général qui attend à la dernière étape, ses vies et ses ordres. */
-const introGeneral = computed(() => {
-  const id = level.value?.general
-  if (!id || !isCampaign.value || (level.value.stageCount ?? 1) < 2) return null
-  return { id, stages: level.value.stageCount, lives: livesFor(id, matchDifficulty.value), skills: GENERALS[id].skills }
-})
+const introGeneral = computed(() => Setup.introGeneral(mode.value, level.value, matchDifficulty.value))
 
 const aiming = computed(() => phase.value === 'playing' && hud.value?.state === 'aiming')
 
-/* ---------- Engin : catapulte ou trébuchet ---------- */
+/* ---------- Engin : catapulte, trébuchet ou baliste ---------- */
 
 /** Niveaux réussis par le profil (campagne solo, ou à deux si plus avancée). */
-const completedForEngine = computed(() => Math.max(state.profile?.completed ?? 0, isCoop.value ? (state.profile?.coop?.completed ?? 0) : 0))
+const completedForEngine = computed(() => Setup.completedLevels(mode.value, state.profile))
 /** Niveau d'apprentissage du trébuchet, au premier passage : le trébuchet est imposé. */
-const trebuchetLesson = computed(() => {
-  if (mode.value !== 'story' || level.value.tutorial !== 'engine:trebuchet') return false
-  return !state.profile?.levels[state.levelId]?.completed && state.settings.tutorials !== false
-})
-/** Le trébuchet est débloqué après le niveau 13 (jamais au face-à-face : il tire depuis l'arrière). */
-const engineChoice = computed(() => !isVersus.value && !isDefi.value && !trebuchetLesson.value && completedForEngine.value >= TREBUCHET_UNLOCK)
+const trebuchetLesson = computed(() => Setup.isTrebuchetLesson({ mode: mode.value, level: level.value, record: state.profile?.levels[state.levelId], settings: state.settings }))
+/** Le trébuchet est débloqué après le niveau 3 (jamais au face-à-face : il tire depuis l'arrière). */
+const engineChoice = computed(() => Setup.canChooseEngine({ mode: mode.value, lesson: trebuchetLesson.value, completed: completedForEngine.value }))
 /** Baliste (v5.1) : réservée aux profils qui ont presque tout gagné (BALLISTA_UNLOCK). */
-const ballistaReady = computed(() => ballistaUnlocked(completedForEngine.value, state.profile?.stars ?? 0))
-const engine = computed(() => {
-  // Défis : engin imposé, le même pour tous.
-  if (isDaily.value) return state.match.daily?.engine ?? 'catapult'
-  if (isCup.value) return 'catapult'
-  if (isChallenge.value) return state.match.challenge?.engine ?? 'catapult'
-  if (trebuchetLesson.value) return 'trebuchet'
-  if (engineChoice.value && state.settings.engine === 'ballista' && ballistaReady.value) return 'ballista'
-  return engineChoice.value && state.settings.engine === 'trebuchet' ? 'trebuchet' : 'catapult'
-})
+const ballistaReady = computed(() => Setup.ballistaReady(completedForEngine.value, state.profile?.stars ?? 0))
+const engine = computed(() => Setup.engineFor({ mode: mode.value, match: state.match, lesson: trebuchetLesson.value, choice: engineChoice.value, preferred: state.settings.engine, ballista: ballistaReady.value }))
 const engineOptions = computed(() => [
   { value: 'catapult', label: t('game.engines.catapult') },
   { value: 'trebuchet', label: t('game.engines.trebuchet') },
   ...(ballistaReady.value ? [{ value: 'ballista', label: t('game.engines.ballista') }] : []),
 ])
 const isTrebuchet = computed(() => hud.value?.engine === 'trebuchet')
+/** Bornes des curseurs de visée (celles de l'engin : voir aim.js et Ballista.js). */
+const aimRange = computed(() => Setup.aimRange(hud.value?.engine))
 /** Visée précise (curseurs) : option ; par défaut, on vise dans la scène et une barre fine suffit. */
 const precise = computed(() => state.settings.preciseAim === true)
 /** Changement d'engin depuis l'introduction : la partie est reconstruite, l'introduction reste affichée. */
@@ -270,9 +267,9 @@ async function startLevel({ rebuild = false } = {}) {
   const profile = state.profile
   if (mode.value === 'hotseat') {
     if (!tourney || tourney.finished) newTourney()
-    state.levelId = tourney.levelId
+    app.setLevel(tourney.levelId)
   }
-  const rec = isCoop.value ? profile?.coop?.levels[state.levelId] : profile?.levels[state.levelId]
+  const rec = track.value.record(profile, state.levelId)
   // Siège sans fin : un siège neuf au premier château (ou après une défaite).
   if (isEndless.value) {
     if (!profile || !profile.endless?.unlocked) {
@@ -280,7 +277,7 @@ async function startLevel({ rebuild = false } = {}) {
       return
     }
     if (!endlessRun || endlessRun.over) endlessRun = markRaw(EndlessRun.start())
-    state.levelId = endlessRun.levelFor()
+    app.setLevel(endlessRun.levelFor())
     refreshEndless()
   }
   // Atelier : le château est relu et validé à chaque partie.
@@ -293,39 +290,29 @@ async function startLevel({ rebuild = false } = {}) {
     }
   }
   // Défis : le défi du jour exige un profil (la série), le défi par lien un code validé.
-  if ((isDaily.value && (!profile || !state.match.daily)) || (isCup.value && (!profile || !state.match.cup)) || (isChallenge.value && !state.match.challenge)) {
+  if (Setup.defiMissing(mode.value, profile, state.match)) {
     app.go('home', { replace: true })
     return
   }
   // Contrôles d'accès : la campagne (seul ou à deux) suit la progression, le mode libre exige un niveau terminé.
-  if ((isCampaign.value && !rec?.unlocked) || (mode.value === 'free' && !rec?.completed)) {
-    app.go(profile ? (isCoop.value ? 'multiplayer' : 'levels') : 'profiles', { replace: true })
+  const denied = Setup.accessDenied(mode.value, profile, rec)
+  if (denied) {
+    app.go(denied, { replace: true })
     return
   }
-  const players = state.match.players.length === 2 ? state.match.players : [t('mp.defaultName', { n: 1 }), t('mp.defaultName', { n: 2 })]
   // Pouvoirs : ceux débloqués par le profil, en solo comme à deux.
-  const completedLevels = Math.max(profile?.completed ?? 0, isCoop.value ? (profile?.coop?.completed ?? 0) : 0)
+  const completedLevels = Setup.completedLevels(mode.value, profile)
   const effects = app.activeSlot?.effects
   share.value = { state: 'idle', url: '' }
   // Défi par lien : le score à battre est calculé une fois, en rejouant le tir de l'ami.
-  if (isChallenge.value && challengeTarget.value === null) challengeTarget.value = await computeTarget(state.match.challenge)
-  const rules =
-    isDefi.value || isCustom.value
-      ? createMode(mode.value, { completedLevels })
-      : isEndless.value
-        ? createMode('endless', { effects, completedLevels, shots: endlessRun.shots, bonusAmmo: endlessRun.loadout.ammo, supply: endlessRun.loadout.supply })
-      : mode.value === 'story' || mode.value === 'free'
-      ? createMode(mode.value, { effects, completedLevels })
-      : mode.value === 'hotseat'
-        ? createMode('hotseat', { players: [players[tourney.player]], completedLevels })
-        : createMode(mode.value, { players, completedLevels })
+  if (isChallenge.value && challengeTarget.value === null) challengeTarget.value = await Setup.challengeTarget(state.match.challenge)
+  const rules = Setup.matchRules(mode.value, { completedLevels, effects, players: players(), hotseatPlayer: tourney?.player, endless: endlessRun })
   const { GameController } = await import('../../game/GameController.js')
   if (!canvas.value) return
   controller = markRaw(
     await GameController.create(canvas.value, level.value, {
-      // À deux, tout se joue en Difficile : deux humains, des châteaux à leur mesure.
-      // Défis : Normal pour tout le monde.
-      difficulty: isMulti.value ? 'hard' : isDefi.value || isCustom.value || !profile ? 'normal' : profile.difficulty,
+      // À deux, tout se joue en Difficile ; défis : Normal pour tout le monde (voir MatchSetup).
+      difficulty: Setup.matchDifficulty(mode.value, profile),
       completedLevels,
       settings: { ...state.settings },
       reducedMotion: app.reducedMotion(),
@@ -340,7 +327,7 @@ async function startLevel({ rebuild = false } = {}) {
       season: eventFor(dayKey()),
       translate: (key) => t(key),
       // Coup de pouce discret (v6.0) : campagne seule, premier chapitre, après des défaites.
-      luck: mode.value === 'story' && profile ? (app.activeSlot?.luckFor(state.levelId, profile.difficulty) ?? 0) : 0,
+      luck: Setup.matchLuck(mode.value, profile, app.activeSlot, state.levelId),
     }),
   )
   controller.on('turn', ({ name }) => showTurn(name))
@@ -393,26 +380,13 @@ async function startLevel({ rebuild = false } = {}) {
   if (mode.value === 'story' && level.value.tutorial && !rec?.completed && state.settings.tutorials !== false) startCoach(level.value.tutorial)
   // Premier passage d'un niveau qui ouvre un chapitre : la Chronique d'abord.
   // Démarrage rapide (nouveau joueur sur un portail) : directement dans la partie, le tutoriel guide.
-  const quick = !rebuild && state.match.quick === true
-  if (quick) state.match.quick = false
+  const quick = !rebuild && app.takeQuickStart()
   const beat = !quick && !rebuild && isCampaign.value && !rec?.completed && state.settings.story !== false ? StoryRepository.before(state.levelId) : null
   storyBeat.value = beat
   if (quick) return play()
   phase.value = beat ? 'story' : 'intro'
   await nextTick()
   observeHud()
-}
-
-/** Score obtenu par le tir partagé, recalculé par le moteur (jamais lu dans le lien). */
-async function computeTarget(run) {
-  const [{ GameSession }, { ReplayPlayer }] = await Promise.all([import('../../game/GameSession.js'), import('../../game/replay/ReplayPlayer.js')])
-  const session = new GameSession(LevelRepository.get(run.levelId), { difficulty: 'normal', completedLevels: 0, reducedMotion: true, engine: run.engine, replay: true }, createMode('challenge', {}))
-  let ended = null
-  session.on('end', (e) => (ended = e))
-  new ReplayPlayer(session, run.actions).runToEnd()
-  const score = ended ? ended.scores[0] : session.score.current
-  session.destroy()
-  return score
 }
 
 /** Défi par lien : regarder le tir de l'ami, puis revenir à l'introduction. */
@@ -438,7 +412,7 @@ async function shareRun() {
     log: lastLog,
   }
   try {
-    const res = await app.shareRun(run, t('daily.shareText', { score: (end.value?.score ?? 0).toLocaleString(state.locale) }))
+    const res = await app.shareRun(run, t('daily.shareText', { score: end.value?.score ?? 0 }))
     share.value = { state: res.method, url: res.url }
     if (res.method === 'copied') app.announce(t('daily.copied'))
   } catch {
@@ -448,6 +422,8 @@ async function shareRun() {
 
 function destroyController() {
   clearTimeout(coachTimer)
+  // Le bilan en attente appartient à la partie qui s'achève (v6.2) : il ne s'affiche plus.
+  clearEndTimer()
   clearBossBanners()
   highlight.value = null
   coach = null
@@ -510,19 +486,40 @@ function observeHud() {
   measureInsets()
 }
 
+/*
+ * Clavier (v6.2, voir useGameKeyboard) : ses écouteurs se posent avant le
+ * lancement du niveau, et se retirent avant la fin de la partie. Les actions
+ * sont appelées au moment de la touche (elles sont définies plus bas).
+ */
+const { drive } = useGameKeyboard({
+  controller: () => controller,
+  phase,
+  showPowers,
+  isTrebuchet,
+  hud,
+  coach: coachNotify,
+  actions: {
+    resume: () => resume(),
+    pause: () => pause(),
+    fire: () => fire(),
+    bucket: () => useBucket(),
+    selectAmmo: (type) => selectAmmo(type),
+    stopWatching: () => stopWatching(),
+  },
+})
+
 onMounted(() => {
-  window.addEventListener('keydown', onKey)
-  window.addEventListener('keyup', onKeyUp)
   startLevel()
 })
 onBeforeUnmount(() => {
-  window.removeEventListener('keydown', onKey)
-  window.removeEventListener('keyup', onKeyUp)
   hudObs?.disconnect()
   destroyController()
+  // Écran quitté (v6.2) : ni bandeau de tour ni cloches d'étoiles sur la carte des niveaux.
+  clearTimeout(turnTimer)
+  clearStarTimers()
 })
 watch(
-  () => [state.settings.trajectoryAid, state.settings.screenShake, state.settings.blood, state.settings.screams, state.settings.motion, state.systemReducedMotion, state.settings.slowSwing],
+  () => [state.settings.trajectoryAid, state.settings.screenShake, state.settings.blood, state.settings.screams, state.settings.motion, state.systemReducedMotion, state.settings.slowSwing, state.settings.contrast],
   () => {
     controller?.applySettings({ ...state.settings }, app.reducedMotion())
     if (coach && controller) controller.session.options.trajectoryAid = true
@@ -574,7 +571,6 @@ function usePower(id) {
     coachNotify('power', id)
   }
 }
-/* Vidéos récompensées en partie (portails, campagne solo) : toujours facultatives. */
 /*
  * Vidéos récompensées facultatives (portails, campagne solo).
  * Règle des portails : jamais de bouton vidéo pendant qu'on joue. Elles sont
@@ -628,10 +624,9 @@ function quit() {
   tourney = null
   refreshTourney()
   endlessRun = null
-  if (isCustom.value) return app.go(state.match.custom?.fromEditor ? 'editor' : 'home')
   // Coupe de la semaine : retour à l'accueil, la coupe ouverte.
-  if (isCup.value) state.showCup = true
-  app.go(isMulti.value ? 'multiplayer' : isDefi.value ? 'home' : isEndless.value ? 'modes' : 'levels')
+  if (isCup.value) app.requestCup()
+  app.go(Setup.exitScreen(mode.value, state.match))
 }
 /** Rejouer : en « chacun sa partie », la revanche repart d'un tournoi neuf. */
 async function restart() {
@@ -646,7 +641,7 @@ function nextRound() {
   startLevel()
 }
 async function nextLevel() {
-  state.levelId = Math.min(state.levelId + 1, GAME.LEVEL_COUNT)
+  app.setLevel(Math.min(state.levelId + 1, track.value.count))
   // Portails : une publicité éventuelle, uniquement entre deux niveaux (règles AdPolicy).
   await app.services.ads.interstitial()
   startLevel()
@@ -698,6 +693,10 @@ function storyDone() {
 function readEpilogue() {
   storyBeat.value = StoryRepository.after(GAME.LEVEL_COUNT)
 }
+/** La Légende (v6.2), lue depuis l'écran de la maîtrise. */
+function readLegend() {
+  storyBeat.value = StoryRepository.get('legend')
+}
 
 /* ---------- Engin en feu (v5.8) ---------- */
 
@@ -710,8 +709,8 @@ function useBucket() {
 
 /* ---------- Musique ---------- */
 
-/** Dernier niveau d'un chapitre (tous les 10) : la tension reste élevée. */
-const isBoss = computed(() => isCampaign.value && state.levelId % GAME.LEVELS_PER_CHAPTER === 0)
+/** Grand siège (fin de chapitre, ou citadelle du Duc) : la tension reste élevée. */
+const isBoss = computed(() => Setup.isBossLevel(mode.value, state.levelId, level.value))
 function updateMusic() {
   const h = hud.value
   const music = app.services.music
@@ -724,17 +723,46 @@ function updateMusic() {
 watch(() => [hud.value?.state, hud.value?.targetsLeft], () => phase.value === 'playing' && updateMusic())
 
 /** Écran de fin : une cloche par étoile, au rythme de leur apparition (voir game.css). */
+let starTimers = []
+function clearStarTimers() {
+  starTimers.forEach(clearTimeout)
+  starTimers = []
+}
 watch(end, (e) => {
   const stars = e?.won ? e.stars ?? 0 : 0
-  for (let i = 0; i < stars; i++) setTimeout(() => app.services.audio.play('star', { intensity: 0.8 + i * 0.2 }), 220 + i * 260)
+  for (let i = 0; i < stars; i++) starTimers.push(setTimeout(() => app.services.audio.play('star', { intensity: 0.8 + i * 0.2 }), 220 + i * 260))
 })
 
-/** Fin de partie : présentation propre à chaque mode. */
+/* ---------- Fin de partie : présentation propre à chaque mode (voir EndOfMatch) ---------- */
+
 /** Durée du décompte des tirs restants (v6.0) : le bilan attend la fin du spectacle. */
 let celebrateMs = 0
+/** Minuterie du bilan (ou de la fin d'une relecture). */
+let endTimer = null
+function clearEndTimer() {
+  clearTimeout(endTimer)
+  endTimer = null
+}
 /** Moments forts (v6.0) : le plus beau tir de la partie, filmé (ou null). */
 const highlight = shallowRef(null)
 const clipName = computed(() => `catapulte-mania-${isCup.value ? 'coupe' : isDaily.value ? 'defi' : 'niveau'}-${state.levelId}`)
+
+/** Ce que les stratégies de fin de partie lisent et appellent. */
+function endContext() {
+  return {
+    mode: mode.value,
+    t,
+    n,
+    state,
+    app,
+    session: controller?.session ?? null,
+    tourney,
+    endlessRun,
+    refreshTourney,
+    refreshEndless,
+    challengeTarget: challengeTarget.value,
+  }
+}
 
 async function onEnd(e) {
   celebrateMs = e.celebrateMs ?? 0
@@ -747,96 +775,27 @@ async function onEnd(e) {
   lastLog = controller?.session.log ?? null
   if (isChallenge.value && challengeStage.value === 'watch') {
     // Fin de la relecture : retour à l'introduction, le défi peut commencer.
-    setTimeout(() => stopWatching(), 1500)
+    clearEndTimer()
+    endTimer = setTimeout(() => stopWatching(), 1500)
     return
   }
-  if (isDaily.value) return onDailyEnd(e)
-  if (isCup.value) return onCupEnd(e)
-  if (isEndless.value) return onEndlessEnd(e)
-  if (isCustom.value) return onCustomEnd(e)
-  if (isChallenge.value) return onChallengeEnd(e)
-  if (mode.value === 'story') return onStoryEnd(e)
-  if (isCoop.value) return onCoopEnd(e)
-  const session = controller?.session
-  const names = session?.players.map((p) => p.name) ?? []
-  let view
-  if (mode.value === 'free') {
-    view = { kind: 'free' }
-  } else if (mode.value === 'hotseat') {
-    const p = session.players[0]
-    const shots = p.shotsTotal - p.shotsLeft
-    const kills = session.level.targets.length - session.targetsLeft
-    const who = tourney.player
-    const step = tourney.record({ cleared: e.won, shots, kills, score: e.scores[0] })
-    refreshTourney()
-    const result = { name: state.match.players[who] || names[0], cleared: e.won, shots, kills, score: e.scores[0] }
-    if (step === 'next-player') view = { kind: 'round', who, result, next: tourney.player, nextName: tourney.players[tourney.player] }
-    else if (step === 'round-over') view = { kind: 'roundEnd', round: tourney.round - 1, winner: tourney.roundWinner(tourney.round - 1) }
-    else view = { kind: 'tourney', winner: tourney.winner, names: [...tourney.players] }
-  } else {
-    view = {
-      kind: 'compare',
-      winner: e.winner,
-      reason: e.reason,
-      names,
-      scores: e.scores,
-      renown: e.renown,
-      defenders: isVersus.value ? session?.hud.players.map((p) => p.defenders) : null,
-    }
+  const ending = EndOfMatch.for(mode.value)
+  if (ending.doublesGold) {
+    lastResult = e.result
+    doubling.value = 'idle'
   }
-  setTimeout(() => {
+  const match = controller
+  const ctx = endContext()
+  const outcome = await ending.record(e, ctx)
+  // Partie quittée pendant l'enregistrement (v6.2) : aucun bilan sur l'écran suivant.
+  if (controller !== match) return
+  const view = ending.view(e, outcome, ctx)
+  clearEndTimer()
+  endTimer = setTimeout(() => {
     end.value = view
     phase.value = 'ended'
-    if (view.kind === 'compare' || view.kind === 'tourney') app.announce(view.winner === null ? t('end.draw') : t('end.winner', { name: view.names[view.winner] }))
-    else if (view.kind === 'round') app.announce(t('end.roundDone', { name: view.result.name }))
-    else if (view.kind === 'roundEnd') app.announce(view.winner === null ? t('end.roundDraw') : t('end.roundWon', { name: tourney.players[view.winner] }))
-    else app.announce(t('end.cleared'))
-  }, 1200 + celebrateMs)
-}
-
-/** Fin d'un niveau de la campagne à deux : progression commune, meilleur joueur. */
-async function onCoopEnd({ won, result, renown }) {
-  const outcome = result ? await app.recordCoop(result) : { saved: true }
-  const names = controller?.session.players.map((p) => p.name) ?? []
-  const [a, b] = renown ?? [0, 0]
-  setTimeout(() => {
-    end.value = {
-      kind: 'coop',
-      won,
-      score: result?.score ?? 0,
-      stars: result?.stars ?? 0,
-      shotsUsed: result?.shotsUsed ?? 0,
-      names,
-      renown: [a, b],
-      mvp: a === b ? null : a > b ? 0 : 1,
-      newBest: won && outcome.newBest,
-      saved: outcome.saved !== false,
-      hasNext: won && state.levelId < PLAYABLE_LEVELS,
-    }
-    phase.value = 'ended'
-    app.announce(won ? `${t('end.victory')} ${t('a11y.stars', { count: result.stars })}` : t('end.defeat'))
-  }, won ? 1400 + celebrateMs : 900)
-}
-
-/** Fin du défi du jour : série, record du jour, partage. */
-async function onDailyEnd({ won, result, scores }) {
-  const outcome = result ? await safely(() => app.recordDaily(result, state.match.daily.key), { newBest: false, extended: false, reward: null }) : { saved: true }
-  const score = result?.score ?? scores?.[0] ?? 0
-  setTimeout(() => {
-    end.value = {
-      kind: 'daily',
-      won,
-      score,
-      newBest: won && outcome.newBest,
-      reward: outcome.reward ?? null,
-      streak: outcome.streak ?? state.profile?.daily?.streak ?? 0,
-      extended: Boolean(outcome.extended),
-      todayBest: state.profile?.daily?.todayBest ?? null,
-      saved: outcome.saved !== false,
-    }
-    phase.value = 'ended'
-    app.announce(won ? `${t('end.victory')} ${t('end.score')} ${score}. ${t('daily.streak', { count: end.value.streak })}` : t('end.defeat'))
-  }, won ? 1400 + celebrateMs : 900)
+    app.announce(ending.announce(view, ctx))
+  }, ending.delay(e, outcome, celebrateMs))
 }
 
 /** Passer le niveau après trois défaites (v6.0) : le suivant s'ouvre, on y va. */
@@ -844,37 +803,11 @@ async function skipLevel() {
   const id = state.levelId
   await app.skipLevel(id)
   if (id < PLAYABLE_LEVELS) {
-    state.levelId = id + 1
-    state.match = { ...state.match, levelId: id + 1 }
+    app.setLevel(id + 1, { match: true })
     startLevel()
   } else app.go('levels')
 }
 
-/** Fin d'un château de la coupe de la semaine (v6.0) : étoiles, médaille, château suivant. */
-async function onCupEnd({ won, result, scores }) {
-  const { week, index } = state.match.cup
-  const outcome = result ? await safely(() => app.recordCup(result, week, index), { newBest: false, medal: null, medalUp: false }) : { saved: true }
-  const score = result?.score ?? scores?.[0] ?? 0
-  const view = state.profile?.cup
-  setTimeout(() => {
-    end.value = {
-      kind: 'cup',
-      won,
-      score,
-      stars: result?.stars ?? 0,
-      index,
-      newBest: won && outcome.newBest,
-      cupStars: outcome.stars ?? view?.stars ?? 0,
-      maxStars: view?.maxStars ?? 15,
-      medal: outcome.medal ?? view?.medal ?? null,
-      medalUp: Boolean(outcome.medalUp),
-      next: index < (view?.castles.length ?? 5) ? index + 1 : null,
-      saved: outcome.saved !== false,
-    }
-    phase.value = 'ended'
-    app.announce(won ? `${t('end.victory')} ${t('a11y.stars', { count: end.value.stars })}` : t('end.defeat'))
-  }, won ? 1400 + celebrateMs : 900)
-}
 async function nextCupCastle() {
   await app.services.ads.interstitial()
   await app.startCup(end.value?.next ?? 1)
@@ -889,22 +822,6 @@ async function shareCup() {
   share.value = { state: r.method, url: r.url }
 }
 
-/** Fin d'un château du siège sans fin : château suivant, ou fin du siège. */
-async function onEndlessEnd({ result }) {
-  const left = controller?.session.player.shotsLeft ?? 0
-  const step = endlessRun.record(result, Math.max(0, left))
-  refreshEndless()
-  let outcome = null
-  if (step === 'over') outcome = await app.recordEndless(endlessRun)
-  setTimeout(() => {
-    end.value =
-      step === 'next'
-        ? { kind: 'endlessNext', ...endlessRun.last, wave: endlessRun.wave, shots: endlessRun.shots, total: endlessRun.score, hand: endlessRun.hand, picked: null }
-        : { kind: 'endlessOver', cleared: endlessRun.cleared, total: endlessRun.score, newBest: outcome?.newBest, newWave: outcome?.newWave, best: state.profile?.endless?.best ?? 0, saved: outcome?.saved !== false }
-    phase.value = 'ended'
-    app.announce(step === 'next' ? t('endless.castleDown', { n: endlessRun.cleared }) : t('endless.over', { count: endlessRun.cleared }))
-  }, step === 'next' ? 1400 + celebrateMs : 900)
-}
 /** Main du siège (v6.0) : garder une carte, puis passer au château suivant. */
 function pickCard(id) {
   if (!endlessRun || !end.value?.hand || end.value.picked) return
@@ -922,82 +839,6 @@ function newSiege() {
   startLevel()
 }
 
-/** Fin d'une partie dans un château de l'atelier. */
-function onCustomEnd({ won, scores }) {
-  const fromEditor = state.match.custom?.fromEditor
-  // Prendre son propre château prouve qu'il est faisable : on peut alors le partager.
-  if (won && fromEditor) {
-    state.editorVerified = state.match.custom.code
-    try {
-      app.services.storage.writeJson(STORAGE_KEYS.verified, state.match.custom.code)
-    } catch {
-      /* sans stockage : la preuve vaut pour la session */
-    }
-  }
-  setTimeout(() => {
-    end.value = { kind: 'custom', won, score: scores?.[0] ?? 0, fromEditor }
-    phase.value = 'ended'
-    app.announce(won ? t('editor.taken') : t('end.defeat'))
-  }, won ? 1400 + celebrateMs : 900)
-}
-
-/** Fin d'un défi par lien : a-t-on battu le score de l'ami ? */
-function onChallengeEnd({ won, scores }) {
-  const score = scores?.[0] ?? 0
-  const target = challengeTarget.value ?? 0
-  setTimeout(() => {
-    end.value = { kind: 'challenge', won, score, target, beaten: won && score > target, name: state.match.challenge?.name || '' }
-    phase.value = 'ended'
-    app.announce(end.value.beaten ? t('daily.beaten') : t('daily.notBeaten', { score: target }))
-  }, won ? 1400 + celebrateMs : 900)
-}
-
-/**
- * Enregistrement d'un résultat : une sauvegarde refusée (profil incohérent,
- * stockage plein) ne doit jamais bloquer la fin de partie ; le bilan s'affiche
- * alors avec l'avis « non enregistré ».
- */
-async function safely(record, fallback) {
-  try {
-    return await record()
-  } catch (err) {
-    console.warn('[save]', err)
-    return { ...fallback, saved: false }
-  }
-}
-
-async function onStoryEnd({ won, result, reason }) {
-  lastResult = result
-  doubling.value = 'idle'
-  const maskBefore = state.profile?.levels[result.levelId]?.ach ?? 0
-  const outcome = await safely(() => app.recordResult(result), { newBest: false, unlockedPower: null, gold: 0, newAchievements: 0 })
-  const rec = state.profile?.levels[result.levelId]
-  setTimeout(() => {
-    end.value = {
-      kind: 'story',
-      won,
-      reason: reason ?? null,
-      score: result.score,
-      stars: result.stars,
-      best: rec?.best ?? 0,
-      newBest: won && outcome.newBest,
-      unlockedPower: outcome.unlockedPower,
-      gold: outcome.gold || 0,
-      achMask: maskBefore,
-      achFresh: outcome.newAchievements || 0,
-      shotsUsed: result.shotsUsed,
-      saved: outcome.saved,
-      hasNext: won && result.levelId < PLAYABLE_LEVELS,
-      campaignDone: won && result.levelId === GAME.LEVEL_COUNT,
-      demoDone: won && IS_DEMO && result.levelId === PLAYABLE_LEVELS,
-      // Trois défaites d'affilée (v6.0) : on peut passer au niveau suivant.
-      canSkip: !won && Boolean(app.activeSlot?.canSkip(result.levelId)),
-    }
-    phase.value = 'ended'
-    app.announce(won ? `${t('end.victory')} ${t('end.score')} ${result.score}. ${t('a11y.stars', { count: result.stars })}` : t('end.defeat'))
-  }, won ? 1400 + celebrateMs : 900)
-}
-
 /** Titre de l'introduction et du bandeau : niveau, ou arène en face-à-face. */
 const matchTitle = computed(() =>
   isCustom.value
@@ -1012,102 +853,36 @@ const matchTitle = computed(() =>
       ? state.match.challenge?.name
         ? t('daily.challengeFrom', { name: state.match.challenge.name })
         : t('daily.challengeTitle')
-      : isVersus.value ? t(`mp.arenas.${state.match.arenaId}`) : isDuel.value ? t(`mp.duels.${state.match.duelId}`) : t('game.level', { n: state.levelId }),
+      : isVersus.value
+        ? t(`mp.arenas.${state.match.arenaId}`)
+        : isDuel.value
+          ? t(`mp.duels.${state.match.duelId}`)
+          : isDuke.value
+            ? t(`duke.names.${state.levelId}`)
+            : isHeroic.value
+              ? t('heroic.level', { n: state.levelId })
+              : t('game.level', { n: state.levelId }),
 )
 const matchSubtitle = computed(() => {
   if (isCustom.value) return state.match.custom?.fromEditor ? t('editor.testing') : t('editor.title')
-  if (isEndless.value) return `${t('endless.title')} · ${t('end.points', { score: (endlessView.value?.score ?? 0).toLocaleString(state.locale) })}`
-  if (isDaily.value) return `${formatDay(state.match.daily.key)} · ${t('game.level', { n: state.levelId })}`
+  if (isEndless.value) return `${t('endless.title')} · ${t('end.points', { score: endlessView.value?.score ?? 0 })}`
+  if (isDaily.value) return `${formatDayKey(app.d, state.match.daily.key)} · ${t('game.level', { n: state.levelId })}`
   if (isCup.value) return `${t('cup.title')} · ${t('game.level', { n: state.levelId })}`
   if (isChallenge.value) return t('game.level', { n: state.levelId })
   if (isCoop.value) return `${t('mp.formats.coop.name')} · ${t('levels.chapter', { n: level.value.chapter })} · ${t(`levels.chapters.${level.value.chapter}`)}`
   if (mode.value === 'hotseat' && tourneyView.value) return `${t('mp.formats.hotseat.name')} · ${t('mp.roundOf', { n: Math.min(tourneyView.value.round + 1, 3) })}`
   if (isMulti.value) return t(`mp.formats.${mode.value}.name`)
   if (mode.value === 'free') return t('levels.free')
+  if (isDuke.value) return `${t('duke.num')} · ${t('duke.tab')}`
+  if (isHeroic.value) return `${t('heroic.title')} · ${t(`levels.chapters.${level.value.chapter}`)}`
   return `${t('levels.chapter', { n: level.value.chapter })} · ${t(`levels.chapters.${level.value.chapter}`)}`
 })
 
-/** Date lisible d'un défi du jour (langue du joueur). */
-function formatDay(key) {
-  const [y, m, d] = key.split('-').map(Number)
-  try {
-    return new Date(y, m - 1, d).toLocaleDateString(state.locale, { weekday: 'long', day: 'numeric', month: 'long' })
-  } catch {
-    return key
-  }
-}
-
-/* ---------- Clavier ---------- */
-
-const ARROWS = Object.freeze({ ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' })
-function onKeyUp(e) {
-  const arrow = ARROWS[e.code]
-  if (arrow) controller?.aimKey(arrow, false)
-}
-function onKey(e) {
-  if (e.target instanceof HTMLElement && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) && e.target.type !== 'range') return
-  if (phase.value === 'paused' && (e.key === 'p' || e.key === 'P')) return resume()
-  if (phase.value !== 'playing' || showPowers.value) return
-  if (controller?.replaying) {
-    if (e.code === 'KeyP') stopWatching()
-    return
-  }
-  // Flèches (v5.2) : maintien avec accélération, Maj pour la précision (voir AimInput).
-  const arrow = ARROWS[e.code]
-  if (arrow) {
-    if (e.target?.type === 'range') return
-    // Trébuchet : ← → déplacent la cible au sol (Maj : par petits pas).
-    if (isTrebuchet.value) {
-      if (arrow !== 'left' && arrow !== 'right') return
-      e.preventDefault()
-      controller?.trebNudge(arrow === 'left' ? -1 : 1, e.shiftKey)
-      return
-    }
-    e.preventDefault()
-    controller?.aimKey(arrow, true, e.shiftKey)
-    coachNotify('aim')
-    return
-  }
-  switch (e.code) {
-    case 'Space':
-    case 'Enter':
-      if (e.target instanceof HTMLButtonElement) return
-      if (!e.repeat) fire()
-      break
-    // Pas d'Échap : sur les portails, cette touche sert au navigateur (sortie du plein écran).
-    case 'KeyP':
-      pause()
-      break
-    // Seau d'eau (v5.8).
-    case 'KeyB':
-      useBucket()
-      break
-    default:
-      // Munitions : touches 1 à 9, dans l'ordre de la barre (neuf munitions depuis la v6.1).
-      if (/^Digit[1-9]$/.test(e.code)) {
-        const a = hud.value?.ammo[Number(e.code.slice(5)) - 1]
-        if (a) selectAmmo(a.type)
-        break
-      }
-      return
-  }
-  e.preventDefault()
-}
-
 /* ---------- Accessibilité ---------- */
-
-/** Vent lu aux lecteurs d'écran : vitesse réelle, sens, et rafales en Difficile. */
-function windText(w) {
-  const h = hud.value
-  const kmh = h?.windKmh ?? Math.round(Math.abs(w) * 30)
-  if (!kmh) return t('game.windCalm')
-  const base = `${kmh} km/h ${w < 0 ? t('a11y.windLeft') : t('a11y.windRight')}`
-  return h?.windDynamic ? `${base}, ${t('a11y.windGusty')}` : base
-}
 
 function formatAnnouncement({ key, params = {} }) {
   const p = { ...params }
-  if (key === 'a11y.turn') p.wind = windText(hud.value?.wind ?? 0)
+  if (key === 'a11y.turn') p.wind = windText(t, hud.value, hud.value?.wind ?? 0)
   if (key === 'a11y.powerUsed') p.power = t(`powers.${params.power}`)
   // Généraux (v6.0) : leur nom et celui de leur ordre.
   if (params.general) p.general = t(`characters.${params.general}.name`)
@@ -1117,9 +892,11 @@ function formatAnnouncement({ key, params = {} }) {
 
 const canvasLabel = computed(() =>
   hud.value
-    ? `${t('a11y.canvas', { level: state.levelId, targets: hud.value.targetsLeft, shots: hud.value.shotsLeft ?? '∞', wind: windText(hud.value.wind) })} ${isTrebuchet.value ? t('a11y.keyboardHelpTreb') : t('a11y.keyboardHelp')}`
+    ? `${t('a11y.canvas', { level: state.levelId, targets: hud.value.targetsLeft, shots: hud.value.shotsLeft ?? '∞', wind: windText(t, hud.value, hud.value.wind) })} ${isTrebuchet.value ? t('a11y.keyboardHelpTreb') : t('a11y.keyboardHelp')}`
     : t('app.title'),
 )
+/** Angle et puissance lus dans la barre fine (visée dans la scène). */
+const aimReadout = computed(() => (hud.value ? { angle: formatDegrees(t, hud.value.angle), power: formatPercent(t, hud.value.power) } : null))
 </script>
 
 <template>
@@ -1152,10 +929,13 @@ const canvasLabel = computed(() =>
         <button type="button" class="btn btn--small" @click="stopWatching">{{ t('daily.skip') }}</button>
       </div>
       <div v-show="phase === 'playing' && !(isChallenge && challengeStage === 'watch')" :class="['hud-bottom', { 'hud-bottom--compact': !precise }]">
+        <!-- Déplacement de l'engin (v6.2) : à gauche, sous le pouce libre. -->
+        <DriveControl v-if="hud.drive" :drive="hud.drive" :disabled="!hud.drive.open" :coach="coachAnchor" @drive="drive" />
         <TrebuchetPanel v-if="isTrebuchet" :hud="hud" />
-        <AimPanel v-else-if="precise" :angle="hud.angle" :power="hud.power" :disabled="!aiming" :coach="coachAnchor" :min-angle="hud.engine === 'ballista' ? 0 : 5" :max-angle="hud.engine === 'ballista' ? 60 : 80" @aim="aim" @nudge="nudge" />
-        <p v-else class="aim-readout" data-coach="aim" :aria-label="`${t('game.angle')} ${hud.angle}°, ${t('game.power')} ${hud.power} %`">
-          <span>{{ hud.angle }}°</span><span class="aim-readout__sep" aria-hidden="true">·</span><span>{{ hud.power }} %</span>
+        <AimPanel v-else-if="precise" :angle="hud.angle" :power="hud.power" :disabled="!aiming" :coach="coachAnchor" :min-angle="aimRange.min" :max-angle="aimRange.max" @aim="aim" @nudge="nudge" />
+        <p v-else class="aim-readout" data-coach="aim">
+          <span aria-hidden="true">{{ aimReadout.angle }}</span><span class="aim-readout__sep" aria-hidden="true">·</span><span aria-hidden="true">{{ aimReadout.power }}</span>
+          <span class="visually-hidden">{{ t('game.angle') }} {{ aimReadout.angle }}, {{ t('game.power') }} {{ aimReadout.power }}</span>
         </p>
         <AmmoBar :ammo="hud.ammo" :disabled="!aiming" :coach="coachAnchor" @select="selectAmmo" />
         <button
@@ -1247,6 +1027,21 @@ const canvasLabel = computed(() =>
           <AchievementList :level="level" :mask="state.profile?.levels[state.levelId]?.ach ?? 0" compact />
         </template>
       </template>
+      <template v-else-if="isMedal">
+        <figure v-if="isDuke" class="interlude">
+          <PixelPortrait id="gontran" height="5.5rem" decorative class="interlude__portrait" />
+          <figcaption class="interlude__text">
+            <span class="interlude__name">{{ t('characters.gontran.name') }}</span>
+            <q>{{ t(`duke.lines.${state.levelId}`) }}</q>
+          </figcaption>
+        </figure>
+        <p v-else class="intro-heroic"><MasteryCrest :size="22" />{{ t('heroic.rules') }}</p>
+        <p>{{ t('intro.goal') }} {{ t('intro.shots', { count: hud?.shotsTotal ?? level.shots }) }}</p>
+        <p class="intro-stars">
+          <span><span class="medal-dot medal-dot--gold" aria-hidden="true" />{{ t('heroic.medal.gold') }} · {{ t('intro.star3', { count: level.par }) }}</span>
+          <span><span class="medal-dot medal-dot--silver" aria-hidden="true" />{{ t('heroic.medal.silver') }} · {{ t('intro.star2', { count: level.star2 }) }}</span>
+        </p>
+      </template>
       <template v-else-if="isCustom">
         <p>{{ state.match.custom?.fromEditor ? t('editor.testHint') : t('editor.friendHint') }}</p>
         <p>{{ t('intro.shots', { count: hud?.shotsTotal ?? level.shots }) }}</p>
@@ -1259,9 +1054,9 @@ const canvasLabel = computed(() =>
         <p>{{ t(isDaily ? 'daily.rules' : 'daily.challengeRules', { engine: t(`game.engines.${engine}`) }) }}</p>
         <p v-if="isDaily" class="daily-line">
           <AppIcon name="flame" :size="18" />{{ t('daily.streak', { count: state.profile?.daily?.streak ?? 0 }) }}
-          <span v-if="state.profile?.daily?.todayBest !== null && state.profile?.daily?.todayBest !== undefined"> · {{ t('daily.todayBest', { score: state.profile.daily.todayBest.toLocaleString(state.locale) }) }}</span>
+          <span v-if="state.profile?.daily?.todayBest !== null && state.profile?.daily?.todayBest !== undefined"> · {{ t('daily.todayBest', { score: state.profile.daily.todayBest }) }}</span>
         </p>
-        <p v-if="isChallenge" class="end__big">{{ t('daily.toBeat', { score: (challengeTarget ?? 0).toLocaleString(state.locale) }) }}</p>
+        <p v-if="isChallenge" class="end__big">{{ t('daily.toBeat', { score: challengeTarget ?? 0 }) }}</p>
       </template>
       <p v-else-if="mode === 'free'">{{ t('levels.freeHint') }}</p>
       <template v-else>
@@ -1362,8 +1157,8 @@ const canvasLabel = computed(() =>
       <template v-if="end.won">
         <StarRow :count="end.stars" :size="40" class="end__stars" />
         <dl class="end__scores">
-          <div><dt>{{ t('end.score') }}</dt><dd>{{ end.score.toLocaleString(state.locale) }}</dd></div>
-          <div><dt>{{ t('end.best') }}</dt><dd>{{ end.best.toLocaleString(state.locale) }}</dd></div>
+          <div><dt>{{ t('end.score') }}</dt><dd>{{ n(end.score) }}</dd></div>
+          <div><dt>{{ t('end.best') }}</dt><dd>{{ n(end.best) }}</dd></div>
         </dl>
         <p class="end__shots">{{ t('end.shotsUsed', { count: end.shotsUsed }) }}<template v-if="end.stars < 3"> · {{ t('end.star3Hint', { count: level.par }) }}</template></p>
       </template>
@@ -1393,6 +1188,14 @@ const canvasLabel = computed(() =>
         </p>
         <p v-if="end.campaignDone" class="end__note">{{ t('end.campaignDone') }}</p>
         <button v-if="end.campaignDone" type="button" class="btn" @click="readEpilogue"><AppIcon name="map" />{{ t('story.readEpilogue') }}</button>
+        <!-- Maîtrise du royaume (v6.2) : le titre, l'écusson, les récompenses, la Légende. -->
+        <section v-if="end.mastery" class="end__mastery" role="status">
+          <MasteryCrest :size="56" />
+          <p class="end__mastery-title">{{ t('mastery.title') }}</p>
+          <p>{{ t('mastery.reached') }}</p>
+          <p class="end__note">{{ t('mastery.rewards') }}</p>
+          <button type="button" class="btn btn--primary" @click="readLegend"><AppIcon name="map" />{{ t('mastery.read') }}</button>
+        </section>
         <p v-if="end.demoDone" class="end__note">{{ t('end.demoDone') }}</p>
       </template>
       <p v-else>{{ end.reason === 'engine' ? t('end.engineHint') : t('end.defeatHint') }}</p>
@@ -1403,11 +1206,36 @@ const canvasLabel = computed(() =>
       <p v-if="!end.saved" class="notice notice--warning" role="alert">{{ t('end.saveError') }}</p>
     </ModalPanel>
 
+    <!-- Fin de niveau : Campagne héroïque, Terres du Duc (v6.2) -->
+    <ModalPanel v-if="phase === 'ended' && end?.kind === 'medal'" labelledby="end-title" :tone="end.won ? 'victory' : 'defeat'" :closable="false">
+      <p class="modal__eyebrow">{{ t(end.titleKey) }}</p>
+      <h2 id="end-title" class="modal__title">{{ end.won ? t('end.victory') : t('end.defeat') }}</h2>
+      <p v-if="!end.won && end.reason === 'engine'" class="end__engine"><AppIcon name="flame" :size="18" />{{ t('end.engineDestroyed') }}</p>
+      <template v-if="end.won">
+        <p :class="['end__medal', `end__medal--${end.medal}`]"><span :class="['medal-dot', `medal-dot--${end.medal}`]" aria-hidden="true" />{{ t(`heroic.medal.${end.medal}`) }}</p>
+        <dl class="end__scores">
+          <div><dt>{{ t('end.score') }}</dt><dd>{{ n(end.score) }}</dd></div>
+          <div><dt>{{ t('end.best') }}</dt><dd>{{ n(end.best) }}</dd></div>
+        </dl>
+        <p class="end__shots">{{ t('end.shotsUsed', { count: end.shotsUsed }) }}<template v-if="end.medal !== 'gold'"> · {{ t('end.star3Hint', { count: level.par }) }}</template></p>
+        <p v-if="end.newBest" class="end__badge">{{ t('end.newBest') }}</p>
+        <p v-if="end.trackDone" class="end__note">{{ t(end.doneKey) }}</p>
+      </template>
+      <p v-else>{{ end.reason === 'engine' ? t('end.engineHint') : t('end.defeatHint') }}</p>
+      <HighlightClip v-if="highlight" :clip="highlight" :name="clipName" />
+      <div class="modal__actions">
+        <button v-if="end.hasNext" type="button" class="btn btn--primary btn--large" data-autofocus @click="nextLevel">{{ t('end.next') }}</button>
+        <button type="button" :class="['btn', { 'btn--primary btn--large': !end.won }]" :data-autofocus="!end.hasNext ? '' : undefined" @click="restart"><AppIcon name="refresh" />{{ t('end.retry') }}</button>
+        <button type="button" class="btn btn--ghost" @click="quit"><AppIcon name="map" />{{ t('end.levels') }}</button>
+      </div>
+      <p v-if="!end.saved" class="notice notice--warning" role="alert">{{ t('end.saveError') }}</p>
+    </ModalPanel>
+
     <!-- Atelier : fin de partie -->
     <ModalPanel v-if="phase === 'ended' && end?.kind === 'custom'" labelledby="end-title" :tone="end.won ? 'victory' : 'defeat'" :closable="false">
       <p class="modal__eyebrow">{{ t('editor.title') }}</p>
       <h2 id="end-title" class="modal__title">{{ end.won ? t('editor.taken') : t('end.defeat') }}</h2>
-      <p v-if="end.won" class="end__big">{{ t('end.points', { score: end.score.toLocaleString(state.locale) }) }}</p>
+      <p v-if="end.won" class="end__big">{{ t('end.points', { score: end.score }) }}</p>
       <p v-if="end.won && end.fromEditor" class="notice">{{ t('editor.verified') }}</p>
       <div class="modal__actions">
         <button v-if="end.fromEditor" type="button" class="btn btn--primary btn--large" data-autofocus @click="quit"><AppIcon name="hammer" />{{ t('editor.back') }}</button>
@@ -1421,9 +1249,9 @@ const canvasLabel = computed(() =>
     <ModalPanel v-if="phase === 'ended' && end?.kind === 'endlessNext'" labelledby="end-title" tone="victory" :closable="false">
       <p class="modal__eyebrow">{{ t('endless.title') }}</p>
       <h2 id="end-title" class="modal__title">{{ t('endless.castleDown', { n: end.wave - 1 }) }}</h2>
-      <p class="end__big">{{ t('end.points', { score: end.score.toLocaleString(state.locale) }) }}</p>
+      <p class="end__big">{{ t('end.points', { score: end.score }) }}</p>
       <p>{{ t('endless.bonus', { count: end.bonus }) }} · {{ t('endless.shots', { count: end.shots }) }}</p>
-      <p class="notice">{{ t('endless.total', { score: end.total.toLocaleString(state.locale) }) }}</p>
+      <p class="notice">{{ t('endless.total', { score: end.total }) }}</p>
       <!-- Main du siège (v6.0) : trois cartes, on en garde une. -->
       <section v-if="end.hand?.length" class="deck" :aria-label="t('endless.handTitle')">
         <p class="deck__title">{{ end.picked ? t('endless.cardKept', { name: t(`endless.cards.${end.picked}.name`) }) : t('endless.handTitle') }}</p>
@@ -1454,9 +1282,9 @@ const canvasLabel = computed(() =>
     <ModalPanel v-if="phase === 'ended' && end?.kind === 'endlessOver'" labelledby="end-title" tone="defeat" :closable="false">
       <p class="modal__eyebrow">{{ t('endless.title') }}</p>
       <h2 id="end-title" class="modal__title">{{ t('endless.over', { count: end.cleared }) }}</h2>
-      <p class="end__big">{{ t('end.points', { score: end.total.toLocaleString(state.locale) }) }}</p>
+      <p class="end__big">{{ t('end.points', { score: end.total }) }}</p>
       <p v-if="end.newBest || end.newWave" class="end__badge">{{ t('endless.record') }}</p>
-      <p v-else class="notice">{{ t('endless.best', { score: end.best.toLocaleString(state.locale) }) }}</p>
+      <p v-else class="notice">{{ t('endless.best', { score: end.best }) }}</p>
       <p v-if="!end.saved" class="notice notice--warning" role="alert">{{ t('end.saveError') }}</p>
       <div class="modal__actions">
         <button type="button" class="btn btn--primary btn--large" data-autofocus @click="newSiege"><AppIcon name="refresh" />{{ t('endless.again') }}</button>
@@ -1469,7 +1297,7 @@ const canvasLabel = computed(() =>
       <p class="modal__eyebrow">{{ t('daily.title') }}</p>
       <h2 id="end-title" class="modal__title">{{ end.won ? t('end.victory') : t('end.defeat') }}</h2>
       <template v-if="end.won">
-        <p class="end__big">{{ t('end.points', { score: end.score.toLocaleString(state.locale) }) }}</p>
+        <p class="end__big">{{ t('end.points', { score: end.score }) }}</p>
         <p v-if="end.newBest" class="end__badge">{{ t('daily.newBest') }}</p>
         <p class="daily-line"><AppIcon name="flame" :size="20" />{{ t('daily.streak', { count: end.streak }) }}<template v-if="end.extended"> · {{ t('daily.extended') }}</template></p>
         <p v-if="end.reward" class="end__badge">{{ t('season.reward', { name: t(`workshop.names.${end.reward}`) }) }}</p>
@@ -1496,7 +1324,7 @@ const canvasLabel = computed(() =>
       <h2 id="end-title" class="modal__title">{{ end.won ? t('end.victory') : t('end.defeat') }}</h2>
       <template v-if="end.won">
         <StarRow :count="end.stars" class="end__stars" />
-        <p class="end__big">{{ t('end.points', { score: end.score.toLocaleString(state.locale) }) }}</p>
+        <p class="end__big">{{ t('end.points', { score: end.score }) }}</p>
         <p v-if="end.newBest" class="end__badge">{{ t('cup.newBest') }}</p>
       </template>
       <p v-else>{{ t('cup.lost') }}</p>
@@ -1525,8 +1353,8 @@ const canvasLabel = computed(() =>
       <p class="modal__eyebrow">{{ t('daily.challengeTitle') }}</p>
       <h2 id="end-title" class="modal__title">{{ end.beaten ? t('daily.beaten') : t('daily.notBeatenTitle') }}</h2>
       <dl class="end__scores">
-        <div><dt>{{ t('daily.you') }}</dt><dd>{{ end.score.toLocaleString(state.locale) }}</dd></div>
-        <div><dt>{{ end.name || t('daily.friend') }}</dt><dd>{{ end.target.toLocaleString(state.locale) }}</dd></div>
+        <div><dt>{{ t('daily.you') }}</dt><dd>{{ n(end.score) }}</dd></div>
+        <div><dt>{{ end.name || t('daily.friend') }}</dt><dd>{{ n(end.target) }}</dd></div>
       </dl>
       <div v-if="end.won" class="share">
         <button type="button" class="btn btn--primary" :disabled="share.state === 'busy'" @click="shareRun"><AppIcon name="users" />{{ t('daily.shareBack') }}</button>
@@ -1554,7 +1382,7 @@ const canvasLabel = computed(() =>
     <ModalPanel v-if="phase === 'ended' && end?.kind === 'round'" labelledby="end-title" :closable="false">
       <h2 id="end-title" class="modal__title">{{ t('end.roundDone', { name: end.result.name }) }}</h2>
       <p class="end__big">{{ end.result.cleared ? t('mp.clearedIn', { count: end.result.shots }) : t('mp.felled', { count: end.result.kills }) }}</p>
-      <p>{{ t('end.points', { score: end.result.score.toLocaleString(state.locale) }) }}</p>
+      <p>{{ t('end.points', { score: end.result.score }) }}</p>
       <p class="notice">{{ end.result.cleared ? t('mp.toBeatCleared', { name: end.nextName, count: end.result.shots }) : t('mp.toBeatKills', { name: end.nextName, count: end.result.kills }) }}</p>
       <div class="modal__actions">
         <button type="button" class="btn btn--primary btn--large" data-autofocus @click="nextRound">
@@ -1609,7 +1437,7 @@ const canvasLabel = computed(() =>
           <span class="versus-result__name">{{ name }}</span>
           <span class="versus-result__score">
             <template v-if="end.defenders">{{ t('end.defendersLeft', { count: end.defenders[i] }) }}</template>
-            <template v-else>{{ t('mp.renownPts', { count: end.renown[i] }) }} · {{ t('end.points', { score: end.scores[i].toLocaleString(state.locale) }) }}</template>
+            <template v-else>{{ t('mp.renownPts', { count: end.renown[i] }) }} · {{ t('end.points', { score: end.scores[i] }) }}</template>
           </span>
           <AppIcon v-if="end.winner === i" name="crown" :size="20" />
         </li>
@@ -1626,7 +1454,7 @@ const canvasLabel = computed(() =>
       <h2 id="end-title" class="modal__title">{{ end.won ? t('end.victory') : t('end.defeat') }}</h2>
       <template v-if="end.won">
         <StarRow :count="end.stars" :size="40" class="end__stars" />
-        <p class="end__shots">{{ t('end.shotsUsed', { count: end.shotsUsed }) }} · {{ t('end.points', { score: end.score.toLocaleString(state.locale) }) }}</p>
+        <p class="end__shots">{{ t('end.shotsUsed', { count: end.shotsUsed }) }} · {{ t('end.points', { score: end.score }) }}</p>
         <p v-if="end.newBest" class="end__badge">{{ t('end.newBest') }}</p>
       </template>
       <p v-else>{{ t('mp.coopDefeat') }}</p>

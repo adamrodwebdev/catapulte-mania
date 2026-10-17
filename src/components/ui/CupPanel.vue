@@ -45,7 +45,7 @@ async function share() {
         <span class="cup-castle__n" aria-hidden="true">{{ c.index }}</span>
         <span class="cup-castle__body">
           <span class="cup-castle__name">{{ t('cup.castle', { n: c.index }) }} · {{ t('game.level', { n: c.levelId }) }}</span>
-          <small>{{ c.best ? t('end.points', { score: c.best.toLocaleString(state.locale) }) : t('cup.notYet') }}</small>
+          <small>{{ c.best ? t('end.points', { score: c.best }) : t('cup.notYet') }}</small>
         </span>
         <StarRow :count="c.stars" />
         <button type="button" class="btn btn--small" :aria-label="`${c.stars ? t('cup.replay') : t('cup.play')} · ${t('cup.castle', { n: c.index })}`" @click="play(c.index)">

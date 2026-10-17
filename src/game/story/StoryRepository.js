@@ -55,6 +55,8 @@ const BEATS = deepFreeze([
   { id: 'ch9', chapter: 9, before: 81, pages: [page(A), page(Y, [G, Y]), page(BA)] },
   { id: 'ch10', chapter: 10, before: 91, pages: [page(M), page(G), page(Y, [G, Y])] },
   { id: 'epilogue', chapter: 10, after: 100, pages: [page(null, [M]), page(A, [A, Y]), page(Y, [G, Y])] },
+  // v6.2 : page cachée, lue à la maîtrise du royaume (toutes les étoiles, tous les succès).
+  { id: 'legend', chapter: 10, mastery: true, pages: [page(A, [A, Y]), page(G, [G, Y]), page(Y, [G, Y])] },
 ])
 
 /**
@@ -125,8 +127,9 @@ export class StoryRepository {
   /**
    * Épisodes déjà accessibles pour un profil (pour les relire dans la Chronique).
    * @param {number} completed niveaux réussis
+   * @param {boolean} [mastered] maîtrise du royaume : la Légende apparaît (v6.2)
    */
-  static unlocked(completed) {
-    return BEATS.filter((b) => (b.before !== undefined ? b.before <= completed + 1 : b.after <= completed))
+  static unlocked(completed, mastered = false) {
+    return BEATS.filter((b) => (b.mastery ? mastered : b.before !== undefined ? b.before <= completed + 1 : b.after <= completed))
   }
 }

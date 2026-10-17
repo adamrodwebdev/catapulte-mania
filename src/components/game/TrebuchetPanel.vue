@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useApp } from '../../app/AppContext.js'
+import { formatDegrees, formatPercent } from '../../app/Formats.js'
 
 /**
  * Commandes du trébuchet (v5.4) : deux clics.
@@ -46,8 +47,8 @@ const needle = computed(() => {
         <span class="treb-bar__target" :style="{ left: `${bar.target * 100}%` }" />
       </div>
       <p class="treb-panel__values">
-        <span>{{ t('game.treb.angle') }} <strong>{{ hasAngle ? `${hud.angle}°` : '–' }}</strong></span>
-        <span>{{ t('game.treb.powerLabel') }} <strong>{{ typeof hud.power === 'number' ? `${hud.power} %` : '–' }}</strong></span>
+        <span>{{ t('game.treb.angle') }} <strong>{{ hasAngle ? formatDegrees(t, hud.angle) : '–' }}</strong></span>
+        <span>{{ t('game.treb.powerLabel') }} <strong>{{ typeof hud.power === 'number' ? formatPercent(t, hud.power) : '–' }}</strong></span>
       </p>
     </div>
   </div>

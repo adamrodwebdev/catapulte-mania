@@ -49,6 +49,17 @@ export const CONDITION = deepFreeze({
   RUST: { MAX: 3, POWER: 0.04, VULNERABILITY: 0.12 },
 })
 
+/**
+ * Frappe d'un pillard sur l'engin (v5.8 ; v6.2 : en table) : selon ce qu'il
+ * porte, il l'enflamme (burn : intensité), le gèle, et lui ôte des points de vie.
+ */
+export const RAID_STRIKE = deepFreeze({
+  fire: { burn: 1, hp: 3 },
+  frost: { freeze: true, hp: 3 },
+  blow: { hp: 9 },
+  smash: { hp: 13 },
+})
+
 const FIRE = CONDITION.FIRE
 
 export class EngineCondition {

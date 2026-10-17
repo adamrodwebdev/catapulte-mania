@@ -48,6 +48,8 @@ export class GameController extends EventBus {
   #drag = null
   /** Relâcher après avoir tiré vers l'arrière déclenche le tir (sauf « visée précise »). */
   #releaseToFire = true
+  /** Contraste élevé (réglage, v6.2) : le rendu du canevas s'y adapte aussi. */
+  #highContrast = false
   #hudTimer = 0
   /** Durée moyenne d'une image (ms), pour alléger les effets sur un appareil lent. */
   #frameAvg = 16.7
@@ -85,6 +87,8 @@ export class GameController extends EventBus {
     this.#audio = audio
     this.#haptics = haptics
     this.#renderer = new Renderer(canvas, registry)
+    // Fond peint du chapitre (v6.2) : chargé dès l'ouverture, pendant l'introduction du niveau.
+    this.#renderer.art.preload(level.chapter)
     this.session = new GameSession(level, {
       difficulty,
       completedLevels,
@@ -108,6 +112,7 @@ export class GameController extends EventBus {
     this.#aim = new AimInput({ minAngle: bounds.MIN_ANGLE, maxAngle: bounds.MAX_ANGLE, dir: this.session.catapult.dir })
     this.#aim.set(this.session.catapult.angle, this.session.catapult.power)
     this.#releaseToFire = settings.preciseAim !== true
+    this.#highContrast = settings.contrast === 'high'
     const focus = this.session.focus
     // Moments forts : seulement si le réglage le permet et que le navigateur sait filmer.
     if (settings.highlights === true && !Array.isArray(replay) && ClipRecorder.supported(canvas)) this.#clips = new ClipRecorder(canvas)
@@ -137,6 +142,11 @@ export class GameController extends EventBus {
     this.session.camera.setInsets(Number(top), Number(bottom))
   }
 
+  /** Fonds peints (v6.2) : pour les outils et les essais (voir BackgroundArt.add). */
+  get backgroundArt() {
+    return this.#renderer.art
+  }
+
   get paused() {
     return this.#paused
   }
@@ -146,6 +156,7 @@ export class GameController extends EventBus {
     // Les niveaux de premiers pas gardent la trajectoire visible quel que soit le réglage.
     this.session.options.trajectoryAid = settings.trajectoryAid || this.session.assist
     this.#releaseToFire = settings.preciseAim !== true
+    this.#highContrast = settings.contrast === 'high'
     this.session.options.reducedMotion = reducedMotion
     this.session.camera.shakeEnabled = settings.screenShake && !reducedMotion
     this.session.options.blood = settings.blood
@@ -208,6 +219,7 @@ export class GameController extends EventBus {
 
   #sceneWithAim() {
     const scene = this.session.scene()
+    scene.highContrast = this.#highContrast
     if (this.session.state === STATE.AIMING && this.session.engine !== 'trebuchet') {
       const c = this.session.catapult
       const bounds = this.session.engine === 'ballista' ? BALLISTA_AIM : AIM
@@ -241,6 +253,17 @@ export class GameController extends EventBus {
   /** Une relecture est-elle en cours ? */
   get replaying() {
     return this.#replayer !== null && !this.#replayer.done
+  }
+
+  /**
+   * Avancer (1), reculer (-1) ou s'arrêter (0) (v6.2). L'arrêt passe toujours,
+   * même en pause : un bouton relâché pendant la pause n'emmène pas l'engin.
+   * @param {-1|0|1} dir
+   */
+  drive(dir) {
+    if (this.#replayer || (dir !== 0 && this.#paused)) return false
+    if (dir !== 0) this.#audio.unlock()
+    return this.session.drive(dir)
   }
 
   trigger() {

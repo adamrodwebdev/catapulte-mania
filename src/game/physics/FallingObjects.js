@@ -98,6 +98,15 @@ export function hitDamage(other, rel) {
  * @param {{ maxHp: number, baseToughness?: number }} unit
  * @param {number} v
  */
+/**
+ * Chute libre (v6.2) : un défenseur qui retombe au moins DROP px sous son
+ * perchoir, et succombe à sa chute ou dans les WINDOW_MS qui suivent (les
+ * débris qui tombent avec lui), compte pour le succès « Chute libre ».
+ * Avant, seule la chute elle-même devait l'achever : depuis les points de vie
+ * (v6.1), ce sont presque toujours les débris qui le font.
+ */
+export const FREEFALL = Object.freeze({ DROP: 120, WINDOW_MS: 1500 })
+
 export function fallDamage(unit, v) {
   const over = v - WORLD.FALL.SAFE
   if (!(over > 0) || !Number.isFinite(unit.maxHp)) return 0
@@ -118,7 +127,8 @@ export function canPush(unit, other, rel, time) {
   // Un projectile encore en vol n'est jamais lent : seul ce qui roule ou retombe se repousse.
   if (other.kind === 'projectile' && !other.hasImpacted) return false
   // Un tablier sur sa charnière, une charge à sa corde : on ne les renvoie pas d'une main.
-  if (other.hinged || other.tethered > 0 || other.body?.isStatic) return false
+  // Un tablier sur sa charnière, une charge à sa corde, un bloc soudé au château (v6.2).
+  if (other.hinged || other.tethered > 0 || other.joints > 0 || other.body?.isStatic) return false
   if (rel > WORLD.PUSH.SPEED * (unit.pushSpeedFactor ?? 1)) return false
   return other.mass * Math.max(rel, 0.25) <= unit.pushCapacity
 }

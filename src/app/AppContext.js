@@ -4,15 +4,16 @@ import { SettingsService } from '../services/SettingsService.js'
 import { I18nService } from '../services/I18nService.js'
 import { SaveSigner } from '../services/SaveSigner.js'
 import { SaveManager } from '../services/SaveManager.js'
+import { ShareService } from '../services/ShareService.js'
 import { AudioService } from '../game/audio/AudioService.js'
 import { HapticService } from '../game/audio/HapticService.js'
 import { MusicDirector } from '../game/audio/MusicDirector.js'
 import { AmbienceDirector } from '../game/audio/AmbienceDirector.js'
-import { LevelRepository } from '../game/levels/LevelRepository.js'
+import { Tracks } from '../game/levels/Tracks.js'
 import { starsFor } from '../game/score/ScoreRules.js'
 import { PowerRegistry } from '../game/powers/PowerRegistry.js'
 import { WeeklyCup, weekKey, CUP } from '../game/daily/WeeklyCup.js'
-import { DailyChallenge, dayKey } from '../game/daily/DailyChallenge.js'
+import { DailyChallenge } from '../game/daily/DailyChallenge.js'
 import { ReplayCode } from '../game/replay/ReplayCode.js'
 import { ENDLESS } from '../domain/EndlessRun.js'
 import { loadDictionary } from '../i18n/loader.js'
@@ -20,7 +21,7 @@ import { NoAdService } from '../services/ads/AdService.js'
 import { CloudStorageBackend } from '../services/CloudStorageBackend.js'
 import { GAME, PLAYABLE_LEVELS, IS_PORTAL } from '../config/gameConfig.js'
 import { ValidationError } from '../core/utils/Guard.js'
-import { UpgradeCatalog } from '../game/progression/UpgradeCatalog.js'
+import { ProfilePresenter } from './ProfilePresenter.js'
 
 const KEY = Symbol('app')
 
@@ -31,10 +32,11 @@ const KEY = Symbol('app')
  * ce nombre est inconnu (0), gardent les étoiles obtenues à l'époque.
  * @param {number} levelId
  * @param {{ best: number, stars: number, shots: number }} rec
+ * @param {'campaign' | 'heroic' | 'duke'} [track] parcours du record (v6.2, voir Tracks)
  * @returns {number} nombre d'étoiles correct pour ce record
  */
-function checkRecord(levelId, rec) {
-  const level = LevelRepository.get(levelId)
+function checkRecord(levelId, rec, track = 'campaign') {
+  const level = Tracks.get(track).level(levelId)
   // Niveau passé (v6.0) : aucune étoile tant qu'il n'est pas pris pour de bon.
   if (rec.skipped) return 0
   if (rec.best > level.maxScore) throw new ValidationError(`levels.${levelId}.best`, 'impossible score')
@@ -45,10 +47,15 @@ function checkRecord(levelId, rec) {
 /** Écrans de l'application (navigation interne, une seule URL pour le SEO). */
 export const SCREENS = Object.freeze(['home', 'profiles', 'levels', 'game', 'settings', 'help', 'workshop', 'multiplayer', 'privacy', 'modes', 'editor'])
 
+/** Invitations reçues par lien, en attente sur l'accueil (clé de l'état). */
+const INCOMING = Object.freeze({ challenge: 'incomingChallenge', castle: 'incomingCastle', cup: 'incomingCup' })
+
 /**
  * Contexte applicatif : instancie les services (une seule fois) et expose un
  * état réactif minimal à l'interface. Les objets métier restent hors de la
- * réactivité Vue (markRaw) : Vue n'observe que des copies d'affichage.
+ * réactivité Vue (markRaw) : Vue n'observe que des copies d'affichage
+ * (ProfilePresenter). Les écrans ne modifient jamais l'état partagé ni le
+ * stockage eux-mêmes : ils passent par les actions ci-dessous.
  */
 /**
  * @param {{ ads?: import('../services/ads/AdService.js').AdService }} [opts]
@@ -89,6 +96,8 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
   const haptics = new HapticService()
   const music = new MusicDirector(audio)
   const ambience = new AmbienceDirector(audio)
+  // Partage des liens (v6.2) : le titre du partage natif est le nom du jeu.
+  const sharing = new ShareService(ads, { title: () => i18n.t('app.title') })
 
   const state = reactive({
     screen: 'home',
@@ -134,6 +143,34 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
 
   const services = markRaw({ storage, settings, i18n, saves, audio, haptics, music, ambience, ads })
 
+  /* ----- Profil actif : copie d'affichage et sauvegarde ----- */
+
+  const profileView = (slot) => ProfilePresenter.view(slot)
+  /** Rafraîchit la copie d'affichage du profil actif. */
+  function refreshProfile() {
+    state.profile = profileView(activeSlot)
+  }
+
+  /**
+   * Enregistre le profil actif puis rafraîchit sa copie d'affichage. Une
+   * sauvegarde refusée (profil incohérent, stockage plein) ne lève jamais
+   * d'erreur : la partie reste acquise pour la session.
+   * @param {{ strict?: boolean }} [opts] strict : si la sauvegarde lève une
+   *   erreur, l'action est refusée — l'affichage n'est pas rafraîchi, `null` est renvoyé
+   * @returns {Promise<boolean | null>} écriture réussie ou non ; null (strict) si refusée
+   */
+  async function persist({ strict = false } = {}) {
+    let saved
+    try {
+      saved = await saves.save(activeSlot)
+    } catch {
+      if (strict) return null
+      saved = false
+    }
+    refreshProfile()
+    return saved
+  }
+
   /* ----- Publicités (portails) : son coupé et commandes bloquées pendant la vidéo ----- */
   ads.on('pause', () => {
     state.adPlaying = true
@@ -156,14 +193,8 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     const ticket = await ads.rewarded('double-gold')
     if (!ticket) return 0
     const bonus = activeSlot.claimDoubleGold(result, ticket)
-    if (bonus > 0) {
-      try {
-        await saves.save(activeSlot)
-      } catch {
-        /* l'or reste acquis pour la session */
-      }
-      state.profile = profileView(activeSlot)
-    }
+    // Sauvegarde refusée : l'or reste acquis pour la session.
+    if (bonus > 0) await persist()
     return bonus
   }
 
@@ -171,6 +202,16 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
   const t = (key, params) => {
     void state.locale // dépendance réactive : retraduit quand la langue change
     return i18n.t(key, params)
+  }
+  /** Nombre dans la langue courante (Intl, code complet de la langue). */
+  const n = (value) => {
+    void state.locale
+    return i18n.formatNumber(value)
+  }
+  /** Date dans la langue courante (Intl, code complet de la langue : « en-GB »…). */
+  const d = (date, options) => {
+    void state.locale
+    return i18n.formatDate(date, options)
   }
   /** Change de langue (téléchargée au besoin). Hors-ligne et non en cache : on garde l'actuelle. */
   async function setLocale(lang) {
@@ -230,62 +271,6 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     state.screen = s === 'game' ? 'levels' : s
   })
 
-  /* ----- Profils ----- */
-  function profileView(slot) {
-    if (!slot) return null
-    const levels = {}
-    for (let id = 1; id <= GAME.LEVEL_COUNT; id++) {
-      const rec = slot.levelRecord(id)
-      levels[id] = { unlocked: slot.isUnlocked(id) && id <= PLAYABLE_LEVELS, stars: rec?.stars ?? 0, best: rec?.best ?? 0, completed: Boolean(rec), shots: rec?.shots ?? 0, ach: rec?.ach ?? 0, skipped: Boolean(rec?.skipped) }
-    }
-    return {
-      index: slot.index,
-      name: slot.name,
-      difficulty: slot.difficulty,
-      completed: slot.completedCount,
-      stars: slot.starCount,
-      achievements: slot.achievementCount,
-      coop: {
-        completed: slot.coopCompleted,
-        stars: slot.coopStars,
-        next: Math.min(slot.coopCompleted + 1, PLAYABLE_LEVELS),
-        levels: Object.fromEntries(
-          Array.from({ length: PLAYABLE_LEVELS }, (_, i) => {
-            const rec = slot.coopRecord(i + 1)
-            return [i + 1, { stars: rec?.stars ?? 0, completed: Boolean(rec), unlocked: slot.isCoopUnlocked(i + 1) }]
-          }),
-        ),
-      },
-      score: slot.totalScore,
-      next: Math.min(slot.nextLevel, PLAYABLE_LEVELS),
-      levels,
-      powers: PowerRegistry.all().map((p) => ({ id: p.id, cost: p.cost, unlockAfter: p.unlockAfter, unlocked: p.isUnlocked(slot.completedCount) })),
-      gold: slot.gold,
-      upgrades: slot.upgrades,
-      cosmetics: slot.cosmetics,
-      daily: dailyView(slot),
-      cup: cupView(slot),
-      endless: { ...slot.endless, unlocked: slot.completedCount >= ENDLESS.UNLOCK },
-      login: slot.loginStatus(),
-      affordable: affordableUpgrade(slot),
-    }
-  }
-
-  /**
-   * Amélioration que le joueur peut s'offrir tout de suite (la moins chère),
-   * pour lui signaler l'atelier. null s'il n'y en a aucune.
-   */
-  function affordableUpgrade(slot) {
-    let best = null
-    for (const u of UpgradeCatalog.upgrades()) {
-      const level = slot.upgrades[u.id] ?? 0
-      const cost = u.nextCost(level)
-      if (cost === null || cost > slot.gold || u.nextStars(level) > slot.starCount) continue
-      if (!best || cost < best.cost) best = { id: u.id, cost }
-    }
-    return best
-  }
-
   /* ----- Récompenses de connexion ----- */
 
   /** Ouvre le coffre du jour du profil actif ; renvoie l'or reçu (0 si rien). */
@@ -293,43 +278,11 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     if (!activeSlot) return 0
     const gold = activeSlot.claimLogin()
     if (!gold) return 0
-    try {
-      await saves.save(activeSlot)
-    } catch {
-      return 0
-    }
-    state.profile = profileView(activeSlot)
+    if ((await persist({ strict: true })) === null) return 0
     return gold
   }
 
-  /** Défi du jour vu par un profil : série en cours, record du jour, derniers jours. */
-  /** Coupe de la semaine pour l'interface : châteaux, meilleurs résultats, étoiles, médaille. */
-  function cupView(slot) {
-    const week = weekKey()
-    const saved = slot.cup
-    const current = saved.week === week
-    const castles = WeeklyCup.forWeek(week).levels.map((levelId, i) => {
-      const rec = current ? saved.castles[i + 1] : null
-      return { index: i + 1, levelId, best: rec?.best ?? 0, stars: rec?.stars ?? 0 }
-    })
-    const stars = castles.reduce((sum, c) => sum + c.stars, 0)
-    return { week, castles, stars, maxStars: CUP.CASTLES * 3, medal: current ? saved.medal || null : null, thresholds: CUP.MEDALS, trophies: saved.trophies }
-  }
-
-  function dailyView(slot) {
-    const today = dayKey()
-    const d = slot.daily
-    return {
-      today,
-      challenge: DailyChallenge.forDay(today),
-      streak: slot.dailyStreak(today),
-      bestStreak: d.bestStreak,
-      todayBest: d.days[today] ?? null,
-      history: Object.entries(d.days)
-        .sort((a, b) => (a[0] < b[0] ? 1 : -1))
-        .map(([day, score]) => ({ day, score })),
-    }
-  }
+  /* ----- Profils ----- */
 
   async function refreshSlots() {
     state.slots = await saves.summaries()
@@ -338,9 +291,17 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
   async function openProfile(index) {
     const slot = await saves.load(index)
     if (!slot) return false
+    // Maîtrise atteinte avant la v6.2 : l'Engin d'or et la Comète d'or sont offerts.
+    if (slot.grantMastery().length) {
+      try {
+        await saves.save(slot)
+      } catch {
+        /* offerts de nouveau à la prochaine ouverture */
+      }
+    }
     activeSlot = markRaw(slot)
     saves.lastSlot = index
-    state.profile = profileView(slot)
+    refreshProfile()
     return true
   }
 
@@ -348,7 +309,7 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     const slot = await saves.create(index, name, difficulty)
     activeSlot = markRaw(slot)
     saves.lastSlot = index
-    state.profile = profileView(slot)
+    refreshProfile()
     await refreshSlots()
   }
 
@@ -364,8 +325,9 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
   async function setDifficulty(difficulty) {
     if (!activeSlot) return
     activeSlot.difficulty = difficulty
+    // Ici, une sauvegarde refusée remonte à l'écran des réglages.
     await saves.save(activeSlot)
-    state.profile = profileView(activeSlot)
+    refreshProfile()
   }
 
   /**
@@ -375,13 +337,12 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
   async function recordResult(result) {
     if (!activeSlot) return { newBest: false, firstClear: false, unlockedPower: null, saved: false, gold: 0, newAchievements: 0 }
     const before = activeSlot.completedCount
+    const masteredBefore = activeSlot.mastered
     const outcome = activeSlot.recordResult(result)
-    let saved
-    try {
-      saved = await saves.save(activeSlot)
-    } catch {
-      saved = false
-    }
+    // v6.2 : toutes les étoiles et tous les succès, à l'instant : Grand Ingénieur du Royaume.
+    const mastery = !masteredBefore && activeSlot.mastered
+    if (mastery) activeSlot.grantMastery()
+    const saved = await persist()
     const after = activeSlot.completedCount
     const unlocked = after > before ? PowerRegistry.unlockedAt(after) : null
     if (after > before) ads.reportProgress((after / GAME.LEVEL_COUNT) * 100)
@@ -390,9 +351,29 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
       ads.reportLevel(result.levelId)
       if (outcome.newBest || outcome.firstClear) ads.happytime()
     }
-    state.profile = profileView(activeSlot)
     await refreshSlots()
-    return { ...outcome, unlockedPower: unlocked ? unlocked.id : null, saved }
+    return { ...outcome, unlockedPower: unlocked ? unlocked.id : null, saved, mastery }
+  }
+
+  /** Lance la Campagne héroïque (profil maîtrisé) : ses paliers d'atelier s'ouvrent. */
+  async function startHeroic() {
+    if (!activeSlot || !activeSlot.startHeroic()) return false
+    return (await persist({ strict: true })) !== null
+  }
+
+  /**
+   * Victoire de la Campagne héroïque ou des Terres du Duc : des médailles.
+   * @param {'heroic' | 'duke'} track
+   * @returns {Promise<{ newBest: boolean, firstClear: boolean, stars: number, before: number, saved: boolean }>}
+   */
+  async function recordMedal(result, track) {
+    if (!activeSlot) return { newBest: false, firstClear: false, stars: 0, before: 0, saved: false }
+    const outcome = track === 'heroic' ? activeSlot.recordHeroic(result) : activeSlot.recordDuke(result)
+    // Une défaite n'est pas enregistrée : rien à sauvegarder.
+    let saved = true
+    if (result.won) saved = await persist()
+    else refreshProfile()
+    return { ...outcome, saved }
   }
 
   /**
@@ -402,13 +383,7 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
   async function recordCoop(result) {
     if (!activeSlot) return { newBest: false, firstClear: false, saved: false }
     const outcome = activeSlot.recordCoop(result)
-    let saved
-    try {
-      saved = await saves.save(activeSlot)
-    } catch {
-      saved = false
-    }
-    state.profile = profileView(activeSlot)
+    const saved = await persist()
     return { ...outcome, saved }
   }
 
@@ -421,14 +396,8 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     const outcome = activeSlot.recordDaily(result, day)
     // Événement saisonnier : une victoire au défi du jour offre sa récompense.
     const reward = result.won ? activeSlot.grantEventReward(day) : null
-    let saved
-    try {
-      saved = await saves.save(activeSlot)
-    } catch {
-      saved = false
-    }
+    const saved = await persist()
     if (outcome.newBest || outcome.extended || reward) ads.happytime()
-    state.profile = profileView(activeSlot)
     return { ...outcome, saved, reward }
   }
 
@@ -439,14 +408,8 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
   async function recordCup(result, week, index) {
     if (!activeSlot) return { newBest: false, stars: 0, medal: null, medalUp: false, saved: false }
     const outcome = activeSlot.recordCup(result, week, index)
-    let saved
-    try {
-      saved = await saves.save(activeSlot)
-    } catch {
-      saved = false
-    }
+    const saved = await persist()
     if (outcome.medalUp) ads.happytime()
-    state.profile = profileView(activeSlot)
     return { ...outcome, saved }
   }
 
@@ -469,23 +432,7 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
 
   /** Partage sa coupe : lien qui ouvre la coupe de la semaine chez un ami. */
   async function shareCup(text) {
-    const week = weekKey()
-    let url = await ads.inviteLink({ coupe: week })
-    if (!url) url = `${globalThis.location ? `${location.origin}${location.pathname}` : ''}#coupe=${week}`
-    try {
-      if (globalThis.navigator?.share) {
-        await navigator.share({ title: 'Catapulte Mania', text, url })
-        return { url, method: 'shared' }
-      }
-    } catch (e) {
-      if (e?.name === 'AbortError') return { url, method: 'manual' }
-    }
-    try {
-      await navigator.clipboard.writeText(`${text} ${url}`)
-      return { url, method: 'copied' }
-    } catch {
-      return { url, method: 'manual' }
-    }
+    return sharing.share({ coupe: weekKey() }, text)
   }
 
   /** Au démarrage : une coupe partagée par lien ? (celle de la semaine, ou une coupe finie). */
@@ -505,14 +452,7 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
   async function skipLevel(levelId) {
     if (!activeSlot) return false
     activeSlot.skipLevel(levelId)
-    let saved
-    try {
-      saved = await saves.save(activeSlot)
-    } catch {
-      saved = false
-    }
-    state.profile = profileView(activeSlot)
-    return saved
+    return persist()
   }
 
   /** Lance le défi du jour (un profil est nécessaire pour la série). */
@@ -566,14 +506,8 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
   async function recordEndless(run) {
     if (!activeSlot) return { newBest: false, newWave: false, saved: false }
     const outcome = activeSlot.recordEndless(run)
-    let saved
-    try {
-      saved = await saves.save(activeSlot)
-    } catch {
-      saved = false
-    }
+    const saved = await persist()
     if (outcome.newBest || outcome.newWave) ads.happytime()
-    state.profile = profileView(activeSlot)
     return { ...outcome, saved }
   }
 
@@ -592,26 +526,7 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
    * @returns {Promise<{ url: string, method: 'shared' | 'copied' | 'manual' }>}
    */
   async function shareRun(run, text) {
-    const code = ReplayCode.encode(run)
-    let url = await ads.inviteLink({ defi: code })
-    if (!url) {
-      const base = globalThis.location ? `${location.origin}${location.pathname}` : ''
-      url = `${base}#defi=${code}`
-    }
-    try {
-      if (globalThis.navigator?.share) {
-        await navigator.share({ title: 'Catapulte Mania', text, url })
-        return { url, method: 'shared' }
-      }
-    } catch (e) {
-      if (e?.name === 'AbortError') return { url, method: 'manual' }
-    }
-    try {
-      await navigator.clipboard.writeText(`${text} ${url}`)
-      return { url, method: 'copied' }
-    } catch {
-      return { url, method: 'manual' }
-    }
+    return sharing.share({ defi: ReplayCode.encode(run) }, text)
   }
 
   /** Joue un château de l'atelier (le sien, pour le tester, ou celui d'un ami). */
@@ -628,21 +543,33 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
   async function shareCastle(code, text) {
     const { CastleCode } = await import('../game/editor/CastleDesign.js')
     CastleCode.decode(code)
-    let url = await ads.inviteLink({ chateau: code })
-    if (!url) url = `${globalThis.location ? `${location.origin}${location.pathname}` : ''}#chateau=${code}`
+    return sharing.share({ chateau: code }, text)
+  }
+
+  /**
+   * Château de l'atelier pris par son auteur (v4.0) : il prouve qu'il est
+   * faisable, on peut alors le partager. Mémorisé sur l'appareil (sans
+   * stockage, la preuve vaut pour la session).
+   */
+  async function verifyCastle(code) {
+    state.editorVerified = code
     try {
-      if (globalThis.navigator?.share) {
-        await navigator.share({ title: 'Catapulte Mania', text, url })
-        return { url, method: 'shared' }
-      }
-    } catch (e) {
-      if (e?.name === 'AbortError') return { url, method: 'manual' }
-    }
-    try {
-      await navigator.clipboard.writeText(`${text} ${url}`)
-      return { url, method: 'copied' }
+      const { CastleDraftService } = await import('../services/CastleDraftService.js')
+      new CastleDraftService(storage).rememberVerified(code)
     } catch {
-      return { url, method: 'manual' }
+      /* atelier indisponible : la preuve vaut pour la session */
+    }
+  }
+
+  /** À l'ouverture de l'atelier : le château déjà pris par son auteur, mémorisé sur l'appareil. */
+  async function restoreVerifiedCastle() {
+    if (state.editorVerified) return
+    try {
+      const { CastleDraftService } = await import('../services/CastleDraftService.js')
+      const saved = new CastleDraftService(storage).verifiedCode()
+      if (saved && !state.editorVerified) state.editorVerified = saved
+    } catch {
+      /* rien de mémorisé */
     }
   }
 
@@ -696,6 +623,11 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
   readIncomingChallenge()
   readIncomingCup()
 
+  /** Invitation reçue par lien (défi, château, coupe) refusée ou remise à plus tard. */
+  function dismissIncoming(kind) {
+    if (Object.hasOwn(INCOMING, kind)) state[INCOMING[kind]] = null
+  }
+
   /* ----- Atelier (or et améliorations) ----- */
 
   /**
@@ -707,13 +639,7 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     if (!activeSlot) return false
     const ok = action === 'upgrade' ? activeSlot.buyUpgrade(id) : action === 'cosmetic' ? activeSlot.buyCosmetic(id) : activeSlot.equip(id)
     if (!ok) return false
-    try {
-      await saves.save(activeSlot)
-    } catch {
-      return false
-    }
-    state.profile = profileView(activeSlot)
-    return true
+    return (await persist({ strict: true })) !== null
   }
 
   /* ----- Lancement d'une partie ----- */
@@ -727,6 +653,34 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     state.match = { mode: match.mode, levelId: match.levelId ?? state.levelId, levels, arenaId: match.arenaId ?? 1, duelId: match.duelId ?? 1, players: [...(match.players || [])], daily: null, challenge: null, quick }
     if (match.levelId) state.levelId = match.levelId
     go('game')
+  }
+
+  /**
+   * Niveau à jouer dans la partie en cours (suivant, tournoi, siège sans fin,
+   * niveau passé) ; `match` : la partie le retient aussi (`state.match.levelId`).
+   */
+  function setLevel(levelId, { match = false } = {}) {
+    state.levelId = levelId
+    if (match) state.match = { ...state.match, levelId }
+  }
+
+  /** Démarrage rapide (portails) : vrai une seule fois, au lancement de la partie demandée. */
+  function takeQuickStart() {
+    if (state.match.quick !== true) return false
+    state.match.quick = false
+    return true
+  }
+
+  /** Retour d'un château de la coupe : l'accueil rouvrira la coupe. */
+  function requestCup() {
+    state.showCup = true
+  }
+
+  /** L'accueil doit-il rouvrir la coupe ? (une seule fois) */
+  function takeCupRequest() {
+    const open = Boolean(state.showCup)
+    state.showCup = false
+    return open
   }
 
   /**
@@ -805,10 +759,35 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     watch(() => [state.settings, state.locale, state.systemDark, state.systemReducedMotion], applyDocument, { deep: true, immediate: true })
   }
 
+  /* ----- Profil de test : toute la campagne ouverte (v6.2, serveur de développement) ----- */
+  // `?unlock=all` / `?unlock=complete` : voir devUnlock.js, absent des versions publiées.
+  if (import.meta.env?.DEV) {
+    try {
+      const { openTestCampaign } = await import('./devUnlock.js')
+      await openTestCampaign({
+        state,
+        saves,
+        refreshSlots,
+        openProfile,
+        createProfile,
+        go,
+        activeSlot: () => activeSlot,
+        adopt: (slot) => {
+          activeSlot = markRaw(slot)
+          refreshProfile()
+        },
+      })
+    } catch (err) {
+      console.warn('[Catapulte Mania] profil de test indisponible', err)
+    }
+  }
+
   return {
     state,
     services,
     t,
+    n,
+    d,
     setLocale,
     setSetting: (key, value) => settings.set(key, value),
     resetSettings: () => settings.reset(),
@@ -820,15 +799,21 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     deleteProfile,
     setDifficulty,
     recordResult,
+    startHeroic,
+    recordMedal,
     workshop,
     claimLogin,
     startMatch,
+    setLevel,
+    takeQuickStart,
     recordCoop,
     recordDaily,
     startDaily,
     recordCup,
     startCup,
     shareCup,
+    requestCup,
+    takeCupRequest,
     skipLevel,
     startChallenge,
     startEndless,
@@ -836,6 +821,9 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     startCustom,
     quickStart,
     shareCastle,
+    verifyCastle,
+    restoreVerifiedCastle,
+    dismissIncoming,
     afterProfileChosen,
     shareRun,
     doubleGold,

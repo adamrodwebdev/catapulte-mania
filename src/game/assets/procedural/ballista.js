@@ -9,6 +9,7 @@
  */
 import { TAU, roundRect, lightOver, woodPattern, metalGradient, rivet, cached, EDGE } from './realism.js'
 import { BALLISTA_GEOMETRY } from '../../Ballista.js'
+import { ENGINE_GOLD } from './palette.js'
 
 const { pivotY: PY, stock: STOCK } = BALLISTA_GEOMETRY
 const BASE_BOX = { x: -70, y: -80, w: 140, h: 84 }
@@ -19,8 +20,12 @@ function outline(g, w = 1.4) {
   g.stroke()
 }
 
+/** Engin d'or (v6.2) : un voile doré sur le bois, des ferrures d'or (voir palette.js). */
+const GOLD_TINT = ENGINE_GOLD.tint
+const GOLD_METAL = ENGINE_GOLD.metal
+
 /** Affût : deux pieds en A, une traverse, des patins ferrés. */
-function base(g) {
+function base(g, gold = false) {
   // Pieds : poutres équarries, en A, jusqu'au pivot.
   for (const [x0, x1] of [[-46, -5], [38, 5]]) {
     g.save()
@@ -31,6 +36,10 @@ function base(g) {
     roundRect(g, 0, -4, len, 8, 2)
     g.fillStyle = woodPattern(g, { unitsPerTile: 90 })
     g.fill()
+    if (gold) {
+      g.fillStyle = GOLD_TINT
+      g.fill()
+    }
     lightOver(g, 0, -4, len, 4, 0.2, 0.42)
     outline(g)
     g.restore()
@@ -39,19 +48,23 @@ function base(g) {
   roundRect(g, -40, -26, 74, 9, 2)
   g.fillStyle = woodPattern(g, { unitsPerTile: 80 })
   g.fill()
+  if (gold) {
+    g.fillStyle = GOLD_TINT
+    g.fill()
+  }
   lightOver(g, -40, -26, 34, -17, 0.2, 0.4)
   outline(g)
   for (const x of [-46, 38]) {
     g.beginPath()
     roundRect(g, x - 9, -5, 18, 5, 1.5)
-    g.fillStyle = metalGradient(g, x - 9, -5, x + 9, 0, '#5b616b')
+    g.fillStyle = metalGradient(g, x - 9, -5, x + 9, 0, gold ? GOLD_METAL : '#5b616b')
     g.fill()
     outline(g, 1)
   }
   // Moyeu du pivot.
   g.beginPath()
   g.arc(0, PY, 7, 0, TAU)
-  g.fillStyle = metalGradient(g, -7, PY - 7, 7, PY + 7, '#6b717c')
+  g.fillStyle = metalGradient(g, -7, PY - 7, 7, PY + 7, gold ? GOLD_METAL : '#6b717c')
   g.fill()
   outline(g)
   rivet(g, 0, PY, 2.2)
@@ -107,7 +120,8 @@ export function drawBallista(ctx, s) {
   const ex = s.extra ?? {}
   const angle = ((Number(ex.angle) || 0) * Math.PI) / 180
   const tension = Math.max(0, Math.min(1.1, Number.isFinite(ex.tension) ? ex.tension : 1))
-  cached(ctx, 'ballista.base', BASE_BOX, base, 4)
+  const gold = ex.skin === 'gold'
+  cached(ctx, gold ? 'ballista.base.gold' : 'ballista.base', BASE_BOX, (g) => base(g, gold), 4)
   ctx.save()
   ctx.translate(0, PY)
   ctx.rotate(-angle)
@@ -116,6 +130,10 @@ export function drawBallista(ctx, s) {
   roundRect(ctx, -54, -6, STOCK + 54, 12, 3)
   ctx.fillStyle = woodPattern(ctx, { unitsPerTile: 110 })
   ctx.fill()
+  if (gold) {
+    ctx.fillStyle = GOLD_TINT
+    ctx.fill()
+  }
   lightOver(ctx, -54, -6, STOCK, 6, 0.22, 0.42)
   outline(ctx)
   // Glissière ferrée

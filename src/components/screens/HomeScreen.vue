@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useApp } from '../../app/AppContext.js'
 import AppIcon from '../ui/AppIcon.vue'
+import MasteryCrest from '../ui/MasteryCrest.vue'
 import LanguagePicker from '../ui/LanguagePicker.vue'
 import SiegeLandscape from '../ui/SiegeLandscape.vue'
 import ModalPanel from '../ui/ModalPanel.vue'
@@ -60,8 +61,7 @@ function daily() {
 }
 /** Coupe de la semaine (v6.0) : le panneau s'ouvre sur le profil en cours (ou le dernier). */
 const cupWeek = WeeklyCup.thisWeek()
-const cupOpen = ref(Boolean(state.showCup))
-state.showCup = false
+const cupOpen = ref(app.takeCupRequest())
 const cupHint = computed(() => {
   const c = state.profile?.cup
   if (!c) return t('cup.menuHint', { n: cupWeek.levels.length })
@@ -77,7 +77,7 @@ async function openCup() {
 }
 /** Lien d'une coupe : celle de la semaine s'ouvre ; une coupe finie, on le dit. */
 function acceptCup() {
-  state.incomingCup = null
+  app.dismissIncoming('cup')
   openCup()
 }
 function acceptChallenge() {
@@ -108,7 +108,7 @@ function open(screen) {
     <SiegeLandscape class="home__scene" />
     <div class="home__content">
       <header class="home__heading">
-        <h1 class="home__title">Catapulte Mania</h1>
+        <h1 class="home__title">{{ t('app.title') }}</h1>
         <p class="home__tagline">{{ t('app.tagline') }}</p>
         <p v-if="season && !IS_DEMO" class="home__event">{{ t(`season.${season}`) }}</p>
         <p v-if="IS_DEMO" class="home__demo">{{ t('demo.banner', { count: PLAYABLE_LEVELS }) }}</p>
@@ -122,6 +122,8 @@ function open(screen) {
               <span class="banner__text">
                 {{ t('menu.continue') }}
                 <small>{{ t('menu.continueHint', { name: lastProfile.name, level: Math.min(lastProfile.completed + 1, PLAYABLE_LEVELS) }) }}</small>
+                <!-- Grand Ingénieur du Royaume (v6.2) : l'écusson d'or et le titre. -->
+                <small v-if="lastProfile.mastered" class="mastery-title"><MasteryCrest :size="18" />{{ t('mastery.title') }}</small>
               </span>
             </button>
           </li>
@@ -174,29 +176,29 @@ function open(screen) {
       </nav>
     </div>
 
-    <ModalPanel v-if="state.incomingChallenge" labelledby="incoming-title" class="incoming" @close="state.incomingChallenge = null">
+    <ModalPanel v-if="state.incomingChallenge" labelledby="incoming-title" class="incoming" @close="app.dismissIncoming('challenge')">
       <h2 id="incoming-title" class="modal__title">{{ state.incomingChallenge.name ? t('daily.challengeFrom', { name: state.incomingChallenge.name }) : t('daily.challengeTitle') }}</h2>
       <p>{{ t('daily.incoming', { n: state.incomingChallenge.levelId, engine: t(`game.engines.${state.incomingChallenge.engine}`) }) }}</p>
       <div class="modal__actions">
         <button type="button" class="btn btn--primary btn--large" data-autofocus @click="acceptChallenge">{{ t('daily.accept') }}</button>
-        <button type="button" class="btn btn--ghost" @click="state.incomingChallenge = null">{{ t('daily.later') }}</button>
+        <button type="button" class="btn btn--ghost" @click="app.dismissIncoming('challenge')">{{ t('daily.later') }}</button>
       </div>
     </ModalPanel>
-    <ModalPanel v-if="state.incomingCastle" labelledby="castle-title" class="incoming" @close="state.incomingCastle = null">
+    <ModalPanel v-if="state.incomingCastle" labelledby="castle-title" class="incoming" @close="app.dismissIncoming('castle')">
       <h2 id="castle-title" class="modal__title">{{ state.incomingCastle.name ? t('editor.incomingNamed', { name: state.incomingCastle.name }) : t('editor.incoming') }}</h2>
       <p>{{ t('editor.incomingText') }}</p>
       <div class="modal__actions">
         <button type="button" class="btn btn--primary btn--large" data-autofocus @click="app.startCustom(state.incomingCastle.code)">{{ t('editor.attack') }}</button>
-        <button type="button" class="btn btn--ghost" @click="state.incomingCastle = null">{{ t('daily.later') }}</button>
+        <button type="button" class="btn btn--ghost" @click="app.dismissIncoming('castle')">{{ t('daily.later') }}</button>
       </div>
     </ModalPanel>
     <CupPanel v-if="cupOpen" @close="cupOpen = false" />
-    <ModalPanel v-if="state.incomingCup" labelledby="incoming-cup-title" @close="state.incomingCup = null">
+    <ModalPanel v-if="state.incomingCup" labelledby="incoming-cup-title" @close="app.dismissIncoming('cup')">
       <h2 id="incoming-cup-title" class="modal__title">{{ t('cup.title') }}</h2>
       <p>{{ state.incomingCup.current ? t('cup.incoming') : t('cup.incomingOver') }}</p>
       <div class="modal__actions">
         <button type="button" class="btn btn--primary btn--large" data-autofocus @click="acceptCup">{{ state.incomingCup.current ? t('cup.open') : t('cup.openThisWeek') }}</button>
-        <button type="button" class="btn btn--ghost" @click="state.incomingCup = null">{{ t('daily.later') }}</button>
+        <button type="button" class="btn btn--ghost" @click="app.dismissIncoming('cup')">{{ t('daily.later') }}</button>
       </div>
     </ModalPanel>
     <p v-if="state.badChallenge" class="notice notice--warning home__notice" role="alert">{{ t('daily.badLink') }}</p>

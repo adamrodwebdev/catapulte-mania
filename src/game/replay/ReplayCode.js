@@ -18,9 +18,10 @@ import { AIM } from '../aim.js'
 // Munitions par leur rang dans le code : on ajoute à la fin (v6.1 : botte de paille,
 // orbe d'orage, pot de poison), pour que les liens déjà partagés restent valides.
 const AMMO = Object.freeze(['stone', 'boulder', 'fire', 'bomb', 'split', 'frost', 'bale', 'thunder', 'poison'])
-export const MAX_CODE_LENGTH = 4000
+export const MAX_CODE_LENGTH = 6000
 // v6.0 : un grand siège note aussi chaque fin de tour (e), l’étape suivante (g) et les ordres du général (b).
-const MAX_ACTIONS = 120
+// v6.2 : et chaque trajet de l’engin (m).
+const MAX_ACTIONS = 200
 const STEPS = Schema.int({ min: 0, max: 30000 })
 /** v2 (v5.0) : instants des tirs comptés depuis le début de la partie (pas absolus). */
 const AT = Schema.int({ min: 0, max: 1_000_000 })
@@ -63,7 +64,17 @@ const actionSchema = (raw, path) => {
   // v5.8 : seau d'eau jeté sur l'engin en feu (pas absolu, comme un tir).
   if (k === 'w' && raw.length === 2) return { k, d: AT(raw[1], `${path}.d`) }
   // v6.0 : étape suivante d'un grand siège (g), ordre d'un général (b), fin d'un tour (e) — pas absolus.
-  if ((k === 'g' || k === 'b' || k === 'e') && raw.length === 2) return { k, d: AT(raw[1], `${path}.d`) }
+  // v6.2 : « i », victoire sans tir (le feu, le poison… achèvent le dernier défenseur pendant la visée).
+  if ((k === 'g' || k === 'b' || k === 'e' || k === 'i') && raw.length === 2) return { k, d: AT(raw[1], `${path}.d`) }
+  // v6.2 : trajet de l'engin — départ (pas absolu), sens (1 en avant, -1 en arrière), durée en pas.
+  if (k === 'm' && raw.length === 4) {
+    return {
+      k,
+      d: AT(raw[1], `${path}.d`),
+      v: Schema.enum([-1, 1])(raw[2], `${path}.v`),
+      n: Schema.int({ min: 0, max: 100_000 })(raw[3], `${path}.n`),
+    }
+  }
   throw new ValidationError(path, 'unknown action')
 }
 
@@ -107,7 +118,8 @@ export class ReplayCode {
       if (x.k === 't') return ['t', x.d, AMMO.indexOf(x.a), exact(x.r), x.l]
       if (x.k === 'x') return ['x', x.d]
       if (x.k === 'w') return ['w', x.d]
-      if (x.k === 'g' || x.k === 'b' || x.k === 'e') return [x.k, x.d]
+      if (x.k === 'g' || x.k === 'b' || x.k === 'e' || x.k === 'i') return [x.k, x.d]
+      if (x.k === 'm') return ['m', x.d, x.v, x.n]
       throw new ValidationError('log', `action ${x.k} cannot be shared`)
     })
     const data = { v: 2, day, l: levelId, e: engine, n: PROFILE_NAME.test(name) ? name : '', a }
@@ -142,8 +154,8 @@ export class ReplayCode {
       const c = DailyChallenge.forDay(data.day)
       if (c.levelId !== data.l || c.engine !== data.e) throw new ValidationError('code', 'does not match the daily challenge')
     }
-    // Un seul engin par partie.
-    if (actions.some((x) => (x.k === 'f' && data.e !== 'catapult' && data.e !== 'ballista') || (x.k === 't' && data.e !== 'trebuchet'))) throw new ValidationError('code.a', 'engine mismatch')
+    // Un seul engin par partie ; le trébuchet ne roule pas.
+    if (actions.some((x) => ((x.k === 'f' || x.k === 'm') && data.e !== 'catapult' && data.e !== 'ballista') || (x.k === 't' && data.e !== 'trebuchet'))) throw new ValidationError('code.a', 'engine mismatch')
     return { day: data.day, levelId: data.l, engine: data.e, name: data.n, actions }
   }
 }

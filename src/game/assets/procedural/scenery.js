@@ -12,6 +12,8 @@
  */
 import { SeededRandom } from '../../../core/utils/SeededRandom.js'
 import { WORLD } from '../../physics/constants.js'
+import { range, drawRange, spindrift } from './mountains.js'
+import { THEMES, SUN_AT } from './themes.js'
 
 const TAU = Math.PI * 2
 const LEFT = -1200
@@ -34,9 +36,10 @@ export function mix(a, b, k) {
 
 /** Position de l'astre à l'écran : la même pour le ciel, les rayons et la lumière de la scène. */
 export function sunPosition(theme, viewW, viewH) {
+  const [sx, sy] = THEMES[theme]?.sunAt ?? SUN_AT
   return {
-    x: viewW * (theme === 3 ? 0.78 : 0.82),
-    y: viewH * (theme === 3 ? 0.42 : 0.18),
+    x: viewW * sx,
+    y: viewH * sy,
     r: Math.max(18, viewH * 0.06),
   }
 }
@@ -151,48 +154,32 @@ export function stars(ctx, viewW, viewH, time, animate) {
 
 /* ---------- Lointain (parallaxe 0,2) ---------- */
 
-/** Relief continu : somme de sinusoïdes (aucune répétition visible à l'écran). */
-function ridge(x, seed, amp) {
-  return (
-    Math.sin(x * 0.0021 + seed) * 0.5 +
-    Math.sin(x * 0.0047 + seed * 2.1) * 0.28 +
-    Math.sin(x * 0.011 + seed * 3.7) * 0.14 +
-    Math.abs(Math.sin(x * 0.0009 + seed)) * 0.4
-  ) * amp
-}
-
-/** Chaînes lointaines, très pâles (elles se fondent dans l'horizon). */
+/**
+ * Chaînes lointaines, très pâles (elles se fondent dans l'horizon). v6.2 : même
+ * relief que le plan lointain (voir mountains.js) : crêtes fractales, neige
+ * découpée dans la silhouette, versants à l'ombre à peine marqués.
+ */
 export function distant(ctx, s) {
-  const { th } = s.extra
+  const { th, time = 0, animate = true, wind = 0 } = s.extra
   const base = WORLD.GROUND_Y
   const tall = th.peaks ? 1.9 : th.arid ? 0.7 : 1
   // Perspective atmosphérique : le lointain prend la teinte bleutée du ciel.
   const air = mix(th.skyTop, th.skyBottom, 0.55)
+  const snowy = th.peaks || th.weather === 'snow'
   const layers = [
-    [mix(th.farDark, air, 0.78), 300 * tall, 7.1, 0.9],
-    [mix(th.farDark, air, 0.62), 220 * tall, 2.3, 0.75],
+    [mix(th.farDark, air, 0.78), 520 * tall, 7.1],
+    [mix(th.farDark, air, 0.62), 380 * tall, 2.3],
   ]
-  for (const [color, amp, seed, snow] of layers) {
-    ctx.beginPath()
-    ctx.moveTo(LEFT, base)
-    let peakY = Infinity
-    for (let x = LEFT; x <= RIGHT; x += 40) {
-      const y = base - 200 - Math.max(0, ridge(x, seed, amp))
-      ctx.lineTo(x, y)
-      peakY = Math.min(peakY, y)
-    }
-    ctx.lineTo(RIGHT, base)
-    ctx.closePath()
-    ctx.fillStyle = color
-    ctx.fill()
-    // Neiges éternelles : un liseré clair sur les plus hauts sommets.
-    if ((th.peaks || th.weather === 'snow') && Number.isFinite(peakY)) {
-      ctx.save()
-      ctx.clip()
-      ctx.fillStyle = 'rgba(250,252,255,0.55)'
-      ctx.fillRect(LEFT, peakY - 10, RIGHT - LEFT, (base - 200 - peakY) * (1 - snow) + 60)
-      ctx.restore()
-    }
+  for (const [color, height, seed] of layers) {
+    const geo = range({ seed, left: LEFT, right: RIGHT, base: base - 150, height, rough: snowy ? 2.4 : th.arid ? 1.4 : 1.5, step: 12 })
+    drawRange(ctx, geo, {
+      body: color,
+      shade: th.night ? 'rgba(8,10,24,0.16)' : 'rgba(40,52,80,0.12)',
+      snow: snowy ? 'rgba(250,252,255,0.62)' : null,
+      snowLine: snowy ? base - 150 - height * 0.5 : null,
+    })
+    // Panaches arrachés aux sommets enneigés (ou au sable du désert) par le vent.
+    if (snowy || th.arid) spindrift(ctx, geo.peaks.filter((pk) => pk.y < base - 150 - height * 0.5), { time, wind, rgb: snowy ? '252,253,255' : '238,216,176', animate, alpha: snowy ? 0.6 : 0.4, reach: 340, size: 1.8 })
   }
   // Brume d'horizon par-dessus : le lointain recule encore.
   const v = ctx.createLinearGradient(0, base - 700, 0, base)
@@ -246,14 +233,20 @@ function tent(ctx, x, y, w, colors, ink) {
  * rapprochée de l'horizon (le plan est à mi-distance), jamais sur le château.
  */
 export function near(ctx, s) {
+  // Fond peint (v6.2) : ni bosquets ni arbres dessinés, la peinture les porte ; le camp reste.
+  // `art` : opacité de la peinture (0 à 1, ou vrai) ; pendant son fondu, ils s'effacent avec lui.
   const { th, versus } = s.extra
+  const cover = s.extra.art === true ? 1 : Math.max(0, Math.min(1, Number(s.extra.art) || 0))
+  const art = cover >= 1
   const base = WORLD.GROUND_Y + 2
   const r = new SeededRandom(91)
+  ctx.save()
+  if (cover > 0) ctx.globalAlpha = 1 - cover
   const leaf = mix(th.night ? th.farDark : mix(th.grass, th.farDark, 0.55), th.skyBottom, th.night ? 0.15 : 0.22)
   const leafLight = mix(leaf, th.skyBottom, 0.25)
   const snowy = th.weather === 'snow'
   // Bosquets en buttes arrondies.
-  for (let x = LEFT; x < RIGHT; x += r.range(70, 140)) {
+  for (let x = LEFT; x < RIGHT && !art; x += r.range(70, 140)) {
     if (th.arid && r.next() < 0.6) continue
     const w = r.range(40, 110) * (th.arid ? 0.6 : 1)
     const h = r.range(18, 46) * (th.arid ? 0.7 : 1)
@@ -267,9 +260,9 @@ export function near(ctx, s) {
     ctx.ellipse(x - w * 0.08, base - h * 0.62, w * 0.28, h * (snowy ? 0.4 : 0.25), -0.2, 0, TAU)
     ctx.fill()
   }
-  // Arbres isolés (feuillus ou sapins selon le climat).
+  // Arbres isolés (feuillus ou sapins selon le climat), sauf sur un fond peint.
   const conifer = th.peaks || snowy || th.weather === 'fog'
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 9 && !art; i++) {
     const x = r.range(LEFT + 200, RIGHT - 200)
     const h = r.range(90, 150)
     if (th.arid && !snowy) continue
@@ -297,6 +290,7 @@ export function near(ctx, s) {
       ctx.fill()
     }
   }
+  ctx.restore()
   // Camp de siège du joueur : tentes rayées (pas en face-à-face, chacun son camp).
   if (!versus) {
     const ink = mix(leaf, '#000000', 0.45)
@@ -316,9 +310,9 @@ export function near(ctx, s) {
 
 /* ---------- Particules d'ambiance (repère écran) ---------- */
 
-/** Type de poussière en suspension selon le chapitre (null : la météo suffit). */
-export function moteKind(theme, th) {
-  if (theme === 10) return 'ember'
+/** Type de poussière en suspension selon le chapitre (null : la météo suffit) ; jeton `motes` d'abord (v6.2). */
+export function moteKind(_theme, th) {
+  if (th.motes) return th.motes
   if (th.night) return 'firefly'
   if (th.weather === 'rain' || th.weather === 'snow') return null
   if (th.arid) return 'sand'

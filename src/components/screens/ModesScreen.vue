@@ -27,7 +27,7 @@ function siege() {
         <div class="mode-card__art mode-card__art--siege" aria-hidden="true"><AppIcon name="infinity" :size="32" /></div>
         <h2 id="mode-endless" class="panel__title">{{ t('endless.title') }}</h2>
         <p>{{ t('endless.desc') }}</p>
-        <p v-if="endless && (endless.best || endless.bestWave)" class="mode-card__meta">{{ t('endless.record2', { count: endless.bestWave, score: endless.best.toLocaleString(state.locale) }) }}</p>
+        <p v-if="endless && (endless.best || endless.bestWave)" class="mode-card__meta">{{ t('endless.record2', { count: endless.bestWave, score: endless.best }) }}</p>
         <p v-if="state.profile && !endless?.unlocked" class="mode-card__meta"><AppIcon name="lock" :size="16" />{{ t('endless.locked', { count: ENDLESS.UNLOCK }) }}</p>
         <button type="button" class="btn btn--primary" :disabled="Boolean(state.profile) && !endless?.unlocked" @click="siege">
           {{ state.profile ? t('endless.start') : t('modes.chooseProfile') }}

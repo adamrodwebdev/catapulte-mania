@@ -4,6 +4,9 @@ import { CATEGORY } from '../physics/constants.js'
 import { Guard } from '../../core/utils/Guard.js'
 import { TARGET_TYPES } from './catalog.js'
 
+/** Grimace d'un défenseur touché (ms, dessin seulement). */
+const HURT_MS = 600
+
 export { TARGET_TYPES }
 
 /** Personnage à éliminer, caché dans la structure. */
@@ -37,7 +40,7 @@ export class Target extends Entity {
     /** Veilleur de nuit (v5.8) : il porte une torche qui met le feu là où il tombe. */
     this.torch = Guard.boolean(def.torch ?? false, 'torch')
     this.torchDropped = false
-    /** Pavoisier (v5.8) : son pavois arrête les tirs tendus de face (PhysicsWorld#shieldReacts). */
+    /** Pavoisier (v5.8) : son pavois arrête les tirs tendus de face (DefenderContacts#shieldReacts). */
     this.shield = type === 'shieldbearer'
     /** En pleine course (esquive, panique) : pour l'animation. */
     this.sprinting = false
@@ -59,6 +62,9 @@ export class Target extends Entity {
      */
     this.patrol = Guard.int(def.patrol ?? 0, 'patrol', { min: 0, max: 200 })
     this.home = def.x
+    /** Hauteur de départ (v6.2) et instant où il est retombé de haut (succès « Chute libre »). */
+    this.homeY = def.y
+    this.fallenAt = -Infinity
     this.facing = -1
     this.walking = false
     /** Ogre : instant du dernier revers (animation) et prochain revers possible (ms de monde). */
@@ -66,8 +72,12 @@ export class Target extends Entity {
     this.swatReady = 0
     // Le feu est mortel : une cible qui s'enflamme succombe en 1,5 s environ.
     this.burnDps = (this.maxHp / 1.5) * 1.05
-    /** Instant (ms de jeu) du dernier coup encaissé, pour l'animation. */
-    this.hurtAt = -Infinity
+    /**
+     * Il grimace encore (ms, dessin seulement) après un vrai coup : compte à
+     * rebours au pas de simulation (v6.2 : l'horloge du navigateur, comparée au
+     * temps de la partie, le figeait des minutes dans sa grimace).
+     */
+    this.hurtMs = 0
     /**
      * Force (v6.1) : quantité de mouvement de ce qu'il repousse quand cela
      * arrive lentement (voir physics/FallingObjects.js). Prochain instant (ms
@@ -104,6 +114,26 @@ export class Target extends Entity {
     return time < this.stunUntil
   }
 
+  /** Ce qui le sonne à cet instant (v6.2, lu par le dessin) : 'hit', 'shock', ou null. */
+  stunAt(time) {
+    return time < (this.stunUntil ?? 0) ? this.stunKind : null
+  }
+
+  /** Empoisonné à cet instant (v6.2) : il tousse et perd des points de vie. */
+  poisonedAt(time) {
+    return time < (this.poisonUntil ?? 0)
+  }
+
+  /** En armure (v6.2) : assez résistant pour que sa barre de vie porte un liseré d'acier. */
+  get armored() {
+    return (this.baseToughness ?? 1) >= 1.8
+  }
+
+  /** Sa torche brûle (v6.2) : un veilleur debout et pas gelé ; elle éclaire alentour. */
+  get torchLit() {
+    return this.torch && this.alive !== false && !(this.frozenMs > 0)
+  }
+
   /**
    * Bout de la torche d'un veilleur, en coordonnées du monde (dessin : voir
    * TORCH_TIP dans characters.js ; le personnage regarde à gauche, il est
@@ -127,7 +157,7 @@ export class Target extends Entity {
       this.shownDamage += lost
       this.shownCause = cause
     }
-    if (amount > 1) this.hurtAt = performance.now()
+    if (amount > 1) this.hurtMs = HURT_MS
     return died
   }
 
@@ -140,6 +170,7 @@ export class Target extends Entity {
   update(dtMs) {
     // Trempé par une citerne (v6.1) : il sèche peu à peu.
     if (this.wetMs > 0) this.wetMs = Math.max(0, this.wetMs - dtMs)
+    if (this.hurtMs > 0) this.hurtMs = Math.max(0, this.hurtMs - dtMs)
     super.update(dtMs)
   }
 }

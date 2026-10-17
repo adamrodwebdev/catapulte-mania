@@ -718,6 +718,10 @@
   }
 }
 
+/* v6.2 : le réglage « mouvement réduit » de l'application l'arrête aussi. */
+:root[data-motion='reduced'] .ach--fresh {
+  animation: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .ach--fresh {
     animation: none;
@@ -1382,7 +1386,9 @@
 .swatch {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-2);
+  min-width: var(--hud-size);
   min-height: var(--hud-size);
   padding: var(--space-1) var(--space-4);
   border: 1px solid var(--hairline-strong);
@@ -1516,8 +1522,9 @@
     white-space: nowrap;
     font-size: 0.75rem;
   }
+  /* Cibles tactiles de 44 px (v6.2) : la scène garde au moins 8 rem. */
   .editor__actions .btn {
-    min-height: 2.25rem;
+    min-height: var(--hud-size);
     padding-block: 0;
     font-size: var(--fs-0);
   }
@@ -1538,7 +1545,7 @@
   }
   .tool,
   .swatch {
-    min-height: 2.25rem;
+    min-height: var(--hud-size);
     padding-block: 0;
   }
   .editor__message {

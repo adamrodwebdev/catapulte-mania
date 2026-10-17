@@ -10,6 +10,9 @@ Réglez l'angle et la puissance, calculez la trajectoire, et faites tomber les f
 - **Rondes et ogres** : des défenseurs qui patrouillent, et des ogres qui renvoient les tirs d'un revers de massue
 - **Points de vie et chocs (v6.1)** : chaque défenseur a ses points de vie, en barre au-dessus de lui dès qu'il est blessé ; un choc coûte selon sa force et la dureté de ce qui frappe, une chute selon sa hauteur, et les survivants reculent et chancellent ; ce qui tombe lentement, ils le voient venir et le repoussent
 - **Ouvrages et souffle du monde (v6.1)** : moulins qui soufflent des rafales, forges, citernes, ruches et sacs de farine ; chaque chapitre a son vent (braises, miasmes, sable, air chaud, bise, orage, feu) qui marque les tirs, et se cumule avec les ouvrages
+- **Des châteaux qui tiennent ensemble (v6.2)** : chaque bloc est soudé à ses voisins par un liant qui dépend du matériau ; un choc l'use, la jonction se lézarde puis cède, et le château s'effondre par morceaux ; des **clés de voûte** lézardées lâchent tout ce qu'elles portent ; des **ailes** (remise de paille, bastion de glace, galerie de verre, casemate de fer…) rendent les châteaux asymétriques, chacune défaite par sa munition ; des **combos d'éléments** (fer rougi, trempe, fer électrisé, eau électrisée, éclats de glace)
+- **L'engin roule (v6.2)** : avancez ou reculez la catapulte et la baliste entre deux tirs, tant que le terrain le permet et jusqu'à la portée des archers
+- **Maîtrise du royaume (v6.2)** : toutes les étoiles et tous les succès font de vous le Grand Ingénieur du Royaume : l'Engin d'or, la Comète d'or, une page cachée de la Chronique, les **Terres du Duc** (cinq châteaux secrets) et la **Campagne héroïque**, plus dure, avec des paliers d'atelier en plus
 - **Défenseurs malins** : ils voient venir le tir et se mettent à l'abri (vraie navigation, recherche de chemin A*) ; **éclaireurs** qui esquivent, **pavoisiers** qui arrêtent les tirs tendus, **porte-étendards** qui galvanisent leurs voisins, **sapeurs** qui réparent entre deux tirs, et **veilleurs** dont la torche met le feu là où ils tombent
 - **Pillards et état de l'engin** : des pillards courent incendier, geler ou saboter votre engin, en jetant des ponts sur l'eau et la lave et en dressant des échelles contre les montagnes (un tir bien placé les fait tomber) ; l'engin a des points de vie et des avaries (feu qui s'intensifie, givre, fissures, rouille) ; des **seaux d'eau** en nombre limité éteignent le feu, mais rouillent les ferrures
 - **3 engins** : catapulte, trébuchet (deux clics : on touche le point d'impact, puis on fige la jauge entre tir en cloche et tir tendu) et, pour les meilleurs joueurs, la **baliste** (70 niveaux et 180 étoiles) dont le carreau traverse les montagnes
@@ -69,6 +72,7 @@ On peut l'envoyer par e-mail, le mettre sur une clé USB ou l'héberger sur n'im
 | Viser | Glisser vers l'arrière depuis la catapulte, ou utiliser les curseurs « Angle » et « Puissance » | Flèches ← → (angle) et ↑ ↓ (puissance). Avec Maj : pas de 5 |
 | Tirer | Bouton rouge « Tirer » | Espace ou Entrée |
 | Choisir un projectile | Cliquer sur un projectile en bas | Touches 1 à 9 |
+| Avancer ou reculer l'engin (v6.2) | Maintenir ◀ ou ▶ sous la scène | Maintenir Q et D (AZERTY), A et D (QWERTY) |
 | Diviser la mitraille en vol | Bouton « Diviser » | Espace |
 | Pause | Bouton ⏸ en haut à gauche | P ou Échap |
 | **Trébuchet** : 1. choisir le point d'impact | Toucher exactement l'endroit visé (glisser pour l'ajuster), ou bouton « Viser ici » | Flèches ← → pour déplacer le point (Maj : petits pas), Espace ou Entrée pour valider |
@@ -86,7 +90,15 @@ On peut l'envoyer par e-mail, le mettre sur une clé USB ou l'héberger sur n'im
 
 **Viser au trébuchet (v5.4) :** touchez exactement l'endroit où le projectile doit percuter : un fanion s'y plante. Une jauge se met alors à osciller entre **tir en cloche** et **tir tendu**, et la courbe du tir suit en direct : on voit si l'arc passe au-dessus du rempart ou s'il frappe le mur de face. Touchez une seconde fois pour figer la jauge : le trébuchet tire tout seul, et le projectile arrive pile sur le fanion (en Difficile, les rafales de vent peuvent encore le dévier). Sans l'aide à la trajectoire, seul le début de la courbe est montré.
 
-**Astuce :** certains châteaux ont un point faible (un pied en verre, un étage en paille, une poudrière…). Trouvez-le et tout s'écroule.
+**L'engin roule (v6.2) :** dès le niveau 2, la catapulte et la baliste avancent ou reculent entre deux tirs, tant que vous maintenez ◀ ou ▶. La roche, l'eau, la glace, la lave, un débris ou un défenseur les arrêtent, et elles ne s'approchent jamais du château plus près que la portée de ses archers, que des flèches plantées au sol vous montrent. De plus près, le tir est plus sûr… mais les pillards vous atteignent plus vite. Le trébuchet, lui, reste en place.
+
+**Des châteaux qui tiennent ensemble (v6.2) :** au premier tir, chaque bloc est soudé à ses voisins et au sol : mortier pour la pierre et la brique, chevilles pour le bois, liens pour la paille, rivets pour le fer, glace, plomb pour le verre (entre deux matériaux, le plus faible l'emporte). Un coup use les jonctions du bloc frappé et, moins, celles de ses voisins ; usée, une jonction se lézarde, craque, puis cède. Le feu ronge chevilles et liens et fait fondre la glace, le gel rend les jonctions cassantes, une explosion les arrache. Les **clés de voûte**, ces blocs qui portent tout sans relais, se reconnaissent à leur lézarde : entamez-en une, elle se désagrège et lâche tout ce qu'elle tient.
+
+**Combos d'éléments (v6.2) :** le feu rougit le fer, qui enflamme le bois voisin et brûle qui le touche ; du givre ou de l'eau sur du fer rougi le fend (**trempe**) ; la foudre laisse le fer chargé un instant, et court dans l'eau jusqu'à tous les défenseurs trempés ; une explosion fait voler la glace en éclats. Chaque combo s'annonce dans le ciel.
+
+**Repères des défenseurs (v6.2) :** quand il ne reste qu'un défenseur, un chevron d'or le désigne, où qu'il soit. Et pendant la visée, un défenseur qui atteint le bord droit de l'écran, ou passe au-delà, est signalé par une pastille au bord, à sa hauteur, qui pointe vers lui (d'or si c'est le dernier).
+
+**Astuce :** certains châteaux ont un point faible (un pied en verre, un étage en paille, une poudrière…). Trouvez-le et tout s'écroule. Et tous les niveaux se gagnent avec la simple pierre de départ : les munitions spéciales rendent la victoire plus rapide, pas possible.
 
 **Le but :** éliminer tous les personnages (soldats, chevaliers, rois) avant d'avoir épuisé ses tirs.
 **Le vent** (indiqué en haut à droite) dévie les projectiles. On le voit aussi dans le décor : traînées d'air dans le ciel, manche à air près de la catapulte, fanion au sommet du château, nuages et fumée qui dérivent. **En Difficile**, il devient un adversaire : bien plus fort, plus fort encore en altitude (un tir en cloche dérive bien plus qu'un tir tendu), il souffle **en rafales** (les traînées plus claires qui approchent annoncent la prochaine, un badge « Rafale » et un sous-titre la signalent) et pousse le feu dans son sens. Les projectiles lourds lui résistent : le boulet dévie deux fois moins que la pierre, la mitraille bien plus.
@@ -167,6 +179,17 @@ Chaque niveau s'ouvre sur une réplique d'un personnage ; chaque chapitre, sur u
 
 Une munition découverte reste ensuite disponible dans **tous** les niveaux de la campagne (au moins une de chaque type, même en Difficile) : à vous d'expérimenter.
 
+Les trois derniers niveaux de chaque chapitre, le grand siège compris, ont au moins un **pillard** (v6.2) : le premier, au niveau 8, attend embusqué dans le champ.
+
+### La maîtrise du royaume (v6.2)
+
+Toutes les étoiles et tous les succès de la campagne (300 de chaque) font de vous le **Grand Ingénieur du Royaume** : un titre et un écusson d'or sur votre profil, et des récompenses qui ne s'achètent pas.
+
+- **L'Engin d'or** (catapulte, trébuchet et baliste dorés, bannière royale) et **la Comète d'or**, une traînée d'étincelles derrière le tir ;
+- **La Légende du Grand Ingénieur**, une page cachée de la Chronique ;
+- **Les Terres du Duc**, un chapitre secret de cinq châteaux à médailles (bronze, argent, or), jusqu'à la citadelle de Mordrac ;
+- **La Campagne héroïque** (nouvelle partie +) : la même campagne, plus dure, avec ses propres médailles : châteaux plus solides (blocs +35 %, défenseurs +25 %, jonctions +50 %), un tir de moins, un pillard de plus dès le niveau 4, vent plus fort. Elle ouvre les **paliers héroïques de l'atelier** (voir plus bas), fermés tant qu'elle n'a pas commencé.
+
 ### Les pouvoirs spéciaux
 
 Un seul pouvoir par tour. Chaque utilisation retire des points au score final.
@@ -207,21 +230,21 @@ Un seul pouvoir par tour. Chaque utilisation retire des points au score final.
 
 L'or récompense la **maîtrise**, pas la répétition : 30 pièces pour la première victoire d'un niveau, 15 pour chaque nouvelle étoile, **100 pour chaque défi relevé**, et 50 de plus quand les trois défis d'un niveau sont réussis. Rejouer une victoire déjà obtenue ne rapporte que 5 pièces, une défaite rien.
 
-Le perfectionniste peut **tout débloquer** : la campagne rapporte jusqu'à 42 500 pièces, l'atelier complet (améliorations et apparences) en coûte 26 870. Avec environ 70 % des défis relevés, tout est déjà à portée ; sans les défis, il faut choisir.
+Le perfectionniste peut **tout débloquer** : la campagne rapporte jusqu'à 42 500 pièces, l'atelier complet (améliorations et apparences) en coûte 26 870. Avec environ 70 % des défis relevés, tout est déjà à portée ; sans les défis, il faut choisir. Les **paliers héroïques** (v6.2, en gras dans le tableau) en coûtent 15 600 de plus : ils demandent la maîtrise du royaume et s'ouvrent avec la Campagne héroïque, et la campagne parfaite les paie aussi.
 
 Les meilleurs paliers demandent aussi des **étoiles** (colonne « Étoiles requises »).
 
 | Amélioration | Effet par niveau | Prix | Étoiles requises |
 |---|---|---|---|
-| Bras renforcé (4 niveaux) | Lancer 7 % plus rapide | 300 · 700 · 1 300 · 2 200 | 0 · 30 · 90 · 180 |
-| Boulets lestés (4 niveaux) | Projectiles 20 % plus lourds | 250 · 600 · 1 100 · 1 900 | 0 · 25 · 80 · 170 |
-| Poix (3 niveaux) | Le feu grégeois embrase une zone 35 % plus large | 350 · 900 · 1 600 | 10 · 50 · 120 |
-| Poudre fine (3 niveaux) | Explosions 15 % plus larges et plus fortes | 450 · 1 100 · 2 000 | 20 · 70 · 150 |
-| Réserve de munitions (3 niveaux) | +1 munition spéciale de chaque type | 500 · 1 200 · 2 200 | 15 · 60 · 140 |
-| Stratège (2 niveaux) | Pouvoirs 15 % moins chers | 400 · 1 000 | 10 · 60 |
-| Éclaireur (2 niveaux) | Un tir supplémentaire dans chaque niveau | 1 500 · 3 500 | 60 · 200 |
+| Bras renforcé (4 niveaux + 1 héroïque) | Lancer 7 % plus rapide | 300 · 700 · 1 300 · 2 200 · **2 400** | 0 · 30 · 90 · 180 · **300** |
+| Boulets lestés (4 niveaux + 1 héroïque) | Projectiles 20 % plus lourds | 250 · 600 · 1 100 · 1 900 · **2 000** | 0 · 25 · 80 · 170 · **300** |
+| Poix (3 niveaux + 1 héroïque) | Le feu grégeois embrase une zone 35 % plus large | 350 · 900 · 1 600 · **1 600** | 10 · 50 · 120 · **300** |
+| Poudre fine (3 niveaux + 1 héroïque) | Explosions 15 % plus larges et plus fortes | 450 · 1 100 · 2 000 · **2 200** | 20 · 70 · 150 · **300** |
+| Réserve de munitions (3 niveaux + 1 héroïque) | +1 munition spéciale de chaque type | 500 · 1 200 · 2 200 · **2 400** | 15 · 60 · 140 · **300** |
+| Stratège (2 niveaux + 1 héroïque) | Pouvoirs 15 % moins chers | 400 · 1 000 · **1 200** | 10 · 60 · **300** |
+| Éclaireur (2 niveaux + 1 héroïque) | Un tir supplémentaire dans chaque niveau | 1 500 · 3 500 · **3 800** | 60 · 200 · **300** |
 
-S'y ajoutent des **apparences** sans effet sur le jeu : catapulte (chêne, bannière royale, ébène, dragon) et traînée du projectile (fumée, braises, étincelles d'or).
+S'y ajoutent des **apparences** sans effet sur le jeu : catapulte (chêne, bannière royale, ébène, dragon) et traînée du projectile (fumée, braises, étincelles d'or). La maîtrise du royaume offre l'**Engin d'or** et la **Comète d'or**, qui ne s'achètent pas.
 
 Elles changent vraiment la façon de jouer : avec un bras renforcé et des boulets lestés au maximum, une simple pierre fait plus de deux fois plus de dégâts ; la poix et la poudre fine font du feu et des explosifs une vraie stratégie.
 
@@ -309,6 +332,10 @@ Le terminal affiche une adresse comme `http://localhost:5173`. Ouvrez-la dans le
 
 Pour tester sur un téléphone connecté au même Wi-Fi : utilisez l'adresse « Network » affichée par le terminal.
 
+**Tester n'importe quel niveau sans refaire la campagne :** `npm run dev:unlocked` (ou ajoutez `?unlock=all` à l'adresse, par exemple `http://localhost:5173/?unlock=all`). Le jeu ouvre un profil « Test » (créé dans le premier emplacement libre, ou repris s'il existe) où tous les niveaux sont ouverts : ils comptent comme « passés », sans étoile ni or, et se gagnent ensuite pour de bon. Vos autres profils ne sont pas touchés. Ajoutez `&difficulty=hard` (ou `easy`) pour choisir la difficulté. Avec `?unlock=complete` (v6.2), le profil « Test » devient maître du royaume (toutes les étoiles, tous les succès) : de quoi essayer l'Engin d'or, la Comète d'or, la Légende, les Terres du Duc et la Campagne héroïque. Cet outil n'existe que sur le serveur de développement, jamais dans les versions publiées.
+
+**Fonds peints (v6.2) :** les peintures d'origine (`art/backgrounds/chapter-1.png` à `chapter-10.png`, non versionnées car lourdes) deviennent les WebP du jeu avec `npm run backgrounds` : la bande du bas est rognée (le jeu y dessine son propre sol), l'image ramenée à 2560 px de large. Il faut Chrome (ou son chemin dans `CHROME_PATH`). Vérifiez ensuite, dans `src/game/assets/backgrounds.js`, la ligne de sol de chaque peinture et ses sommets (d'où le vent arrache des panaches).
+
 ---
 
 ## 7. Fabriquer la version finale et la mettre en ligne
@@ -392,37 +419,41 @@ Le code suit une **programmation orientée objet** : chaque notion du jeu est un
 src/
 ├── main.js                 Point d'entrée
 ├── App.vue                 Composant racine (Vue 3)
-├── app/AppContext.js       État de l'application et accès aux services
+├── app/                    AppContext (état de l'application, actions), ProfilePresenter (le profil affiché), MatchSetup (mise en place d'une partie), EndOfMatch (bilans, un par mode), Formats (unités, dates) ; devUnlock (outil de test, développement seulement)
+├── composables/            Logique d'interface réutilisable : useGameKeyboard (les touches du jeu)
 ├── config/gameConfig.js    Constantes du jeu (gelées)
 ├── core/utils/             Outils génériques : Guard (vérification des types), EventBus, hasard reproductible
 ├── domain/                 Objets métier : SaveSlot (profil), LevelResult (résultat de niveau), EngineCondition (points de vie et avaries de l'engin)
-├── services/               Services : StorageService, SaveManager, SaveSigner, SettingsService, I18nService, StoreService
+├── services/               Services : StorageService, SaveManager, SaveSigner, SettingsService, I18nService, StoreService, ShareService, CastleDraftService
 ├── i18n/                   Traductions fr, en, id
 ├── game/
 │   ├── GameController.js   Relie le moteur au canevas (boucle, entrées, redimensionnement)
-│   ├── GameSession.js      Une partie : joueurs, tours, tirs, fin de partie
+│   ├── GameSession.js      Une partie : joueurs, tours, tirs, fin de partie (la logique seule)
+│   ├── drive/              Déplacement de l'engin : EngineDrive (logique), driveRules (règles), DriveView (commandes, flèches de portée)
+│   ├── feel/               GameFeel : arrêts sur image, ralenti, gros plan
 │   ├── modes/              GameMode → StoryMode, FreeMode, CoopMode, DuelMode, HotSeatMode, VersusMode ; HotSeatMatch (tournoi), Renown
-│   ├── progression/        UpgradeCatalog (atelier), GoldRules (barème de l'or), Achievements (les 18 défis)
+│   ├── progression/        UpgradeCatalog (atelier), GoldRules (barème de l'or), Achievements (les défis), Mastery (maîtrise du royaume, Campagne héroïque), Frontier (niveau passé, coup de pouce), DailyRecords
 │   ├── tutorial/           TutorialCoach : les tutoriels guidés, étape par étape
 │   ├── story/              StoryRepository (la Chronique), Portraits (personnages pixel art dessinés par le code)
 │   ├── Catapult.js         Visée et lancement
 │   ├── Trebuchet.js        Trébuchet à contrepoids : balancier et fronde simulés, lâcher au clic
 │   ├── TrajectoryPredictor Calcul de la trajectoire prévue (aide à la visée)
-│   ├── physics/            Monde physique (Matter.js) ; FallingObjects (vitesse de chute, dégâts des chocs et des chutes, poussée), Clouds (gaz, farine, essaims), Props (ouvrages), WorldWinds (souffle de chaque chapitre)
+│   ├── physics/            Monde physique (Matter.js) : PhysicsWorld (pas, collisions, entités) et ses collaborateurs — ElementReactions (feu, givre, vapeur, foudre, nuages), DefenderContacts (coups, chutes, écrasement, ogres et pavois), ElementCombos (fer rougi, trempe, fer électrisé, eau électrisée, éclats de glace), CastleJoints (assemblage des châteaux) ; règles sans moteur : physicsRules, castleRules (liants, clés de voûte), constants ; FallingObjects (chutes, chocs, poussée), Clouds (gaz, farine, essaims), Props (ouvrages), WorldWinds (souffle de chaque chapitre)
 │   ├── ai/                 Défenseurs : NavGraph (corniches), Pathfinder (A*), Steering (marche), Perception (prévoir la chute du tir), UnitBrain (comportements par type, pillards), UnitDirector (orchestration)
 │   ├── entities/           Entity → Block, Projectile, Target, Barrel ; catalog (défenseurs, munitions), props (ouvrages)
-│   ├── levels/             Les 100 niveaux (plans réutilisables), les arènes du face-à-face, les châteaux de duel
+│   ├── levels/             Les 100 niveaux : plans (blueprints, wingBlueprints), règles de la campagne selon le rang (campaignRules), placement (LevelCurve), LevelRepository ; les Terres du Duc (DukeRepository) ; Tracks (les parcours : campagne, à deux, héroïque, Duc) ; les arènes du face-à-face, les châteaux de duel
 │   ├── aim/                AimInput → la visée au geste et au clavier ; TrebuchetInput → point d'impact, jauge et calcul du tir du trébuchet (modules purs, testés)
 │   ├── powers/             Power → les 7 pouvoirs, PowerRegistry
 │   ├── score/              ScoreKeeper, règles de score et d'étoiles
-│   ├── rendering/          Renderer, Camera
-│   ├── assets/             Graphismes (procéduraux ou images, interchangeables)
-│   ├── audio/              Sons synthétisés et mixage, musique adaptative (MusicDirector), ambiance (AmbienceDirector), vibrations
-│   └── effects/            Particules (éclats, fumée, feu)
+│   ├── rendering/          Renderer (orchestre les peintres, dans l'ordre du dessin) : BackdropPainter (ciel, décor, fond peint, terrains), LightingPainter (ombres, lueurs, étalonnage, vignette), EnginePainter, StructurePainter (échelles, jonctions, cordes), StatusOverlayPainter (clés de voûte, fer rougi, givre), WorldHudPainter (barres de vie, marques des pillards, cœurs des généraux), AimPainter (visée, trajectoire), CloudPainter, EntityViewAdapter ; HealthBar, BackgroundArt, Camera ; TargetBeacons et BeaconPainter (repères des défenseurs)
+│   ├── assets/             Graphismes (procéduraux ou images, interchangeables) ; themes et palette (couleurs et réglages de chaque chapitre)
+│   ├── audio/              Sons synthétisés (recettes : soundRecipes, voix : SynthVoices) et mixage, musique adaptative (MusicDirector), ambiance (AmbienceDirector), vibrations
+│   └── effects/            Particules : ParticleSystem (leur vie), ParticlePainter (leur dessin) ; SessionEffects (ce que la partie montre et fait entendre : éclats, sons, sous-titres, répliques)
 ├── components/             Composants Vue : écrans, HUD, éléments d'interface
 └── styles/                 CSS : jetons de design, thèmes, écrans
 tests/                      Tests automatiques
 scripts/check-levels.mjs    Contrôle automatique des 100 niveaux
+scripts/backgrounds/        Encodage des fonds peints (art/backgrounds/*.png → WebP)
 build/                      Sécurité (CSP) et service worker générés au build
 ```
 
@@ -430,7 +461,7 @@ build/                      Sécurité (CSP) et service worker générés au bui
 
 - **Vue 3 + Vite** : interface réactive, build rapide, fichiers légers.
 - **Matter.js** : moteur physique 2D éprouvé. Il n'est téléchargé qu'à l'ouverture d'un niveau, pour que l'accueil s'affiche instantanément.
-- **Graphismes procéduraux** : tous les éléments médiévaux sont dessinés par le code. Le jeu pèse moins de 400 Ko et reste net sur tous les écrans.
+- **Graphismes procéduraux** : tous les éléments médiévaux sont dessinés par le code, nets sur tous les écrans. Le code du jeu pèse environ 460 Ko compressés. Seule la version web y ajoute dix fonds peints, un par chapitre (WebP, 1,7 Mo en tout, mis en cache pour jouer hors connexion) : la démo et les versions des portails gardent le décor dessiné (v6.2).
 - **Sons et musique synthétisés** (Web Audio) : aucun fichier audio à télécharger, la musique se compose en direct et s'adapte à l'action.
 
 ---
@@ -460,6 +491,10 @@ npm test              # tests automatiques (validation, sauvegarde, physique, ga
 npm run check:levels  # un joueur automatique vérifie que les 100 niveaux sont stables et gagnables en Difficile
 npm run check:levels -- --engine trebuchet   # même contrôle, joué au trébuchet
 npm run check:levels -- --levels 13,29,41-50  # seulement ces niveaux (liste ou plages)
+npm run check:levels -- --difficulty normal --ammo stone  # v6.2 : chaque niveau se gagne-t-il avec la seule pierre de départ ?
+npm run check:levels -- --track heroic        # v6.2 : la Campagne héroïque (ou --track duke : les Terres du Duc)
+npm run check:levels -- --workers 4           # v6.2 : au plus 4 cœurs à la fois (plus lent, l'ordinateur chauffe moins)
+npm run check:levels -- --track duke --boss   # v6.2 : face à un général, le joueur automatique le vise d'abord
 npm run lint          # vérification du style de code
 ```
 
@@ -522,6 +557,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v5.8.0 | Défenseurs malins (navigation A*, esquive, réparation), éclaireur, pavoisier, porte-étendard, sapeur, veilleurs à la torche ; pillards (ponts et échelles), état de l'engin (feu, givre, fissures, rouille) et seaux d'eau ; barils derrière les châteaux ; plus de zoom d'ouverture |
 | v5.9.0 | Interface 2026 « Verre & Or » : verre fumé, liserés, or dégradé, entrées à ressort ; accueil en diorama, chapitres illustrés, HUD et bouton de tir refaits, modes illustrés, fenêtres à barre d'actions dépolie |
 | v6.1.0 | Points de vie pour tous les défenseurs, chocs qui portent (dégâts selon l'énergie et la dureté, chutes, recul, secousses), défenseurs qui repoussent ce qui tombe lentement ; orbe d'orage, botte de paille et pot de poison, munitions élémentaires moins écrasantes ; moulins, forges, citernes, ruches et sacs de farine ; souffle du monde propre à chaque chapitre |
+| v6.2.0 | Châteaux assemblés (jonctions qui se lézardent et cèdent, clés de voûte), ailes et combos d'éléments ; l'engin avance et recule ; pillards avant chaque grand siège, et plus pressants ; barres de vie redessinées, infos en haut de l'écran, caméra qui ne suit plus les boulets perdus ; montagnes redessinées et fonds peints ; Chute libre revue ; maîtrise du royaume (Engin d'or, Comète d'or, la Légende, les Terres du Duc, la Campagne héroïque et ses paliers d'atelier) ; tous les niveaux gagnables avec la pierre de départ |
 | v6.0.0 | Les généraux de Mordrac : grands sièges en plusieurs étapes, dix généraux à vies et ordres annoncés, barre du général et bannières, Chronique enrichie ; coup de grâce, défenseurs assommés et répliques, potence et pont-levis, jauge de destruction ; cartes du siège sans fin, coupe de la semaine, moments forts filmés, coup de pouce et niveau passé |
 | v4.2.0 | Qualité des premières minutes (refus CrazyGames) : premier tir réussi, tutoriel en images, tirer-relâcher, barre de commandes compacte, caméra qui garde l'impact visible, trébuchet dès le niveau 4 |
 | v4.1.1 | Versions portails jouables dans le cadre isolé de CrazyGames (script classique unique), démarrage plus robuste |

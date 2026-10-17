@@ -39,6 +39,8 @@ export class Ballista {
   x
   y = WORLD.GROUND_Y
   dir = 1
+  /** Chemin parcouru en roulant, en angle de roue (v6.2) : l'affût tangue un peu. */
+  roll = 0
   speedFactor = 1
   angle = 20
   power = 1

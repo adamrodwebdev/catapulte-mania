@@ -40,15 +40,18 @@ export const BP = {
     return { a, c }
   },
 
-  /** Donjon large flanqué de deux tours plus basses. */
-  fortress(b, { x = 1560, floors = 5, side = 3, m = 'stone', top = 'wood', split = 2, s = 'stone', t = 24, h = 95, king = true, barrel = false }) {
+  /**
+   * Donjon large flanqué de deux tours plus basses. `guard` (v6.2) : le garde
+   * du rez-de-chaussée du donjon (`null` : personne, voir les Terres du Duc).
+   */
+  fortress(b, { x = 1560, floors = 5, side = 3, m = 'stone', top = 'wood', split = 2, s = 'stone', t = 24, h = 95, king = true, barrel = false, guard = 'knight' }) {
     const l = b.tower(x - 270, { floors: side, mats: mix(m, top, split)(side), slab: s, t, h, roof: 'straw' })
     const k = b.tower(x, { floors, mats: mix(m, top, split)(floors), slab: s, w: 170, t, h, roof: 'wood' })
     const r = b.tower(x + 270, { floors: side, mats: mix(m, top, split)(side), slab: s, t, h, roof: 'straw' })
     b.target(l[side - 1])
     b.target(r[side - 1])
     b.target(l[0], 'knight')
-    b.target(k[0], 'knight', -40)
+    if (guard) b.target(k[0], guard, -40)
     if (barrel) b.barrel(k[0], 40)
     else b.target(k[0], 'soldier', 40)
     for (let i = 1; i < floors; i++) b.target(k[i], king && i === floors - 1 ? 'king' : 'soldier')
@@ -82,12 +85,17 @@ export const BP = {
   },
 
   /** Forteresse en escalier : chaque tour cache la suivante. */
-  stairs(b, { x0 = 1280, step = 160, count = 5, start = 2, m = 'stone', top = 'wood', s = 'stone', t = 24, h = 92, king = true, powder = false }) {
+  stairs(b, { x0 = 1280, step = 160, count = 5, start = 2, m = 'stone', top = 'wood', s = 'stone', t = 24, h = 92, king = true, powder = false, crown = 'room', inner = true }) {
     for (let i = 0; i < count; i++) {
       const floors = start + i
-      const r = b.tower(x0 + i * step, { floors, mats: mix(m, top, 2)(floors), slab: s, w: 110, t, h, roof: i === count - 1 ? 'stone' : 'straw' })
-      b.target(r[floors - 1], king && i === count - 1 ? 'king' : i % 2 ? 'knight' : 'soldier')
-      if (floors >= 5) b.target(r[1])
+      const last = i === count - 1
+      // v6.2 : `crown: 'terrace'`, le roi se tient à découvert sur la terrasse du
+      // dernier gradin (sans toit) ; `inner: false`, personne au deuxième étage.
+      const terrace = last && king && crown === 'terrace'
+      const r = b.tower(x0 + i * step, { floors, mats: mix(m, top, 2)(floors), slab: s, w: 110, t, h, roof: terrace ? null : last ? 'stone' : 'straw' })
+      if (terrace) b.target(b.spot(x0 + i * step, r[floors - 1].topY), 'king')
+      else b.target(r[floors - 1], king && last ? 'king' : i % 2 ? 'knight' : 'soldier')
+      if (inner && floors >= 5) b.target(r[1])
       // Poudrière au pied des grandes tours (v3.7) : un point faible accessible
       // aussi aux tirs plongeants du trébuchet.
       if (powder && floors >= 5) b.barrel(r[0])

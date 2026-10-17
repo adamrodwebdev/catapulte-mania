@@ -16,6 +16,7 @@ import './styles/game.css'
 import './styles/modes.css'
 import './styles/bosses.css'
 import './styles/studio.css'
+import './styles/mastery.css'
 import './styles/mobile.css'
 
 // Portails (v5.6.2) : le jeu est souvent intégré dans un cadre sans défilement

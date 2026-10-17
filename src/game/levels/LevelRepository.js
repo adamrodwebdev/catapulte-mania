@@ -4,29 +4,30 @@ import { LEVEL_SPECS_2 } from './levelSpecs2.js'
 import { GAME, IS_DEMO } from '../../config/gameConfig.js'
 import { Schema, Guard, deepFreeze } from '../../core/utils/Guard.js'
 import { MATERIAL_NAMES } from '../entities/materials.js'
-import { TARGET_TYPES, PROJECTILE_NAMES } from '../entities/catalog.js'
+import { TARGET_TYPES, PROJECTILE_NAMES, FLYER_NAMES } from '../entities/catalog.js'
 import { referenceScore, maxScore } from '../score/ScoreRules.js'
 import { achievementsFor } from '../progression/Achievements.js'
 import { PowerRegistry } from '../powers/PowerRegistry.js'
 import { TREBUCHET_UNLOCK } from '../Trebuchet.js'
 import { applyCurve, ammoFor, AMMO_UNLOCK } from './LevelCurve.js'
 import { ZONE_KINDS } from '../physics/Terrain.js'
-import { FLYER_NAMES } from '../entities/Flyer.js'
 import { GENERAL_IDS } from '../bosses/generals.js'
 import { PROP_NAMES } from '../entities/props.js'
 import { worldWindFor } from '../physics/WorldWinds.js'
+import { findKeystones, KEYSTONE } from '../physics/castleRules.js'
+import { WORLD } from '../physics/constants.js'
+import { DRIVE } from '../drive/driveRules.js'
+import { GAUGE } from './campaignRules.js'
 
-/** Premier niveau où la jauge de destruction donne une pierre (même valeur que GameSession.GAUGE). */
-const GAUGE_FROM_LEVEL = 6
 
 const coord = Schema.number({ min: -500, max: 4000 })
-const WORLD_GROUND = 900
+const WORLD_GROUND = WORLD.GROUND_Y
 const size = Schema.number({ min: 6, max: 600 })
 
 const blocksSchema = Schema.array(
   // angle (v6.0) : un tablier de pont-levis légèrement penché ; 0 pour tout le reste.
   // prop (v6.1) : ouvrage (moulin, forge, citerne, ruche, farine ; voir entities/props.js).
-  Schema.object({ material: Schema.enum(MATERIAL_NAMES), x: coord, y: coord, w: size, h: size, shape: Schema.enum(['rect', 'triangle']), angle: Schema.optional(Schema.number({ min: -0.5, max: 0.5 }), 0), prop: Schema.optional(Schema.nullable(Schema.enum(PROP_NAMES)), null) }),
+  Schema.object({ material: Schema.enum(MATERIAL_NAMES), x: coord, y: coord, w: size, h: size, shape: Schema.enum(['rect', 'triangle']), angle: Schema.optional(Schema.number({ min: -0.5, max: 0.5 }), 0), prop: Schema.optional(Schema.nullable(Schema.enum(PROP_NAMES)), null), keystone: Schema.optional(Schema.boolean(), false) }),
   { maxLength: 200 },
 )
 const targetsSchema = Schema.array(
@@ -43,7 +44,8 @@ const targetsSchema = Schema.array(
     raid: Schema.optional(Schema.nullable(Schema.enum(['fire', 'frost', 'blow', 'smash'])), null),
     general: Schema.optional(Schema.nullable(Schema.enum(GENERAL_IDS)), null),
   }),
-  { maxLength: 20 },
+  // 24 (v6.2) : la Campagne héroïque ajoute un pillard aux étapes déjà pleines (20 défenseurs au niveau 90).
+  { maxLength: 24 },
 )
 const barrelsSchema = Schema.array(Schema.object({ x: coord, y: coord }), { maxLength: 20 })
 /** Mécanismes (v6.0) : liens entre deux blocs (rang dans `blocks`, point dans le repère du bloc), charnières. */
@@ -123,14 +125,18 @@ function checkGenerals(targets, where) {
  * @param {number} id
  * @param {number} chapter thème du décor (1 à 10)
  */
-export function buildLevel(spec, id, chapter, seedSalt = 0, { tutorial = null, rank = null } = {}) {
+/**
+ * @param {{ tutorial?: string | null, rank?: number | null, track?: 'campaign' | 'heroic' | 'duke', heroic?: boolean }} [opts]
+ *   track (v6.2) : parcours du niveau (ses records) ; heroic : variante de la Campagne héroïque
+ */
+export function buildLevel(spec, id, chapter, seedSalt = 0, { tutorial = null, rank = null, track = 'campaign', heroic = false } = {}) {
   const b = new StructureBuilder()
   spec.build(b)
   // Campagne : distance, décor et garnison selon le rang du niveau (LevelCurve).
   let ammo = { ...spec.ammo }
   let shots = spec.shots
   if (rank) {
-    const { terrain } = applyCurve(b, rank)
+    const { terrain } = applyCurve(b, rank, { heroic })
     // Montagne ET douves de lave ou d'eau : un tir de plus pour composer avec les deux.
     if (terrain.mountain && b.zones.some((z) => z.kind === 'lava' || z.kind === 'lake') && b.blocks.some((k) => k.material === 'rock' && k.shape === 'triangle' && k.x < 1100)) shots = Math.min(12, shots + 1)
     const cold = b.zones.some((z) => z.kind !== 'lake')
@@ -140,9 +146,12 @@ export function buildLevel(spec, id, chapter, seedSalt = 0, { tutorial = null, r
   // (plateaux de roche, douves) reste celui du niveau : `floorAt(x)` donne le dessus du sol.
   const rock = b.blocks.filter((k) => k.material === 'rock' && k.shape === 'rect')
   const floorAt = (x) => rock.filter((k) => Math.abs(x - k.x) <= k.w / 2).reduce((top, k) => Math.min(top, k.y - k.h / 2), WORLD_GROUND)
+  // Points sensibles (v6.2) : les clés de voûte du château, d'après sa géométrie.
+  if (!rank || rank >= KEYSTONE.FROM) markKeystones(b)
   const stages = (spec.stages ?? []).map((st, i) => {
     const sb = new StructureBuilder()
     st.build(sb, { floorAt })
+    if (!rank || rank >= KEYSTONE.FROM) markKeystones(sb)
     const where = `level ${id} stage ${i + 2}`
     const d = stageSchema({ blocks: sb.blocks, targets: sb.targets, barrels: sb.barrels, flyers: sb.flyers, ...mechanisms(sb, where) }, where)
     if (!d.targets.length) throw new Error(`${where}: no target`)
@@ -181,6 +190,8 @@ export function buildLevel(spec, id, chapter, seedSalt = 0, { tutorial = null, r
   level.star2 = Math.min(data.shots, level.par + Math.max(1, Math.floor((data.shots - level.par) / 2)))
   // Outil présenté par un tutoriel guidé (voir LevelRepository.tutorialFor).
   level.tutorial = tutorial
+  // Parcours (v6.2) : campagne, Campagne héroïque ou Terres du Duc.
+  level.track = track
   // Seaux d'eau (v5.8) : deux par niveau où un pillard porte une torche (un en Difficile).
   level.buckets = Guard.int(spec.buckets ?? (data.targets.some((t) => t.raid === 'fire') ? 2 : 0), `level ${id} buckets`, { min: 0, max: 5 })
   level.achievements = achievementsFor(level)
@@ -190,15 +201,39 @@ export function buildLevel(spec, id, chapter, seedSalt = 0, { tutorial = null, r
 }
 
 /**
+ * Clés de voûte (v6.2, voir CastleJoints.findKeystones) : marquées sur les
+ * définitions des blocs ; les blocs des mécanismes (potence, pont-levis) n'en
+ * sont jamais.
+ * @param {StructureBuilder} b
+ */
+function markKeystones(b) {
+  const skip = new Set()
+  for (const t of b.tethers ?? []) {
+    for (const block of [t.a, t.b]) {
+      const i = b.blocks.indexOf(block)
+      if (i >= 0) skip.add(i)
+    }
+  }
+  for (const h of b.hinges ?? []) {
+    const i = b.blocks.indexOf(h.block ?? h.b)
+    if (i >= 0) skip.add(i)
+  }
+  for (const i of findKeystones(b.blocks, skip)) b.blocks[i].keystone = true
+}
+
+/**
  * Ouvrages que les pillards devront bâtir dans ce niveau (v5.8) : échelle pour
  * une montagne ou un plateau, pont pour des douves au ras du sol.
  * @returns {('build:ladder' | 'build:bridge')[]}
  */
 function worksOf(level) {
-  if (!level.targets.some((t) => t.raid)) return []
-  const plateau = level.blocks.some((b) => b.material === 'rock' && b.shape === 'rect' && b.y < WORLD_GROUND - 20)
-  const mountain = level.blocks.some((b) => b.material === 'rock' && b.shape === 'triangle' && b.h >= 150 && b.x < 1100)
-  const moat = level.zones.some((z) => z.kind === 'lake' || z.kind === 'lava' || z.kind === 'ice')
+  const raiders = level.targets.filter((t) => t.raid)
+  if (!raiders.length) return []
+  // v6.2 : seul ce qu'un pillard doit franchir compte (l'embusqué du champ n'a ni pont ni échelle à bâtir).
+  const far = Math.max(...raiders.map((t) => t.x))
+  const plateau = raiders.some((t) => t.y + TARGET_TYPES[t.type].h / 2 < WORLD_GROUND - 20) && level.blocks.some((b) => b.material === 'rock' && b.shape === 'rect' && b.y < WORLD_GROUND - 20)
+  const mountain = level.blocks.some((b) => b.material === 'rock' && b.shape === 'triangle' && b.h >= 150 && b.x < 1100 && b.x - b.w / 2 < far)
+  const moat = level.zones.some((z) => (z.kind === 'lake' || z.kind === 'lava' || z.kind === 'ice') && z.x0 < far)
   const out = []
   if (plateau || mountain) out.push('build:ladder')
   if (moat && !plateau) out.push('build:bridge')
@@ -258,6 +293,24 @@ export class LevelRepository {
     })
   }
 
+  /** Campagne héroïque (v6.2) : variantes construites à la demande. */
+  static #heroic = new Map()
+
+  /**
+   * Niveau de la Campagne héroïque : le même château, avec un pillard de plus
+   * (voir LevelCurve.raidFor) ; plus solide en partie (voir HeroicMode).
+   */
+  static heroic(id) {
+    Guard.int(id, 'level id', { min: 1, max: GAME.LEVEL_COUNT })
+    let level = LevelRepository.#heroic.get(id)
+    if (!level) {
+      const spec = [...LEVEL_SPECS, ...LEVEL_SPECS_2][id - 1]
+      level = buildLevel(spec, id, Math.ceil(id / GAME.LEVELS_PER_CHAPTER), 0, { rank: id, track: 'heroic', heroic: true })
+      LevelRepository.#heroic.set(id, level)
+    }
+    return level
+  }
+
   static all() {
     if (!LevelRepository.#levels) {
       LevelRepository.#levels = Object.freeze(LevelRepository.#build())
@@ -294,7 +347,8 @@ export class LevelRepository {
     const seen = new Set()
     for (const l of LevelRepository.all().slice(0, id - 1)) {
       l.blocks.forEach((b) => seen.add(`material:${b.material}`))
-      l.targets.forEach((t) => seen.add(`target:${t.type}`))
+      // Un pillard a sa propre fiche (v6.2) : il ne présente pas son type de défenseur.
+      l.targets.forEach((t) => !t.raid && seen.add(`target:${t.type}`))
       // Veilleurs de nuit (les pillards à la torche ont leur propre fiche).
       if (l.targets.some((t) => t.torch && !t.raid)) seen.add('torch')
       l.targets.forEach((t) => t.raid && seen.add(`raid:${t.raid}`))
@@ -312,11 +366,12 @@ export class LevelRepository {
       // v6.1 : ouvrages et souffle du monde.
       for (const p of [l, ...(l.stages ?? [])]) p.blocks.forEach((b) => b.prop && seen.add(`prop:${b.prop}`))
       seen.add(`wind:${worldWindFor(l.chapter)}`)
+      if ([l, ...(l.stages ?? [])].some((p) => p.blocks.some((b) => b.keystone))) seen.add('keystone')
     }
     const level = LevelRepository.get(id)
     const now = new Set()
     level.blocks.forEach((b) => now.add(`material:${b.material}`))
-    level.targets.forEach((t) => now.add(`target:${t.type}`))
+    level.targets.forEach((t) => !t.raid && now.add(`target:${t.type}`))
     if (level.targets.some((t) => t.torch && !t.raid)) now.add('torch')
     level.targets.forEach((t) => t.raid && now.add(`raid:${t.raid}`))
     if (level.buckets) now.add('buckets')
@@ -331,9 +386,13 @@ export class LevelRepository {
     if (level.stageCount > 1) now.add('siege')
     for (const t of [level, ...(level.stages ?? [])].flatMap((p) => p.tethers ?? [])) now.add(t.kind === 'chain' ? 'contraption:drawbridge' : 'contraption:gallows')
     // Jauge de destruction (v6.0, voir GameSession) : présentée au niveau où elle apparaît.
-    if (id === GAUGE_FROM_LEVEL) now.add('gauge')
+    if (id === GAUGE.FROM_LEVEL) now.add('gauge')
+    // v6.2 : l'engin roule (présenté au niveau où les boutons apparaissent).
+    if (id === DRIVE.FROM_LEVEL) now.add('drive')
     // v6.1 : ouvrages et souffle du monde (le vent simple n'a pas de fiche).
     for (const p of [level, ...(level.stages ?? [])]) p.blocks.forEach((b) => b.prop && now.add(`prop:${b.prop}`))
+    // v6.2 : points sensibles (clés de voûte), présentés la première fois.
+    if ([level, ...(level.stages ?? [])].some((p) => p.blocks.some((b) => b.keystone))) now.add('keystone')
     const wind = worldWindFor(level.chapter)
     if (wind !== 'breeze') now.add(`wind:${wind}`)
     // Le général a sa propre fiche dans l'introduction (voir GameScreen.vue).

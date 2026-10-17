@@ -17,6 +17,8 @@ export class ReplayPlayer {
   #session
   #queue
   #current = null
+  /** Pas où s'arrêtent les déplacements de l'engin en cours (v6.2). */
+  #stops = []
   #acc = 0
   #ticks = 0
   done = false
@@ -28,9 +30,10 @@ export class ReplayPlayer {
   constructor(session, actions) {
     this.#session = session
     const all = actions.map((a) => ({ ...a }))
-    // Étapes, ordres des généraux et fins de tour (v6.0) : la partie les exécute elle-même, au pas enregistré.
+    // Étapes, ordres des généraux et fins de tour (v6.0), victoires sans tir (v6.2) :
+    // la partie les exécute elle-même, au pas enregistré.
     session.preloadRecorded?.(all)
-    this.#queue = all.filter((a) => a.k !== 'g' && a.k !== 'b' && a.k !== 'e')
+    this.#queue = all.filter((a) => a.k !== 'g' && a.k !== 'b' && a.k !== 'e' && a.k !== 'i')
     session.on('end', () => (this.done = true))
   }
 
@@ -56,10 +59,20 @@ export class ReplayPlayer {
     if (this.done) return
     this.#ticks++
     const s = this.#session
-    // Seau d'eau (v5.8) : jeté au pas enregistré, quel que soit le moment du tour.
-    while (this.#queue[0]?.k === 'w' && s.steps >= this.#queue[0].d) {
-      this.#queue.shift()
-      s.useBucket()
+    // Déplacements de l'engin (v6.2) : l'arrêt d'un trajet passe avant le départ
+    // du suivant (le joueur relâche, puis rappuie au même pas).
+    while (this.#stops.length && s.steps >= this.#stops[0]) {
+      this.#stops.shift()
+      s.drive(0)
+    }
+    // Seau d'eau (v5.8) et départs de l'engin (v6.2) : au pas enregistré, quel que soit le moment du tour.
+    while ((this.#queue[0]?.k === 'w' || this.#queue[0]?.k === 'm') && s.steps >= this.#queue[0].d) {
+      const a = this.#queue.shift()
+      if (a.k === 'w') s.useBucket()
+      else if (a.n > 0) {
+        s.drive(a.v)
+        this.#stops.push(a.d + a.n)
+      }
     }
     const next = this.#queue[0]
     if (s.state === STATE.AIMING && next && (next.k === 'f' || next.k === 't' || next.k === 'p') && s.steps >= next.d) {
@@ -75,7 +88,7 @@ export class ReplayPlayer {
         } else s.fire()
         this.#current = next
       }
-    } else if (s.state === STATE.AIMING && !next) {
+    } else if (s.state === STATE.AIMING && !next && !s.idleWinPending) {
       // Journal épuisé sans fin de partie (partie abandonnée) : la relecture s'arrête.
       this.done = true
       return

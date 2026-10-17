@@ -105,6 +105,8 @@ export class SaveManager {
             stars: slot.starCount,
             score: slot.totalScore,
             updatedAt: slot.updatedAt,
+            // v6.2 : Grand Ingénieur du Royaume (écusson d'or sur la carte du profil).
+            mastered: slot.mastered,
           })
         }
       } catch {

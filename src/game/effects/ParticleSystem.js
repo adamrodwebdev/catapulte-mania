@@ -22,38 +22,102 @@ const SPLINTERS = new Set(['wood', 'straw', 'barrel'])
 const SPARKY = new Set(['stone', 'iron', 'marble', 'brick', 'sandstone'])
 const CONFETTI = ['#d4a537', '#a3322b', '#2f4b7c', '#3d7a3a', '#f4efe6', '#ffb347']
 
-/* ---------- Sprites (rendu doux, mis en cache) ---------- */
+/** Couleur des chiffres de dégâts selon leur cause (v6.1). */
+const DAMAGE_COLORS = Object.freeze({ crush: '#ff7a66', fall: '#ffb08a', knockout: '#ffb08a', explosion: '#ff9c4a', fire: '#ffc14d', impact: '#ff7a66', poison: '#8fe26a', shock: '#9fdcff', scald: '#e8f4ff', sting: '#ffd54a' })
 
-const sprites = new Map()
-
-function makeCanvas(w, h) {
-  if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(w, h)
-  const c = document.createElement('canvas')
-  c.width = w
-  c.height = h
-  return c
+/** Éclats et échardes : pesanteur, rotation, rebond amorti sur le sol, puis glissade qui s'arrête. */
+function tumble(p, k) {
+  p.vy += 0.3 * k
+  p.rot += p.vr * k
+  if (p.y > p.floor) {
+    p.y = p.floor
+    p.vy = Math.abs(p.vy) > 1.2 ? -p.vy * 0.35 : 0
+    p.vx *= 0.6
+    p.vr *= 0.5
+  }
 }
 
 /**
- * Disque flou d'une couleur donnée (64 px), centre plein et bord qui s'efface :
- * la base de la fumée, de la poussière, des lueurs et du feu.
- * @param {string} rgb ex. '230,225,215'
+ * Mouvement propre à chaque sorte (v6.2, table), après la vitesse : pesanteur,
+ * rebonds, flottement, croissance. `sys` : tacher une surface, laisser un sillage.
  */
-function soft(rgb) {
-  let c = sprites.get(rgb)
-  if (!c) {
-    c = makeCanvas(64, 64)
-    const g = c.getContext('2d')
-    const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32)
-    grad.addColorStop(0, `rgba(${rgb},1)`)
-    grad.addColorStop(0.45, `rgba(${rgb},0.7)`)
-    grad.addColorStop(1, `rgba(${rgb},0)`)
-    g.fillStyle = grad
-    g.fillRect(0, 0, 64, 64)
-    sprites.set(rgb, c)
-  }
-  return c
-}
+const MOTION = new Map([
+  [
+    'knockout',
+    (p, k) => {
+      p.vy += 0.24 * k
+      p.rot += p.spin * k
+    },
+  ],
+  ['chunk', tumble],
+  ['shard', tumble],
+  [
+    'spark',
+    (p, k) => {
+      p.vy += 0.32 * k
+      p.vx *= 0.98
+    },
+  ],
+  [
+    'ember',
+    (p, k) => {
+      p.vy += 0.03 * k
+      p.vx += Math.sin((p.life + p.x) / 120) * 0.03 * k
+    },
+  ],
+  [
+    'drop',
+    (p, k, sys) => {
+      p.vy += 0.28 * k
+      p.vx *= 0.995
+      if (p.y >= WORLD.GROUND_Y - 1) {
+        p.y = WORLD.GROUND_Y - 1
+        if (p.splat) sys.splat(p, true)
+        else p.life = p.max
+      } else if (p.splat && p.life > 70 && p.vy > 0 && sys.surfaceAt && sys.surfaceAt(p.x, p.y)) {
+        sys.splat(p, false)
+      }
+    },
+  ],
+  [
+    'confetti',
+    (p, k) => {
+      // Chute lente et oscillante, comme du papier.
+      p.vy = Math.min(p.vy + 0.12 * k, 1.6)
+      p.vx += Math.sin(p.life / 180 + p.phase) * 0.06 * k
+      p.vx *= 0.97
+      p.rot += p.vr * k
+    },
+  ],
+  [
+    'smoke',
+    (p, k) => {
+      p.size += (p.grow ?? 0.25) * k
+      p.vy *= 0.995
+    },
+  ],
+  [
+    'fireball',
+    (p, k) => {
+      p.size += 0.9 * k
+      p.vy -= 0.02 * k
+    },
+  ],
+  [
+    'shell',
+    (p, k, sys) => {
+      // Parabole fixe (indépendante du vent) : départ, sommet, arrivée sur l'engin.
+      const t = Math.min(1, p.life / p.max)
+      p.x = p.x0 + (p.x1 - p.x0) * t
+      p.y = p.y0 + (p.y1 - p.y0) * t - p.apex * 4 * t * (1 - t)
+      p.rot += 0.18 * k
+      if (p.life - p.trailAt > 45 && t < 0.97) {
+        p.trailAt = p.life
+        sys.trails.push(p)
+      }
+    },
+  ],
+])
 
 /**
  * Système de particules purement visuel (éclats, échardes, fumée, feu,
@@ -64,10 +128,10 @@ function soft(rgb) {
  * rebondissent sur le sol, boule de feu + onde de choc + suie au sol pour les
  * explosions, étincelles sur la pierre et le fer, confettis à la victoire.
  * Les particules sont plafonnées (les plus anciennes cèdent la place).
+ *
+ * v6.2 : ce module simule (émetteurs, mouvement, durée de vie) ; le dessin est
+ * celui du ParticlePainter, qui lit les particules vivantes (`items`).
  */
-/** Couleur des chiffres de dégâts selon leur cause (v6.1). */
-const DAMAGE_COLORS = Object.freeze({ crush: '#ff7a66', fall: '#ffb08a', knockout: '#ffb08a', explosion: '#ff9c4a', fire: '#ffc14d', impact: '#ff7a66', poison: '#8fe26a', shock: '#9fdcff', scald: '#e8f4ff', sting: '#ffd54a' })
-
 export class ParticleSystem {
   /** @type {object[]} */
   #items = []
@@ -82,11 +146,18 @@ export class ParticleSystem {
    * @type {((x: number, y: number) => boolean) | null}
    */
   surfaceAt = null
-  /** Largeur de la vue (px écran), fournie par le Renderer : borne la largeur des titres. */
-  viewWidth = 0
 
   get count() {
     return this.#items.length
+  }
+
+  /**
+   * Particules vivantes, pour le dessin (v6.2, voir ParticlePainter.js) : à lire
+   * seulement, jamais à modifier.
+   * @returns {ReadonlyArray<object>}
+   */
+  get items() {
+    return this.#items
   }
 
   /** Nombre de particules d'un type donné (diagnostic et tests). */
@@ -256,6 +327,10 @@ export class ParticleSystem {
     } else if (style === 'snow') {
       // Événement d'hiver : flocons qui tombent doucement.
       this.#spawn({ kind: 'dot', x: x + r.range(-5, 5), y: y + r.range(-5, 5), vx: r.range(-0.2, 0.2), vy: r.range(0.1, 0.4), max: 700, size: r.range(2, 3.5), color: r.pick(['#ffffff', '#e6f3ff', '#cfe6ff']) })
+    } else if (style === 'comet') {
+      // Maîtrise du royaume (v6.2) : une comète d'or (halo doré) et des étincelles nettes qui fusent.
+      this.#spawn({ kind: 'ember', x, y, vx: 0, vy: 0, max: 1000, size: r.range(5.5, 8), glow: '255,206,80' })
+      for (let i = 0; i < 2; i++) this.#spawn({ kind: 'dot', x: x + r.range(-4, 4), y: y + r.range(-4, 4), vx: r.range(-1.3, 1.3), vy: r.range(-1.3, 0.9), max: 650, size: r.range(1.8, 3), color: r.pick(['#ffffff', '#fff1b0', '#ffd24d', '#f2a91c']) })
     } else if (style === 'stars') {
       this.#spawn({ kind: 'ember', x: x + r.range(-4, 4), y: y + r.range(-4, 4), vx: 0, vy: 0, max: 560, size: r.range(1.8, 3.2), color: r.pick(['#fff1c4', '#d4a537', '#ffffff']) })
     } else {
@@ -335,7 +410,7 @@ export class ParticleSystem {
    * Défenseur assommé (v6.0) : son dessin continue la chute qui l'a emporté.
    * Il bondit, tourne sur lui-même en se débattant, puis s'efface ; en
    * mouvement réduit (`still`), il s'efface seulement. Dessiné par le
-   * Renderer (voir drawSprite) : rien ne change à la simulation.
+   * ParticlePainter avec le dessin des personnages : rien ne change à la simulation.
    */
   knockout(x, y, { key, w, h, angle = 0, vx = 0, extra = {}, still = false }) {
     const r = this.#rng
@@ -389,7 +464,7 @@ export class ParticleSystem {
    */
   callout(x, y, text, tier = 1) {
     this.#items = this.#items.filter((p) => p.kind !== 'callout')
-    this.#spawn({ kind: 'callout', x, y, vx: 0, vy: -0.35, max: 1500, size: 44 + tier * 10, tier, text: String(text) })
+    this.#spawn({ kind: 'callout', x, y, y0: y, vx: 0, vy: -0.35, max: 1500, size: 44 + tier * 10, tier, text: String(text) })
     this.#glints(x, y, 6 + tier * 3)
   }
 
@@ -413,76 +488,15 @@ export class ParticleSystem {
     const k = dtMs / 16.67
     const drift = this.wind * 0.9
     const trails = []
+    // Ce que certaines sortes demandent au système : tacher une surface, laisser un sillage.
+    const sys = { splat: (p, onGround) => this.#splat(p, onGround), surfaceAt: this.surfaceAt, trails }
     for (const p of this.#items) {
       p.life += dtMs
       if (p.delay && p.life < p.delay) continue
       p.x += p.vx * k
       if (p.kind === 'smoke' || p.kind === 'flame' || p.kind === 'ember') p.x += drift * k * Math.min(1, p.life / 300)
       p.y += p.vy * k
-      if (p.kind === 'knockout') {
-        p.vy += 0.24 * k
-        p.rot += p.spin * k
-      }
-      switch (p.kind) {
-        case 'chunk':
-        case 'shard':
-          p.vy += 0.3 * k
-          p.rot += p.vr * k
-          // Rebond amorti sur le sol, puis glissade qui s'arrête.
-          if (p.y > p.floor) {
-            p.y = p.floor
-            p.vy = Math.abs(p.vy) > 1.2 ? -p.vy * 0.35 : 0
-            p.vx *= 0.6
-            p.vr *= 0.5
-          }
-          break
-        case 'spark':
-          p.vy += 0.32 * k
-          p.vx *= 0.98
-          break
-        case 'ember':
-          p.vy += 0.03 * k
-          p.vx += Math.sin((p.life + p.x) / 120) * 0.03 * k
-          break
-        case 'drop':
-          p.vy += 0.28 * k
-          p.vx *= 0.995
-          if (p.y >= WORLD.GROUND_Y - 1) {
-            p.y = WORLD.GROUND_Y - 1
-            if (p.splat) this.#splat(p, true)
-            else p.life = p.max
-          } else if (p.splat && p.life > 70 && p.vy > 0 && this.surfaceAt && this.surfaceAt(p.x, p.y)) {
-            this.#splat(p, false)
-          }
-          break
-        case 'confetti':
-          // Chute lente et oscillante, comme du papier.
-          p.vy = Math.min(p.vy + 0.12 * k, 1.6)
-          p.vx += Math.sin(p.life / 180 + p.phase) * 0.06 * k
-          p.vx *= 0.97
-          p.rot += p.vr * k
-          break
-        case 'smoke':
-          p.size += (p.grow ?? 0.25) * k
-          p.vy *= 0.995
-          break
-        case 'fireball':
-          p.size += 0.9 * k
-          p.vy -= 0.02 * k
-          break
-        case 'shell': {
-          // Parabole fixe (indépendante du vent) : départ, sommet, arrivée sur l'engin.
-          const t = Math.min(1, p.life / p.max)
-          p.x = p.x0 + (p.x1 - p.x0) * t
-          p.y = p.y0 + (p.y1 - p.y0) * t - p.apex * 4 * t * (1 - t)
-          p.rot += 0.18 * k
-          if (p.life - p.trailAt > 45 && t < 0.97) {
-            p.trailAt = p.life
-            trails.push(p)
-          }
-          break
-        }
-      }
+      MOTION.get(p.kind)?.(p, k, sys)
     }
     // Sillage des tirs des généraux (ajouté après le parcours).
     for (const p of trails) {
@@ -491,347 +505,6 @@ export class ParticleSystem {
       else this.#spawn({ kind: 'smoke', x: p.x, y: p.y, vx: 0, vy: -0.1, size: 5, grow: 0.3, rgb: '120,112,104', opacity: 0.35, life: 0, max: 480 })
     }
     this.#items = this.#items.filter((p) => p.life < p.max)
-  }
-
-  /* ---------- Rendu ---------- */
-
-  /** @param {CanvasRenderingContext2D} ctx contexte en coordonnées monde */
-  draw(ctx, pixel = 1) {
-    // 1) Traces au sol, 2) matière (éclats, fumée), 3) lumière en mélange additif, 4) textes.
-    ctx.save()
-    for (const p of this.#items) if (p.kind === 'stain') this.#drawStain(ctx, p)
-    for (const p of this.#items) {
-      if (p.delay && p.life < p.delay) continue
-      const t = (p.life - (p.delay || 0)) / (p.max - (p.delay || 0))
-      switch (p.kind) {
-        case 'smoke': {
-          // Apparition rapide, disparition lente.
-          const a = (t < 0.12 ? t / 0.12 : 1 - (t - 0.12) / 0.88) * (p.opacity ?? 0.45)
-          ctx.globalAlpha = Math.max(0, a)
-          const s = p.size * 2
-          ctx.drawImage(soft(p.rgb || '230,225,215'), p.x - s / 2, p.y - s / 2, s, s)
-          break
-        }
-        case 'chunk':
-        case 'shard': {
-          ctx.globalAlpha = Math.min(1, (1 - t) * 2.2)
-          ctx.save()
-          ctx.translate(p.x, p.y)
-          ctx.rotate(p.rot)
-          const w = p.kind === 'shard' ? p.len : p.size
-          const h = p.kind === 'shard' ? p.size * 0.45 : p.size * 0.75
-          ctx.fillStyle = p.color
-          ctx.fillRect(-w / 2, -h / 2, w, h)
-          ctx.fillStyle = 'rgba(255,255,255,0.22)'
-          ctx.fillRect(-w / 2, -h / 2, w, h * 0.35)
-          ctx.strokeStyle = '#1e1a2b'
-          ctx.lineWidth = pixel
-          ctx.strokeRect(-w / 2, -h / 2, w, h)
-          ctx.restore()
-          break
-        }
-        case 'drop': {
-          // Goutte étirée dans le sens de sa course.
-          ctx.globalAlpha = p.splat ? 1 : Math.min(1, (1 - t) * 1.8)
-          ctx.strokeStyle = p.color
-          ctx.lineCap = 'round'
-          ctx.lineWidth = p.size * 1.5
-          ctx.beginPath()
-          ctx.moveTo(p.x, p.y)
-          ctx.lineTo(p.x - p.vx * 1.1, p.y - p.vy * 1.1)
-          ctx.stroke()
-          break
-        }
-        case 'dot':
-          ctx.globalAlpha = 1 - t
-          ctx.fillStyle = p.color
-          ctx.beginPath()
-          ctx.arc(p.x, p.y, p.size, 0, TAU)
-          ctx.fill()
-          break
-        case 'confetti': {
-          ctx.globalAlpha = t > 0.8 ? (1 - t) / 0.2 : 1
-          ctx.save()
-          ctx.translate(p.x, p.y)
-          ctx.rotate(p.rot)
-          // Le papier tourne sur lui-même : sa largeur apparente oscille.
-          ctx.scale(Math.cos(p.life / 120 + p.phase), 1)
-          ctx.fillStyle = p.color
-          ctx.fillRect(-p.size / 2, -p.size * 0.3, p.size, p.size * 0.6)
-          ctx.restore()
-          break
-        }
-        case 'ring': {
-          const e = 1 - Math.pow(1 - t, 3)
-          ctx.globalAlpha = (1 - t) * 0.7
-          ctx.strokeStyle = '#fff6dc'
-          ctx.lineWidth = (10 * (1 - t) + 1) * Math.max(1, pixel)
-          ctx.beginPath()
-          ctx.ellipse(p.x, p.y, p.size * e, p.size * e * 0.55, 0, 0, TAU)
-          ctx.stroke()
-          break
-        }
-      }
-    }
-    // Lumière : feu, étincelles, éclairs (mélange additif, ça brille).
-    ctx.globalCompositeOperation = 'lighter'
-    for (const p of this.#items) {
-      if (p.delay && p.life < p.delay) continue
-      const t = p.life / p.max
-      switch (p.kind) {
-        case 'flame': {
-          ctx.globalAlpha = (1 - t) * 0.85
-          const s = p.size * 2 * (1 - t * 0.5)
-          ctx.drawImage(soft(t < 0.35 ? '255,214,120' : '255,120,40'), p.x - s / 2, p.y - s / 2, s, s)
-          break
-        }
-        case 'fireball': {
-          ctx.globalAlpha = (1 - t) * 0.9
-          const s = p.size * 2
-          ctx.drawImage(soft(t < 0.3 ? '255,236,170' : t < 0.6 ? '255,150,50' : '170,60,30'), p.x - s / 2, p.y - s / 2, s, s)
-          break
-        }
-        case 'flash': {
-          ctx.globalAlpha = (1 - t) * 0.9
-          const s = p.size * 2 * (0.7 + t * 0.6)
-          ctx.drawImage(soft(p.rgb), p.x - s / 2, p.y - s / 2, s, s)
-          break
-        }
-        case 'spark': {
-          // Trait orienté selon la vitesse : l'œil lit une étincelle rapide.
-          ctx.globalAlpha = 1 - t
-          ctx.strokeStyle = p.color
-          ctx.lineWidth = p.size * (1 - t * 0.5)
-          ctx.lineCap = 'round'
-          ctx.beginPath()
-          ctx.moveTo(p.x, p.y)
-          ctx.lineTo(p.x - p.vx * 2.2, p.y - p.vy * 2.2)
-          ctx.stroke()
-          break
-        }
-        case 'ember': {
-          ctx.globalAlpha = (1 - t) * (0.6 + 0.4 * Math.sin(p.life / 40 + p.x))
-          const s = p.size * 5
-          ctx.drawImage(soft('255,170,70'), p.x - s / 2, p.y - s / 2, s, s)
-          break
-        }
-        case 'streak': {
-          ctx.globalAlpha = Math.sin(t * Math.PI) * 0.75
-          ctx.strokeStyle = `rgb(${p.rgb})`
-          ctx.lineWidth = 2 * Math.max(1, pixel)
-          ctx.lineCap = 'round'
-          ctx.beginPath()
-          ctx.moveTo(p.x, p.y)
-          ctx.lineTo(p.x - Math.sign(p.vx) * p.size, p.y - p.vy * 3)
-          ctx.stroke()
-          ctx.lineCap = 'butt'
-          break
-        }
-        case 'bolt': {
-          ctx.globalAlpha = t < 0.15 ? 1 : (1 - t) * (0.6 + 0.4 * Math.sin(p.life / 18))
-          for (const [wdt, col] of [[9, 'rgba(150,190,255,0.5)'], [3.2, '#ffffff']]) {
-            ctx.strokeStyle = col
-            ctx.lineWidth = wdt * (p.size ?? 1) * Math.max(1, pixel)
-            ctx.lineJoin = 'round'
-            ctx.beginPath()
-            p.pts.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)))
-            ctx.stroke()
-          }
-          break
-        }
-        case 'shell':
-          this.#drawShell(ctx, p, pixel)
-          break
-        case 'knockout':
-          this.#drawKnockout(ctx, p, t)
-          break
-        case 'glint': {
-          ctx.globalAlpha = Math.sin(t * Math.PI)
-          ctx.strokeStyle = '#ffffff'
-          ctx.lineWidth = 1.6 * Math.max(1, pixel)
-          const s = p.size
-          ctx.beginPath()
-          ctx.moveTo(p.x - s, p.y)
-          ctx.lineTo(p.x + s, p.y)
-          ctx.moveTo(p.x, p.y - s)
-          ctx.lineTo(p.x, p.y + s)
-          ctx.stroke()
-          break
-        }
-      }
-    }
-    ctx.globalCompositeOperation = 'source-over'
-    for (const p of this.#items) if (p.kind === 'bubble') this.#drawBubble(ctx, p, pixel)
-    for (const p of this.#items) if (p.kind === 'callout') this.#drawCallout(ctx, p, pixel)
-    for (const p of this.#items) {
-      if (p.kind !== 'text') continue
-      const t = p.life / p.max
-      const pop = p.life < 160 ? 0.6 + (p.life / 160) * 0.6 : p.life < 260 ? 1.2 - ((p.life - 160) / 100) * 0.2 : 1
-      ctx.globalAlpha = Math.min(1, (1 - t) * 2)
-      ctx.font = `700 ${Math.round(p.size * pop)}px Cinzel, Georgia, serif`
-      ctx.textAlign = 'center'
-      ctx.lineJoin = 'round'
-      ctx.lineWidth = 6 * pixel
-      ctx.strokeStyle = '#1e1a2b'
-      ctx.strokeText(p.text, p.x, p.y)
-      ctx.fillStyle = p.color
-      ctx.fillText(p.text, p.x, p.y)
-    }
-    ctx.restore()
-    ctx.globalAlpha = 1
-  }
-
-  /** Le défenseur assommé : son dessin du jeu (visage crispé), tourné, qui s'efface. */
-  #drawKnockout(ctx, p, t) {
-    if (!this.drawSprite) return
-    ctx.save()
-    ctx.globalCompositeOperation = 'source-over'
-    ctx.globalAlpha = t < 0.55 ? 1 : Math.max(0, 1 - (t - 0.55) / 0.45)
-    ctx.translate(p.x, p.y)
-    ctx.rotate(p.rot)
-    this.drawSprite(ctx, p.key, { w: p.w, h: p.h, time: p.life, seed: 7, extra: { ...p.extra, hurt: true, still: p.still, walking: false } })
-    ctx.restore()
-  }
-
-  /**
-   * Bulle de parole : cartouche clair à bord sombre, petite pointe vers le
-   * personnage ; taille constante à l'écran (`pixel`), apparition en rebond.
-   */
-  #drawBubble(ctx, p, pixel) {
-    const t = p.life / p.max
-    const s = Math.max(1, pixel)
-    const pop = p.life < 140 ? 0.7 + (p.life / 140) * 0.3 : 1
-    const size = 15 * s * pop
-    ctx.save()
-    ctx.globalAlpha = t > 0.82 ? (1 - t) / 0.18 : 1
-    ctx.font = `700 ${Math.round(size)}px system-ui, -apple-system, 'Segoe UI', sans-serif`
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    const maxW = this.viewWidth > 0 ? this.viewWidth * 0.5 * pixel : 1e6
-    const w = Math.min(maxW, ctx.measureText(p.text).width) + 18 * s * pop
-    const h = size + 12 * s * pop
-    const x = p.x
-    const y = p.y - h / 2 - 8 * s
-    const enemy = p.tone === 'enemy'
-    ctx.beginPath()
-    const r = Math.min(10 * s, h / 2)
-    ctx.moveTo(x - w / 2 + r, y - h / 2)
-    ctx.arcTo(x + w / 2, y - h / 2, x + w / 2, y + h / 2, r)
-    ctx.arcTo(x + w / 2, y + h / 2, x - w / 2, y + h / 2, r)
-    ctx.lineTo(x + 4 * s, y + h / 2)
-    ctx.lineTo(x, y + h / 2 + 7 * s)
-    ctx.lineTo(x - 4 * s, y + h / 2)
-    ctx.arcTo(x - w / 2, y + h / 2, x - w / 2, y - h / 2, r)
-    ctx.arcTo(x - w / 2, y - h / 2, x + w / 2, y - h / 2, r)
-    ctx.closePath()
-    ctx.fillStyle = enemy ? '#fbeee8' : '#fbf6ea'
-    ctx.fill()
-    ctx.lineWidth = 2 * s
-    ctx.strokeStyle = enemy ? '#7a1f1a' : '#1e1a2b'
-    ctx.stroke()
-    ctx.fillStyle = enemy ? '#5a1612' : '#1e1a2b'
-    ctx.fillText(p.text, x, y + 1 * s, maxW)
-    ctx.restore()
-  }
-
-  /** Tir d'un général en vol : bombe à mèche, pot de feu, rocher, volée de flèches ou nuée de givre. */
-  #drawShell(ctx, p, pixel) {
-    ctx.save()
-    ctx.globalCompositeOperation = 'source-over'
-    ctx.globalAlpha = 1
-    ctx.translate(p.x, p.y)
-    const lw = Math.max(1, pixel)
-    if (p.sub === 'arrows') {
-      // Cinq flèches en éventail, la pointe en feu, orientées selon la course.
-      const t = Math.min(1, p.life / p.max)
-      const dx = p.x1 - p.x0
-      const dy = p.y1 - p.y0 - p.apex * 4 * (1 - 2 * t)
-      ctx.rotate(Math.atan2(dy, dx))
-      for (let i = 0; i < 5; i++) {
-        const ox = -i * 9
-        const oy = (i - 2) * 7
-        ctx.strokeStyle = '#4a3220'
-        ctx.lineWidth = 2 * lw
-        ctx.beginPath()
-        ctx.moveTo(ox - 16, oy)
-        ctx.lineTo(ox + 6, oy)
-        ctx.stroke()
-        ctx.fillStyle = '#ffb347'
-        ctx.beginPath()
-        ctx.arc(ox + 8, oy, 3.2, 0, TAU)
-        ctx.fill()
-      }
-    } else if (p.sub === 'frost') {
-      ctx.globalAlpha = 0.85
-      const s = 46
-      ctx.drawImage(soft('214,240,255'), -s / 2, -s / 2, s, s)
-      ctx.fillStyle = '#ffffff'
-      for (let i = 0; i < 4; i++) {
-        const a = p.rot + (i * TAU) / 4
-        ctx.fillRect(Math.cos(a) * 9 - 1.5, Math.sin(a) * 9 - 1.5, 3, 3)
-      }
-    } else if (p.sub === 'boulder') {
-      ctx.rotate(p.rot)
-      ctx.fillStyle = '#7f796f'
-      ctx.strokeStyle = '#4b463f'
-      ctx.lineWidth = 2 * lw
-      ctx.beginPath()
-      for (let i = 0; i < 7; i++) {
-        const a = (i * TAU) / 7
-        const r = 13 + ((i * 5) % 3)
-        i ? ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r) : ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r)
-      }
-      ctx.closePath()
-      ctx.fill()
-      ctx.stroke()
-    } else {
-      // Bombe (noire, mèche qui crépite) ou pot de feu (terre cuite, flammes).
-      const pot = p.sub === 'firepot'
-      ctx.fillStyle = pot ? '#a5533d' : '#1f1b28'
-      ctx.strokeStyle = pot ? '#5e2a1c' : '#000000'
-      ctx.lineWidth = 2 * lw
-      ctx.beginPath()
-      ctx.arc(0, 0, pot ? 9 : 10, 0, TAU)
-      ctx.fill()
-      ctx.stroke()
-      const flick = 0.7 + 0.3 * Math.sin(p.life / 30)
-      ctx.globalCompositeOperation = 'lighter'
-      const s = (pot ? 34 : 16) * flick
-      ctx.drawImage(soft(pot ? '255,150,60' : '255,210,120'), (pot ? 0 : 6) - s / 2, (pot ? -8 : -9) - s / 2, s, s)
-    }
-    ctx.restore()
-  }
-
-  /**
-   * Titre d'enchaînement : taille constante à l'écran (`pixel`), rebond
-   * élastique à l'apparition, dégradé or et contour encre, léger penché.
-   */
-  #drawCallout(ctx, p, pixel) {
-    const t = p.life / p.max
-    // Rebond « ease-out back » : dépasse sa taille puis se pose (220 ms).
-    const u = Math.min(1, p.life / 220) - 1
-    const pop = 0.3 + 0.7 * (1 + 2.70158 * u * u * u + 1.70158 * u * u)
-    const size = p.size * pop * Math.max(1, pixel)
-    ctx.save()
-    ctx.translate(p.x, p.y)
-    ctx.rotate(-0.06)
-    ctx.globalAlpha = t > 0.75 ? (1 - t) / 0.25 : 1
-    ctx.font = `700 ${Math.round(size)}px Cinzel, Georgia, serif`
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.lineJoin = 'round'
-    ctx.lineWidth = size * 0.2
-    ctx.strokeStyle = '#1e1a2b'
-    // Jamais plus large que 80 % de l'écran (langues aux mots longs, téléphone en portrait).
-    const maxW = this.viewWidth > 0 ? this.viewWidth * 0.8 * pixel : 1e6
-    ctx.strokeText(p.text, 0, 0, maxW)
-    const g = ctx.createLinearGradient(0, -size / 2, 0, size / 2)
-    g.addColorStop(0, '#fff3c4')
-    g.addColorStop(0.5, p.tier >= 3 ? '#ffb347' : '#f2c94c')
-    g.addColorStop(1, p.tier >= 3 ? '#d4552b' : '#c98f1e')
-    ctx.fillStyle = g
-    ctx.fillText(p.text, 0, 0, maxW)
-    ctx.restore()
   }
 
   /* ---------- Terrains, givre et vapeur (v5.0) ---------- */
@@ -978,18 +651,4 @@ export class ParticleSystem {
     this.#spawn({ kind: 'flash', x, y, vx: 0, vy: 0, max: 300, size: 160, rgb: '220,235,255' })
   }
 
-  /** Tache au sol (sang, suie) : s'étale vite, s'efface sur le dernier tiers. */
-  #drawStain(ctx, p) {
-    const t = p.life / p.max
-    const grow = Math.min(1, p.life / 200)
-    const base = p.opacity ?? 0.85
-    ctx.globalAlpha = t < 0.65 ? base : base * (1 - (t - 0.65) / 0.35)
-    ctx.fillStyle = p.color
-    ctx.beginPath()
-    for (const l of p.lobes) {
-      ctx.moveTo(p.x + l.dx * grow + l.r * grow, p.y + l.dy)
-      ctx.ellipse(p.x + l.dx * grow, p.y + l.dy, l.r * grow, l.r * grow * 0.38, 0, 0, TAU)
-    }
-    ctx.fill()
-  }
 }

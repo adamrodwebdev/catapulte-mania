@@ -55,9 +55,10 @@ export class ScoreKeeper {
 
   /**
    * Une entité vient d'être détruite.
+   * @param {{ fell?: boolean }} [how] fell : défenseur tombé de haut juste avant (v6.2)
    * @returns {number} points gagnés (avant multiplicateur de difficulté)
    */
-  registerDestroyed(entity, cause = null) {
+  registerDestroyed(entity, cause = null, { fell = false } = {}) {
     if (this.#finalized) return 0
     let base = 0
     if (entity.kind === 'target') {
@@ -65,6 +66,8 @@ export class ScoreKeeper {
       this.#stats.targetsKilled++
       const family = killFamily(cause)
       if (family) this.#run.kills[family]++
+      // Tombé de haut, achevé par les débris : la chute compte aussi (v6.2).
+      if (fell && family !== 'fall') this.#run.kills.fall++
       if (this.#run.firstKill === null) this.#run.firstKill = entity.type
       this.#shotKills++
       this.#run.maxShotKills = Math.max(this.#run.maxShotKills, this.#shotKills)
@@ -144,6 +147,7 @@ export class ScoreKeeper {
       won,
       shotsUsed,
       difficulty: this.#difficulty,
+      track: this.#level.track ?? 'campaign',
       ...this.#stats,
     })
   }

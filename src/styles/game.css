@@ -335,6 +335,8 @@
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   text-align: right;
+  /* « 99,5 % » sur une seule ligne (v6.2). */
+  white-space: nowrap;
 }
 
 .range--aim {
@@ -601,43 +603,32 @@
   color: var(--accent);
 }
 
-/* Astuce de visée : en bas, près du sol, hors de la zone de tir. */
-.game__hint {
-  position: absolute;
-  z-index: 5;
-  left: 50%;
-  bottom: calc(var(--hud-controls-h, var(--hud-bottom-h, 7rem)) + var(--space-2));
-  transform: translateX(-50%);
-  max-width: min(28rem, 90%);
-  padding: var(--space-2) var(--space-4);
-  text-align: center;
-  font-weight: 600;
-  background: var(--glass-strong);
-  -webkit-backdrop-filter: var(--blur);
-  backdrop-filter: var(--blur);
-  border: 1px solid color-mix(in srgb, var(--accent) 65%, transparent);
-  border-radius: var(--radius-l);
-  box-shadow: var(--inner-hi), var(--elev-2);
-  pointer-events: none;
-}
-
 /* ---------- Sous-titres des sons ---------- */
-/* Sous-titres : en bas, au-dessus des commandes (au sol), pour ne jamais masquer
-   la trajectoire ni le haut des châteaux. */
+/* Sous-titres (v6.2) : en haut, sous le bandeau, à droite (la bulle du tutoriel
+   est à gauche). La partie se joue en bas de l'écran (pieds des châteaux, engin,
+   pillards) : le ciel, lui, est libre. Trois au plus à la fois. */
 .captions {
   position: absolute;
   z-index: 15;
-  left: 50%;
-  bottom: calc(var(--hud-controls-h, var(--hud-bottom-h, 7rem)) + var(--space-2));
-  transform: translateX(-50%);
-  max-width: min(32rem, 70%);
+  top: calc(var(--hud-top-h, 4rem) + var(--space-2));
+  right: calc(var(--dock-right, 0px) + var(--space-4));
+  max-width: min(26rem, 46%);
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
   gap: var(--space-1);
-  justify-items: center;
+  justify-items: end;
   pointer-events: none;
+}
+
+.captions__item:nth-last-child(n + 4) {
+  display: none;
+}
+
+/* Grand siège : sous la barre du général, qui occupe ce coin. */
+.game:has(.boss-bar) .captions {
+  top: calc(var(--hud-top-h, 4rem) + 5rem);
 }
 
 /* Des pastilles sombres et floutées, lisibles sur n'importe quel ciel. */
@@ -781,8 +772,37 @@
       'ammo aid fire';
   }
 
+  /* v6.2 : le déplacement de l'engin, à gauche, sur les deux lignes. */
+  .hud-bottom:has(> .drive) {
+    grid-template-columns: auto 1fr auto auto;
+    grid-template-areas:
+      'drive aim aid fire'
+      'drive ammo aid fire';
+  }
+
+  .drive {
+    grid-area: drive;
+  }
+
   .aid-btn {
     grid-area: aid;
+  }
+
+  /* Seau d'eau (v5.8) : sous l'aide à la visée (v6.2 : plus par-dessus). */
+  .hud-bottom:has(> .bucket-btn) {
+    grid-template-areas:
+      'aim aid fire'
+      'ammo bucket fire';
+  }
+
+  .hud-bottom:has(> .drive):has(> .bucket-btn) {
+    grid-template-areas:
+      'drive aim aid fire'
+      'drive ammo bucket fire';
+  }
+
+  .bucket-btn {
+    grid-area: bucket;
   }
 
   .aim-panel {
@@ -830,7 +850,7 @@
   }
 
   .aim-row {
-    grid-template-columns: minmax(3.4rem, max-content) auto 1fr auto 2.8rem;
+    grid-template-columns: minmax(3.4rem, max-content) auto 1fr auto 3.4rem;
     gap: var(--space-1);
   }
 
@@ -839,7 +859,7 @@
   }
 
   .range--aim {
-    min-height: 36px;
+    min-height: var(--hud-size);
   }
 
   .ammo__item {
@@ -872,9 +892,10 @@
     gap: 4px;
   }
 
+  /* Cibles tactiles de 44 px au moins (v6.2), même sur les écrans bas. */
   .ammo__item {
-    min-width: 2.2rem;
-    min-height: 2.2rem;
+    min-width: var(--hud-size);
+    min-height: var(--hud-size);
     padding: 2px;
   }
 
@@ -887,12 +908,12 @@
   }
 
   .aim-row .btn--step {
-    width: 2.25rem;
-    min-height: 2.25rem;
+    width: var(--hud-size);
+    min-height: var(--hud-size);
   }
 
   .range--aim {
-    min-height: 2.25rem;
+    min-height: var(--hud-size);
   }
 
   .fire-btn {
@@ -906,8 +927,8 @@
   }
 
   .hud-top .btn--icon {
-    width: 2.4rem;
-    min-height: 2.4rem;
+    width: var(--hud-size);
+    min-height: var(--hud-size);
   }
 
   .hud-top__name {
@@ -924,16 +945,11 @@
     clip: rect(0 0 0 0);
     white-space: nowrap;
   }
-
-  .game__hint {
-    font-size: var(--fs-0);
-  }
 }
 
 /* Contraste élevé : pas de transparence */
 :root[data-contrast='high'] .hud-top,
-:root[data-contrast='high'] .hud-bottom,
-:root[data-contrast='high'] .game__hint {
+:root[data-contrast='high'] .hud-bottom {
   background: var(--surface);
   backdrop-filter: none;
 }
@@ -945,7 +961,10 @@
   .captions {
     /* sous le conseil « tournez l'appareil » pour ne jamais le chevaucher */
     top: calc(var(--hud-top-h, 3.5rem) + 2.75rem);
-    bottom: auto;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    justify-items: center;
     max-width: calc(100% - 2 * var(--space-3));
   }
 
@@ -956,11 +975,6 @@
 
   .captions__item:nth-last-child(n + 3) {
     display: none;
-  }
-
-  .game__hint {
-    top: calc(var(--hud-top-h, 3.5rem) + var(--space-2));
-    bottom: auto;
   }
 
   /* Conseil « tournez l'appareil » : en haut, puis il s'efface seul après 6 s. */
@@ -1315,6 +1329,124 @@
 .hud-bottom--compact .treb-panel {
   padding: var(--space-1) var(--space-3);
 }
+/* ---------- Déplacement de l'engin (v6.2) ----------
+   Deux boutons à maintenir, en tête des commandes : chevron et roue. La roue
+   tourne tant que l'engin roule ; le côté où il bute s'estompe. */
+.drive {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
+.hud-bottom--compact .drive {
+  padding: var(--space-1);
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-l);
+  box-shadow: var(--inner-hi), var(--elev-2);
+}
+.drive__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 3.25rem;
+  min-height: var(--hud-size);
+  padding: 0 var(--space-2);
+  color: inherit;
+  font: inherit;
+  background: var(--glass-tint);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  cursor: pointer;
+  /* Maintenu au doigt : ni défilement, ni loupe, ni menu contextuel. */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  transition:
+    background-color var(--dur-2) var(--ease-out),
+    border-color var(--dur-2) var(--ease-out),
+    box-shadow var(--dur-2) var(--ease-out),
+    opacity var(--dur-2) var(--ease-out),
+    transform var(--dur-2) var(--ease-spring);
+}
+.drive__btn--front {
+  flex-direction: row-reverse;
+}
+@media (hover: hover) {
+  .drive__btn:hover:not(:disabled):not([aria-disabled='true']) {
+    border-color: var(--hairline-strong);
+    transform: translateY(-1px);
+  }
+}
+.drive__btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+.drive__btn:disabled,
+.drive__btn[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.drive__btn--end:not(.drive__btn--on) {
+  opacity: 0.55;
+}
+.drive__btn--on {
+  border-color: color-mix(in srgb, var(--accent) 85%, transparent);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.3),
+    0 0 16px color-mix(in srgb, var(--accent) 38%, transparent);
+  transform: scale(0.96);
+}
+.drive__wheel {
+  opacity: 0.85;
+}
+.drive__btn--on:not(.drive__btn--end) .drive__wheel {
+  animation: drive-wheel calc(var(--speed, 1) * 900ms) linear infinite;
+}
+.drive__btn--back .drive__wheel {
+  animation-direction: reverse;
+}
+@keyframes drive-wheel {
+  to {
+    transform: rotate(360deg);
+  }
+}
+:root[data-motion='reduced'] .drive__wheel {
+  animation: none;
+}
+/*
+ * Visée précise (panneau à curseurs) sur grand écran : une seule ligne. v6.2 :
+ * le déplacement de l'engin en tête et le seau d'eau ont chacun leur colonne
+ * (le tir ne passe plus à la ligne) ; les curseurs gardent 22 rem, les
+ * munitions défilent quand elles manquent de place (neuf munitions).
+ */
+@media (min-width: 901px) {
+  .hud-bottom:not(.hud-bottom--compact) {
+    grid-template-columns: minmax(22rem, 1.4fr) minmax(0, auto) auto auto;
+  }
+  .hud-bottom:not(.hud-bottom--compact):has(> .bucket-btn) {
+    grid-template-columns: minmax(22rem, 1.4fr) minmax(0, auto) auto auto auto;
+  }
+  .hud-bottom:not(.hud-bottom--compact):has(> .drive) {
+    grid-template-columns: auto minmax(22rem, 1.4fr) minmax(0, auto) auto auto;
+  }
+  .hud-bottom:not(.hud-bottom--compact):has(> .drive):has(> .bucket-btn) {
+    grid-template-columns: auto minmax(22rem, 1.4fr) minmax(0, auto) auto auto auto;
+  }
+  .hud-bottom:not(.hud-bottom--compact) > .ammo {
+    min-width: 0;
+    overflow-x: auto;
+  }
+  /* Chaque munition garde sa largeur (son nom entier) : la barre défile. */
+  .hud-bottom:not(.hud-bottom--compact) > .ammo > .ammo__item {
+    flex: 0 0 auto;
+  }
+}
+
 /* Écran étroit (téléphone en portrait) : le panneau du trébuchet passe sur sa
    propre ligne au lieu de déborder à gauche de l'écran (v5.3). */
 @media (max-width: 640px) {
@@ -1389,6 +1521,7 @@
   85% { offset-distance: 100%; opacity: 0; }
   100% { offset-distance: 0%; opacity: 0; }
 }
+:root[data-motion='reduced'] .drag-hint__hand { animation: none; offset-distance: 100%; }
 @media (prefers-reduced-motion: reduce) {
   .drag-hint__hand { animation: none; offset-distance: 100%; }
 }
@@ -1402,18 +1535,13 @@
 .coach:has(> .coach__skip) {
   padding-right: 5.5rem;
 }
+/* Cible tactile de 44 px (v6.2 : le bouton lui-même, plus un halo autour). */
 .coach > .coach__skip {
   position: absolute;
   top: var(--space-1);
   right: var(--space-1);
   margin: 0;
-  min-height: 2.25rem;
-}
-/* Cible tactile de 44 px autour du petit bouton. */
-.coach > .coach__skip::after {
-  content: '';
-  position: absolute;
-  inset: -4px;
+  min-height: var(--hud-size);
 }
 .hud-bottom--compact .fire-btn {
   margin-bottom: 6px;
@@ -1532,6 +1660,10 @@
     animation: treb-now 0.5s ease-in-out infinite alternate;
   }
 }
+/* v6.2 : le réglage « mouvement réduit » de l'application l'arrête aussi. */
+:root[data-motion='reduced'] .treb-panel__step--power {
+  animation: none;
+}
 @keyframes treb-now {
   to {
     transform: scale(1.08);
@@ -1554,17 +1686,72 @@
   box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.3);
   overflow: hidden;
 }
-.engine-hp__bar {
+/* v6.2 : jauge de l'engin à la manière des barres de vie de la scène (HealthBar.js) :
+   couleur continue du vert au rouge, traînée claire qui suit après un temps,
+   quarts marqués, sursaut au coup. */
+.engine-hp__bar,
+.engine-hp__lag {
   position: absolute;
   inset: 0;
   border-radius: inherit;
   transform-origin: left center;
   transform: scaleX(var(--hp, 1));
-  background: linear-gradient(180deg, color-mix(in srgb, var(--success) 65%, var(--c-limestone)), var(--success));
-  transition: transform var(--dur-3) var(--ease-out);
 }
-.hud-stat--alarm .engine-hp__bar {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--danger) 65%, var(--c-limestone)), var(--danger));
+/* Couleurs : jetons --hp-* (tokens.css), contraste élevé compris. */
+.engine-hp__lag {
+  background: var(--hp-lag);
+  transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) 0.28s;
+}
+.engine-hp__bar {
+  background:
+    linear-gradient(180deg, var(--hp-gloss) 0 38%, transparent 38%),
+    hsl(calc(min(1, var(--hp, 1) / 0.6) * var(--hp-hue)) var(--hp-saturation) var(--hp-lightness));
+  transition: transform var(--dur-2) var(--ease-out);
+}
+/* Quarts : on lit vite « encore trois quarts ». */
+.engine-hp::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, transparent 0 calc(25% - 1px), var(--hp-ticks) calc(25% - 1px) 25%);
+  pointer-events: none;
+}
+.engine-hp--hit {
+  animation: engine-hit 0.42s var(--ease-out);
+}
+@keyframes engine-hit {
+  0% {
+    transform: scale(1.18);
+    box-shadow: 0 0 0 2px rgb(255 255 255 / 0.85), 0 0 10px rgb(255 255 255 / 0.6);
+  }
+  35% {
+    transform: scale(0.96) translateX(-1px);
+  }
+  60% {
+    transform: scale(1.03) translateX(1px);
+  }
+  100% {
+    transform: none;
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.3);
+  }
+}
+.hud-stat--alarm .engine-hp {
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.3), 0 0 6px color-mix(in srgb, var(--danger) 70%, transparent);
+}
+/* B3 (v6.2) : le réglage « mouvement réduit » de l'application arrête aussi le sursaut. */
+:root[data-motion='reduced'] .engine-hp--hit {
+  animation: none;
+}
+:root[data-motion='reduced'] .engine-hp__lag {
+  transition-duration: 0.2s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .engine-hp--hit {
+    animation: none;
+  }
+  .engine-hp__lag {
+    transition-duration: 0.2s;
+  }
 }
 :root[data-contrast='high'] .engine-hp {
   border: 1px solid var(--border);
@@ -1648,6 +1835,11 @@
   50% {
     box-shadow: var(--inner-hi), var(--elev-1), 0 0 0 9px color-mix(in srgb, var(--danger) 0%, transparent);
   }
+}
+:root[data-motion='reduced'] .bucket-btn--urgent {
+  animation: none;
+  outline: 3px solid var(--danger);
+  outline-offset: 2px;
 }
 @media (prefers-reduced-motion: reduce) {
   .bucket-btn--urgent {
