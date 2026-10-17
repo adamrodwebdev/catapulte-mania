@@ -1,4 +1,5 @@
 import { clamp } from '../../core/utils/math.js'
+import { SKY_BEDS } from '../sky/skyConfig.js'
 
 /**
  * Ambiance sonore des champs de bataille (v5.7), synthétisée en temps réel.
@@ -32,6 +33,24 @@ export const AMBIENCE_PROFILES = Object.freeze({
   10: { wind: 0.35, voices: { crackle: 22, cricket: 5, rumble: 1 } },
 })
 
+/**
+ * Profil joué (v6.3) : celui du chapitre, ajusté quand son fond peint s'anime
+ * (ciel vivant) — à l'Orage, le tonnerre suit désormais les éclairs, plus de
+ * grondement au hasard ; au Fort de pierre, la cascade gronde doucement.
+ * @param {number} chapter
+ * @param {boolean} painted le chapitre a-t-il son fond peint (et son ciel vivant) ?
+ */
+export function ambienceProfile(chapter, painted) {
+  const base = AMBIENCE_PROFILES[chapter] ?? AMBIENCE_PROFILES[1]
+  if (!painted) return base
+  const voices = { ...base.voices }
+  if (chapter === 9) delete voices.rumble
+  return { ...base, voices, bed: SKY_BEDS[chapter] ?? null }
+}
+
+/** Niveau des sons du ciel vivant, dans le bus d'ambiance (v6.3). */
+const SKY_LEVEL = Object.freeze({ thunder: 1.2, gust: 0.07, devil: 0.025, plip: 0.03, falls: 0.06 })
+
 export class AmbienceDirector {
   /** @type {AudioContext | null} */
   #ctx = null
@@ -41,6 +60,8 @@ export class AmbienceDirector {
   #bed = null
   #timers = new Set()
   #chapter = 0
+  /** Le chapitre a-t-il son fond peint (v6.3) ? */
+  #painted = false
   #enabled = true
   #rand = Math.random
   #white = null
@@ -69,12 +90,34 @@ export class AmbienceDirector {
     else if (this.#chapter) this.#start()
   }
 
-  /** Lance le paysage sonore d'un chapitre (rien ne change s'il joue déjà). */
-  play(chapter) {
+  /**
+   * Lance le paysage sonore d'un chapitre (rien ne change s'il joue déjà).
+   * @param {number} chapter
+   * @param {{ painted?: boolean }} [opts] painted : le fond peint s'anime (v6.3, voir ambienceProfile)
+   */
+  play(chapter, { painted = false } = {}) {
     const c = clamp(Math.round(Number(chapter) || 1), 1, 10)
-    if (c === this.#chapter && this.playing) return
+    if (c === this.#chapter && painted === this.#painted && this.playing) return
     this.#chapter = c
+    this.#painted = painted
     this.#start()
+  }
+
+  /**
+   * Un son du ciel vivant (v6.3), annoncé par un effet de la peinture :
+   *  - `thunder` { distance 0..1, pan } : le tonnerre d'un éclair, d'autant plus tard et sourd qu'il est loin ;
+   *  - `gust` { dir, seconds } : le souffle d'une risée, qui passe d'un côté à l'autre avec elle ;
+   *  - `devil` { u, speed, seconds } : le sable qui siffle dans un tourbillon, et suit sa course ;
+   *  - `plip` { u } : une goutte, quand un rond s'ouvre sur l'eau.
+   * Sans ambiance en cours (coupée, ou pas encore lancée), rien ne joue.
+   */
+  sky(event) {
+    if (!this.#bed || !this.#ctx || !event) return
+    try {
+      this.#skyVoice(event)
+    } catch {
+      /* son non critique */
+    }
   }
 
   /** Fondu de sortie (fin de partie, retour au menu). */
@@ -88,7 +131,7 @@ export class AmbienceDirector {
   #start() {
     this.#halt()
     if (!this.#enabled || !this.#ctx || !this.#bus || !this.#chapter) return
-    const profile = AMBIENCE_PROFILES[this.#chapter]
+    const profile = ambienceProfile(this.#chapter, this.#painted)
     try {
       this.#bed = this.#makeBed(profile)
     } catch {
@@ -186,9 +229,9 @@ export class AmbienceDirector {
       src.start(ctx.currentTime, this.#rand() * 1.5)
       sources.push(src)
     }
-    // Pluie : bruit blanc aigu et une couche plus grave (l'averse sur la terre).
+    // Pluie : bruit blanc aigu et une couche plus grave (l'averse sur la terre), en murmure (v6.3).
     if (profile.rain) {
-      for (const [type, freq, level] of [['highpass', 2400, 0.16], ['bandpass', 900, 0.1]]) {
+      for (const [type, freq, level] of [['highpass', 2400, 0.06], ['bandpass', 900, 0.035]]) {
         const src = ctx.createBufferSource()
         src.buffer = this.#whiteBuffer()
         src.loop = true
@@ -203,7 +246,133 @@ export class AmbienceDirector {
         sources.push(src)
       }
     }
+    // Cascade (v6.3, Fort de pierre peint) : un grondement grave et doux qui respire à peine.
+    if (profile.bed === 'falls') {
+      const src = ctx.createBufferSource()
+      src.buffer = this.#noiseBuffer()
+      src.loop = true
+      const hp = ctx.createBiquadFilter()
+      hp.type = 'highpass'
+      hp.frequency.value = 120
+      const lp = ctx.createBiquadFilter()
+      lp.type = 'lowpass'
+      lp.frequency.value = 900
+      const g = ctx.createGain()
+      g.gain.value = SKY_LEVEL.falls
+      src.connect(hp).connect(lp).connect(g).connect(gain)
+      lfo(0.07, SKY_LEVEL.falls * 0.2, g.gain)
+      src.start(ctx.currentTime, this.#rand() * 1.5)
+      sources.push(src)
+    }
     return { gain, sources }
+  }
+
+  /** Panoramique fixe (ou qui glisse de `from` à `to` en `seconds`), vers le lit en cours. */
+  #pan(from, to = from, seconds = 0) {
+    const ctx = this.#ctx
+    const p = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain()
+    if (p.pan) {
+      const t = ctx.currentTime
+      p.pan.setValueAtTime(clamp(from, -1, 1), t)
+      if (seconds > 0) p.pan.linearRampToValueAtTime(clamp(to, -1, 1), t + seconds)
+    }
+    p.connect(this.#bed.gain)
+    return p
+  }
+
+  /** Les sons du ciel vivant (voir sky). */
+  #skyVoice(event) {
+    const ctx = this.#ctx
+    const now = ctx.currentTime
+    const side = (u) => clamp(2 * u - 1, -0.8, 0.8)
+    switch (event.kind) {
+      case 'thunder': {
+        // Un grondement qui s'ouvre puis s'éteint en s'assourdissant, après le temps du trajet du son.
+        const d = clamp(event.distance ?? 0.5, 0, 1)
+        const t = now + 0.5 + d * 1.4
+        const src = ctx.createBufferSource()
+        src.buffer = this.#noiseBuffer()
+        src.loop = true
+        const lp = ctx.createBiquadFilter()
+        lp.type = 'lowpass'
+        lp.frequency.setValueAtTime(1100 - d * 700, t)
+        lp.frequency.exponentialRampToValueAtTime(110, t + 3)
+        const g = ctx.createGain()
+        g.gain.setValueAtTime(0.0001, t)
+        g.gain.exponentialRampToValueAtTime(SKY_LEVEL.thunder * (0.85 - d * 0.45), t + 0.08)
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 3.1)
+        src.connect(lp).connect(g).connect(this.#pan(event.pan ?? 0))
+        src.start(t, this.#rand() * 1.5)
+        src.stop(t + 3.2)
+        break
+      }
+      case 'gust': {
+        // Un souffle qui enfle puis retombe, et traverse la scène avec la risée.
+        const T = clamp(event.seconds ?? 6, 4, 9)
+        const dir = Math.sign(event.dir ?? 1) || 1
+        const src = ctx.createBufferSource()
+        src.buffer = this.#noiseBuffer()
+        src.loop = true
+        const bp = ctx.createBiquadFilter()
+        bp.type = 'bandpass'
+        bp.Q.value = 0.7
+        bp.frequency.setValueAtTime(360, now)
+        bp.frequency.linearRampToValueAtTime(760, now + T * 0.45)
+        bp.frequency.linearRampToValueAtTime(380, now + T)
+        const g = ctx.createGain()
+        g.gain.setValueAtTime(0.0001, now)
+        g.gain.exponentialRampToValueAtTime(SKY_LEVEL.gust, now + T * 0.45)
+        g.gain.exponentialRampToValueAtTime(0.0001, now + T)
+        src.connect(bp).connect(g).connect(this.#pan(-0.7 * dir, 0.7 * dir, T))
+        src.start(now, this.#rand() * 1.5)
+        src.stop(now + T + 0.1)
+        break
+      }
+      case 'devil': {
+        // Le sable siffle en tournant (un souffle qui pulse), et suit la course du tourbillon.
+        const T = clamp(event.seconds ?? 12, 5, 16)
+        const u = clamp(event.u ?? 0.5, 0, 1)
+        const src = ctx.createBufferSource()
+        src.buffer = this.#whiteBuffer()
+        src.loop = true
+        const bp = ctx.createBiquadFilter()
+        bp.type = 'bandpass'
+        bp.frequency.value = 2300
+        bp.Q.value = 1.1
+        const g = ctx.createGain()
+        g.gain.setValueAtTime(0.0001, now)
+        g.gain.exponentialRampToValueAtTime(SKY_LEVEL.devil, now + 2.5)
+        g.gain.setValueAtTime(SKY_LEVEL.devil, now + T - 2.5)
+        g.gain.exponentialRampToValueAtTime(0.0001, now + T)
+        const lfo = ctx.createOscillator()
+        lfo.frequency.value = 2.6
+        const depth = ctx.createGain()
+        depth.gain.value = SKY_LEVEL.devil * 0.3
+        lfo.connect(depth).connect(g.gain)
+        src.connect(bp).connect(g).connect(this.#pan(side(u), side(u + (event.speed ?? 0) * T), T))
+        src.start(now, this.#rand())
+        src.stop(now + T + 0.1)
+        lfo.start(now)
+        lfo.stop(now + T + 0.1)
+        break
+      }
+      case 'plip': {
+        // Une goutte : un sinus qui monte très vite, à peine audible.
+        const f0 = 650 + 300 * this.#rand()
+        const o = ctx.createOscillator()
+        o.type = 'sine'
+        o.frequency.setValueAtTime(f0, now)
+        o.frequency.exponentialRampToValueAtTime(f0 * 2.1, now + 0.06)
+        const g = ctx.createGain()
+        g.gain.setValueAtTime(0.0001, now)
+        g.gain.exponentialRampToValueAtTime(SKY_LEVEL.plip, now + 0.008)
+        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.13)
+        o.connect(g).connect(this.#pan(side(event.u ?? 0.5)))
+        o.start(now)
+        o.stop(now + 0.15)
+        break
+      }
+    }
   }
 
   /** Programme une voix au hasard (loi exponentielle : pas de régularité audible). */

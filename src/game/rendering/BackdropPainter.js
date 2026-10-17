@@ -3,14 +3,22 @@ import { drawLake, drawLava } from '../assets/procedural/liquids.js'
 import { spindrift } from '../assets/procedural/mountains.js'
 import { THEMES } from '../assets/procedural/themes.js'
 import { PEAK_PLUMES } from '../assets/procedural/palette.js'
+import { SkyLibrary } from '../sky/SkyLibrary.js'
+import { PAINTED } from '../assets/backgrounds.js'
 
 /**
  * Décor (v6.2, sorti du Renderer) : ciel, chaînes lointaines et collines en
- * parallaxe, ou le fond peint du chapitre (voir BackgroundArt.js) ; haies et
- * camp ; sol et décor de saison ; terrains (lacs, glace, lave, neige) ; et les
- * panaches que le vent arrache aux grandes montagnes du niveau.
+ * parallaxe, ou le fond peint du chapitre (voir BackgroundArt.js) et son ciel
+ * vivant (v6.3, voir sky/) ; haies et camp ; sol et décor de saison ; terrains
+ * (lacs, glace, lave, neige) ; et les panaches que le vent arrache aux grandes
+ * montagnes du niveau.
  */
 export class BackdropPainter {
+  /** Ciels vivants des fonds peints (v6.3) ; aucun là où il n'y a pas de peinture (démo, portails). */
+  #skies = PAINTED ? new SkyLibrary() : null
+  /** Le ciel vivant dessiné à la dernière image (ou null). */
+  sky = null
+
   /** Dégradés verticaux des terrains : créés une fois (ils ne dépendent que de la hauteur du sol). */
   #gradients = new Map()
   #zoneGradient(ctx, key, y0, y1, colors, stops) {
@@ -34,6 +42,7 @@ export class BackdropPainter {
    */
   draw(ctx, scene, backgroundArt, assets, dpr, pixel) {
     const { camera, theme, time, animate } = scene
+    this.sky = null
     const windBase = scene.wind?.field.base ?? 0
     const skyState = { w: camera.viewW, h: camera.viewH, extra: { theme, viewW: camera.viewW, viewH: camera.viewH, time, animate, wind: windBase } }
     // Fond peint du chapitre (v6.2) quand il est prêt ; sinon (ou pendant son fondu), le décor dessiné.
@@ -51,7 +60,16 @@ export class BackdropPainter {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       const placed = backgroundArt.draw(ctx, art, camera)
       backgroundArt.plumes(ctx, art, placed, { time, wind: windBase, animate: animate !== false })
-      assets.draw(ctx, 'scene.sky', { ...skyState, extra: { ...skyState.extra, overlay: true } })
+      // Ciel vivant (v6.3) : une fois la peinture lue et apparue, il l'anime.
+      const sky = art.alpha >= 1 ? (this.#skies?.for(theme, art.img, art.meta.ground ?? 1) ?? null) : null
+      if (sky) {
+        const view = skyView(camera, placed, art.img)
+        const motion = animate !== false && !scene.highContrast
+        if (motion) sky.update(time, view, { wind: windBase })
+        sky.draw(ctx, view, { animate: animate !== false, highContrast: Boolean(scene.highContrast) })
+        this.sky = sky
+      }
+      assets.draw(ctx, 'scene.sky', { ...skyState, extra: { ...skyState.extra, overlay: true, skyWeather: Boolean(sky?.replaces('weather')) } })
     }
     camera.apply(ctx, dpr, 0.75)
     // v6.2 : bosquets et arbres s'effacent au rythme du fondu de la peinture (hier, dès son premier instant).
@@ -72,6 +90,11 @@ export class BackdropPainter {
 
     // Terrains (v5.0) : lacs, glace, lave, neige, posés sur le sol.
     if (scene.terrain && !scene.terrain.empty) this.#drawZones(ctx, scene.terrain.list, time, animate, pixel)
+  }
+
+  /** Le ciel vivant veut-il qu'on taise les poussières d'ambiance (v6.3) ? */
+  get quietMotes() {
+    return Boolean(this.sky?.replaces('motes'))
   }
 
   /**
@@ -126,5 +149,25 @@ export class BackdropPainter {
       }
     }
     ctx.restore()
+  }
+}
+
+/**
+ * La vue et la peinture posée dedans, pour les effets du ciel vivant (repère écran, px CSS).
+ * u : unité de taille, 1 pour une peinture affichée sur 1440 px de large.
+ */
+function skyView(camera, placed, img) {
+  const { x0, y0, w, h } = placed
+  return {
+    W: camera.viewW,
+    H: camera.viewH,
+    ground: camera.worldToScreen(0, WORLD.GROUND_Y).y,
+    x0,
+    y0,
+    iw: w,
+    ih: h,
+    s: w / img.width,
+    u: w / 1440,
+    map: (u, v) => ({ x: x0 + u * w, y: y0 + v * h }),
   }
 }

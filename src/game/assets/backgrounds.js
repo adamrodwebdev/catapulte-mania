@@ -13,7 +13,7 @@
  * intégré au script, dans un cadre isolé) gardent le décor dessiné, plus léger.
  * Un chapitre sans entrée garde lui aussi son décor dessiné (montagnes procédurales).
  */
-const PAINTED = (typeof __TARGET__ === 'undefined' || __TARGET__ === 'web') && (typeof __DEMO__ === 'undefined' || __DEMO__ !== true)
+export const PAINTED = (typeof __TARGET__ === 'undefined' || __TARGET__ === 'web') && (typeof __DEMO__ === 'undefined' || __DEMO__ !== true)
 
 const SNOW = 'snow'
 

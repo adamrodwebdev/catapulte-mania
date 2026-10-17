@@ -317,6 +317,7 @@ async function startLevel({ rebuild = false } = {}) {
       settings: { ...state.settings },
       reducedMotion: app.reducedMotion(),
       audio: app.services.audio,
+      ambience: app.services.ambience,
       haptics: app.services.haptics,
       effects,
       mode: rules,
@@ -531,7 +532,8 @@ watch(
 const play = async () => {
   app.services.audio.unlock()
   app.services.music.play('chapter', { chapter: level.value.chapter || 1 })
-  app.services.ambience.play(level.value.chapter || 1)
+  // Fond peint (v6.3) : son ciel vivant joue ses propres sons (tonnerre des éclairs, cascade…).
+  app.services.ambience.play(level.value.chapter || 1, { painted: Boolean(controller?.backgroundArt?.has(level.value.chapter || 1)) })
   app.services.audio.duckAmbience(false)
   updateMusic()
   phase.value = 'playing'

@@ -41,6 +41,8 @@ export class GameController extends EventBus {
   #renderer
   #audio
   #haptics
+  /** Ambiance sonore (v6.3) : elle joue les sons du ciel vivant (tonnerre, risées…). */
+  #ambience
   #raf = 0
   #last = 0
   #paused = false
@@ -73,7 +75,7 @@ export class GameController extends EventBus {
   /**
    * @param {HTMLCanvasElement} canvas
    * @param {object} level niveau du LevelRepository
-   * @param {object} opts { difficulty, completedLevels, settings, reducedMotion, audio, haptics }
+   * @param {object} opts { difficulty, completedLevels, settings, reducedMotion, audio, ambience, haptics }
    */
   static async create(canvas, level, opts) {
     const c = new GameController(canvas, level, opts, await assets())
@@ -81,10 +83,11 @@ export class GameController extends EventBus {
     return c
   }
 
-  constructor(canvas, level, { difficulty, completedLevels, settings, reducedMotion, audio, haptics, effects, mode, continueOffer = false, engine = 'catapult', replay = null, season = null, translate = null, luck = 0 }, registry) {
+  constructor(canvas, level, { difficulty, completedLevels, settings, reducedMotion, audio, ambience = null, haptics, effects, mode, continueOffer = false, engine = 'catapult', replay = null, season = null, translate = null, luck = 0 }, registry) {
     super()
     this.#canvas = canvas
     this.#audio = audio
+    this.#ambience = ambience
     this.#haptics = haptics
     this.#renderer = new Renderer(canvas, registry)
     // Fond peint du chapitre (v6.2) : chargé dès l'ouverture, pendant l'introduction du niveau.
@@ -204,6 +207,8 @@ export class GameController extends EventBus {
       this.#flightSound()
       this.#watchClip()
       this.#renderer.render(this.#sceneWithAim())
+      // Sons du ciel vivant (v6.3) : le tonnerre suit l'éclair, un souffle suit la risée.
+      for (const event of this.#renderer.takeSkyEvents()) this.#ambience?.sky?.(event)
       this.#hudTimer += dt
       // En vol (et en visée quand le vent souffle en rafales), le HUD suit en continu.
       // Trébuchet : l'angle de la jauge suit aussi dans le panneau.
