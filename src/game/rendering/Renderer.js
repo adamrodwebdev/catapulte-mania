@@ -70,6 +70,20 @@ export class Renderer {
     return this.#assets
   }
 
+  /**
+   * Les sons que le ciel vivant a annoncés depuis le dernier relevé (v6.3) :
+   * tonnerre d'un éclair, souffle d'une risée… Le contrôleur les fait jouer.
+   * @returns {Array<{ kind: string }>}
+   */
+  takeSkyEvents() {
+    return this.#backdrop.sky?.drain() ?? []
+  }
+
+  /** Chapitre dont le ciel vivant est en place (v6.3), sinon null. */
+  get livingSkyChapter() {
+    return this.#backdrop.sky?.chapter ?? null
+  }
+
   resize(cssW, cssH, dpr) {
     this.dpr = Math.min(2, Math.max(1, dpr || 1))
     this.#canvas.width = Math.round(cssW * this.dpr)
@@ -187,7 +201,8 @@ export class Renderer {
     // Lumière de la scène et poussières d'ambiance (en coordonnées écran).
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
     this.#lighting.drawGrade(ctx, camera, theme)
-    if (animate !== false && !scene.highContrast) this.#lighting.drawMotes(ctx, camera, theme, time)
+    // Poussières d'ambiance, sauf si le ciel vivant de la peinture fait déjà les siennes (v6.3).
+    if (animate !== false && !scene.highContrast && !this.#backdrop.quietMotes) this.#lighting.drawMotes(ctx, camera, theme, time)
     // Vignette légère : resserre le regard sur la scène.
     this.#lighting.drawVignette(ctx, camera.viewW, camera.viewH)
     // Repères (v6.2) : pendant la visée, une pastille au bord droit de l'écran pour qui en atteint la marge, ou passe au-delà.

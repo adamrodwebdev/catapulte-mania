@@ -334,7 +334,7 @@ Pour tester sur un téléphone connecté au même Wi-Fi : utilisez l'adresse « 
 
 **Tester n'importe quel niveau sans refaire la campagne :** `npm run dev:unlocked` (ou ajoutez `?unlock=all` à l'adresse, par exemple `http://localhost:5173/?unlock=all`). Le jeu ouvre un profil « Test » (créé dans le premier emplacement libre, ou repris s'il existe) où tous les niveaux sont ouverts : ils comptent comme « passés », sans étoile ni or, et se gagnent ensuite pour de bon. Vos autres profils ne sont pas touchés. Ajoutez `&difficulty=hard` (ou `easy`) pour choisir la difficulté. Avec `?unlock=complete` (v6.2), le profil « Test » devient maître du royaume (toutes les étoiles, tous les succès) : de quoi essayer l'Engin d'or, la Comète d'or, la Légende, les Terres du Duc et la Campagne héroïque. Cet outil n'existe que sur le serveur de développement, jamais dans les versions publiées.
 
-**Fonds peints (v6.2) :** les peintures d'origine (`art/backgrounds/chapter-1.png` à `chapter-10.png`, non versionnées car lourdes) deviennent les WebP du jeu avec `npm run backgrounds` : la bande du bas est rognée (le jeu y dessine son propre sol), l'image ramenée à 2560 px de large. Il faut Chrome (ou son chemin dans `CHROME_PATH`). Vérifiez ensuite, dans `src/game/assets/backgrounds.js`, la ligne de sol de chaque peinture et ses sommets (d'où le vent arrache des panaches).
+**Fonds peints (v6.2) :** les peintures d'origine (`art/backgrounds/chapter-1.png` à `chapter-10.png`, non versionnées car lourdes) deviennent les WebP du jeu avec `npm run backgrounds` : la bande du bas est rognée (le jeu y dessine son propre sol), l'image ramenée à 2560 px de large. Il faut Chrome (ou son chemin dans `CHROME_PATH`). Vérifiez ensuite, dans `src/game/assets/backgrounds.js`, la ligne de sol de chaque peinture et ses sommets (d'où le vent arrache des panaches). L'encodeur efface aussi ce que le jeu anime déjà (oiseaux, pluie, flocons, étoiles filantes figés). Les ciels vivants (v6.3) lisent ensuite chaque peinture au chargement : si l'une change, vérifiez dans `src/game/sky/skyConfig.js` la place de son soleil, de sa cascade ou de ses zones d'eau.
 
 ---
 
@@ -357,19 +357,7 @@ Pour tester sur un téléphone connecté au même Wi-Fi : utilisez l'adresse « 
 2. « Add new site » → « Import an existing project » → choisissez le dépôt GitHub.
 3. Netlify lit la configuration tout seul et publie le site. À chaque nouveau commit sur GitHub, le site se met à jour.
 
-**Accès limité à quelques appareils (verrou du site Netlify)** :
-
-Notre site Netlify n'est ouvert qu'aux appareils autorisés (deux aujourd'hui). La démo et les versions pour portails n'ont pas de verrou.
-
-- Chaque appareil reçoit sa propre **clé d'accès**. La première fois qu'on ouvre le site, une page demande la clé : une fois saisie, elle est **liée à cet appareil** (à ce navigateur) et ne fonctionne plus ailleurs.
-- Les clés se règlent dans Netlify : *Project configuration → Environment variables*.
-  - `ACCESS_KEYS` : les clés, séparées par des virgules (une par appareil, au moins 20 caractères : lettres, chiffres, `-` ou `_`) ;
-  - `GATE_SECRET` : un texte secret d'au moins 32 caractères (il signe le « badge » enregistré dans le navigateur).
-- **Ajouter un appareil** : ajouter une clé à `ACCESS_KEYS`, puis redéployer.
-- **Retirer ou remplacer un appareil** (appareil perdu, données du navigateur effacées) : remplacer sa clé par une nouvelle, puis redéployer. L'ancienne clé ne fonctionne plus.
-- Sans ces deux variables, le site reste fermé (sécurité par défaut) et affiche « verrou non configuré ». Après avoir ajouté ou modifié une variable, il faut **redéployer** (Deploys → Trigger deploy → Deploy site) pour qu'elle soit prise en compte.
-
-Le code du verrou se trouve dans `netlify/gate/AccessGate.js` (logique, testée) et `netlify/edge-functions/gate.js` (branchement sur Netlify).
+**Site ouvert à tous (v6.3)** : le verrou d'accès par clés de la v4.0.1 (une clé par appareil) est retiré. Les variables `ACCESS_KEYS` et `GATE_SECRET` ne servent plus : on peut les effacer dans Netlify (*Project configuration → Environment variables*).
 
 Tout autre hébergeur de fichiers statiques convient (GitHub Pages, Cloudflare Pages, OVH…) : il suffit d'envoyer le contenu du dossier `dist/`.
 
@@ -445,7 +433,8 @@ src/
 │   ├── aim/                AimInput → la visée au geste et au clavier ; TrebuchetInput → point d'impact, jauge et calcul du tir du trébuchet (modules purs, testés)
 │   ├── powers/             Power → les 7 pouvoirs, PowerRegistry
 │   ├── score/              ScoreKeeper, règles de score et d'étoiles
-│   ├── rendering/          Renderer (orchestre les peintres, dans l'ordre du dessin) : BackdropPainter (ciel, décor, fond peint, terrains), LightingPainter (ombres, lueurs, étalonnage, vignette), EnginePainter, StructurePainter (échelles, jonctions, cordes), StatusOverlayPainter (clés de voûte, fer rougi, givre), WorldHudPainter (barres de vie, marques des pillards, cœurs des généraux), AimPainter (visée, trajectoire), CloudPainter, EntityViewAdapter ; HealthBar, BackgroundArt, Camera ; TargetBeacons et BeaconPainter (repères des défenseurs)
+│   ├── sky/                Ciels vivants (v6.3) : skyConfig (ce que chaque fond peint anime), paintingAnalysis (lecture des peintures : soleil, rayons, herbe, eau, neige, cascade, lave, étoiles ; fonctions pures, testées), effects (un effet par nom), LivingSky (temps, vent, hasard à part et sons d'un ciel), SkyLibrary (lecture des peintures dans les moments libres), skySprites
+│   ├── rendering/          Renderer (orchestre les peintres, dans l'ordre du dessin) : BackdropPainter (ciel, décor, fond peint et son ciel vivant, terrains), LightingPainter (ombres, lueurs, étalonnage, vignette), EnginePainter, StructurePainter (échelles, jonctions, cordes), StatusOverlayPainter (clés de voûte, fer rougi, givre), WorldHudPainter (barres de vie, marques des pillards, cœurs des généraux), AimPainter (visée, trajectoire), CloudPainter, EntityViewAdapter ; HealthBar, BackgroundArt, Camera ; TargetBeacons et BeaconPainter (repères des défenseurs)
 │   ├── assets/             Graphismes (procéduraux ou images, interchangeables) ; themes et palette (couleurs et réglages de chaque chapitre)
 │   ├── audio/              Sons synthétisés (recettes : soundRecipes, voix : SynthVoices) et mixage, musique adaptative (MusicDirector), ambiance (AmbienceDirector), vibrations
 │   └── effects/            Particules : ParticleSystem (leur vie), ParticlePainter (leur dessin) ; SessionEffects (ce que la partie montre et fait entendre : éclats, sons, sous-titres, répliques)
@@ -461,7 +450,7 @@ build/                      Sécurité (CSP) et service worker générés au bui
 
 - **Vue 3 + Vite** : interface réactive, build rapide, fichiers légers.
 - **Matter.js** : moteur physique 2D éprouvé. Il n'est téléchargé qu'à l'ouverture d'un niveau, pour que l'accueil s'affiche instantanément.
-- **Graphismes procéduraux** : tous les éléments médiévaux sont dessinés par le code, nets sur tous les écrans. Le code du jeu pèse environ 460 Ko compressés. Seule la version web y ajoute dix fonds peints, un par chapitre (WebP, 1,7 Mo en tout, mis en cache pour jouer hors connexion) : la démo et les versions des portails gardent le décor dessiné (v6.2).
+- **Graphismes procéduraux** : tous les éléments médiévaux sont dessinés par le code, nets sur tous les écrans. Le code du jeu pèse environ 460 Ko compressés. Seule la version web y ajoute dix fonds peints, un par chapitre (WebP, 1,7 Mo en tout, mis en cache pour jouer hors connexion), qui s'animent (ciels vivants, v6.3) : la démo et les versions des portails gardent le décor dessiné (v6.2).
 - **Sons et musique synthétisés** (Web Audio) : aucun fichier audio à télécharger, la musique se compose en direct et s'adapte à l'action.
 
 ---
@@ -557,6 +546,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v5.8.0 | Défenseurs malins (navigation A*, esquive, réparation), éclaireur, pavoisier, porte-étendard, sapeur, veilleurs à la torche ; pillards (ponts et échelles), état de l'engin (feu, givre, fissures, rouille) et seaux d'eau ; barils derrière les châteaux ; plus de zoom d'ouverture |
 | v5.9.0 | Interface 2026 « Verre & Or » : verre fumé, liserés, or dégradé, entrées à ressort ; accueil en diorama, chapitres illustrés, HUD et bouton de tir refaits, modes illustrés, fenêtres à barre d'actions dépolie |
 | v6.1.0 | Points de vie pour tous les défenseurs, chocs qui portent (dégâts selon l'énergie et la dureté, chutes, recul, secousses), défenseurs qui repoussent ce qui tombe lentement ; orbe d'orage, botte de paille et pot de poison, munitions élémentaires moins écrasantes ; moulins, forges, citernes, ruches et sacs de farine ; souffle du monde propre à chaque chapitre |
+| v6.3.0 | Ciels vivants : les dix fonds peints s'animent (soleil et rayons, vent et feuilles, cascade, brume qui roule, tourbillon de sable, neige, pluie et éclairs, lave et braises), le tonnerre suit l'éclair, rien n'est doublé, mouvement réduit respecté |
 | v6.2.0 | Châteaux assemblés (jonctions qui se lézardent et cèdent, clés de voûte), ailes et combos d'éléments ; l'engin avance et recule ; pillards avant chaque grand siège, et plus pressants ; barres de vie redessinées, infos en haut de l'écran, caméra qui ne suit plus les boulets perdus ; montagnes redessinées et fonds peints ; Chute libre revue ; maîtrise du royaume (Engin d'or, Comète d'or, la Légende, les Terres du Duc, la Campagne héroïque et ses paliers d'atelier) ; tous les niveaux gagnables avec la pierre de départ |
 | v6.0.0 | Les généraux de Mordrac : grands sièges en plusieurs étapes, dix généraux à vies et ordres annoncés, barre du général et bannières, Chronique enrichie ; coup de grâce, défenseurs assommés et répliques, potence et pont-levis, jauge de destruction ; cartes du siège sans fin, coupe de la semaine, moments forts filmés, coup de pouce et niveau passé |
 | v4.2.0 | Qualité des premières minutes (refus CrazyGames) : premier tir réussi, tutoriel en images, tirer-relâcher, barre de commandes compacte, caméra qui garde l'impact visible, trébuchet dès le niveau 4 |

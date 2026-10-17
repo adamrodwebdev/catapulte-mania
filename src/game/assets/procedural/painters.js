@@ -288,7 +288,8 @@ function sky(ctx, s) {
   // `overlay` (v6.2) : par-dessus un fond peint, seulement ce qui vit (météo, nuages
   // qui montrent le vent, oiseaux) : ni dégradé, ni étoiles, ni brume, ni astre (la
   // peinture a son soleil ou sa lune).
-  const { theme = 1, viewW, viewH, time = 0, animate = true, wind = 0, overlay = false } = s.extra
+  // `skyWeather` (v6.3) : le ciel vivant du fond peint fait sa propre pluie, neige ou brume.
+  const { theme = 1, viewW, viewH, time = 0, animate = true, wind = 0, overlay = false, skyWeather = false } = s.extra
   const th = THEMES[theme]
   if (!overlay) {
     ctx.fillStyle = skyGradient(ctx, th, theme, viewH)
@@ -300,7 +301,7 @@ function sky(ctx, s) {
     if (hasSunRays(th)) sunRays(ctx, th, sun, viewW, viewH, animate ? time : 0)
     celestial(ctx, th, sun, th.skyTop)
   }
-  weather(ctx, th, viewW, viewH, animate ? time : 0)
+  if (!skyWeather) weather(ctx, th, viewW, viewH, animate ? time : 0)
   // Brume claire à l'horizon : profondeur atmosphérique (la peinture a la sienne).
   if (!overlay) {
     const haze = ctx.createLinearGradient(0, viewH * 0.45, 0, viewH)

@@ -41,6 +41,11 @@ export class BackgroundArt {
     this.#entries.delete(chapter)
   }
 
+  /** Le chapitre a-t-il un fond peint (v6.3) ? Dans la démo et sur les portails, aucun. */
+  has(chapter) {
+    return Boolean(this.#manifest[chapter])
+  }
+
   /** Commence à charger le fond d'un chapitre (avant même qu'on le dessine). */
   preload(chapter) {
     this.#entry(chapter)

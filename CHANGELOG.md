@@ -2,6 +2,65 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [6.3.0] – 2026-10-17
+### Ciels vivants
+- **Les fonds peints s'animent** (`src/game/sky/`), chacun selon sa peinture,
+  toujours derrière le château et en contraste doux. Les effets lisent la
+  peinture elle-même (soleil, rayons, herbe, eau, neige, cascade, lave,
+  étoiles) et suivent le vent du niveau :
+  - **la Palissade** : le soleil rayonne (halo qui pulse, lumière qui file le
+    long des rayons peints, reflet doré), le vent emporte feuilles et pétales,
+    les rafales couchent l'herbe, les ombres des nuages glissent ;
+  - **le Fort de pierre** : la lumière coule de la trouée des nuages, qui se
+    referme par moments ; la cascade coule et son écume monte ; brume de la
+    vallée, ombres des nuages, risées dans la bruyère ;
+  - **la Forteresse** : le couchant palpite, une poussière dorée flotte, les
+    premières lucioles s'allument sur la colline ;
+  - **la Citadelle** : les étoiles scintillent, une étoile filante passe, le
+    halo de la lune respire, la brume des vallées file ;
+  - **les Marais** : la brume roule, des ronds s'ouvrent sur l'eau, des feux
+    follets flottent ;
+  - **le Désert** : l'air chaud tremble à l'horizon, des voiles de sable
+    filent, un tourbillon traverse les dunes au loin ;
+  - **la Montagne** : la neige scintille au soleil, les ombres des nuages
+    glissent sur les névés ;
+  - **l'Hiver** : la neige tombe sur trois profondeurs, des cristaux de givre
+    étincellent, la poudreuse vole au ras de la plaine ;
+  - **l'Orage** : pluie en deux nappes, lambeaux de nuages, éclairs qui
+    illuminent les nuages peints ;
+  - **le Trône** : la lave rougeoie, les braises montent, la fumée roule, la
+    cendre retombe.
+- **Rien n'est doublé** : là où le ciel vivant fait sa pluie, sa neige ou sa
+  brume, celles du décor dessiné se taisent, comme les poussières d'ambiance
+  qu'il remplace (Forteresse, Citadelle, Trône).
+- **Le son suit** : le tonnerre gronde après chaque éclair, d'autant plus tard
+  et plus sourd qu'il frappe loin (plus de grondement au hasard à l'Orage) ;
+  une risée passe d'une oreille à l'autre, le sable siffle dans le tourbillon,
+  une goutte tombe dans l'eau, la cascade gronde doucement. La pluie de
+  l'ambiance n'est plus qu'un murmure.
+- **Mouvement réduit** : la peinture reste fixe ; **contraste élevé** : seules
+  ses lueurs demeurent, rien ne bouge devant elle.
+- **Discret pour l'appareil** : chaque peinture n'est lue qu'une fois, par
+  petites étapes, dans les moments libres du navigateur ; moins d'une
+  milliseconde de dessin par image. Le hasard du ciel est le sien : les
+  relectures et l'empreinte des parties ne changent pas.
+- Version web seulement (les portails et la démo n'ont pas de fond peint).
+
+### Retiré
+- **Le verrou d'accès du site Netlify** (v4.0.1) : le site est ouvert à tous,
+  sans clé. La fonction edge et sa logique sont supprimées ; les variables
+  `ACCESS_KEYS` et `GATE_SECRET` ne servent plus.
+
+### Corrigé
+- **Page de confidentialité** : elle a son icône, comme l'accueil ; le
+  navigateur ne réclame plus un `favicon.ico` absent (erreur dans la console,
+  bonnes pratiques Lighthouse 96 → 100).
+
+### Mesuré
+- **Lighthouse** (version publiée, 3 passages) : accueil 98, 100, 100, 100 sur
+  mobile et 100 partout sur ordinateur (performances, accessibilité, bonnes
+  pratiques, référencement) ; page de confidentialité 100 partout.
+
 ## [6.2.0] – 2026-10-17
 ### Des châteaux qui tiennent ensemble
 - **Assemblage des châteaux** (`CastleJoints.js`) : au premier tir, chaque bloc
