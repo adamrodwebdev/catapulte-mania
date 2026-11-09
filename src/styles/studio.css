@@ -18,6 +18,7 @@
   padding: 1rem;
   background: var(--bg);
   color: var(--fg);
+  /* Un clic n'importe où passe le générique : tout l'écran se clique (voir base.css). */
   cursor: pointer;
   overflow: hidden;
   transition: opacity 0.35s ease;

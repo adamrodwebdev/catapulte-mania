@@ -256,6 +256,8 @@ Les profils créés avant la v3.1 gardent leurs étoiles et leur or ; leurs amé
 
 La partie est enregistrée automatiquement dans le navigateur (3 emplacements de profil). Effacer les données du navigateur efface aussi les sauvegardes.
 
+Une sauvegarde que le jeu ne sait pas lire (coupée, modifiée, écrite par une autre version, ou que le stockage du portail n'a pas pu rendre) n'est jamais prise pour un emplacement libre (v6.3.1) : elle est signalée « altérée » et rien ne l'écrase, ni le démarrage rapide des portails ni le profil de test ; seul le joueur peut la supprimer.
+
 ---
 
 ## 3. Accessibilité
@@ -274,6 +276,7 @@ Tout se règle dans **Réglages** (et une partie directement depuis la pause) :
 - **Effets de sang** désactivables : un nuage de poussière les remplace.
 - **Animations réduites** : désactive les tremblements d'écran et le suivi de caméra. Respecte automatiquement le réglage du système.
 - **Jouable entièrement au clavier**, avec des zones tactiles d'au moins 44 pixels.
+- **Le curseur dit ce qui se clique** (v6.3.1) : la flèche sur les textes et les images, la main sur ce qui se clique, la barre de texte dans les champs, « interdit » sur une commande désactivée. Sur la scène, il suit le geste : la main sur la fronde de la catapulte (fermée en tirant), le viseur pour le point d'impact du trébuchet, la main en vol quand un appui agit.
 
 ---
 
@@ -377,6 +380,8 @@ GameDistribution et Y8 donnent un identifiant de jeu **après** la création de 
 npm run release:portals -- --gd-id <id GameDistribution> --y8-game <Game ID Y8> --y8-app <App ID Y8>
 ```
 
+Un argument inconnu, répété, sans sa valeur ou mal formé arrête la commande (code 2) avant le premier build (v6.3.1) : un identifiant mal tapé ne part jamais dans un paquet.
+
 ### Publier sur un portail de jeux (CrazyGames, Poki)
 
 Le guide complet (portails, Microsoft Store, Google Play, App Store) est dans [`docs/BOUTIQUES.md`](docs/BOUTIQUES.md).
@@ -407,12 +412,12 @@ Le code suit une **programmation orientée objet** : chaque notion du jeu est un
 src/
 ├── main.js                 Point d'entrée
 ├── App.vue                 Composant racine (Vue 3)
-├── app/                    AppContext (état de l'application, actions), ProfilePresenter (le profil affiché), MatchSetup (mise en place d'une partie), EndOfMatch (bilans, un par mode), Formats (unités, dates) ; devUnlock (outil de test, développement seulement)
-├── composables/            Logique d'interface réutilisable : useGameKeyboard (les touches du jeu)
-├── config/gameConfig.js    Constantes du jeu (gelées)
-├── core/utils/             Outils génériques : Guard (vérification des types), EventBus, hasard reproductible
-├── domain/                 Objets métier : SaveSlot (profil), LevelResult (résultat de niveau), EngineCondition (points de vie et avaries de l'engin)
-├── services/               Services : StorageService, SaveManager, SaveSigner, SettingsService, I18nService, StoreService, ShareService, CastleDraftService
+├── app/                    AppContext (état de l'application, actions), ProfilePresenter (le profil affiché), MatchSetup (mise en place d'une partie), EndOfMatch (bilans, un par mode), Formats (unités, dates), fields (curseurs et listes des écrans lus à la porte) ; devUnlock (outil de test, développement seulement)
+├── composables/            Logique d'interface réutilisable : useGameKeyboard (les touches du jeu, cherchées dans des Map)
+├── config/                 gameConfig.js (constantes du jeu, gelées) ; limits.js (v6.3.1 : la table des limites de ce qui vient de l'extérieur)
+├── core/utils/             Outils génériques : input (v6.3.1 : les lecteurs à la porte, nombres et textes), Guard (schémas et vérification des types), EventBus, hasard reproductible
+├── domain/                 Objets métier : SaveSlot (profil, et la lecture des noms saisis), LevelResult (résultat de niveau), EngineCondition (points de vie et avaries de l'engin)
+├── services/               Services : StorageService (entrée vide, présente ou illisible), SaveManager, SaveSigner, SettingsService, I18nService, StoreService, ShareService, CastleDraftService ; outsideValues (langues, liens et codes d'invitation venus du navigateur et des portails)
 ├── i18n/                   Traductions fr, en, id
 ├── game/
 │   ├── GameController.js   Relie le moteur au canevas (boucle, entrées, redimensionnement)
@@ -430,7 +435,7 @@ src/
 │   ├── ai/                 Défenseurs : NavGraph (corniches), Pathfinder (A*), Steering (marche), Perception (prévoir la chute du tir), UnitBrain (comportements par type, pillards), UnitDirector (orchestration)
 │   ├── entities/           Entity → Block, Projectile, Target, Barrel ; catalog (défenseurs, munitions), props (ouvrages)
 │   ├── levels/             Les 100 niveaux : plans (blueprints, wingBlueprints), règles de la campagne selon le rang (campaignRules), placement (LevelCurve), LevelRepository ; les Terres du Duc (DukeRepository) ; Tracks (les parcours : campagne, à deux, héroïque, Duc) ; les arènes du face-à-face, les châteaux de duel
-│   ├── aim/                AimInput → la visée au geste et au clavier ; TrebuchetInput → point d'impact, jauge et calcul du tir du trébuchet (modules purs, testés)
+│   ├── aim/                AimInput → la visée au geste et au clavier ; TrebuchetInput → point d'impact, jauge et calcul du tir du trébuchet ; canvasCursor → le curseur de la scène selon ce qu'un clic y fait (modules purs, testés)
 │   ├── powers/             Power → les 7 pouvoirs, PowerRegistry
 │   ├── score/              ScoreKeeper, règles de score et d'étoiles
 │   ├── sky/                Ciels vivants (v6.3) : skyConfig (ce que chaque fond peint anime), paintingAnalysis (lecture des peintures : soleil, rayons, herbe, eau, neige, cascade, lave, étoiles ; fonctions pures, testées), effects (un effet par nom), LivingSky (temps, vent, hasard à part et sons d'un ciel), SkyLibrary (lecture des peintures dans les moments libres), skySprites
@@ -442,8 +447,9 @@ src/
 └── styles/                 CSS : jetons de design, thèmes, écrans
 tests/                      Tests automatiques
 scripts/check-levels.mjs    Contrôle automatique des 100 niveaux
+scripts/arguments.mjs       Arguments des scripts, lus strictement (v6.3.1)
 scripts/backgrounds/        Encodage des fonds peints (art/backgrounds/*.png → WebP)
-build/                      Sécurité (CSP) et service worker générés au build
+build/                      Sécurité (CSP), service worker et adresse du site (siteUrl) préparés au build
 ```
 
 **Choix techniques**
@@ -457,7 +463,7 @@ build/                      Sécurité (CSP) et service worker générés au bui
 
 ## 9. Sécurité et anti-triche
 
-- **Vérification des types à chaque entrée** : toute donnée venant de l'extérieur (sauvegarde, réglages, paramètres d'URL, saisies) passe par `Guard` et des schémas de validation. Une valeur invalide est rejetée ou remplacée par une valeur sûre.
+- **Données lues à la porte** (v6.3.1) : toute donnée venant de l'extérieur (sauvegardes et réglages, stockage des portails, adresse et liens d'invitation, langues du navigateur et des portails, valeurs des SDK, saisies, curseurs, noms de touches, arguments des scripts, variable `VITE_SITE_URL`) passe par un lecteur partagé (`src/core/utils/input.js`) ou un schéma qui les assemble (`Guard`). Un nombre est un vrai nombre fini dans sa plage, écrit en entier (jamais `Number()`, `parseInt` ni un champ « number ») ; un texte est nettoyé (caractères de contrôle, inversions bidirectionnelles et espaces de largeur nulle retirés, accents composés) puis borné, refusé au-delà, jamais coupé ; une liste fermée est lue exactement, dans une `Map` ou les champs propres d'un objet. Chaque limite vient d'une seule table (`src/config/limits.js`), et une entrée du stockage est mesurée avant d'être lue. Une valeur refusée est écartée (la valeur par défaut d'un réglage, un lien signalé illisible) ; une sauvegarde illisible est gardée, jamais écrasée.
 - **Sauvegardes signées** (HMAC-SHA256) : modifier une sauvegarde à la main la rend invalide.
 - **Contrôles de cohérence** : un score impossible, un niveau débloqué sans avoir fini le précédent, ou des étoiles incohérentes sont refusés.
 - **Étoiles et succès non déclarables** : ils sont calculés par le moteur de jeu à partir de ce qui s'est réellement passé (tirs, munitions, destructions). Au chargement, les étoiles sont recalculées à partir du nombre de tirs enregistré, et une amélioration achetée sans les étoiles requises est refusée.
@@ -486,6 +492,8 @@ npm run check:levels -- --workers 4           # v6.2 : au plus 4 cœurs à la fo
 npm run check:levels -- --track duke --boss   # v6.2 : face à un général, le joueur automatique le vise d'abord
 npm run lint          # vérification du style de code
 ```
+
+Les arguments de `check:levels` s'écrivent `--levels 13` ou `--levels=13`. Un argument inconnu, répété, sans sa valeur ou illisible (`--levels abc`, `--levels 1e1`, `--workers four`, `--difficulty hrad`) arrête la commande avec le code 2 avant le premier niveau (v6.3.1) : un contrôle mal tapé ne passe jamais sans avoir joué.
 
 ### Contrôles automatiques sur GitHub
 
@@ -546,6 +554,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v5.8.0 | Défenseurs malins (navigation A*, esquive, réparation), éclaireur, pavoisier, porte-étendard, sapeur, veilleurs à la torche ; pillards (ponts et échelles), état de l'engin (feu, givre, fissures, rouille) et seaux d'eau ; barils derrière les châteaux ; plus de zoom d'ouverture |
 | v5.9.0 | Interface 2026 « Verre & Or » : verre fumé, liserés, or dégradé, entrées à ressort ; accueil en diorama, chapitres illustrés, HUD et bouton de tir refaits, modes illustrés, fenêtres à barre d'actions dépolie |
 | v6.1.0 | Points de vie pour tous les défenseurs, chocs qui portent (dégâts selon l'énergie et la dureté, chutes, recul, secousses), défenseurs qui repoussent ce qui tombe lentement ; orbe d'orage, botte de paille et pot de poison, munitions élémentaires moins écrasantes ; moulins, forges, citernes, ruches et sacs de farine ; souffle du monde propre à chaque chapitre |
+| v6.3.1 | Données lues à la porte (sauvegardes, liens, langues, portails, saisies, touches, arguments des scripts) : un profil illisible n'est plus écrasé, régler le volume ne fait plus revenir le jeu en français, l'atelier refuse les munitions décimales, les noms à accents décomposés sont acceptés ; le curseur dit ce qui se clique |
 | v6.3.0 | Ciels vivants : les dix fonds peints s'animent (soleil et rayons, vent et feuilles, cascade, brume qui roule, tourbillon de sable, neige, pluie et éclairs, lave et braises), le tonnerre suit l'éclair, rien n'est doublé, mouvement réduit respecté |
 | v6.2.0 | Châteaux assemblés (jonctions qui se lézardent et cèdent, clés de voûte), ailes et combos d'éléments ; l'engin avance et recule ; pillards avant chaque grand siège, et plus pressants ; barres de vie redessinées, infos en haut de l'écran, caméra qui ne suit plus les boulets perdus ; montagnes redessinées et fonds peints ; Chute libre revue ; maîtrise du royaume (Engin d'or, Comète d'or, la Légende, les Terres du Duc, la Campagne héroïque et ses paliers d'atelier) ; tous les niveaux gagnables avec la pierre de départ |
 | v6.0.0 | Les généraux de Mordrac : grands sièges en plusieurs étapes, dix généraux à vies et ordres annoncés, barre du général et bannières, Chronique enrichie ; coup de grâce, défenseurs assommés et répliques, potence et pont-levis, jauge de destruction ; cartes du siège sans fin, coupe de la semaine, moments forts filmés, coup de pouce et niveau passé |

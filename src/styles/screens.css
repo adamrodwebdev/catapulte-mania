@@ -899,7 +899,6 @@
 }
 
 .level-tile--locked {
-  cursor: not-allowed;
   color: var(--text-muted);
   filter: none;
 }
@@ -1068,7 +1067,6 @@
   text-decoration: underline;
   text-underline-offset: 0.2em;
   text-shadow: 0 1px 4px rgb(0 0 0 / 0.7);
-  cursor: pointer;
   min-height: var(--hud-size);
 }
 

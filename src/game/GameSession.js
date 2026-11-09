@@ -1224,6 +1224,17 @@ export class GameSession extends EventBus {
     return true
   }
 
+  /**
+   * Un appui en vol agit-il maintenant ? (diviser la mitraille, faire plonger le
+   * météore ou le faucon). Lu à chaque image pour le curseur de la scène : sans
+   * tableau intermédiaire, et seulement en vol.
+   */
+  get canActivate() {
+    if (this.#state !== STATE.FLYING) return false
+    for (const e of this.world.entities()) if (e.kind === 'projectile' && e.alive && e.canActivate) return true
+    return false
+  }
+
   /** Action en vol (mitraille : division en trois). */
   activate() {
     const p = this.#activeProjectiles().find((x) => x.canActivate)

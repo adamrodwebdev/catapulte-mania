@@ -20,8 +20,32 @@ export const GAME_KEYS = Object.freeze({
   KeyD: Object.freeze({ command: 'drive', dir: 1, once: true }),
 })
 
+/**
+ * Les mêmes tables, cherchées par nom de touche (v6.3.1). Le nom vient de
+ * l'extérieur (événement du navigateur, d'une extension, d'un clavier virtuel) :
+ * une recherche dans un objet ordinaire prenait `constructor` ou `toString`
+ * pour une flèche ou une commande, et `['Space']` pour la barre d'espace. Une
+ * Map ne connaît que ses propres clés, et seulement des textes.
+ */
+const ARROWS = new Map(Object.entries(ARROW_KEYS))
+const COMMANDS = new Map(Object.entries(GAME_KEYS))
 /** Munitions : touches 1 à 9, dans l'ordre de la barre (neuf munitions depuis la v6.1). */
-const AMMO_KEY = /^Digit[1-9]$/
+const AMMO_SLOTS = new Map(Array.from({ length: 9 }, (_, i) => [`Digit${i + 1}`, i]))
+
+/** Flèche de visée d'une touche, ou null. */
+export function arrowFor(code) {
+  return ARROWS.get(code) ?? null
+}
+
+/** Commande d'une touche (tir, pause, seau, engin), ou null. */
+export function gameKeyFor(code) {
+  return COMMANDS.get(code) ?? null
+}
+
+/** Place dans la barre des munitions d'une touche 1 à 9 (0 à 8), ou null. */
+export function ammoSlotFor(code) {
+  return AMMO_SLOTS.get(code) ?? null
+}
 
 /**
  * Clavier de la partie (v6.2, sorti de l'écran de jeu) : visée aux flèches
@@ -66,9 +90,9 @@ export function useGameKeyboard({ controller, phase, showPowers, isTrebuchet, hu
   }
 
   function onKeyUp(e) {
-    const arrow = ARROW_KEYS[e.code]
+    const arrow = arrowFor(e.code)
     if (arrow) controller()?.aimKey(arrow, false)
-    const dir = GAME_KEYS[e.code]?.dir
+    const dir = gameKeyFor(e.code)?.dir
     if (dir && dir === driveKey) drive(0)
   }
 
@@ -81,7 +105,7 @@ export function useGameKeyboard({ controller, phase, showPowers, isTrebuchet, hu
       if (e.code === 'KeyP') actions.stopWatching()
       return
     }
-    const arrow = ARROW_KEYS[e.code]
+    const arrow = arrowFor(e.code)
     if (arrow) {
       if (e.target?.type === 'range') return
       // Trébuchet : ← → déplacent la cible au sol (Maj : par petits pas).
@@ -96,12 +120,13 @@ export function useGameKeyboard({ controller, phase, showPowers, isTrebuchet, hu
       coach('aim')
       return
     }
-    const key = GAME_KEYS[e.code]
+    const key = gameKeyFor(e.code)
+    const slot = ammoSlotFor(e.code)
     if (key) {
       if (key.notOnButton && e.target instanceof globalThis.HTMLButtonElement) return
       if (!(key.once && e.repeat)) run(key)
-    } else if (AMMO_KEY.test(e.code)) {
-      const a = hud.value?.ammo[Number(e.code.slice(5)) - 1]
+    } else if (slot !== null) {
+      const a = hud.value?.ammo[slot]
       if (a) actions.selectAmmo(a.type)
     } else return
     e.preventDefault()

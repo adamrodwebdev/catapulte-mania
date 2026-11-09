@@ -1,10 +1,11 @@
 <script setup>
 import { useApp } from '../../app/AppContext.js'
 import { formatDegrees, formatPercent } from '../../app/Formats.js'
+import { readAimSlider } from '../../app/fields.js'
 import { AIM } from '../../game/aim.js'
 import AppIcon from '../ui/AppIcon.vue'
 
-defineProps({
+const props = defineProps({
   angle: { type: Number, required: true },
   power: { type: Number, required: true },
   disabled: { type: Boolean, default: false },
@@ -17,9 +18,12 @@ defineProps({
 const emit = defineEmits(['aim', 'nudge'])
 const { t } = useApp()
 
+/** Bornes de la puissance (en %), comme celles du curseur. */
+const POWER_RANGE = Object.freeze({ min: 0, max: 100 })
+/** Curseur lu à la porte (v6.3.1) : un nombre écrit en entier, dans les bornes du curseur. */
 function onRange(kind, e) {
-  const v = Number(e.target.value)
-  if (!Number.isFinite(v)) return
+  const v = readAimSlider(e.target.value, kind === 'angle' ? { min: props.minAngle, max: props.maxAngle } : POWER_RANGE)
+  if (v === null) return
   emit('aim', kind, v)
 }
 </script>

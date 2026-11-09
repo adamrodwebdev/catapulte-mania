@@ -1,4 +1,5 @@
 import { Guard } from '../core/utils/Guard.js'
+import { orElse, readChoice } from '../core/utils/input.js'
 import { GAME, PLAYABLE_LEVELS } from '../config/gameConfig.js'
 import { SaveSlot } from '../domain/SaveSlot.js'
 import { GOLD, maxGoldFor } from '../game/progression/GoldRules.js'
@@ -93,13 +94,15 @@ export function perfectRecords() {
  * @param {string} [search] ex. location.search
  */
 export async function openTestCampaign(app, search = globalThis.location?.search || '') {
+  // Paramètres de l'adresse : des listes fermées, lues à la porte (v6.3.1).
   const params = new URLSearchParams(search)
-  const unlock = params.get('unlock')
-  if (unlock !== 'all' && unlock !== 'complete') return
+  const unlock = orElse(() => readChoice(params.get('unlock'), ['all', 'complete'], 'unlock'), null)
+  if (unlock === null) return
   await app.refreshSlots()
   const existing = app.state.slots.find((s) => s.status === 'ok' && s.name === TEST_PROFILE)
+  // Un emplacement altéré n'est pas libre (v6.3.1) : le profil de test ne s'y écrit jamais.
   const free = app.state.slots.find((s) => s.status === 'empty')
-  const difficulty = GAME.DIFFICULTIES.includes(params.get('difficulty')) ? params.get('difficulty') : null
+  const difficulty = orElse(() => readChoice(params.get('difficulty'), GAME.DIFFICULTIES, 'difficulty'), null)
   if (existing) await app.openProfile(existing.index)
   else if (free) await app.createProfile(free.index, TEST_PROFILE, difficulty ?? 'normal')
   else return console.warn('[Catapulte Mania] ?unlock=all : aucun emplacement libre pour le profil « Test ».')

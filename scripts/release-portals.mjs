@@ -18,12 +18,14 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statS
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { deflateRawSync } from 'node:zlib'
+import { argumentsOrExit, readReleaseArguments } from './arguments.mjs'
 
-const args = process.argv.slice(2)
-const arg = (k) => (args.includes(k) ? args[args.indexOf(k) + 1] : '')
-const ID = /^[\w-]{1,64}$/
-const ids = { gd: arg('--gd-id'), y8Game: arg('--y8-game'), y8App: arg('--y8-app') }
-for (const [k, v] of Object.entries(ids)) if (v && !ID.test(v)) throw new Error(`identifiant invalide (${k})`)
+// Identifiants lus à la porte (v6.3.1, voir arguments.mjs) : un argument inconnu, répété,
+// sans valeur ou mal formé arrête tout (code 2) avant le premier build.
+const ids = argumentsOrExit(
+  () => readReleaseArguments(process.argv.slice(2)),
+  'Usage : npm run release:portals [-- --gd-id <id GameDistribution> --y8-game <Game ID Y8> --y8-app <App ID Y8>]',
+)
 
 /** Portail → cible de build et variables d'environnement. */
 const PLATFORMS = [

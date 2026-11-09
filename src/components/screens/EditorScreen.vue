@@ -3,11 +3,12 @@ import { computed, onBeforeUnmount, onMounted, ref, markRaw } from 'vue'
 import { useApp } from '../../app/AppContext.js'
 import AppIcon from '../ui/AppIcon.vue'
 import ModalPanel from '../ui/ModalPanel.vue'
-import { placePart, removeAt, CastleCode, PARTS, LIMITS, DESIGN_AMMO } from '../../game/editor/CastleDesign.js'
+import { placePart, removeAt, CastleCode, PARTS, LIMITS, DESIGN_AMMO, DESIGN_RANGES, readDesignField } from '../../game/editor/CastleDesign.js'
 import { BUILD_MATERIALS } from '../../game/entities/materials.js'
 import { CastleDraftService } from '../../services/CastleDraftService.js'
-import { PROFILE_NAME } from '../../domain/SaveSlot.js'
 import { GAME } from '../../config/gameConfig.js'
+import { TEXT_LIMITS } from '../../config/limits.js'
+import { orElse } from '../../core/utils/input.js'
 
 /**
  * Atelier de châteaux (v4.0) : construire, tester, partager.
@@ -49,7 +50,8 @@ const counts = computed(() => ({
 // Château déjà pris par son auteur (dans cette session, ou mémorisé sur l'appareil).
 app.restoreVerifiedCastle()
 const verified = computed(() => Boolean(code.value) && state.editorVerified === code.value)
-const playable = computed(() => counts.value.targets > 0)
+// Un château qui ne se code pas (v6.3.1) ne part pas à l'essai : le bouton se ferme au lieu de ne rien faire.
+const playable = computed(() => counts.value.targets > 0 && code.value !== '')
 
 function changed() {
   design.value = { ...design.value, parts: [...design.value.parts] }
@@ -113,7 +115,7 @@ function onKey(e) {
       tool.value = prev
     }
     e.preventDefault()
-  } else if (e.key.toLowerCase() === 'z' && (e.ctrlKey || e.metaKey)) {
+  } else if ((e.key === 'z' || e.key === 'Z') && (e.ctrlKey || e.metaKey)) {
     undo()
     e.preventDefault()
   }
@@ -138,16 +140,40 @@ async function shareCastle() {
     share.value = { state: 'failed', url: '' }
   }
 }
-function setting(key, value) {
+/**
+ * Champs refusés (v6.3.1) : chaque saisie est lue à la porte (readDesignField).
+ * Refusée, elle reste affichée telle que tapée et marquée, jusqu'à une saisie
+ * lisible ; le château garde sa dernière valeur lue : il se code toujours.
+ */
+const refused = ref(new Map())
+function mark(key, text, ok) {
+  if (ok ? !refused.value.has(key) : refused.value.get(key) === text) return
+  const next = new Map(refused.value)
+  if (ok) next.delete(key)
+  else next.set(key, text)
+  refused.value = next
+}
+/** Ce que le champ affiche : la saisie refusée, sinon la valeur du château. */
+const shown = (key, value) => (refused.value.has(key) ? refused.value.get(key) : value)
+function setting(key, text) {
+  const value = orElse(() => readDesignField(key, text), undefined)
+  mark(key, text, value !== undefined)
+  if (value === undefined || value === design.value[key]) return
   design.value = { ...design.value, [key]: value }
   changed()
 }
-function setAmmo(type, value) {
-  design.value = { ...design.value, ammo: { ...design.value.ammo, [type]: Math.max(0, Math.min(5, value)) } }
+function setAmmo(type, text) {
+  const value = orElse(() => readDesignField('ammo', text), undefined)
+  mark(`ammo:${type}`, text, value !== undefined)
+  if (value === undefined || value === design.value.ammo[type]) return
+  design.value = { ...design.value, ammo: { ...design.value.ammo, [type]: value } }
   changed()
 }
-/** Nom du château : la règle des noms de profil (SaveSlot.PROFILE_NAME). */
-const nameError = computed(() => design.value.name !== '' && !PROFILE_NAME.test(design.value.name))
+/** Nom du château : la règle des noms de profil (SaveSlot.PROFILE_NAME), 16 caractères au plus. */
+const nameError = computed(() => refused.value.has('name'))
+const ammoError = computed(() => DESIGN_AMMO.some((a) => refused.value.has(`ammo:${a}`)))
+/** Chiffres d'un nombre de munitions (0 à 5) : la longueur du champ. */
+const AMMO_DIGITS = String(DESIGN_RANGES.ammo.max).length
 
 onMounted(async () => {
   const { assets } = await import('../../game/GameController.js')
@@ -214,31 +240,43 @@ onBeforeUnmount(() => ro?.disconnect())
       <div class="editor__form">
         <label class="field">
           <span class="field__label">{{ t('editor.name') }}</span>
-          <input class="input" type="text" maxlength="16" :value="design.name" :aria-invalid="nameError" @input="setting('name', $event.target.value.slice(0, 16))">
+          <input class="input" type="text" :maxlength="TEXT_LIMITS.name" :value="shown('name', design.name)" :aria-invalid="nameError" @input="setting('name', $event.target.value)">
           <span v-if="nameError" class="notice notice--warning">{{ t('profiles.nameError') }}</span>
         </label>
         <label class="field">
           <span class="field__label">{{ t('editor.theme') }}</span>
-          <select class="input" :value="design.theme" @change="setting('theme', Number($event.target.value))">
+          <select class="input" :value="design.theme" @change="setting('theme', $event.target.value)">
             <option v-for="n in THEMES" :key="n" :value="n">{{ t(`levels.chapters.${n}`) }}</option>
           </select>
         </label>
         <label class="field">
           <span class="field__label">{{ t('editor.shots', { count: design.shots }) }}</span>
-          <input class="range" type="range" min="1" max="12" step="1" :value="design.shots" @input="setting('shots', Number($event.target.value))">
+          <input class="range" type="range" :min="DESIGN_RANGES.shots.min" :max="DESIGN_RANGES.shots.max" step="1" :value="design.shots" @input="setting('shots', $event.target.value)">
         </label>
         <label class="field">
           <span class="field__label">{{ t('editor.wind', { value: Math.round(design.wind * 100) }) }}</span>
-          <input class="range" type="range" min="0" max="20" step="1" :value="Math.round(design.wind * 20)" @input="setting('wind', Number($event.target.value) / 20)">
+          <input class="range" type="range" :min="DESIGN_RANGES.windNotches.min" :max="DESIGN_RANGES.windNotches.max" step="1" :value="Math.round(design.wind * 20)" @input="setting('wind', $event.target.value)">
         </label>
         <fieldset class="field">
           <legend class="field__label">{{ t('game.ammoTitle') }}</legend>
           <div class="editor__ammo">
             <label v-for="a in DESIGN_AMMO" :key="a" class="editor__ammo-item">
               <span>{{ t(`game.ammo.${a}`) }}</span>
-              <input class="input" type="number" min="0" max="5" :value="design.ammo[a] ?? 0" @change="setAmmo(a, Number($event.target.value) || 0)">
+              <!-- Un champ texte numérique (v6.3.1) : un champ « number » laissait passer 1.5 ou 1e0. -->
+              <input
+                class="input"
+                type="text"
+                inputmode="numeric"
+                autocomplete="off"
+                :maxlength="AMMO_DIGITS"
+                :value="shown(`ammo:${a}`, design.ammo[a] ?? 0)"
+                :aria-invalid="refused.has(`ammo:${a}`) ? 'true' : 'false'"
+                :aria-describedby="refused.has(`ammo:${a}`) ? 'editor-ammo-error' : undefined"
+                @change="setAmmo(a, $event.target.value)"
+              >
             </label>
           </div>
+          <p v-if="ammoError" id="editor-ammo-error" class="notice notice--warning">{{ t('editor.ammoError', { max: DESIGN_RANGES.ammo.max }) }}</p>
         </fieldset>
       </div>
       <div class="modal__actions">

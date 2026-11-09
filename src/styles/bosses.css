@@ -514,7 +514,6 @@
   border: 1px solid var(--hairline-strong);
   border-radius: var(--radius-l);
   box-shadow: var(--inner-hi), var(--elev-1);
-  cursor: pointer;
   transition:
     translate var(--dur-2) var(--ease-spring),
     box-shadow var(--dur-2) var(--ease-out),
@@ -561,7 +560,6 @@
 
 .deck-card:disabled:not(.deck-card--kept) {
   opacity: 0.45;
-  cursor: default;
 }
 
 /* Écran étroit : les cartes en rangées, l'icône à gauche. */
