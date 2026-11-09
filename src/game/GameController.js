@@ -7,6 +7,7 @@ import { WORLD } from './physics/constants.js'
 import { ReplayPlayer } from './replay/ReplayPlayer.js'
 import { AimInput } from './aim/AimInput.js'
 import { TREB_TUNING, TrebuchetInput } from './aim/TrebuchetInput.js'
+import { canvasCursor } from './aim/canvasCursor.js'
 import { BALLISTA_AIM } from './Ballista.js'
 import { AIM } from './aim.js'
 import { ClipRecorder } from '../services/ClipRecorder.js'
@@ -48,6 +49,8 @@ export class GameController extends EventBus {
   #paused = false
   #resizeObs = null
   #drag = null
+  /** Curseur posé sur la scène (v6.3.1) : changé seulement quand il change. */
+  #cursor = ''
   /** Relâcher après avoir tiré vers l'arrière déclenche le tir (sauf « visée précise »). */
   #releaseToFire = true
   /** Contraste élevé (réglage, v6.2) : le rendu du canevas s'y adapte aussi. */
@@ -206,6 +209,7 @@ export class GameController extends EventBus {
       }
       this.#flightSound()
       this.#watchClip()
+      this.#updateCursor()
       this.#renderer.render(this.#sceneWithAim())
       // Sons du ciel vivant (v6.3) : le tonnerre suit l'éclair, un souffle suit la risée.
       for (const event of this.#renderer.takeSkyEvents()) this.#ambience?.sky?.(event)
@@ -220,6 +224,28 @@ export class GameController extends EventBus {
     }
     this.#raf = requestAnimationFrame(frame)
     this.emit('hud', this.session.hud)
+  }
+
+  /**
+   * Le curseur dit ce qui se clique (v6.3.1) : la main ou le viseur seulement
+   * quand un clic sur la scène agit, la flèche sinon (voir canvasCursor).
+   */
+  #updateCursor() {
+    const s = this.session
+    const cursor = canvasCursor({
+      paused: this.#paused,
+      replaying: this.replaying,
+      aiming: s.state === STATE.AIMING,
+      flying: s.state === STATE.FLYING,
+      trebuchet: s.engine === 'trebuchet',
+      trebPhase: s.trebPhase,
+      busy: s.catapult.busy,
+      canActivate: s.canActivate,
+      dragging: this.#drag !== null,
+    })
+    if (cursor === this.#cursor) return
+    this.#cursor = cursor
+    this.#canvas.style.cursor = cursor
   }
 
   #sceneWithAim() {
@@ -576,6 +602,7 @@ export class GameController extends EventBus {
     cancelAnimationFrame(this.#raf)
     this.#resizeObs?.disconnect()
     const cv = this.#canvas
+    cv.style.cursor = ''
     const h = this.#handlers
     cv.removeEventListener('pointerdown', h.down)
     cv.removeEventListener('pointermove', h.move)

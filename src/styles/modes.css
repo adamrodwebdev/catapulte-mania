@@ -88,12 +88,10 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-1);
-  cursor: pointer;
 }
 
 .levels__toolbar .segmented__option[aria-disabled='true'] {
   opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .levels__mode-hint {
@@ -286,7 +284,6 @@
   background: var(--glass-tint);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-l);
-  cursor: pointer;
   transition:
     border-color var(--dur-2) var(--ease-out),
     background-color var(--dur-2) var(--ease-out),
@@ -361,7 +358,6 @@
   background: var(--glass-tint);
   border: 1px solid var(--hairline-strong);
   border-radius: var(--radius-s);
-  cursor: pointer;
 }
 
 .level-pick__item:focus-within,
@@ -391,7 +387,6 @@
   border: 1px solid rgb(255 255 255 / 0.2);
   border-radius: var(--radius-l);
   box-shadow: var(--inner-hi), var(--elev-1);
-  cursor: pointer;
   background: linear-gradient(180deg, #6f9fd6, #b8d3ea 70%, #5c8a4a 70%);
   text-shadow: 0 1px 2px rgb(0 0 0 / 0.7);
 }
@@ -1332,6 +1327,7 @@
   min-height: 0;
   display: block;
   touch-action: none;
+  /* Le viseur : un clic pose la pièce choisie à l'endroit visé (voir base.css). */
   cursor: crosshair;
 }
 
@@ -1398,7 +1394,6 @@
   font: inherit;
   font-size: var(--fs-0);
   font-weight: 700;
-  cursor: pointer;
   transition:
     background-color var(--dur-2) var(--ease-out),
     border-color var(--dur-2) var(--ease-out),
