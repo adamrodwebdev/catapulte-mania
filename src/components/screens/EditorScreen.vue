@@ -142,34 +142,36 @@ async function shareCastle() {
 }
 /**
  * Champs refusés (v6.3.1) : chaque saisie est lue à la porte (readDesignField).
- * Refusée, elle reste affichée et marquée, et le château garde sa dernière valeur
- * lue : il se code toujours.
+ * Refusée, elle reste affichée telle que tapée et marquée, jusqu'à une saisie
+ * lisible ; le château garde sa dernière valeur lue : il se code toujours.
  */
-const invalid = ref(new Set())
-function mark(key, ok) {
-  if (ok === !invalid.value.has(key)) return
-  const next = new Set(invalid.value)
+const refused = ref(new Map())
+function mark(key, text, ok) {
+  if (ok ? !refused.value.has(key) : refused.value.get(key) === text) return
+  const next = new Map(refused.value)
   if (ok) next.delete(key)
-  else next.add(key)
-  invalid.value = next
+  else next.set(key, text)
+  refused.value = next
 }
+/** Ce que le champ affiche : la saisie refusée, sinon la valeur du château. */
+const shown = (key, value) => (refused.value.has(key) ? refused.value.get(key) : value)
 function setting(key, text) {
   const value = orElse(() => readDesignField(key, text), undefined)
-  mark(key, value !== undefined)
+  mark(key, text, value !== undefined)
   if (value === undefined || value === design.value[key]) return
   design.value = { ...design.value, [key]: value }
   changed()
 }
 function setAmmo(type, text) {
   const value = orElse(() => readDesignField('ammo', text), undefined)
-  mark(`ammo:${type}`, value !== undefined)
+  mark(`ammo:${type}`, text, value !== undefined)
   if (value === undefined || value === design.value.ammo[type]) return
   design.value = { ...design.value, ammo: { ...design.value.ammo, [type]: value } }
   changed()
 }
 /** Nom du château : la règle des noms de profil (SaveSlot.PROFILE_NAME), 16 caractères au plus. */
-const nameError = computed(() => invalid.value.has('name'))
-const ammoError = computed(() => DESIGN_AMMO.some((a) => invalid.value.has(`ammo:${a}`)))
+const nameError = computed(() => refused.value.has('name'))
+const ammoError = computed(() => DESIGN_AMMO.some((a) => refused.value.has(`ammo:${a}`)))
 /** Chiffres d'un nombre de munitions (0 à 5) : la longueur du champ. */
 const AMMO_DIGITS = String(DESIGN_RANGES.ammo.max).length
 
@@ -238,7 +240,7 @@ onBeforeUnmount(() => ro?.disconnect())
       <div class="editor__form">
         <label class="field">
           <span class="field__label">{{ t('editor.name') }}</span>
-          <input class="input" type="text" :maxlength="TEXT_LIMITS.name" :value="design.name" :aria-invalid="nameError" @input="setting('name', $event.target.value)">
+          <input class="input" type="text" :maxlength="TEXT_LIMITS.name" :value="shown('name', design.name)" :aria-invalid="nameError" @input="setting('name', $event.target.value)">
           <span v-if="nameError" class="notice notice--warning">{{ t('profiles.nameError') }}</span>
         </label>
         <label class="field">
@@ -267,9 +269,9 @@ onBeforeUnmount(() => ro?.disconnect())
                 inputmode="numeric"
                 autocomplete="off"
                 :maxlength="AMMO_DIGITS"
-                :value="design.ammo[a] ?? 0"
-                :aria-invalid="invalid.has(`ammo:${a}`) ? 'true' : 'false'"
-                :aria-describedby="invalid.has(`ammo:${a}`) ? 'editor-ammo-error' : undefined"
+                :value="shown(`ammo:${a}`, design.ammo[a] ?? 0)"
+                :aria-invalid="refused.has(`ammo:${a}`) ? 'true' : 'false'"
+                :aria-describedby="refused.has(`ammo:${a}`) ? 'editor-ammo-error' : undefined"
                 @change="setAmmo(a, $event.target.value)"
               >
             </label>
