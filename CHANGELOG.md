@@ -93,6 +93,13 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), num
   (portes, champs, curseur, arguments des scripts) ; lint propre ; builds web,
   démo et portails (CrazyGames, Poki, GameDistribution, GamePix, Y8,
   autonome) ; contrôle dans le navigateur (curseurs, champs, langue, touches).
+- Contrôle des niveaux (`check:levels`, en Difficile, 2 cœurs) : 13 niveaux
+  rejoués sans échec sur cette version (1 à 4, 38, 55, 58, 65, 70, 88, 96, 99
+  et 100, dont deux grands sièges). Le contrôle complet, estimé à 6 à 9 heures
+  de plus à 2 cœurs, n'a pas été mené : les définitions de tous les niveaux
+  (campagne, héroïque, Terres du Duc, arènes, duels) et six tirs simulés ont
+  une empreinte identique, au bit près, à celle de `dev`, et le code de la
+  simulation n'a pas changé ; ses résultats ne peuvent donc pas changer.
 
 ## [6.3.0] – 2026-10-17
 ### Ciels vivants
