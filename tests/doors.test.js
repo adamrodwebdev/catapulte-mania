@@ -185,6 +185,40 @@ for (const language of ['ru', 'constructor', 'FR', 42, ['fr'], null]) {
   })
 }
 
+test('réglages : changer un autre réglage n’enregistre pas une langue que le joueur n’a pas choisie (correctif v6.3.1)', () => {
+  const backend = new MemoryStorage()
+  new SettingsService(new StorageService(backend)).set('volume', 0.35)
+  const settings = new SettingsService(new StorageService(backend))
+  assert.equal(settings.hasStoredLanguage, false, 'le français par défaut n’est pas un choix')
+  assert.equal(settings.get('volume'), 0.35)
+})
+
+test('réglages : choisir la langue par défaut l’enregistre quand même (correctif v6.3.1)', () => {
+  const backend = new MemoryStorage()
+  new SettingsService(new StorageService(backend)).set('language', 'fr')
+  assert.equal(new SettingsService(new StorageService(backend)).hasStoredLanguage, true)
+})
+
+test('un joueur indonésien qui règle le volume retrouve sa langue, pas le français (correctif v6.3.1)', async () => {
+  const cloud = new MemoryStorage()
+  const first = await createAppContext({ ads: portal({ cloud, locale: 'id-ID' }) })
+  assert.equal(first.state.locale, 'id')
+  first.setSetting('volume', 0.3)
+  const again = await createAppContext({ ads: portal({ cloud, locale: 'id-ID' }) })
+  assert.equal(again.state.locale, 'id')
+  assert.equal(again.state.settings.volume, 0.3)
+})
+
+test('réglages : la remise à zéro oublie les choix, la langue du joueur est cherchée de nouveau', () => {
+  const backend = new MemoryStorage()
+  const settings = new SettingsService(new StorageService(backend))
+  settings.set('language', 'id')
+  settings.set('volume', 0.2)
+  settings.reset()
+  assert.equal(settings.get('volume'), 0.7)
+  assert.equal(new SettingsService(new StorageService(backend)).hasStoredLanguage, false)
+})
+
 test('réglages : une langue choisie par le joueur se relit', () => {
   const backend = new MemoryStorage()
   new SettingsService(new StorageService(backend)).set('language', 'id')

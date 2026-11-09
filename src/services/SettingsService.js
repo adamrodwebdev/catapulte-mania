@@ -59,6 +59,13 @@ const STORAGE_KEY = 'settings'
 export class SettingsService extends EventBus {
   #storage
   #values
+  /**
+   * Réglages que le joueur a choisis, ou relus de son stockage (v6.3.1) : les seuls
+   * enregistrés. Une valeur par défaut n'est pas un choix : avant, régler le volume
+   * enregistrait aussi la langue par défaut (le français), et un joueur anglais ou
+   * indonésien revenait en français.
+   */
+  #chosen = new Set()
 
   /** @param {import('./StorageService.js').StorageService} storage */
   constructor(storage) {
@@ -67,7 +74,9 @@ export class SettingsService extends EventBus {
     const stored = SettingsService.#stored(storage)
     this.#values = {}
     for (const [key, def] of Object.entries(DEFINITIONS)) {
-      this.#values[key] = stored && Object.hasOwn(stored, key) ? orElse(() => def.validate(stored[key], key), def.fallback) : def.fallback
+      const value = stored && Object.hasOwn(stored, key) ? orElse(() => def.validate(stored[key], key), undefined) : undefined
+      this.#values[key] = value === undefined ? def.fallback : value
+      if (value !== undefined) this.#chosen.add(key)
     }
   }
 
@@ -83,13 +92,12 @@ export class SettingsService extends EventBus {
 
   /**
    * Le joueur a-t-il déjà choisi une langue ? (sinon on détecte celle du portail
-   * ou du navigateur). Seule une langue du jeu compte (v6.3.1) : celle d'une autre
-   * version, ou une valeur abîmée, laisse chercher la langue du joueur.
+   * ou du navigateur). Seule une langue du jeu choisie par le joueur compte
+   * (v6.3.1) : la langue par défaut, celle d'une autre version ou une valeur
+   * abîmée laissent chercher la sienne.
    */
   get hasStoredLanguage() {
-    const stored = SettingsService.#stored(this.#storage)
-    if (!stored || !Object.hasOwn(stored, 'language')) return false
-    return orElse(() => DEFINITIONS.language.validate(stored.language, 'language') !== undefined, false)
+    return this.#chosen.has('language')
   }
 
   get(key) {
@@ -97,14 +105,20 @@ export class SettingsService extends EventBus {
     return this.#values[key]
   }
 
-  /** Valide puis enregistre un réglage. Lève une erreur si la valeur est invalide. */
+  /**
+   * Valide puis enregistre un choix du joueur. Lève une erreur si la valeur est
+   * invalide. Choisir la valeur par défaut l'enregistre aussi (le français choisi
+   * reste le français, même si le navigateur parle anglais).
+   */
   set(key, value) {
     if (!Object.hasOwn(DEFINITIONS, key)) throw new Error(`Unknown setting "${key}"`)
     const valid = DEFINITIONS[key].validate(value, key)
-    if (this.#values[key] === valid) return
+    const changed = this.#values[key] !== valid
+    if (!changed && this.#chosen.has(key)) return
     this.#values[key] = valid
-    this.#storage.writeJson(STORAGE_KEY, this.#values)
-    this.emit('change', { key, value: valid })
+    this.#chosen.add(key)
+    this.#write()
+    if (changed) this.emit('change', { key, value: valid })
   }
 
   /** Copie de tous les réglages. */
@@ -112,7 +126,21 @@ export class SettingsService extends EventBus {
     return { ...this.#values }
   }
 
+  /** Remise à zéro (v6.3.1) : les valeurs par défaut, et plus aucun choix enregistré. */
   reset() {
-    for (const [key, def] of Object.entries(DEFINITIONS)) this.set(key, def.fallback)
+    this.#chosen.clear()
+    this.#storage.remove(STORAGE_KEY)
+    for (const [key, def] of Object.entries(DEFINITIONS)) {
+      if (this.#values[key] === def.fallback) continue
+      this.#values[key] = def.fallback
+      this.emit('change', { key, value: def.fallback })
+    }
+  }
+
+  /** N'enregistre que les réglages choisis (ou relus). */
+  #write() {
+    const chosen = {}
+    for (const key of this.#chosen) chosen[key] = this.#values[key]
+    this.#storage.writeJson(STORAGE_KEY, chosen)
   }
 }
