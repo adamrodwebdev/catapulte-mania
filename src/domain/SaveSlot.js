@@ -32,6 +32,7 @@ export const PROFILE_NAME = /^[\p{L}\p{N}][\p{L}\p{N} _'-]{0,15}$/u
 export function readName(value, { required = true } = {}) {
   return readText(value, { maxLength: TEXT_LIMITS.name, required, pattern: PROFILE_NAME }, 'name')
 }
+
 const LEVEL_KEY = /^(?:[1-9]|[1-9][0-9]|100)$/
 const COUNTER = Schema.int({ min: 0, max: 1e9 })
 

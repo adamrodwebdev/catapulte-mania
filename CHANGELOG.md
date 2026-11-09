@@ -2,6 +2,98 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [6.3.1] – 2026-11-09
+### Sécurité
+- **Les données de l'extérieur sont lues à la porte** (règle du 9 novembre
+  2026). Tout ce qui entre dans le jeu (stockage du navigateur et des
+  portails, adresse et ancres des liens, langues du navigateur et des
+  portails, valeurs des SDK, champs et curseurs, noms de touches, arguments
+  des scripts, variable `VITE_SITE_URL` du build) passe par un lecteur
+  partagé (`src/core/utils/input.js`, le même que dans les autres jeux) :
+  - un nombre est un vrai nombre fini dans sa plage, écrit en entier
+    (« 1e1 », « 0x10 », « » ou « 2.0 » ne valent plus 10, 16, 0 ou 2) ;
+  - un texte est une chaîne nettoyée (caractères de contrôle, inversions
+    bidirectionnelles, espaces de largeur nulle retirés, accents composés,
+    espaces resserrés) dont la longueur est bornée : refusé au-delà, jamais
+    coupé ;
+  - une liste fermée (langue, difficulté, pièce, commande) est lue
+    exactement, dans une `Map` ou les champs propres d'un objet : un nom
+    comme `constructor`, `toString` ou `__proto__` n'y trouve plus rien.
+- **Une seule table des limites** (`src/config/limits.js`) : noms (16
+  caractères), langues, jours et semaines, codes des liens, liens des
+  portails, arguments des scripts, adresse du site, et taille d'une entrée
+  du stockage, vérifiée avant toute lecture (64 Ko ; le profil le plus
+  plein que le schéma permette en fait 26 535 unités).
+- **Les schémas des sauvegardes et des liens** assemblent ces lecteurs :
+  entiers sûrs, textes nettoyés et comptés en caractères, champs propres
+  seulement.
+- **`VITE_SITE_URL`**, écrite telle quelle dans `index.html`, le plan du
+  site et `robots.txt`, doit être une adresse https sans guillemet ni
+  chevron, sinon le build s'arrête.
+
+### Corrigé
+- **Un profil illisible n'est plus pris pour un emplacement libre.** Une
+  sauvegarde coupée, trop longue, rendue par le stockage d'un portail sous
+  une autre forme qu'un texte, ou dont la lecture échouait, passait pour un
+  emplacement vide : sur les portails, le démarrage rapide (« Jouer » d'un
+  nouveau joueur) créait alors un profil par-dessus, d'office. Elle est
+  désormais « altérée » : rien ne l'écrase, seul le joueur peut la supprimer.
+- **Le sel de l'appareil**, qui rend les profils lisibles, n'est plus
+  remplacé quand sa lecture échoue : le nouveau ne vaut que pour la session.
+- **Dernier profil ouvert** (« Continuer », défi du jour, coupe) : « », « 1e0 »
+  ou « 0x1 » enregistrés ne désignent plus un emplacement.
+- **Langue** : régler le volume, ou tout autre réglage, enregistrait aussi la
+  langue par défaut (le français), que le joueur n'avait jamais choisie ; au
+  lancement suivant, un joueur anglais ou indonésien revenait en français.
+  Seuls les réglages choisis sont enregistrés désormais (choisir le français
+  l'enregistre bien), et « Réinitialiser » efface les choix. Une langue
+  enregistrée par une autre version (« ru ») ou abîmée ne compte plus non
+  plus pour un choix (la langue du portail ou du navigateur est cherchée) ;
+  une langue de portail d'un autre type (un objet) arrêtait le démarrage.
+- **Atelier de châteaux** : le champ des munitions acceptait « 1.5 », que
+  le code du château refusait ensuite ; l'essai ne partait plus, le partage
+  restait fermé et le brouillon n'était plus enregistré, sans un mot. C'est
+  un champ texte numérique, refusé hors de 0 à 5 avec un message (la saisie
+  refusée reste affichée jusqu'à une saisie lisible) ; le nom est refusé
+  au-delà de 16 caractères au lieu d'être coupé ; « Essayer » se ferme tant
+  que le château ne se code pas.
+- **Noms** (profil, joueurs, château) : un accent décomposé (claviers
+  vietnamiens, texte collé) était refusé ; il est composé, et les espaces en
+  trop sont resserrés.
+- **Clavier** : une touche nommée `constructor` ou `toString` était prise
+  pour une flèche (la visée levait une erreur).
+- **Château reçu par lien** : une pièce nommée `constructor` arrêtait le
+  décodage sur une erreur, et `["r"]` passait pour un étage ; les deux sont
+  refusés comme un lien illisible.
+- **`npm run check:levels -- --levels abc`** ne contrôlait aucun niveau et
+  passait ; `--levels 1e1` contrôlait le niveau 10, `--workers four` prenait
+  tous les cœurs, `--level 5` (faute de frappe) les 100 niveaux. Un argument
+  inconnu, répété, sans valeur ou illisible arrête désormais la commande
+  (code 2) avant le premier niveau ; de même pour `release:portals`
+  (`--gd-id --y8-game 123` prenait « --y8-game » pour l'identifiant) et
+  `backgrounds` (`--crop abc` encodait avec NaN).
+
+### Interface
+- **Le curseur dit ce qui se clique** : la flèche sur tout le contenu (titres,
+  textes, listes, images), la main sur les liens, boutons, listes, onglets et
+  étiquettes de commandes, la barre de texte dans les champs, « interdit »
+  sur une commande désactivée. Posé une seule fois (`base.css`) ; les 23
+  règles éparses des composants sont retirées (un niveau verrouillé de la
+  campagne à deux montrait la main). Restent le viseur de l'atelier et
+  l'écran du studio, qu'un clic n'importe où passe.
+- **Sur la scène**, le curseur suit le geste : la main ouverte sur la fronde
+  de la catapulte et de la baliste en visée, fermée pendant le geste ; le
+  viseur pour planter le fanion du trébuchet, la main pour figer sa jauge ;
+  en vol, la main seulement quand un appui agit (mitraille, météore,
+  faucon) ; la flèche en pause, en relecture et entre deux tours.
+
+### Contrôles
+- 616 tests, dont 233 nouveaux : les 114 des lecteurs partagés, et un test de
+  régression par correctif, vu en échec sur l'ancien code avant d'être corrigé
+  (portes, champs, curseur, arguments des scripts) ; lint propre ; builds web,
+  démo et portails (CrazyGames, Poki, GameDistribution, GamePix, Y8,
+  autonome) ; contrôle dans le navigateur (curseurs, champs, langue, touches).
+
 ## [6.3.0] – 2026-10-17
 ### Ciels vivants
 - **Les fonds peints s'animent** (`src/game/sky/`), chacun selon sa peinture,
