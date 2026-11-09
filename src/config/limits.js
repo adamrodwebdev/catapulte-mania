@@ -32,6 +32,8 @@ export const TEXT_LIMITS = Object.freeze({
   inviteLink: 2048,
   /** Valeur d'un argument des scripts (`--levels 13,29,41-50`, `--gd-id …`). */
   scriptArgument: 400,
+  /** Adresse publique du site (variable VITE_SITE_URL du build). */
+  siteUrl: 200,
 })
 
 /** Le plus d'éléments lus dans une liste venue de l'extérieur ; au-delà, le reste est ignoré ou refusé. */
