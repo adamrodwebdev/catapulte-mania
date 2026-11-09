@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { Schema, ValidationError, deepFreeze } from '../src/core/utils/Guard.js'
+import { InvalidInput, orElse } from '../src/core/utils/input.js'
 import { SeededRandom } from '../src/core/utils/SeededRandom.js'
 
 test('Schema.int refuse les non-entiers et les valeurs hors plage', () => {
@@ -22,6 +23,36 @@ test('Schema.record bloque la pollution de prototype', () => {
   const v = Schema.record(/^.+$/, Schema.int())
   const evil = JSON.parse('{"__proto__": 1}')
   assert.throws(() => v(evil), /invalid key/)
+})
+
+test('Schema.string lit le texte à la porte : nettoyé, compté en caractères, refusé au-delà (v6.3.1)', () => {
+  const v = Schema.string({ minLength: 1, maxLength: 5, pattern: /^[\p{L} ]+$/u })
+  assert.equal(v('  Bo\u{200B}b  '), 'Bob', 'espace de largeur nulle retiré, bords coupés')
+  assert.equal(v('e\u{301}te\u{301}'), 'été', 'accents composés (NFC)')
+  assert.equal(v('A\u{202E}B'), 'AB', 'inversion bidirectionnelle retirée')
+  assert.equal(v('\u{1D400}\u{1D401}\u{1D402}\u{1D403}\u{1D404}'), '\u{1D400}\u{1D401}\u{1D402}\u{1D403}\u{1D404}', 'cinq lettres hors du plan de base : cinq caractères')
+  for (const bad of ['abcdef', '', '   ', 12, null, ['ab'], { toString: 'x' }, 'a1']) {
+    assert.throws(() => v(bad), ValidationError, JSON.stringify(bad))
+  }
+  assert.throws(() => Schema.string({ minLength: 1 }), TypeError, 'pas de texte sans longueur maximale')
+})
+
+test('Schema.int ne lit qu’un entier sûr, jamais une chaîne qui l’écrit (v6.3.1)', () => {
+  const v = Schema.int({ min: 0, max: 2 ** 60 })
+  for (const bad of ['1', '1e1', 2 ** 53, 1e300, true, [1]]) assert.throws(() => v(bad), ValidationError, String(bad))
+  assert.equal(Object.is(v(-0), 0), true, '-0 se lit 0')
+})
+
+test('Schema.object ne lit que les champs propres de l’objet (v6.3.1)', () => {
+  const v = Schema.object({ toString: Schema.optional(Schema.boolean(), false) })
+  assert.deepEqual(v({}), { toString: false }, 'le toString hérité d’Object.prototype n’est pas une valeur')
+})
+
+test('une ValidationError est un refus de la porte : orElse rend la valeur de repli (v6.3.1)', () => {
+  const v = Schema.int({ min: 1, max: 3 })
+  assert.ok(new ValidationError('x', 'y') instanceof InvalidInput)
+  assert.equal(orElse(() => v(9), 1), 1)
+  assert.equal(orElse(() => v(2), 1), 2)
 })
 
 test('deepFreeze rend un objet imbriqué non modifiable', () => {

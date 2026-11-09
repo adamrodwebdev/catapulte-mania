@@ -1,8 +1,9 @@
 import { Guard } from '../core/utils/Guard.js'
+import { SAVE_LIMITS } from '../config/limits.js'
 
 const PREFIX = 'ctc:'
 /** Taille maximale d'une entrée : protège contre le remplissage abusif du stockage. */
-const MAX_ENTRY_SIZE = 64 * 1024
+const MAX_ENTRY_SIZE = SAVE_LIMITS.entry
 
 /**
  * Accès sécurisé au localStorage.

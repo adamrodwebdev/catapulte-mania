@@ -1,4 +1,5 @@
 import { Guard } from '../core/utils/Guard.js'
+import { SAVE_LIMITS } from '../config/limits.js'
 
 /**
  * Signature des sauvegardes (anti-modification).
@@ -88,7 +89,7 @@ export class SaveSigner {
    * @returns {Promise<string>} signature préfixée par l'algorithme
    */
   async sign(text) {
-    Guard.string(text, 'payload', { maxLength: 64 * 1024 })
+    Guard.string(text, 'payload', { maxLength: SAVE_LIMITS.entry })
     const key = await this.#key()
     if (key) {
       const sig = await this.#subtle().sign('HMAC', key, new TextEncoder().encode(text))

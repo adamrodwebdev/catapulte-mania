@@ -1,4 +1,5 @@
 import { Schema, ValidationError, deepFreeze } from '../../core/utils/Guard.js'
+import { TEXT_LIMITS } from '../../config/limits.js'
 import { MATERIAL_NAMES, BUILD_MATERIALS } from '../entities/materials.js'
 import { TARGET_TYPES } from '../entities/catalog.js'
 import { WORLD } from '../physics/constants.js'
@@ -155,12 +156,12 @@ export function buildCustomLevel(design) {
 
 const KIND_CODE = Object.freeze({ room: 'r', wall: 'w', plank: 'p', base: 'b', roof: 'f', soldier: 's', knight: 'c', king: 'k', barrel: 'o' })
 const CODE_KIND = Object.freeze(Object.fromEntries(Object.entries(KIND_CODE).map(([k, v]) => [v, k])))
-export const MAX_CASTLE_CODE = 4000
+export const MAX_CASTLE_CODE = TEXT_LIMITS.castleCode
 
 const designSchema = Schema.object(
   {
     v: Schema.enum([1]),
-    n: Schema.string({ minLength: 0, maxLength: 16, pattern: /^(?:|[\p{L}\p{N}][\p{L}\p{N} _'-]{0,15})$/u }),
+    n: Schema.string({ minLength: 0, maxLength: TEXT_LIMITS.name, pattern: /^(?:|[\p{L}\p{N}][\p{L}\p{N} _'-]{0,15})$/u }),
     th: Schema.int({ min: 1, max: 10 }),
     s: Schema.int({ min: 1, max: 12 }),
     w: Schema.int({ min: 0, max: 20 }),

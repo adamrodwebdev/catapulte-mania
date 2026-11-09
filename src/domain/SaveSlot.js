@@ -1,5 +1,6 @@
 import { Schema, Guard, ValidationError } from '../core/utils/Guard.js'
 import { GAME } from '../config/gameConfig.js'
+import { TEXT_LIMITS } from '../config/limits.js'
 import { LevelResult } from './LevelResult.js'
 import { UpgradeCatalog } from '../game/progression/UpgradeCatalog.js'
 import { GOLD, goldFor, maxGoldFor, legacyMaxGoldFor } from '../game/progression/GoldRules.js'
@@ -36,7 +37,7 @@ const DUKE_KEY = new RegExp(`^[1-${DUKE_COUNT}]$`)
 /** Défi du jour : série, records des derniers jours (voir DailyRecords). */
 const DAILY = Schema.object({
   // Dernier jour réussi (AAAA-MM-JJ), '' si aucun.
-  last: Schema.string({ minLength: 0, maxLength: 10, pattern: /^(?:|\d{4}-\d{2}-\d{2})$/ }),
+  last: Schema.string({ minLength: 0, maxLength: TEXT_LIMITS.dayKey, pattern: /^(?:|\d{4}-\d{2}-\d{2})$/ }),
   streak: Schema.int({ min: 0, max: 100000 }),
   bestStreak: Schema.int({ min: 0, max: 100000 }),
   // Meilleur score de chaque jour réussi récemment.
@@ -48,7 +49,7 @@ const DAILY = Schema.object({
  * château (1 à 5), la médaille de la semaine ; les médailles gagnées en tout.
  */
 const CUP_SAVE = Schema.object({
-  week: Schema.string({ minLength: 0, maxLength: 8, pattern: /^(?:|\d{4}-W\d{2})$/ }),
+  week: Schema.string({ minLength: 0, maxLength: TEXT_LIMITS.weekKey, pattern: /^(?:|\d{4}-W\d{2})$/ }),
   castles: Schema.record(/^[1-5]$/, Schema.object({ best: Schema.int({ min: 0, max: GAME.MAX_LEVEL_SCORE }), stars: Schema.int({ min: 1, max: 3 }) }), { maxKeys: CUP.CASTLES }),
   medal: Schema.enum(['', 'bronze', 'silver', 'gold']),
   trophies: Schema.object({ bronze: COUNTER, silver: COUNTER, gold: COUNTER }),
@@ -62,7 +63,7 @@ export function emptyCup() {
 /** Schéma de la sauvegarde (version 11). Toute clé inconnue est refusée. */
 export const saveSchema = Schema.object({
   version: Schema.enum([GAME.SAVE_VERSION]),
-  name: Schema.string({ minLength: 1, maxLength: 16, pattern: PROFILE_NAME }),
+  name: Schema.string({ minLength: 1, maxLength: TEXT_LIMITS.name, pattern: PROFILE_NAME }),
   difficulty: Schema.enum(GAME.DIFFICULTIES),
   createdAt: Schema.int({ min: 0, max: 8.64e15 }),
   updatedAt: Schema.int({ min: 0, max: 8.64e15 }),
@@ -110,7 +111,7 @@ export const saveSchema = Schema.object({
   endless: Schema.object({ best: Schema.int({ min: 0, max: 1e9 }), bestWave: Schema.int({ min: 0, max: 10000 }), sieges: COUNTER }),
   // v9 : récompenses de connexion (dernier coffre ouvert, jour du cycle, total).
   login: Schema.object({
-    last: Schema.string({ minLength: 0, maxLength: 10, pattern: /^(?:|\d{4}-\d{2}-\d{2})$/ }),
+    last: Schema.string({ minLength: 0, maxLength: TEXT_LIMITS.dayKey, pattern: /^(?:|\d{4}-\d{2}-\d{2})$/ }),
     day: Schema.int({ min: 0, max: LOGIN_CYCLE.length }),
     claims: Schema.int({ min: 0, max: 100000 }),
     gold: GOLD_INT,
