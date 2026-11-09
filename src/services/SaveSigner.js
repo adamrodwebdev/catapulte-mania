@@ -59,13 +59,15 @@ export class SaveSigner {
   }
 
   #salt() {
-    let salt = this.#storage.read(SALT_KEY)
-    if (!salt || !/^[A-Za-z0-9_-]{22}$/.test(salt)) {
-      const bytes = new Uint8Array(16)
-      globalThis.crypto.getRandomValues(bytes)
-      salt = b64url(bytes)
-      this.#storage.write(SALT_KEY, salt)
-    }
+    const entry = this.#storage.readEntry(SALT_KEY)
+    if (entry.status === 'present' && /^[A-Za-z0-9_-]{22}$/.test(entry.text)) return entry.text
+    const bytes = new Uint8Array(16)
+    globalThis.crypto.getRandomValues(bytes)
+    const salt = b64url(bytes)
+    // Lecture en échec (v6.3.1) : le sel d'origine est sans doute encore là, et avec
+    // lui la lecture des profils. Le nouveau ne vaut que pour la session : il n'est
+    // jamais écrit par-dessus. (Absent ou mal formé, il ne protège rien : on le remplace.)
+    if (!(entry.status === 'unreadable' && entry.reason === 'read-failed')) this.#storage.write(SALT_KEY, salt)
     return salt
   }
 

@@ -34,6 +34,12 @@ export const TEXT_LIMITS = Object.freeze({
   scriptArgument: 400,
 })
 
+/** Le plus d'éléments lus dans une liste venue de l'extérieur ; au-delà, le reste est ignoré ou refusé. */
+export const LIST_LIMITS = Object.freeze({
+  /** Langues du navigateur et du portail essayées pour choisir la langue du jeu. */
+  languages: 20,
+})
+
 /**
  * La plus longue entrée lue dans le stockage (celui du navigateur ou du
  * portail), en unités UTF-16, vérifiée avant `JSON.parse`. Mesuré le

@@ -12,7 +12,7 @@ import { AmbienceDirector } from '../game/audio/AmbienceDirector.js'
 import { Tracks } from '../game/levels/Tracks.js'
 import { starsFor } from '../game/score/ScoreRules.js'
 import { PowerRegistry } from '../game/powers/PowerRegistry.js'
-import { WeeklyCup, weekKey, CUP } from '../game/daily/WeeklyCup.js'
+import { WeeklyCup, weekKey, CUP, WEEK_KEY } from '../game/daily/WeeklyCup.js'
 import { DailyChallenge } from '../game/daily/DailyChallenge.js'
 import { ReplayCode } from '../game/replay/ReplayCode.js'
 import { ENDLESS } from '../domain/EndlessRun.js'
@@ -21,6 +21,8 @@ import { NoAdService } from '../services/ads/AdService.js'
 import { CloudStorageBackend } from '../services/CloudStorageBackend.js'
 import { GAME, PLAYABLE_LEVELS, IS_PORTAL } from '../config/gameConfig.js'
 import { ValidationError } from '../core/utils/Guard.js'
+import { orElse, readChoice } from '../core/utils/input.js'
+import { readInviteParam } from '../services/outsideValues.js'
 import { ProfilePresenter } from './ProfilePresenter.js'
 
 const KEY = Symbol('app')
@@ -78,9 +80,9 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
   }
   const storage = cloud ? new StorageService(cloud) : new StorageService()
   const settings = new SettingsService(storage)
-  const urlLang = new URLSearchParams(globalThis.location?.search || '').get('lang')
+  const urlLang = orElse(() => readChoice(new URLSearchParams(globalThis.location?.search || '').get('lang'), GAME.LANGUAGES, 'lang'), null)
   const locale =
-    urlLang && GAME.LANGUAGES.includes(urlLang)
+    urlLang !== null
       ? urlLang
       : settings.hasStoredLanguage
         ? settings.get('language')
@@ -435,17 +437,33 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     return sharing.share({ coupe: weekKey() }, text)
   }
 
+  /**
+   * Invitation reçue par lien, lue à la porte (v6.3.1) : le paramètre du portail,
+   * sinon l'ancre de notre site (`#defi=…`, `#chateau=…`, `#coupe=…`), bornée et
+   * limitée à l'alphabet des codes. `undefined` : aucune invitation ; `null` : une
+   * invitation illisible (le jeu le dit à l'accueil).
+   * @param {'defi' | 'chateau' | 'coupe'} key
+   * @returns {string | null | undefined}
+   */
+  function incomingInvite(key) {
+    let raw
+    try {
+      raw = ads.inviteParam(key)
+      if (raw === null || raw === undefined || raw === '') {
+        const hash = globalThis.location?.hash
+        raw = typeof hash === 'string' && hash.startsWith(`#${key}=`) ? hash.slice(key.length + 2) : undefined
+      }
+    } catch {
+      raw = undefined
+    }
+    return raw === undefined || raw === '' ? undefined : readInviteParam(raw)
+  }
+
   /** Au démarrage : une coupe partagée par lien ? (celle de la semaine, ou une coupe finie). */
   function readIncomingCup() {
-    let week
-    try {
-      week = ads.inviteParam('coupe')
-      if (!week && globalThis.location?.hash.startsWith('#coupe=')) week = decodeURIComponent(location.hash.slice(7))
-    } catch {
-      week = null
-    }
-    if (!week) return
-    state.incomingCup = /^\d{4}-W\d{2}$/.test(week) ? { week, current: week === weekKey() } : null
+    const week = incomingInvite('coupe')
+    if (week === undefined) return
+    state.incomingCup = week !== null && WEEK_KEY.test(week) ? { week, current: week === weekKey() } : null
   }
 
   /** Passe un niveau après trois défaites d'affilée (v6.0) ; le suivant s'ouvre. */
@@ -575,15 +593,10 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
 
   /** Au démarrage : un château partagé par lien ? */
   async function readIncomingCastle() {
-    let code
+    const code = incomingInvite('chateau')
+    if (code === undefined) return
     try {
-      code = ads.inviteParam('chateau')
-      if (!code && globalThis.location?.hash.startsWith('#chateau=')) code = location.hash.slice(9)
-    } catch {
-      code = null
-    }
-    if (!code) return
-    try {
+      if (code === null) throw new ValidationError('castle', 'unreadable invite')
       const { CastleCode } = await import('../game/editor/CastleDesign.js')
       const design = CastleCode.decode(code)
       state.incomingCastle = { code, name: design.name }
@@ -600,15 +613,10 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
 
   /** Au démarrage : un défi reçu par lien (portail ou #defi= sur notre site) ? */
   function readIncomingChallenge() {
-    let code
+    const code = incomingInvite('defi')
+    if (code === undefined) return
     try {
-      code = ads.inviteParam('defi')
-      if (!code && globalThis.location?.hash.startsWith('#defi=')) code = location.hash.slice(6)
-    } catch {
-      code = null
-    }
-    if (!code) return
-    try {
+      if (code === null) throw new ValidationError('code', 'unreadable invite')
       state.incomingChallenge = ReplayCode.decode(code)
     } catch {
       state.badChallenge = true

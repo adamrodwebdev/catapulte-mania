@@ -2,6 +2,7 @@ import { AdService } from './AdService.js'
 import { AdPolicy } from './AdPolicy.js'
 import { loadScript, SDK_URLS } from './loadScript.js'
 import { ADS_ENABLED } from '../../config/gameConfig.js'
+import { readInviteLink, readLanguageTag } from '../outsideValues.js'
 
 /**
  * CrazyGames (SDK v3) : interstitiels « midgame », vidéos « rewarded »,
@@ -48,8 +49,7 @@ export class CrazyGamesAdService extends AdService {
 
   get locale() {
     try {
-      const locale = this.#sdk?.user?.systemInfo?.locale
-      return typeof locale === 'string' && /^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*$/.test(locale) ? locale : null
+      return readLanguageTag(this.#sdk?.user?.systemInfo?.locale)
     } catch {
       return null
     }
@@ -67,8 +67,7 @@ export class CrazyGamesAdService extends AdService {
   /** Lien d'invitation CrazyGames (module `game`). */
   async inviteLink(params) {
     try {
-      const link = this.#sdk?.game?.inviteLink?.(params)
-      return typeof link === 'string' && /^https:\/\//.test(link) ? link : null
+      return readInviteLink(this.#sdk?.game?.inviteLink?.(params))
     } catch {
       return null
     }

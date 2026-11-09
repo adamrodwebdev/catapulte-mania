@@ -1,4 +1,5 @@
-import { Guard, ValidationError } from '../core/utils/Guard.js'
+import { Guard, ValidationError, isPlainObject } from '../core/utils/Guard.js'
+import { orElse, parseNumber } from '../core/utils/input.js'
 import { GAME } from '../config/gameConfig.js'
 import { SaveSlot } from '../domain/SaveSlot.js'
 
@@ -44,21 +45,31 @@ export class SaveManager {
   /**
    * @param {number} index
    * @returns {Promise<SaveSlot | null>} `null` si l'emplacement est vide
-   * @throws {ValidationError} si la sauvegarde est altérée ou incohérente
+   * @throws {ValidationError} si la sauvegarde est illisible, altérée ou incohérente
    */
   async load(index) {
     this.#checkIndex(index)
-    const envelope = this.#storage.readJson(slotKey(index))
-    if (envelope === null) return null
-    if (!envelope || typeof envelope.data !== 'string' || typeof envelope.sig !== 'string') {
-      throw new ValidationError('save', 'malformed envelope')
+    // Illisible n'est pas vide (v6.3.1) : une entrée coupée, trop longue, d'une autre
+    // forme ou que le stockage n'a pas pu rendre est « corrompue », jamais un
+    // emplacement libre que le démarrage rapide des portails viendrait écraser.
+    const entry = this.#storage.readEntry(slotKey(index))
+    if (entry.status === 'empty') return null
+    if (entry.status === 'unreadable') throw new ValidationError('save', `unreadable entry (${entry.reason})`)
+    let envelope
+    try {
+      envelope = JSON.parse(entry.text)
+    } catch {
+      throw new ValidationError('save', 'invalid JSON')
     }
-    if (!(await this.#signer.verify(envelope.data, envelope.sig))) {
+    const data = isPlainObject(envelope) && Object.hasOwn(envelope, 'data') ? envelope.data : undefined
+    const sig = isPlainObject(envelope) && Object.hasOwn(envelope, 'sig') ? envelope.sig : undefined
+    if (typeof data !== 'string' || typeof sig !== 'string') throw new ValidationError('save', 'malformed envelope')
+    if (!(await this.#signer.verify(data, sig))) {
       throw new ValidationError('save', 'signature mismatch')
     }
     let raw
     try {
-      raw = JSON.parse(envelope.data)
+      raw = JSON.parse(data)
     } catch {
       throw new ValidationError('save', 'invalid JSON')
     }
@@ -116,11 +127,14 @@ export class SaveManager {
     return out
   }
 
-  /** Dernier emplacement utilisé (pour « Continuer »). */
+  /**
+   * Dernier emplacement utilisé (pour « Continuer »), ou null. Le texte stocké
+   * est lu en entier (v6.3.1) : « », « 1e0 », « 0x1 » ou « 2.0 » ne désignent
+   * plus un emplacement.
+   */
   get lastSlot() {
-    const v = this.#storage.read('last-slot')
-    const n = v === null ? NaN : Number(v)
-    return Number.isInteger(n) && n >= 0 && n < GAME.SAVE_SLOTS ? n : null
+    const text = this.#storage.read('last-slot')
+    return orElse(() => parseNumber(text, { min: 0, max: GAME.SAVE_SLOTS - 1, integer: true }, 'last-slot'), null)
   }
 
   set lastSlot(index) {

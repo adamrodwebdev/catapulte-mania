@@ -1,4 +1,5 @@
-import { Schema } from '../core/utils/Guard.js'
+import { Schema, isPlainObject } from '../core/utils/Guard.js'
+import { orElse } from '../core/utils/input.js'
 import { GAME, IS_PORTAL } from '../config/gameConfig.js'
 import { EventBus } from '../core/utils/EventBus.js'
 
@@ -63,25 +64,32 @@ export class SettingsService extends EventBus {
   constructor(storage) {
     super()
     this.#storage = storage
-    const stored = storage.readJson(STORAGE_KEY)
+    const stored = SettingsService.#stored(storage)
     this.#values = {}
     for (const [key, def] of Object.entries(DEFINITIONS)) {
-      try {
-        this.#values[key] = stored && Object.hasOwn(stored, key) ? def.validate(stored[key], key) : def.fallback
-      } catch {
-        this.#values[key] = def.fallback
-      }
+      this.#values[key] = stored && Object.hasOwn(stored, key) ? orElse(() => def.validate(stored[key], key), def.fallback) : def.fallback
     }
+  }
+
+  /** Les réglages enregistrés (un objet lu champ par champ), ou null. */
+  static #stored(storage) {
+    const stored = storage.readJson(STORAGE_KEY)
+    return isPlainObject(stored) ? stored : null
   }
 
   static get keys() {
     return Object.keys(DEFINITIONS)
   }
 
-  /** Le joueur a-t-il déjà choisi une langue ? (sinon on détecte celle du navigateur) */
+  /**
+   * Le joueur a-t-il déjà choisi une langue ? (sinon on détecte celle du portail
+   * ou du navigateur). Seule une langue du jeu compte (v6.3.1) : celle d'une autre
+   * version, ou une valeur abîmée, laisse chercher la langue du joueur.
+   */
   get hasStoredLanguage() {
-    const stored = this.#storage.readJson(STORAGE_KEY)
-    return Boolean(stored && typeof stored.language === 'string')
+    const stored = SettingsService.#stored(this.#storage)
+    if (!stored || !Object.hasOwn(stored, 'language')) return false
+    return orElse(() => DEFINITIONS.language.validate(stored.language, 'language') !== undefined, false)
   }
 
   get(key) {
