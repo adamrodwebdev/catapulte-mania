@@ -55,6 +55,17 @@ function atDoor(read, path) {
 }
 
 /**
+ * Un nombre est jugé par le lecteur partagé, puis rendu tel quel : -0 reste -0.
+ * Les niveaux, la physique et les relectures (« Bats mon tir », score à battre,
+ * contrôle des niveaux) passent par ces schémas et doivent rester identiques au
+ * bit près (Math.atan2(-0, -1) vaut -π, Math.atan2(0, -1) vaut π).
+ */
+function numberAtDoor(v, rule, path) {
+  atDoor(() => readNumber(v, rule, path), path)
+  return v
+}
+
+/**
  * @template T
  * @typedef {(value: unknown, path?: string) => T} Validator
  */
@@ -63,13 +74,13 @@ export const Schema = Object.freeze({
   /** Entier sûr dans [min, max] (jamais une chaîne qui l'écrit). */
   int({ min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_INTEGER } = {}) {
     const rule = Object.freeze({ min, max, integer: true })
-    return (v, path = '') => atDoor(() => readNumber(v, rule, path), path)
+    return (v, path = '') => numberAtDoor(v, rule, path)
   },
 
   /** Nombre fini dans [min, max]. */
   number({ min = -Number.MAX_VALUE, max = Number.MAX_VALUE } = {}) {
     const rule = Object.freeze({ min, max })
-    return (v, path = '') => atDoor(() => readNumber(v, rule, path), path)
+    return (v, path = '') => numberAtDoor(v, rule, path)
   },
 
   boolean() {

@@ -40,7 +40,8 @@ test('Schema.string lit le texte à la porte : nettoyé, compté en caractères,
 test('Schema.int ne lit qu’un entier sûr, jamais une chaîne qui l’écrit (v6.3.1)', () => {
   const v = Schema.int({ min: 0, max: 2 ** 60 })
   for (const bad of ['1', '1e1', 2 ** 53, 1e300, true, [1]]) assert.throws(() => v(bad), ValidationError, String(bad))
-  assert.equal(Object.is(v(-0), 0), true, '-0 se lit 0')
+  assert.equal(Object.is(v(-0), -0), true, 'rendu tel quel : -0 reste -0 (relectures au bit près)')
+  assert.equal(Object.is(Schema.number({ min: -1, max: 1 })(-0), -0), true)
 })
 
 test('Schema.object ne lit que les champs propres de l’objet (v6.3.1)', () => {
