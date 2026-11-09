@@ -1,5 +1,6 @@
 import { Schema, ValidationError, deepFreeze } from '../../core/utils/Guard.js'
 import { TEXT_LIMITS } from '../../config/limits.js'
+import { parseNumber, readText } from '../../core/utils/input.js'
 import { MATERIAL_NAMES, BUILD_MATERIALS } from '../entities/materials.js'
 import { TARGET_TYPES } from '../entities/catalog.js'
 import { WORLD } from '../physics/constants.js'
@@ -45,6 +46,45 @@ export const STORAGE_KEYS = Object.freeze({ draft: 'castle-draft', verified: 'ca
  */
 export const DESIGN_AMMO = Object.freeze(['boulder', 'fire', 'bomb', 'split', 'frost', 'bale', 'thunder', 'poison'])
 const AMMO = DESIGN_AMMO
+
+/**
+ * Bornes des réglages d'un château (v6.3.1 : une seule source pour le code de
+ * partage et les champs de l'atelier) : décor (un par chapitre), tirs, vent en
+ * vingtièmes, munitions de chaque type.
+ */
+export const DESIGN_RANGES = deepFreeze({
+  theme: { min: 1, max: 10, integer: true },
+  shots: { min: 1, max: 12, integer: true },
+  windNotches: { min: 0, max: 20, integer: true },
+  ammo: { min: 0, max: 5, integer: true },
+})
+/** Nom d'un château : la règle des noms de profil (SaveSlot.PROFILE_NAME), ou aucun nom. */
+const DESIGN_NAME = /^(?:|[\p{L}\p{N}][\p{L}\p{N} _'-]{0,15})$/u
+
+/** Lecteur de chaque champ des réglages de l'atelier (v6.3.1). */
+const FIELD_READERS = new Map([
+  ['name', (text) => readText(text, { maxLength: TEXT_LIMITS.name, pattern: DESIGN_NAME }, 'castle.name')],
+  ['theme', (text) => parseNumber(text, DESIGN_RANGES.theme, 'castle.theme')],
+  ['shots', (text) => parseNumber(text, DESIGN_RANGES.shots, 'castle.shots')],
+  ['wind', (text) => parseNumber(text, DESIGN_RANGES.windNotches, 'castle.wind') / 20],
+  ['ammo', (text) => parseNumber(text, DESIGN_RANGES.ammo, 'castle.ammo')],
+])
+
+/**
+ * Valeur d'un champ des réglages de l'atelier, lue à la porte (v6.3.1) : le
+ * nom nettoyé (16 caractères au plus, refusé au-delà, jamais coupé), et des
+ * entiers lus en entier dans leurs bornes. « 1.5 » munition, gardé tel quel
+ * avant, rendait le château impossible à coder : l'essai ne partait plus, le
+ * partage restait fermé et le brouillon n'était plus enregistré.
+ * @param {'name' | 'theme' | 'shots' | 'wind' | 'ammo'} field
+ * @param {unknown} text la valeur saisie
+ * @throws {import('../../core/utils/input.js').InvalidInput} si elle ne convient pas
+ */
+export function readDesignField(field, text) {
+  const read = FIELD_READERS.get(field)
+  if (!read) throw new TypeError(`unknown castle field "${field}"`)
+  return read(text)
+}
 
 /** Château vide, prêt à construire. */
 export function emptyDesign() {
@@ -155,17 +195,22 @@ export function buildCustomLevel(design) {
 /* ---------- Code de partage ---------- */
 
 const KIND_CODE = Object.freeze({ room: 'r', wall: 'w', plank: 'p', base: 'b', roof: 'f', soldier: 's', knight: 'c', king: 'k', barrel: 'o' })
-const CODE_KIND = Object.freeze(Object.fromEntries(Object.entries(KIND_CODE).map(([k, v]) => [v, k])))
+/**
+ * Pièce de chaque lettre du code, cherchée dans une Map (v6.3.1) : la lettre vient
+ * d'un lien. Un objet ordinaire prenait `constructor` pour une pièce (le décodage
+ * s'arrêtait alors sur une TypeError) et `["r"]` pour un étage.
+ */
+const CODE_KIND = new Map(Object.entries(KIND_CODE).map(([k, v]) => [v, k]))
 export const MAX_CASTLE_CODE = TEXT_LIMITS.castleCode
 
 const designSchema = Schema.object(
   {
     v: Schema.enum([1]),
-    n: Schema.string({ minLength: 0, maxLength: TEXT_LIMITS.name, pattern: /^(?:|[\p{L}\p{N}][\p{L}\p{N} _'-]{0,15})$/u }),
-    th: Schema.int({ min: 1, max: 10 }),
-    s: Schema.int({ min: 1, max: 12 }),
-    w: Schema.int({ min: 0, max: 20 }),
-    a: Schema.array(Schema.int({ min: 0, max: 5 }), { maxLength: AMMO.length }),
+    n: Schema.string({ minLength: 0, maxLength: TEXT_LIMITS.name, pattern: DESIGN_NAME }),
+    th: Schema.int(DESIGN_RANGES.theme),
+    s: Schema.int(DESIGN_RANGES.shots),
+    w: Schema.int(DESIGN_RANGES.windNotches),
+    a: Schema.array(Schema.int(DESIGN_RANGES.ammo), { maxLength: AMMO.length }),
     p: Schema.array((raw) => raw, { maxLength: LIMITS.parts }),
   },
   { strict: true },
@@ -215,7 +260,7 @@ export class CastleCode {
     const d = designSchema(raw, 'castle')
     const parts = d.p.map((x, i) => {
       if (!Array.isArray(x) || x.length < 3 || x.length > 4) throw new ValidationError(`castle.p.${i}`, 'part expected')
-      const kind = CODE_KIND[x[0]]
+      const kind = CODE_KIND.get(x[0])
       if (!kind) throw new ValidationError(`castle.p.${i}`, 'unknown part')
       const def = PARTS[kind]
       const px = Schema.int({ min: ZONE.left, max: ZONE.right })(x[1], `castle.p.${i}.x`)

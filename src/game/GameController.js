@@ -140,9 +140,9 @@ export class GameController extends EventBus {
     })
   }
 
-  /** Place occupée par le HUD (px CSS), mesurée par l'interface. */
+  /** Place occupée par le HUD (px CSS), mesurée par l'interface (la caméra ne prend qu'un nombre fini, borné). */
   setInsets(top, bottom) {
-    this.session.camera.setInsets(Number(top), Number(bottom))
+    this.session.camera.setInsets(top, bottom)
   }
 
   /** Fonds peints (v6.2) : pour les outils et les essais (voir BackgroundArt.add). */

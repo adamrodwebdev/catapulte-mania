@@ -913,6 +913,7 @@ export default {
     share: 'Share',
     clear: 'Clear all',
     verifyFirst: 'Take your own castle first to be able to share it.',
+    ammoError: 'A whole number from 0 to {max}.',
     canvasLabel: 'Building area. Tap to place the chosen piece. Keyboard: left and right arrows move the cursor, Enter places, Delete removes.',
     partsLabel: 'Pieces',
     materialLabel: 'Material',

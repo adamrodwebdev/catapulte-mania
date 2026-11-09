@@ -1,6 +1,7 @@
 import { Schema, Guard, ValidationError } from '../core/utils/Guard.js'
 import { GAME } from '../config/gameConfig.js'
 import { TEXT_LIMITS } from '../config/limits.js'
+import { readText } from '../core/utils/input.js'
 import { LevelResult } from './LevelResult.js'
 import { UpgradeCatalog } from '../game/progression/UpgradeCatalog.js'
 import { GOLD, goldFor, maxGoldFor, legacyMaxGoldFor } from '../game/progression/GoldRules.js'
@@ -17,6 +18,20 @@ import { DAILY_HISTORY } from '../game/progression/DailyRecords.js'
 
 /** Nom de profil : lettres (toutes langues), chiffres, espaces, tirets. */
 export const PROFILE_NAME = /^[\p{L}\p{N}][\p{L}\p{N} _'-]{0,15}$/u
+
+/**
+ * Nom saisi (profil, joueur des modes à deux, château de l'atelier), lu à la
+ * porte (v6.3.1) : un texte seulement, nettoyé (caractères invisibles retirés,
+ * accents composés, espaces resserrés), puis jugé : 16 caractères au plus
+ * (TEXT_LIMITS.name, refusé au-delà, jamais coupé) et la règle PROFILE_NAME.
+ * @param {unknown} value
+ * @param {{ required?: boolean }} [opts] required : faux si un nom vide est permis (nom par défaut)
+ * @returns {string} le nom nettoyé ('' seulement s'il est facultatif)
+ * @throws {import('../core/utils/input.js').InvalidInput}
+ */
+export function readName(value, { required = true } = {}) {
+  return readText(value, { maxLength: TEXT_LIMITS.name, required, pattern: PROFILE_NAME }, 'name')
+}
 const LEVEL_KEY = /^(?:[1-9]|[1-9][0-9]|100)$/
 const COUNTER = Schema.int({ min: 0, max: 1e9 })
 
@@ -206,7 +221,8 @@ export class SaveSlot {
   static create(index, name, difficulty, now = Date.now()) {
     const data = saveSchema({
       version: GAME.SAVE_VERSION,
-      name: String(name).trim(),
+      // Le schéma lit le nom (v6.3.1) : un texte seulement, nettoyé, jamais converti par String().
+      name,
       difficulty,
       createdAt: now,
       updatedAt: now,

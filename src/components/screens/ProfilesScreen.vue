@@ -1,8 +1,10 @@
 <script setup>
 import { ref, reactive, onMounted, nextTick } from 'vue'
 import { useApp } from '../../app/AppContext.js'
-import { PROFILE_NAME } from '../../domain/SaveSlot.js'
+import { readName } from '../../domain/SaveSlot.js'
 import { GAME } from '../../config/gameConfig.js'
+import { TEXT_LIMITS } from '../../config/limits.js'
+import { orElse } from '../../core/utils/input.js'
 import AppIcon from '../ui/AppIcon.vue'
 import MasteryCrest from '../ui/MasteryCrest.vue'
 import ScreenHeader from '../ui/ScreenHeader.vue'
@@ -33,8 +35,9 @@ async function startCreate(index) {
 }
 
 async function submit(index) {
-  const name = form.name.trim()
-  if (!PROFILE_NAME.test(name)) {
+  // Lu à la porte (v6.3.1) : nettoyé (accents composés, espaces resserrés), refusé au-delà de la limite.
+  const name = orElse(() => readName(form.name), null)
+  if (name === null) {
     form.error = t('profiles.nameError')
     return
   }
@@ -114,7 +117,7 @@ async function remove(index) {
                 v-model="form.name"
                 class="input"
                 type="text"
-                maxlength="16"
+                :maxlength="TEXT_LIMITS.name"
                 autocomplete="nickname"
                 spellcheck="false"
                 :placeholder="t('profiles.namePlaceholder')"

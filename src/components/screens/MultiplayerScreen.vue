@@ -1,7 +1,9 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useApp } from '../../app/AppContext.js'
-import { PROFILE_NAME } from '../../domain/SaveSlot.js'
+import { readName } from '../../domain/SaveSlot.js'
+import { TEXT_LIMITS } from '../../config/limits.js'
+import { orElse } from '../../core/utils/input.js'
 import { ArenaRepository } from '../../game/levels/ArenaRepository.js'
 import { DuelRepository } from '../../game/levels/DuelRepository.js'
 import { HotSeatMatch } from '../../game/modes/HotSeatMatch.js'
@@ -52,13 +54,15 @@ async function pickProfile(index) {
 const coopChapter = ref(Math.ceil((state.profile?.coop?.next ?? 1) / PER_CHAPTER))
 const coopLevels = computed(() => Array.from({ length: PER_CHAPTER }, (_, i) => (coopChapter.value - 1) * PER_CHAPTER + i + 1).filter((id) => coop.value?.levels[id]))
 
-const nameError = (i) => names.value[i].trim() !== '' && !PROFILE_NAME.test(names.value[i].trim())
+/** Nom du joueur, lu à la porte (v6.3.1) : nettoyé, '' s'il est vide (nom par défaut), null s'il est refusé. */
+const playerName = (i) => orElse(() => readName(names.value[i], { required: false }), null)
+const nameError = (i) => playerName(i) === null
 const canStart = computed(() => !nameError(0) && !nameError(1) && (format.value !== 'coop' || (coop.value && coop.value.levels[coopLevel.value]?.unlocked)))
 
 function start() {
   if (!canStart.value) return
   app.services.audio.unlock()
-  const players = names.value.map((n, i) => n.trim() || t('mp.defaultName', { n: i + 1 }))
+  const players = [0, 1].map((i) => playerName(i) || t('mp.defaultName', { n: i + 1 }))
   const levelFor = format.value === 'coop' ? coopLevel.value : format.value === 'hotseat' ? tourneyLevels.value[0] : undefined
   app.startMatch({ mode: format.value, levelId: levelFor, levels: format.value === 'hotseat' ? tourneyLevels.value : undefined, arenaId: arenaId.value, duelId: duelId.value, players })
 }
@@ -92,7 +96,7 @@ function start() {
               v-model="names[i]"
               class="input"
               type="text"
-              maxlength="16"
+              :maxlength="TEXT_LIMITS.name"
               autocomplete="off"
               :placeholder="t('mp.defaultName', { n: i + 1 })"
               :aria-invalid="nameError(i) ? 'true' : 'false'"
