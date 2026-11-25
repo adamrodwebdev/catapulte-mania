@@ -122,6 +122,33 @@ unité, météo, distance, général. Chaque mécanique y est jouable, réglée 
 10. **Les performances** : mesures par niveau de qualité sur un Android modeste, un iPhone et un
     ordinateur ; pire image comptée.
 
+### Règle de conception : chaque élément a son avantage et son revers
+
+Idée de l'utilisateur (2026-11-25), à éprouver sur le banc :
+
+- **Le métal conduit.** Toute unité qui porte du métal (cotte de mailles, plates rivetées,
+  casque, brassards) conduit l'électricité. L'arc saute d'une unité à l'autre et longe les
+  structures métalliques (plaques rivetées, grilles, chaînes, chaudières) jusqu'à la terre.
+  Le moteur de la v6 a déjà la base : l'orbe d'orage saute jusqu'à 4 fois et conduit mieux
+  par le chevalier, le porte-bouclier et le général.
+- **Les dégâts arrachent le métal.** Une pièce d'armure touchée se détache et tombe, en corps
+  physique. L'unité devient plus fragile au coup suivant, mais conduit moins. Une plaque tombée
+  reste au sol et peut encore relayer l'arc.
+- **La tension des trois étoiles.** Abîmer une armure aide (l'unité devient fragile) mais casse
+  la chaîne qui aurait tout emporté d'un seul orbe : l'ordre des tirs compte.
+
+| Élément | Avantage | Revers (premières pistes) |
+|---|---|---|
+| Foudre | saute de métal en métal, plus loin sous la pluie ou sur l'eau | sans effet sur le bois et la paille ; arrêtée par une unité sans métal ; arrache peu |
+| Feu | prend le bois, la paille et le chaume, et se propage | la pluie l'éteint ; le métal ne brûle pas ; sa fumée cache les cibles |
+| Givre | rend le métal cassant : une plaque gelée éclate au choc | éteint le feu déjà posé ; la glace isole, une unité gelée ne conduit plus |
+| Poison | passe sous les armures | dérive avec le vent et peut revenir ; lent ; sans effet sur les murs |
+| Bombe | arrache les armures et ouvre les murs | disperse le métal et casse les chaînes de conduction ; peut projeter un défenseur hors de portée |
+| Pierre | fiable, arrache les plaques | le vent la dévie ; ne déclenche aucune réaction |
+
+La même règle vaut pour les unités et les matériaux : le chevalier encaisse mais conduit ; un
+mur de fer résiste mais relaie la foudre et rouille sous la pluie.
+
 *Terminé quand* chaque mécanique est jouable sur le banc, mesurée, et validée par vous ; les
 changements décidés en chemin sont notés ici.
 
