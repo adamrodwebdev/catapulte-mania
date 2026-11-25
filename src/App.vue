@@ -76,5 +76,5 @@ function introDone() {
   <div class="visually-hidden" role="status" aria-live="polite" aria-atomic="true">{{ state.announcement }}</div>
   <!-- Portails : pendant une publicité, le jeu est masqué et ne reçoit plus aucune commande. -->
   <StudioIntro v-if="showIntro" @done="introDone" />
-  <div v-if="state.adPlaying" class="ad-curtain" role="status" aria-live="polite">{{ t('ads.playing') }}</div>
+  <div v-if="state.adPlaying" class="ad-curtain" role="status" aria-live="polite">{{ t(state.pausedBy === 'platform' ? 'ads.paused' : 'ads.playing') }}</div>
 </template>

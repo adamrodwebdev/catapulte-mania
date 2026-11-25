@@ -49,7 +49,20 @@ self.addEventListener('fetch', (e) => {
     )
     return
   }
-  e.respondWith(caches.match(req).then((hit) => hit || fetch(req)))
+  e.respondWith(
+    caches.match(req).then(
+      (hit) =>
+        hit ||
+        fetch(req).then((res) => {
+          // Peintures allégées (v6.4) : gardées à leur première utilisation, pour jouer hors ligne.
+          if (res.ok && url.pathname.endsWith('.webp')) {
+            const copy = res.clone()
+            caches.open(CACHE).then((c) => c.put(req, copy))
+          }
+          return res
+        }),
+    ),
+  )
 })
 `
 }

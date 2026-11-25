@@ -35,6 +35,7 @@ Couvertures conformes à leurs règles : **seulement le titre** (pas de slogan, 
 | `portals/gamedistribution/` | 512×512, 512×384, 512×340, 1280×720, 1280×550 |
 | `portals/gamepix/` | icône 256×256 et couverture 1360×850, **sans texte** (règle GamePix) |
 | `portals/y8/` | vignettes 512×384, 480×360, 512×512, couverture 1280×720 |
+| `portals/playgama/` | couvertures 800×800, 1080×1920, 1920×1080 (v6.4) : une scène du jeu mise en scène (tour qui vole en éclats, pierre enflammée, catapulte au premier plan) devant le couchant peint du chapitre 3, titre seul |
 | `portals/screenshots/` | 5 captures de jeu 1280×720 |
 | `portals/LISTINGS/` | fiche de chaque portail : marche à suivre, titre, description, commandes, tags |
 

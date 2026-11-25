@@ -321,8 +321,10 @@ async function startLevel({ rebuild = false } = {}) {
       haptics: app.services.haptics,
       effects,
       mode: rules,
-      // Portails : un dernier tir contre une vidéo, en campagne solo uniquement.
-      continueOffer: state.rewardedAvailable && mode.value === 'story',
+      // v6.5 (prototype) : fond WebGL2 à l'essai, seulement avec ?gl=1 (valeur exacte, rien d'autre).
+      gpuBackdrop: new URLSearchParams(globalThis.location?.search ?? '').get('gl') === '1',
+      // Portails : un dernier tir contre une vidéo, en campagne solo, une fois par niveau et par session (v6.4).
+      continueOffer: state.rewardedAvailable && mode.value === 'story' && app.services.ads.policy.canOfferLastShot(state.levelId),
       engine: engine.value,
       replay: isChallenge.value && challengeStage.value === 'watch' ? state.match.challenge.actions : null,
       season: eventFor(dayKey()),
@@ -359,6 +361,7 @@ async function startLevel({ rebuild = false } = {}) {
   })
   controller.on('end', onEnd)
   controller.on('offer', () => {
+    app.services.ads.policy.lastShotOffered(state.levelId)
     offer.value = 'idle'
     showPowers.value = false
     phase.value = 'offer'
@@ -681,6 +684,13 @@ watch(phase, (now, before) => {
   if (now === 'playing') app.services.ads.gameplayStart()
   else if (before === 'playing') app.services.ads.gameplayStop()
 })
+// Publicité ou pause imposée par la plateforme en pleine partie (v6.4, Playgama) : on met en pause.
+watch(
+  () => state.adPlaying,
+  (on) => {
+    if (on && phase.value === 'playing') pause()
+  },
+)
 
 /* ---------- Chronique ---------- */
 
@@ -781,6 +791,7 @@ async function onEnd(e) {
     endTimer = setTimeout(() => stopWatching(), 1500)
     return
   }
+  app.services.ads.levelEnded(e.won === true)
   const ending = EndOfMatch.for(mode.value)
   if (ending.doublesGold) {
     lastResult = e.result
@@ -1307,7 +1318,7 @@ const aimReadout = computed(() => (hud.value ? { angle: formatDegrees(t, hud.val
       <p v-else>{{ t('daily.lost') }}</p>
       <HighlightClip v-if="highlight" :clip="highlight" :name="clipName" />
       <p class="notice">{{ t('daily.comeBack') }}</p>
-      <div v-if="end.won" class="share">
+      <div v-if="end.won && state.externalLinks" class="share">
         <button type="button" class="btn btn--primary" :disabled="share.state === 'busy'" @click="shareRun"><AppIcon name="users" />{{ t('daily.share') }}</button>
         <p v-if="share.state === 'copied'" class="share__done" role="status">{{ t('daily.copied') }}</p>
         <p v-else-if="share.state === 'shared'" class="share__done" role="status">{{ t('daily.shared') }}</p>
@@ -1336,7 +1347,7 @@ const aimReadout = computed(() => (hud.value ? { angle: formatDegrees(t, hud.val
       </p>
       <HighlightClip v-if="highlight" :clip="highlight" :name="clipName" />
       <p v-if="end.medalUp && end.medal" class="end__badge">{{ t('cup.medalWon', { medal: t(`cup.medals.${end.medal}`) }) }}</p>
-      <div v-if="end.medal" class="share">
+      <div v-if="end.medal && state.externalLinks" class="share">
         <button type="button" class="btn btn--primary" :disabled="share.state === 'busy'" @click="shareCup"><AppIcon name="users" />{{ t('cup.share') }}</button>
         <p v-if="share.state === 'copied'" class="share__done" role="status">{{ t('daily.copied') }}</p>
         <p v-else-if="share.state === 'shared'" class="share__done" role="status">{{ t('daily.shared') }}</p>
@@ -1358,7 +1369,7 @@ const aimReadout = computed(() => (hud.value ? { angle: formatDegrees(t, hud.val
         <div><dt>{{ t('daily.you') }}</dt><dd>{{ n(end.score) }}</dd></div>
         <div><dt>{{ end.name || t('daily.friend') }}</dt><dd>{{ n(end.target) }}</dd></div>
       </dl>
-      <div v-if="end.won" class="share">
+      <div v-if="end.won && state.externalLinks" class="share">
         <button type="button" class="btn btn--primary" :disabled="share.state === 'busy'" @click="shareRun"><AppIcon name="users" />{{ t('daily.shareBack') }}</button>
         <p v-if="share.state === 'copied'" class="share__done" role="status">{{ t('daily.copied') }}</p>
         <p v-else-if="share.state === 'shared'" class="share__done" role="status">{{ t('daily.shared') }}</p>

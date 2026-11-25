@@ -1,7 +1,8 @@
 /**
- * Paquets d'envoi pour les cinq portails retenus (v5.6) :
+ * Paquets d'envoi pour les portails retenus (v5.6, Playgama en v6.4) :
  *   npm run release:portals
  *   npm run release:portals -- --gd-id <gameId GameDistribution> --y8-game <Game ID Y8> --y8-app <App ID Y8>
+ *   npm run release:portals -- --only playgama   (un seul portail)
  *
  * Pour chaque portail, le dossier release/<portail>/ contient :
  *   - <portail>-game.zip : le jeu (index.html à la racine), prêt à téléverser ;
@@ -24,6 +25,7 @@ const arg = (k) => (args.includes(k) ? args[args.indexOf(k) + 1] : '')
 const ID = /^[\w-]{1,64}$/
 const ids = { gd: arg('--gd-id'), y8Game: arg('--y8-game'), y8App: arg('--y8-app') }
 for (const [k, v] of Object.entries(ids)) if (v && !ID.test(v)) throw new Error(`identifiant invalide (${k})`)
+const only = arg('--only')
 
 /** Portail → cible de build et variables d'environnement. */
 const PLATFORMS = [
@@ -32,7 +34,12 @@ const PLATFORMS = [
   { id: 'gamedistribution', target: 'gamedistribution', env: { CTC_GAME_ID: ids.gd } },
   { id: 'gamepix', target: 'gamepix', env: {} },
   { id: 'y8', target: 'y8', env: { CTC_GAME_ID: ids.y8Game, CTC_APP_ID: ids.y8App } },
+  // Playgama (v6.4) : aucun lien vers l'extérieur, donc pas de page de confidentialité à part
+  // (elle est dans le jeu) ; l'archive porte la version (règle Playgama).
+  { id: 'playgama', target: 'playgama', env: {}, drop: ['privacy.html'], zip: (v) => `catapulte-mania-playgama-${v}.zip` },
 ]
+if (only && !PLATFORMS.some((p) => p.id === only)) throw new Error(`portail inconnu : ${only}`)
+const VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const OUT = join(ROOT, 'release')
@@ -97,10 +104,11 @@ function zipDir(dir, file) {
 }
 
 /* ---------- Construction ---------- */
-rmSync(OUT, { recursive: true, force: true })
+if (only) rmSync(join(OUT, only), { recursive: true, force: true })
+else rmSync(OUT, { recursive: true, force: true })
 mkdirSync(OUT, { recursive: true })
 const built = new Map()
-for (const p of PLATFORMS) {
+for (const p of PLATFORMS.filter((p) => !only || p.id === only)) {
   const key = `${p.target}:${JSON.stringify(p.env)}`
   if (!built.has(key)) {
     console.log(`→ build ${p.target}`)
@@ -108,16 +116,17 @@ for (const p of PLATFORMS) {
     const snapshot = join(OUT, `.build-${built.size}`)
     cpSync(join(ROOT, `dist-${p.target}`), snapshot, { recursive: true })
     // Fichiers propres à notre site (hébergeur, application installable, fiche) : inutiles sur un portail.
-    for (const f of ['_headers', 'manifest.webmanifest', 'og-image.png', 'screenshots']) rmSync(join(snapshot, f), { recursive: true, force: true })
+    for (const f of ['_headers', 'manifest.webmanifest', 'og-image.png', 'screenshots', ...(p.drop ?? [])]) rmSync(join(snapshot, f), { recursive: true, force: true })
     built.set(key, snapshot)
   }
   const dir = join(OUT, p.id)
   mkdirSync(dir, { recursive: true })
-  const n = zipDir(built.get(key), join(dir, `${p.id}-game.zip`))
+  const zipName = p.zip ? p.zip(VERSION) : `${p.id}-game.zip`
+  const n = zipDir(built.get(key), join(dir, zipName))
   if (existsSync(join(STORE, p.id))) cpSync(join(STORE, p.id), join(dir, 'images'), { recursive: true })
   cpSync(join(STORE, 'screenshots'), join(dir, 'screenshots'), { recursive: true })
   if (existsSync(join(STORE, 'LISTINGS', `${p.id}.md`))) cpSync(join(STORE, 'LISTINGS', `${p.id}.md`), join(dir, 'LISTING.md'))
-  const kb = Math.round(statSync(join(dir, `${p.id}-game.zip`)).size / 1024)
+  const kb = Math.round(statSync(join(dir, zipName)).size / 1024)
   const missing = (p.id === 'gamedistribution' && !ids.gd) || (p.id === 'y8' && !ids.y8Game) ? ' — SANS identifiant : publicité désactivée' : ''
   console.log(`✓ ${p.id} : ${n} fichiers, ${kb} Ko${missing}`)
 }

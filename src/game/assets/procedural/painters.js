@@ -281,6 +281,45 @@ function snowcap(ctx) {
 /* ---------- Décor ---------- */
 
 /**
+ * Voile de nuage (v6.4) : sur une peinture photographique, un nuage dessiné jure ;
+ * un voile doux, fait de halos fondus, dérive à sa place (et montre toujours le
+ * vent). Trois formes, gardées par couleur ; sans document (tests), rien.
+ */
+const CLOUD_VEILS = new Map()
+function cloudVeil(i, rgb) {
+  if (typeof document === 'undefined') return null
+  const key = `${i % 3}:${rgb}`
+  let c = CLOUD_VEILS.get(key)
+  if (!c) {
+    const w = 320
+    const h = 120
+    c = document.createElement('canvas')
+    c.width = w
+    c.height = h
+    const g = c.getContext('2d')
+    const r = new SeededRandom(101 + (i % 3) * 17)
+    // Des halos étirés en long (un voile, pas une boule), tous dans le cadre.
+    for (let k = 0; k < 22; k++) {
+      const rad = h * (0.16 + 0.2 * r.next())
+      const x = rad * 1.9 + (w - rad * 3.8) * r.next()
+      const y = h * (0.5 + 0.16 * (r.next() - 0.5))
+      g.save()
+      g.translate(x, y)
+      g.scale(1.9, 1)
+      const gr = g.createRadialGradient(0, 0, 0, 0, 0, rad)
+      gr.addColorStop(0, `rgba(${rgb},0.22)`)
+      gr.addColorStop(0.55, `rgba(${rgb},0.09)`)
+      gr.addColorStop(1, `rgba(${rgb},0)`)
+      g.fillStyle = gr
+      g.fillRect(-rad, -rad, 2 * rad, 2 * rad)
+      g.restore()
+    }
+    CLOUD_VEILS.set(key, c)
+  }
+  return c
+}
+
+/**
  * Ciel (repère écran) : dégradé en trois temps, rayons de soleil, astre,
  * étoiles qui scintillent, nuages qui dérivent (v5.7, voir scenery.js).
  */
@@ -314,8 +353,9 @@ function sky(ctx, s) {
   const light = th.night ? 'rgba(200,210,255,0.10)' : th.weather === 'rain' ? 'rgba(110,118,135,0.75)' : 'rgba(255,255,255,0.82)'
   const shade = th.night ? 'rgba(120,130,180,0.08)' : th.weather === 'rain' ? 'rgba(60,66,80,0.6)' : 'rgba(170,185,210,0.45)'
   // Sur une peinture, quelques nuages légers suffisent à montrer le vent, et
-  // seulement dans un ciel clair (la nuit, la pluie et la brume ont les leurs).
-  if (overlay) ctx.globalAlpha = 0.55
+  // seulement dans un ciel clair (la nuit, la pluie et la brume ont les leurs) ;
+  // v6.4 : des voiles doux, pas des nuages dessinés (les peintures sont des photographies).
+  if (overlay) ctx.globalAlpha = 0.75
   const clouds = !overlay ? 7 : th.night || th.weather === 'rain' || th.weather === 'fog' ? 0 : 4
   for (let i = 0; i < clouds; i++) {
     // Les nuages suivent le vent : sens et vitesse (brise lente par temps calme).
@@ -324,6 +364,11 @@ function sky(ctx, s) {
     const cx = ((((r.range(0, span) + (animate ? time * speed : 0)) % span) + span) % span) - 150
     const cy = r.range(viewH * 0.06, viewH * 0.4)
     const cw = r.range(60, 150) * (viewH / 600)
+    if (overlay) {
+      const veil = cloudVeil(i, (th.cloudVeil ?? [255, 255, 255]).join(','))
+      if (veil) ctx.drawImage(veil, cx - cw * 1.5, cy - cw * 0.55, cw * 3, cw * 1.1)
+      continue
+    }
     const puffs = Array.from({ length: 5 }, (_, k) => [cx + (k - 2) * cw * 0.28, cy - Math.sin((k / 4) * Math.PI) * cw * 0.16, cw * (0.2 + 0.1 * Math.sin((k / 4) * Math.PI))])
     // Dessous ombré, puis dessus éclairé, légèrement décalé vers le haut.
     ctx.fillStyle = shade

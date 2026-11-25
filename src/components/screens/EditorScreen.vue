@@ -172,7 +172,7 @@ onBeforeUnmount(() => ro?.disconnect())
         <button type="button" class="btn" :disabled="!design.parts.length" @click="undo"><AppIcon name="refresh" :size="18" />{{ t('editor.undo') }}</button>
         <button type="button" class="btn" @click="showSettings = true"><AppIcon name="gear" :size="18" />{{ t('editor.settings') }}</button>
         <button type="button" class="btn btn--primary" :disabled="!playable" @click="test"><AppIcon name="play" :size="18" />{{ t('editor.test') }}</button>
-        <button type="button" class="btn" :disabled="!verified" :title="verified ? '' : t('editor.verifyFirst')" @click="shareCastle"><AppIcon name="users" :size="18" />{{ t('editor.share') }}</button>
+        <button v-if="app.state.externalLinks" type="button" class="btn" :disabled="!verified" :title="verified ? '' : t('editor.verifyFirst')" @click="shareCastle"><AppIcon name="users" :size="18" />{{ t('editor.share') }}</button>
       </div>
     </header>
 

@@ -14,6 +14,8 @@ import { SKY_ORDER } from './skyConfig.js'
  * - Les sons (tonnerre, risée, tourbillon, goutte) ne sont pas joués ici : ils
  *   attendent dans une file que le contrôleur de la partie relève (`drain`).
  */
+const NONE = Object.freeze(new Set())
+
 export class LivingSky {
   /** @type {Array<[string, object]>} */
   #effects
@@ -42,6 +44,11 @@ export class LivingSky {
     const names = SKY_ORDER.filter((n) => cfg.fx.includes(n))
     this.#effects = names.map((name) => [name, EFFECTS[name](this)])
     for (const [name, fx] of this.#effects) this.#byName.set(name, fx)
+  }
+
+  /** Temps des effets à dessiner : figé quand rien ne doit bouger (mouvement réduit, contraste élevé). */
+  time({ animate = true, highContrast = false } = {}) {
+    return animate && !highContrast ? this.t : 3.2
   }
 
   /** Ce que le ciel remplace dans le jeu (`weather`, `motes`). */
@@ -85,13 +92,14 @@ export class LivingSky {
    * Dessine le ciel, en repère écran, juste après la peinture.
    * @param {CanvasRenderingContext2D} ctx
    * @param {object} view
-   * @param {{ animate?: boolean, highContrast?: boolean, k?: number }} [opts]
+   * @param {{ animate?: boolean, highContrast?: boolean, k?: number, except?: ReadonlySet<string> }} [opts]
+   *   except : effets dessinés ailleurs (v6.5 : par le fond WebGL2)
    */
-  draw(ctx, view, { animate = true, highContrast = false, k = 1 } = {}) {
+  draw(ctx, view, { animate = true, highContrast = false, k = 1, except = NONE } = {}) {
     const motion = animate && !highContrast
-    const t = motion ? this.t : 3.2
-    for (const [, fx] of this.#effects) {
-      if (!fx.draw) continue
+    const t = this.time({ animate, highContrast })
+    for (const [name, fx] of this.#effects) {
+      if (!fx.draw || except.has(name)) continue
       ctx.save()
       fx.draw(ctx, view, t, motion, k)
       ctx.restore()

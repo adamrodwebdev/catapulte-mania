@@ -31,6 +31,7 @@ export const PORTAL_SDK_ORIGINS = Object.freeze({
   gamedistribution: 'https://html5.api.gamedistribution.com',
   gamepix: 'https://integration.gamepix.com',
   y8: 'https://cdn.y8.com',
+  playgama: 'https://bridge.playgama.com',
 })
 
 /**

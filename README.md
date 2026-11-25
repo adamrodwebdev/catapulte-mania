@@ -361,9 +361,9 @@ Pour tester sur un téléphone connecté au même Wi-Fi : utilisez l'adresse « 
 
 Tout autre hébergeur de fichiers statiques convient (GitHub Pages, Cloudflare Pages, OVH…) : il suffit d'envoyer le contenu du dossier `dist/`.
 
-### Publier sur les cinq portails retenus (v5.6)
+### Publier sur les portails retenus (v5.6, Playgama en v6.4)
 
-Une seule commande prépare tout l'envoi pour **itch.io, Newgrounds, GameDistribution, GamePix et Y8** :
+Une seule commande prépare tout l'envoi pour **itch.io, Newgrounds, GameDistribution, GamePix, Y8 et Playgama** :
 
 ```
 npm run release:portals
@@ -376,6 +376,10 @@ GameDistribution et Y8 donnent un identifiant de jeu **après** la création de 
 ```
 npm run release:portals -- --gd-id <id GameDistribution> --y8-game <Game ID Y8> --y8-app <App ID Y8>
 ```
+
+Un seul portail : `npm run release:portals -- --only playgama`. Playgama (v6.4) passe par son Bridge (publicités, sauvegarde, langue, pause) ; sa fiche et sa marche à suivre (Sandbox, puis catalogue) sont dans `docs/store/portals/LISTINGS/playgama.md`.
+
+Fonds peints : sur notre site et sur Playgama (photographies FLUX.1 [schnell], licence Apache 2.0 ; provenance dans [`docs/PEINTURES.md`](docs/PEINTURES.md)). `CTC_PAINTED=off` au build les retire ; la démo et les autres portails gardent le décor dessiné.
 
 ### Publier sur un portail de jeux (CrazyGames, Poki)
 
@@ -546,6 +550,7 @@ Chaque grande étape est un commit commenté avec une étiquette de version. Le 
 | v5.8.0 | Défenseurs malins (navigation A*, esquive, réparation), éclaireur, pavoisier, porte-étendard, sapeur, veilleurs à la torche ; pillards (ponts et échelles), état de l'engin (feu, givre, fissures, rouille) et seaux d'eau ; barils derrière les châteaux ; plus de zoom d'ouverture |
 | v5.9.0 | Interface 2026 « Verre & Or » : verre fumé, liserés, or dégradé, entrées à ressort ; accueil en diorama, chapitres illustrés, HUD et bouton de tir refaits, modes illustrés, fenêtres à barre d'actions dépolie |
 | v6.1.0 | Points de vie pour tous les défenseurs, chocs qui portent (dégâts selon l'énergie et la dureté, chutes, recul, secousses), défenseurs qui repoussent ce qui tombe lentement ; orbe d'orage, botte de paille et pot de poison, munitions élémentaires moins écrasantes ; moulins, forges, citernes, ruches et sacs de farine ; souffle du monde propre à chaque chapitre |
+| v6.4.0 | Playgama : version avec son Bridge (publicités entre deux niveaux et vidéos vérifiées dans l'outil de test, bloqueur de publicités, pause et son de la plateforme, sauvegarde et langue), aucun lien vers l'extérieur, couvertures mises en scène ; dix nouveaux fonds photoréalistes sous licence commerciale (FLUX.1 [schnell]), sur notre site et sur Playgama, ciels vivants replacés, rais de lumière, cadrage en portrait ; langue du portail respectée, dernier tir contre une vidéo une fois par niveau |
 | v6.3.0 | Ciels vivants : les dix fonds peints s'animent (soleil et rayons, vent et feuilles, cascade, brume qui roule, tourbillon de sable, neige, pluie et éclairs, lave et braises), le tonnerre suit l'éclair, rien n'est doublé, mouvement réduit respecté |
 | v6.2.0 | Châteaux assemblés (jonctions qui se lézardent et cèdent, clés de voûte), ailes et combos d'éléments ; l'engin avance et recule ; pillards avant chaque grand siège, et plus pressants ; barres de vie redessinées, infos en haut de l'écran, caméra qui ne suit plus les boulets perdus ; montagnes redessinées et fonds peints ; Chute libre revue ; maîtrise du royaume (Engin d'or, Comète d'or, la Légende, les Terres du Duc, la Campagne héroïque et ses paliers d'atelier) ; tous les niveaux gagnables avec la pierre de départ |
 | v6.0.0 | Les généraux de Mordrac : grands sièges en plusieurs étapes, dix généraux à vies et ordres annoncés, barre du général et bannières, Chronique enrichie ; coup de grâce, défenseurs assommés et répliques, potence et pont-levis, jauge de destruction ; cartes du siège sans fin, coupe de la semaine, moments forts filmés, coup de pouce et niveau passé |

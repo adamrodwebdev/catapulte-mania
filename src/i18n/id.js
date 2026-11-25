@@ -355,6 +355,7 @@ export default {
     hint: 'Petunjuk (video)',
     hintGranted: 'Petunjuk: lintasan ditampilkan untuk tembakan ini.',
     playing: 'Iklan sedang diputar… Permainan berlanjut sesudahnya.',
+    paused: 'Permainan dijeda',
     offerTitle: 'Amunisi habis!',
     offerText: { other: 'Masih ada {count} pembela. Satu tembakan terakhir untuk menuntaskannya?' },
     extraShot: 'Tonton video: +1 tembakan',

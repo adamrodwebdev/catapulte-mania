@@ -134,8 +134,12 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
     systemReducedMotion: false,
     /** Une publicité est à l'écran (son coupé, commandes bloquées). */
     adPlaying: false,
+    /** D'où vient ce rideau : 'ad' (notre publicité) ou 'platform' (pause de la plateforme, v6.4). */
+    pausedBy: null,
     /** Les vidéos récompensées sont-elles proposables sur cette plateforme ? */
     rewardedAvailable: ads.rewardedAvailable,
+    /** Liens vers l'extérieur (partage, courriel) permis sur cette plateforme ? (v6.4 : pas sur Playgama) */
+    externalLinks: ads.externalLinksAllowed,
   })
 
   /** @type {import('../domain/SaveSlot.js').SaveSlot | null} */
@@ -172,14 +176,23 @@ export async function createAppContext({ ads = new NoAdService() } = {}) {
   }
 
   /* ----- Publicités (portails) : son coupé et commandes bloquées pendant la vidéo ----- */
-  ads.on('pause', () => {
-    state.adPlaying = true
-    audio.adMuted = true
+  // Deux sources (v6.4) : nos publicités, et la plateforme (onglet caché, publicité qu'elle
+  // lance) ; le rideau reste tant que l'une des deux tient le jeu en pause.
+  const pauses = new Set(ads.platformPaused ? ['platform'] : [])
+  const applyPause = () => {
+    state.adPlaying = pauses.size > 0
+    state.pausedBy = pauses.has('ad') ? 'ad' : pauses.size ? 'platform' : null
+    audio.adMuted = pauses.size > 0
+  }
+  ads.on('pause', (source) => {
+    pauses.add(source === 'platform' ? 'platform' : 'ad')
+    applyPause()
   })
-  ads.on('resume', () => {
-    state.adPlaying = false
-    audio.adMuted = false
+  ads.on('resume', (source) => {
+    pauses.delete(source === 'platform' ? 'platform' : 'ad')
+    applyPause()
   })
+  applyPause()
   // Son coupé par le portail (réglage du site CrazyGames).
   audio.portalMuted = ads.portalMuted
   ads.on('mute', (muted) => (audio.portalMuted = muted))

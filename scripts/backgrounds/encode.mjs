@@ -3,18 +3,20 @@
  * Fonds peints des chapitres (v6.2) :
  *   art/backgrounds/chapter-N.png → src/game/assets/backgrounds/chapter-N.webp
  *
- * - la bande du bas est rognée : le jeu y dessine son propre sol (et c'est là
- *   que le générateur d'images pose sa marque) ;
- * - l'image est ramenée à 2560 px de large et encodée en WebP.
+ * - les peintures (v6.4) sont des photographies générées par FLUX.1 [schnell]
+ *   (2048 × 1024, Apache 2.0 ; graines et textes dans docs/PEINTURES.md) : sans
+ *   marque, rien à rogner ; le jeu dessine son sol sur leur bas (`ground`) ;
+ * - l'image garde sa largeur (2560 px au plus) et est encodée en WebP.
  *
  * Après un nouvel encodage, vérifiez dans src/game/assets/backgrounds.js la
- * ligne de sol de chaque peinture (`ground`) et ses sommets (`peaks`).
+ * ligne de sol de chaque peinture (`ground`) et ses sommets (`peaks`), et dans
+ * src/game/sky/skyConfig.js la place de ce que le ciel vivant anime.
  *
  * L'encodage passe par Chrome sans interface (Node ne sait pas écrire de
  * WebP) : Chrome doit être installé (ou son chemin donné par CHROME_PATH).
  * Les PNG d'origine, lourds, ne sont pas versionnés ; les WebP le sont.
  *
- * Usage : npm run backgrounds [-- --crop 0.885 --width 2560 --quality 0.84 --boxes]
+ * Usage : npm run backgrounds [-- --crop 1 --width 2560 --quality 0.84 --boxes]
  * (--boxes : affiche les boîtes des flocons trouvés, pour les vérifier)
  */
 /* global fetch, WebSocket */
@@ -32,10 +34,13 @@ const opt = (name, fallback) => {
   const i = args.indexOf(`--${name}`)
   return i >= 0 ? Number(args[i + 1]) : fallback
 }
-/** Part de la hauteur gardée (le reste, en bas, est rogné). */
-const CROP = opt('crop', 0.885)
+/** Part de la hauteur gardée (le reste, en bas, est rogné ; v6.2 : 0,885 sous la marque du générateur). */
+const CROP = opt('crop', 1)
 const WIDTH = opt('width', 2560)
 const QUALITY = opt('quality', 0.84)
+/** Version allégée (v6.4) : largeur et qualité (voir BackgroundArt.liteFor). */
+const LITE = opt('lite', 1600)
+const LITE_QUALITY = opt('lite-quality', 0.82)
 
 /**
  * Oiseaux peints (v6.2) : le jeu dessine les siens, qui volent ; ceux des
@@ -46,17 +51,10 @@ const QUALITY = opt('quality', 0.84)
  * 'mask' (5e valeur) : seuls les pixels qui tranchent nettement sur ce fond
  * lissé (l'oiseau, son bec) sont repeints ; le reste de la boîte (une crête,
  * la pluie) garde la peinture.
- * Les feuilles soufflées du désert (chapitre 6) restent : on les lit comme du vent.
+ * v6.4 : les photographies FLUX n'ont ni oiseau, ni pluie, ni flocon figés ;
+ * ces tables (et STREAKS, DOTS) restent vides, prêtes pour une retouche.
  */
-const ERASE = {
-  1: [[645, 227, 42, 19], [878, 241, 47, 23], [285, 295, 42, 16], [1769, 206, 46, 19], [1688, 348, 18, 15], [1730, 448, 30, 19]],
-  3: [[703, 161, 38, 16], [651, 312, 30, 21], [1103, 244, 34, 17], [611, 345, 19, 16]],
-  6: [[1850, 442, 41, 22]],
-  7: [[646, 229, 43, 17], [882, 242, 45, 21], [289, 294, 40, 16], [1390, 272, 56, 30], [1734, 232, 46, 20], [2387, 229, 31, 16]],
-  8: [[642, 229, 44, 19], [881, 245, 43, 22], [294, 297, 36, 16], [1763, 208, 43, 18], [1683, 350, 23, 16]],
-  9: [[1346, 282, 66, 27], [1306, 303, 23, 14], [1290, 330, 42, 18], [1439, 295, 43, 27], [1128, 558, 38, 22], [1048, 680, 56, 42, 'mask'], [886, 936, 37, 30], [1491, 303, 14, 13], [1481, 317, 12, 12], [1160, 444, 22, 15]],
-  10: [[1723, 448, 34, 22], [1085, 678, 25, 19]],
-}
+const ERASE = {}
 
 /**
  * Traits peints (v6.2) : la pluie de l'orage (chapitre 9), que le jeu fait
@@ -72,10 +70,7 @@ const ERASE = {
  *  - `keep` : disques épargnés [x, y, rayon] en part de la largeur (la lune) ;
  *  - `heads` : la tête de chaque trait (au début, dans le sens de `dir`) est effacée aussi.
  */
-const STREAKS = {
-  4: { dir: [1, -0.07], side: 4, contrast: 16, area: [0, 0, 1, 0.5], keep: [[0.8205, 0.2035, 0.035]], heads: true },
-  9: { dir: [-0.375, 0.927], side: 3, contrast: 12, area: [0, 0, 1, 1], keep: [] },
-}
+const STREAKS = {}
 
 /**
  * Flocons peints (v6.2) : la neige de l'hiver (chapitre 8), que le jeu fait
@@ -88,9 +83,7 @@ const STREAKS = {
  *  - `blue` : de combien le bleu du ciel dépasse son rouge, au moins ;
  *  - `spread` : écart de luminance maximal entre ces voisins (ciel uni).
  */
-const DOTS = {
-  8: { area: [0, 0, 1, 0.55], min: 200, contrast: 22, blue: 30, spread: 18, ring: 9, box: 18 },
-}
+const DOTS = {}
 
 function findChrome() {
   const candidates = [
@@ -365,7 +358,14 @@ try {
         }
         g.putImageData(im, x, y)
       }
-      return { w, h, streakCount, flakes: flakes.map((f) => f.map(Math.round)), data: c.toDataURL('image/webp', ${QUALITY}) }
+      // Version allégée (v6.4), tirée de l'image finale.
+      const lc = document.createElement('canvas')
+      lc.width = Math.min(${LITE}, w)
+      lc.height = Math.round((h * lc.width) / w)
+      const lg = lc.getContext('2d')
+      lg.imageSmoothingQuality = 'high'
+      lg.drawImage(c, 0, 0, lc.width, lc.height)
+      return { w, h, streakCount, flakes: flakes.map((f) => f.map(Math.round)), data: c.toDataURL('image/webp', ${QUALITY}), lite: lc.toDataURL('image/webp', ${LITE_QUALITY}) }
     })()`
     const r = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })
     const v = r.result?.result?.value
@@ -373,6 +373,7 @@ try {
     const out = join(OUT, file.replace('.png', '.webp'))
     const buf = Buffer.from(v.data.split(',')[1], 'base64')
     writeFileSync(out, buf)
+    if (v.lite?.startsWith('data:image/webp')) writeFileSync(out.replace('.webp', '-lite.webp'), Buffer.from(v.lite.split(',')[1], 'base64'))
     console.log(`${file} → ${v.w}×${v.h}, ${(buf.length / 1024).toFixed(0)} Ko${boxes.length ? `, ${boxes.length} oiseau(x) peint(s) effacé(s)` : ''}${v.streakCount ? `, ${v.streakCount} px de traits peints effacés` : ''}${v.flakes.length ? `, ${v.flakes.length} flocon(s) peint(s) effacé(s)` : ''}`)
     if (args.includes('--boxes') && v.flakes.length) console.log(`  flocons : ${JSON.stringify(v.flakes)}`)
   }

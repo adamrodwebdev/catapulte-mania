@@ -11,6 +11,8 @@ coverage/
 .scratch/
 # Peintures d'origine des fonds (lourdes) : seuls les WebP encodés sont versionnés.
 art/backgrounds/*.png
+# Candidates FLUX et anciennes peintures (licence non commerciale) : gardées en local.
+art/backgrounds-*/
 .netlify/
 dist-crazygames/
 dist-poki/
@@ -18,4 +20,5 @@ release/
 dist-gamedistribution/
 dist-gamepix/
 dist-y8/
+dist-playgama/
 dist-standalone/

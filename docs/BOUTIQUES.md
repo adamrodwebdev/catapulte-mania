@@ -23,10 +23,13 @@ CrazyGames est mis de côté pour l'instant. Les cinq portails retenus n'exigent
 | **GamePix** | oui (pubs, vidéos, stockage, langue) | compte développeur, suivre les onglets du formulaire |
 | **Y8** | oui (pauses publicitaires, vidéos) | créer le jeu, récupérer **Game ID** et **App ID** |
 | **Newgrounds** | non | rien : téléverser le zip, vote des joueurs ensuite |
+| **Playgama** (v6.4) | oui, Bridge v2 (pubs entre niveaux, vidéos, sauvegarde, langue, pause) | compte développeur ; « Add Game », zip et trois couvertures, puis **Publish to Sandbox** ; le catalogue s'ouvre à 100 parties et 5 min de jeu en moyenne |
 
 Tout se prépare d'une commande : `npm run release:portals` (dossier `release/`, un sous-dossier par portail : le zip du jeu, les images aux bons formats, 5 captures, la fiche `LISTING.md` avec la marche à suivre). Avec les identifiants : `npm run release:portals -- --gd-id <gameId> --y8-game <Game ID> --y8-app <App ID>`.
 
-Écartés : **Poki** (exclusivité web de cinq ans par défaut, sinon forfait unique sans partage des revenus), **GameMonetize** (doublon du réseau GameDistribution), **Playgama** (diffuse aussi sur Discord et YouTube Playables), **Game Jolt** (audience faible), **Kongregate** (soumissions fermées). Les builds CrazyGames et Poki restent disponibles (`npm run build:crazygames`, `npm run build:poki`).
+Playgama (v6.4, choisi le 17 octobre 2026) : la case de diffusion sur ses plateformes partenaires est gardée cochée (Playgama ne publie pas là où le jeu est déjà en ligne). Paquet seul : `npm run release:portals -- --only playgama`.
+
+Écartés : **Poki** (exclusivité web de cinq ans par défaut, sinon forfait unique sans partage des revenus), **GameMonetize** (doublon du réseau GameDistribution), **Game Jolt** (audience faible), **Kongregate** (soumissions fermées). Les builds CrazyGames et Poki restent disponibles (`npm run build:crazygames`, `npm run build:poki`).
 
 ## 2. Microsoft Store (PC)
 
