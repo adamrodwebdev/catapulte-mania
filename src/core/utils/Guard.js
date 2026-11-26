@@ -1,23 +1,33 @@
+import { InvalidInput, readBoolean, readNumber, readText } from './input.js'
+
 /**
  * Validation des données à l'exécution.
  *
- * Toute donnée qui franchit une frontière de confiance (localStorage, URL,
- * paramètres de configuration, événements d'interface) passe par un schéma.
- * Un schéma est une fonction `(valeur, chemin) => valeurNettoyée` qui lève une
- * `ValidationError` dès qu'une donnée n'a pas le type ou la plage attendus.
+ * Toute donnée qui franchit une frontière de confiance (stockage, URL, liens
+ * partagés, portails, événements d'interface) est lue à la porte (règle du
+ * 9 novembre 2026). Les valeurs simples passent par les lecteurs partagés de
+ * `input.js` (un nombre est un vrai nombre fini dans sa plage, un texte une
+ * chaîne nettoyée et bornée) ; un schéma assemble ces lecteurs pour un objet
+ * entier. Un schéma est une fonction `(valeur, chemin) => valeurNettoyée` qui
+ * lève une `ValidationError` dès qu'une donnée n'a pas le type ou la plage
+ * attendus.
  *
  * Exemple :
- *   const userSchema = Schema.object({ name: Schema.string({ maxLength: 16 }) })
+ *   const userSchema = Schema.object({ name: Schema.string({ maxLength: TEXT_LIMITS.name }) })
  *   const user = userSchema(JSON.parse(raw)) // lève une erreur si invalide
  */
 
-export class ValidationError extends Error {
+/**
+ * Refus d'une valeur. C'est un `InvalidInput` (input.js) : `orElse` le prend
+ * pour un refus et rend la valeur de repli.
+ */
+export class ValidationError extends InvalidInput {
   /**
    * @param {string} path chemin de la donnée fautive (ex. "save.levels.3.stars")
    * @param {string} reason description courte du problème
    */
   constructor(path, reason) {
-    super(`${path || 'value'}: ${reason}`)
+    super(path || 'value', reason)
     this.name = 'ValidationError'
     this.path = path
     this.reason = reason
@@ -34,45 +44,60 @@ export function isPlainObject(v) {
 /** Clés interdites : protection contre la pollution de prototype. */
 const FORBIDDEN_KEYS = new Set(['__proto__', 'prototype', 'constructor'])
 
+/** Lit une valeur avec un lecteur de input.js : son refus devient une ValidationError, au même chemin. */
+function atDoor(read, path) {
+  try {
+    return read()
+  } catch (error) {
+    if (error instanceof InvalidInput && !(error instanceof ValidationError)) throw new ValidationError(path, error.problem)
+    throw error
+  }
+}
+
+/**
+ * Un nombre est jugé par le lecteur partagé, puis rendu tel quel : -0 reste -0.
+ * Les niveaux, la physique et les relectures (« Bats mon tir », score à battre,
+ * contrôle des niveaux) passent par ces schémas et doivent rester identiques au
+ * bit près (Math.atan2(-0, -1) vaut -π, Math.atan2(0, -1) vaut π).
+ */
+function numberAtDoor(v, rule, path) {
+  atDoor(() => readNumber(v, rule, path), path)
+  return v
+}
+
 /**
  * @template T
  * @typedef {(value: unknown, path?: string) => T} Validator
  */
 
 export const Schema = Object.freeze({
-  /** Entier dans [min, max]. */
+  /** Entier sûr dans [min, max] (jamais une chaîne qui l'écrit). */
   int({ min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_INTEGER } = {}) {
-    return (v, path = '') => {
-      if (typeof v !== 'number' || !Number.isInteger(v)) throw new ValidationError(path, 'integer expected')
-      if (v < min || v > max) throw new ValidationError(path, `out of range [${min}, ${max}]`)
-      return v
-    }
+    const rule = Object.freeze({ min, max, integer: true })
+    return (v, path = '') => numberAtDoor(v, rule, path)
   },
 
   /** Nombre fini dans [min, max]. */
   number({ min = -Number.MAX_VALUE, max = Number.MAX_VALUE } = {}) {
-    return (v, path = '') => {
-      if (typeof v !== 'number' || !Number.isFinite(v)) throw new ValidationError(path, 'finite number expected')
-      if (v < min || v > max) throw new ValidationError(path, `out of range [${min}, ${max}]`)
-      return v
-    }
+    const rule = Object.freeze({ min, max })
+    return (v, path = '') => numberAtDoor(v, rule, path)
   },
 
   boolean() {
-    return (v, path = '') => {
-      if (typeof v !== 'boolean') throw new ValidationError(path, 'boolean expected')
-      return v
-    }
+    return (v, path = '') => atDoor(() => readBoolean(v, path), path)
   },
 
-  /** Chaîne de longueur bornée, éventuellement contrainte par une expression régulière. */
-  string({ minLength = 0, maxLength = 256, pattern = null } = {}) {
-    return (v, path = '') => {
-      if (typeof v !== 'string') throw new ValidationError(path, 'string expected')
-      if (v.length < minLength || v.length > maxLength) throw new ValidationError(path, `length must be in [${minLength}, ${maxLength}]`)
-      if (pattern && !pattern.test(v)) throw new ValidationError(path, 'invalid format')
-      return v
-    }
+  /**
+   * Texte nettoyé (caractères de contrôle, inversions bidirectionnelles et
+   * caractères invisibles retirés, NFC, espaces resserrés), de longueur bornée
+   * en caractères, éventuellement contraint par une expression ancrée (^…$).
+   * La longueur maximale est obligatoire : elle vient de TEXT_LIMITS (config/limits.js).
+   */
+  string({ minLength = 0, maxLength, pattern = null } = {}) {
+    if (!Number.isSafeInteger(maxLength) || maxLength < 1) throw new TypeError('Schema.string : longueur maximale obligatoire (TEXT_LIMITS)')
+    if (minLength !== 0 && minLength !== 1) throw new TypeError('Schema.string : minLength vaut 0 (facultatif) ou 1 (obligatoire)')
+    const rule = Object.freeze({ maxLength, required: minLength === 1, ...(pattern ? { pattern } : {}) })
+    return (v, path = '') => atDoor(() => readText(v, rule, path), path)
   },
 
   /** Valeur appartenant à une liste fermée. */
@@ -97,7 +122,8 @@ export const Schema = Object.freeze({
 
   /**
    * Objet à forme fixe. Les clés inconnues sont refusées (mode strict par défaut),
-   * ce qui empêche l'injection de champs non prévus.
+   * ce qui empêche l'injection de champs non prévus. Seuls les champs propres
+   * de l'objet sont lus, jamais ce qu'il hérite.
    */
   object(shape, { strict = true } = {}) {
     const keys = Object.keys(shape)
@@ -109,7 +135,7 @@ export const Schema = Object.freeze({
         }
       }
       const out = {}
-      for (const k of keys) out[k] = shape[k](v[k], path ? `${path}.${k}` : k)
+      for (const k of keys) out[k] = shape[k](Object.hasOwn(v, k) ? v[k] : undefined, path ? `${path}.${k}` : k)
       return out
     }
   },
@@ -143,6 +169,8 @@ export const Schema = Object.freeze({
 /**
  * Vérifications ponctuelles pour les arguments de fonctions et de méthodes.
  * Elles lèvent une erreur immédiatement : un mauvais type est un bug, pas un cas métier.
+ * Ce ne sont pas des portes : une chaîne y est vérifiée telle quelle, sans être
+ * nettoyée (clés de stockage, texte signé d'une sauvegarde).
  */
 export const Guard = Object.freeze({
   int(v, name, opts) {
@@ -154,8 +182,11 @@ export const Guard = Object.freeze({
   boolean(v, name) {
     return Schema.boolean()(v, name)
   },
-  string(v, name, opts) {
-    return Schema.string(opts)(v, name)
+  string(v, name, { minLength = 0, maxLength = 256, pattern = null } = {}) {
+    if (typeof v !== 'string') throw new ValidationError(name, 'string expected')
+    if (v.length < minLength || v.length > maxLength) throw new ValidationError(name, `length must be in [${minLength}, ${maxLength}]`)
+    if (pattern && !pattern.test(v)) throw new ValidationError(name, 'invalid format')
+    return v
   },
   oneOf(v, values, name) {
     return Schema.enum(values)(v, name)

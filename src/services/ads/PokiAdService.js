@@ -1,6 +1,7 @@
 import { AdService } from './AdService.js'
 import { AdPolicy } from './AdPolicy.js'
 import { loadScript, SDK_URLS } from './loadScript.js'
+import { readInviteLink } from '../outsideValues.js'
 
 /**
  * Poki (SDK v2) : `commercialBreak` avant chaque reprise de partie (Poki décide
@@ -39,8 +40,7 @@ export class PokiAdService extends AdService {
   /** Lien partageable Poki (`shareableURL`), relu avec `getURLParam`. */
   async inviteLink(params) {
     try {
-      const link = await this.#sdk?.shareableURL?.(params)
-      return typeof link === 'string' && /^https:\/\//.test(link) ? link : null
+      return readInviteLink(await this.#sdk?.shareableURL?.(params))
     } catch {
       return null
     }

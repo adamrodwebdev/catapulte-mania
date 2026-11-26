@@ -1,5 +1,6 @@
 import { Schema, ValidationError } from '../../core/utils/Guard.js'
 import { GAME } from '../../config/gameConfig.js'
+import { TEXT_LIMITS } from '../../config/limits.js'
 import { PROFILE_NAME } from '../../domain/SaveSlot.js'
 import { DAY_KEY, DailyChallenge } from '../daily/DailyChallenge.js'
 import { AIM } from '../aim.js'
@@ -18,7 +19,7 @@ import { AIM } from '../aim.js'
 // Munitions par leur rang dans le code : on ajoute à la fin (v6.1 : botte de paille,
 // orbe d'orage, pot de poison), pour que les liens déjà partagés restent valides.
 const AMMO = Object.freeze(['stone', 'boulder', 'fire', 'bomb', 'split', 'frost', 'bale', 'thunder', 'poison'])
-export const MAX_CODE_LENGTH = 6000
+export const MAX_CODE_LENGTH = TEXT_LIMITS.replayCode
 // v6.0 : un grand siège note aussi chaque fin de tour (e), l’étape suivante (g) et les ordres du général (b).
 // v6.2 : et chaque trajet de l’engin (m).
 const MAX_ACTIONS = 200
@@ -81,10 +82,10 @@ const actionSchema = (raw, path) => {
 const codeSchema = Schema.object(
   {
     v: Schema.enum([2]),
-    day: Schema.string({ minLength: 0, maxLength: 10, pattern: /^(?:|\d{4}-\d{2}-\d{2})$/ }),
+    day: Schema.string({ minLength: 0, maxLength: TEXT_LIMITS.dayKey, pattern: /^(?:|\d{4}-\d{2}-\d{2})$/ }),
     l: Schema.int({ min: 1, max: GAME.LEVEL_COUNT }),
     e: Schema.enum(['catapult', 'trebuchet', 'ballista']),
-    n: Schema.string({ minLength: 0, maxLength: 16, pattern: /^(?:|[\p{L}\p{N}][\p{L}\p{N} _'-]{0,15})$/u }),
+    n: Schema.string({ minLength: 0, maxLength: TEXT_LIMITS.name, pattern: /^(?:|[\p{L}\p{N}][\p{L}\p{N} _'-]{0,15})$/u }),
     a: Schema.array((raw) => raw, { maxLength: MAX_ACTIONS }),
   },
   { strict: true },

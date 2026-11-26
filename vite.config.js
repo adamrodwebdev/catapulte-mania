@@ -18,6 +18,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { buildCsp } from './build/csp.js'
 import { buildServiceWorker, PUBLIC_PRECACHE } from './build/sw.js'
+import { readSiteUrl } from './build/siteUrl.js'
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
 const LANGS = ['fr', 'en', 'id']
@@ -178,7 +179,7 @@ export default defineConfig(({ mode }) => {
   const isDemo = mode === 'demo'
   /** Plateforme visée : notre site ('web'), ou un portail (mode du même nom). */
   const target = PORTALS.includes(mode) ? mode : 'web'
-  const siteUrl = env.VITE_SITE_URL || 'https://catapulte-mania.netlify.app'
+  const siteUrl = readSiteUrl(env.VITE_SITE_URL)
 
   return {
     base: './',

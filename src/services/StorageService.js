@@ -1,8 +1,15 @@
 import { Guard } from '../core/utils/Guard.js'
+import { SAVE_LIMITS } from '../config/limits.js'
 
 const PREFIX = 'ctc:'
 /** Taille maximale d'une entrée : protège contre le remplissage abusif du stockage. */
-const MAX_ENTRY_SIZE = 64 * 1024
+const MAX_ENTRY_SIZE = SAVE_LIMITS.entry
+const EMPTY = Object.freeze({ status: 'empty' })
+const UNREADABLE = Object.freeze({
+  readFailed: Object.freeze({ status: 'unreadable', reason: 'read-failed' }),
+  notText: Object.freeze({ status: 'unreadable', reason: 'not-text' }),
+  tooLong: Object.freeze({ status: 'unreadable', reason: 'too-long' }),
+})
 
 /**
  * Accès sécurisé au localStorage.
@@ -44,16 +51,33 @@ export class StorageService {
     return PREFIX + key
   }
 
-  /** @returns {string | null} */
-  read(key) {
+  /**
+   * Ce que contient une entrée (v6.3.1) : rien (`empty`), un texte lisible
+   * (`present`), ou ce que le jeu ne sait pas lire (`unreadable`) : la lecture
+   * a échoué (`read-failed`), la valeur n'est pas un texte (`not-text`, stockage
+   * d'un portail) ou dépasse la taille permise (`too-long`, vérifiée avant toute
+   * lecture JSON). Illisible n'est pas vide : seule une action du joueur peut
+   * remplacer une entrée illisible, jamais une écriture automatique.
+   * @returns {{ status: 'empty' } | { status: 'present', text: string } | { status: 'unreadable', reason: 'read-failed' | 'not-text' | 'too-long' }}
+   */
+  readEntry(key) {
     const k = this.#key(key)
+    let v
     try {
-      const v = this.#backend ? this.#backend.getItem(k) : this.#memory.get(k)
-      if (typeof v !== 'string' || v.length > MAX_ENTRY_SIZE) return null
-      return v
+      v = this.#backend ? this.#backend.getItem(k) : this.#memory.get(k)
     } catch {
-      return null
+      return UNREADABLE.readFailed
     }
+    if (v === null || v === undefined) return EMPTY
+    if (typeof v !== 'string') return UNREADABLE.notText
+    if (v.length > MAX_ENTRY_SIZE) return UNREADABLE.tooLong
+    return { status: 'present', text: v }
+  }
+
+  /** @returns {string | null} le texte de l'entrée, ou null si elle est vide ou illisible */
+  read(key) {
+    const entry = this.readEntry(key)
+    return entry.status === 'present' ? entry.text : null
   }
 
   /** @returns {boolean} succès de l'écriture */

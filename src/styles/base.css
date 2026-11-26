@@ -104,9 +104,31 @@ select {
   color: inherit;
 }
 
-button {
+/* Le curseur dit ce qui se clique (règle du 9 novembre 2026), posé une seule fois ici :
+   la flèche sur tout le contenu (titres, textes, listes, images), la main sur les liens,
+   boutons, listes de choix et étiquettes de commandes, la barre de texte dans les champs,
+   « interdit » sur une commande désactivée. Aucun composant ne pose le sien, sauf deux
+   curseurs qui ont un sens : le viseur de l'atelier (modes.css) et l'écran du studio,
+   qu'un clic n'importe où passe (studio.css). La scène de jeu pose le sien selon ce qu'un
+   clic y fait (game/aim/canvasCursor.js). */
+html { cursor: default; }
+/* :where() garde ces sélecteurs à une spécificité nulle : la règle « interdit » de la fin
+   l'emporte toujours (button:not(:disabled) battait [aria-disabled='true'], Bastion 2026-11-09). */
+:where(a[href], area[href], button, select, summary, label[for],
+  [role='button'], [role='link'], [role='tab'], [role='menuitem'], [role='option'],
+  [role='switch'],
+  input:is([type='checkbox'], [type='radio'], [type='submit'], [type='button'],
+    [type='reset'], [type='file'], [type='color'], [type='range'])) {
   cursor: pointer;
 }
+/* Une règle à part : un navigateur sans :has() n'abandonne qu'elle, pas la liste au-dessus. */
+:where(label:has(> input:not(:disabled))) { cursor: pointer; }
+/* Étiquette d'un choix fermé (bouton radio caché, v6.3.1) : « interdit », comme le choix. */
+:where(label:has(> input:disabled)) { cursor: not-allowed; }
+:where(input:is(:not([type]), [type='text'], [type='email'], [type='search'],
+  [type='password'], [type='number'], [type='tel'], [type='url']),
+  textarea, [contenteditable='true']) { cursor: text; }
+:disabled, [aria-disabled='true'] { cursor: not-allowed; }
 
 :focus-visible {
   outline: 3px solid var(--focus);

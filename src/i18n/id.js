@@ -913,6 +913,7 @@ export default {
     share: 'Bagikan',
     clear: 'Hapus semua',
     verifyFirst: 'Taklukkan dulu kastel Anda sendiri agar bisa membagikannya.',
+    ammoError: 'Bilangan bulat dari 0 sampai {max}.',
     canvasLabel: 'Area bangunan. Ketuk untuk meletakkan potongan yang dipilih. Papan ketik: panah kiri dan kanan menggeser kursor, Enter meletakkan, Delete menghapus.',
     partsLabel: 'Potongan',
     materialLabel: 'Bahan',

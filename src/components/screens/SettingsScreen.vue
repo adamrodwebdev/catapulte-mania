@@ -2,6 +2,7 @@
 import { ClipRecorder } from '../../services/ClipRecorder.js'
 import { computed } from 'vue'
 import { useApp } from '../../app/AppContext.js'
+import { readPercentSlider } from '../../app/fields.js'
 import { GAME } from '../../config/gameConfig.js'
 import ScreenHeader from '../ui/ScreenHeader.vue'
 import ToggleSwitch from '../ui/ToggleSwitch.vue'
@@ -17,9 +18,10 @@ const opts = (key, values) => values.map((v) => ({ value: v, label: t(`settings.
 const set = (key) => (value) => app.setSetting(key, value)
 const back = () => app.go(state.previous === 'game' || state.previous === 'settings' ? 'home' : state.previous)
 
+/** Curseur de volume, lu à la porte (v6.3.1) : un pourcentage entier, de 0 à 100. */
 function onVolume(e, key = 'volume') {
-  const v = Number(e.target.value) / 100
-  if (Number.isFinite(v)) app.setSetting(key, Math.min(1, Math.max(0, v)))
+  const v = readPercentSlider(e.target.value)
+  if (v !== null) app.setSetting(key, v)
 }
 /** Moments forts (v6.0) : réglage proposé seulement si le navigateur sait filmer le jeu. */
 const clipsSupported = typeof document !== 'undefined' && ClipRecorder.supported(document.createElement('canvas'))

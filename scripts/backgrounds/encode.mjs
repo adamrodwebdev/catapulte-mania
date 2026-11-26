@@ -23,19 +23,21 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { argumentsOrExit, readEncodeArguments } from '../arguments.mjs'
+import { parseNumber } from '../../src/core/utils/input.js'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const SRC = join(ROOT, 'art', 'backgrounds')
 const OUT = join(ROOT, 'src', 'game', 'assets', 'backgrounds')
-const args = process.argv.slice(2)
-const opt = (name, fallback) => {
-  const i = args.indexOf(`--${name}`)
-  return i >= 0 ? Number(args[i + 1]) : fallback
-}
-/** Part de la hauteur gardée (le reste, en bas, est rogné). */
-const CROP = opt('crop', 0.885)
-const WIDTH = opt('width', 2560)
-const QUALITY = opt('quality', 0.84)
+/**
+ * Réglages lus à la porte (v6.3.1, voir arguments.mjs) : des nombres dans leurs bornes, ou
+ * l'arrêt (code 2) avant tout encodage. Ils sont écrits dans le code que Chrome exécute :
+ * jamais autre chose qu'un nombre. CROP : part de la hauteur gardée (le reste, en bas, est rogné).
+ */
+const { crop: CROP, width: WIDTH, quality: QUALITY, boxes: BOXES } = argumentsOrExit(
+  () => readEncodeArguments(process.argv.slice(2)),
+  'Usage : npm run backgrounds [-- --crop 0.885 --width 2560 --quality 0.84 --boxes]',
+)
 
 /**
  * Oiseaux peints (v6.2) : le jeu dessine les siens, qui volent ; ceux des
@@ -110,7 +112,10 @@ function findChrome() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
-const files = existsSync(SRC) ? readdirSync(SRC).filter((f) => /^chapter-\d+\.png$/.test(f)) : []
+/** Peinture d'un chapitre (chapter-N.png) ; son numéro est lu en entier (v6.3.1 : plus de parseInt). */
+const CHAPTER_FILE = /^chapter-(\d{1,3})\.png$/
+const chapterOf = (file) => parseNumber(CHAPTER_FILE.exec(file)[1], { min: 0, max: 999, integer: true }, file)
+const files = existsSync(SRC) ? readdirSync(SRC).filter((f) => CHAPTER_FILE.test(f)) : []
 if (!files.length) {
   console.log(`Aucune peinture dans ${SRC} (chapter-1.png … chapter-10.png).`)
   process.exit(0)
@@ -149,11 +154,12 @@ try {
       ws.send(JSON.stringify({ id: n, method, params }))
     })
 
-  for (const file of files.sort((a, b) => parseInt(a.slice(8), 10) - parseInt(b.slice(8), 10))) {
+  for (const file of files.sort((a, b) => chapterOf(a) - chapterOf(b))) {
+    const chapter = chapterOf(file)
     const src = `data:image/png;base64,${readFileSync(join(SRC, file)).toString('base64')}`
-    const boxes = ERASE[parseInt(file.slice(8), 10)] ?? []
-    const streaks = STREAKS[parseInt(file.slice(8), 10)] ?? null
-    const dots = DOTS[parseInt(file.slice(8), 10)] ?? null
+    const boxes = ERASE[chapter] ?? []
+    const streaks = STREAKS[chapter] ?? null
+    const dots = DOTS[chapter] ?? null
     const expression = `(async () => {
       const img = new Image()
       img.src = ${JSON.stringify(src)}
@@ -374,7 +380,7 @@ try {
     const buf = Buffer.from(v.data.split(',')[1], 'base64')
     writeFileSync(out, buf)
     console.log(`${file} → ${v.w}×${v.h}, ${(buf.length / 1024).toFixed(0)} Ko${boxes.length ? `, ${boxes.length} oiseau(x) peint(s) effacé(s)` : ''}${v.streakCount ? `, ${v.streakCount} px de traits peints effacés` : ''}${v.flakes.length ? `, ${v.flakes.length} flocon(s) peint(s) effacé(s)` : ''}`)
-    if (args.includes('--boxes') && v.flakes.length) console.log(`  flocons : ${JSON.stringify(v.flakes)}`)
+    if (BOXES && v.flakes.length) console.log(`  flocons : ${JSON.stringify(v.flakes)}`)
   }
   ws.close()
 } finally {

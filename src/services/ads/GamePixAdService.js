@@ -2,6 +2,7 @@ import { AdService } from './AdService.js'
 import { AdPolicy } from './AdPolicy.js'
 import { loadScript, SDK_URLS } from './loadScript.js'
 import { ADS_ENABLED } from '../../config/gameConfig.js'
+import { readLanguageTag } from '../outsideValues.js'
 
 /**
  * GamePix (SDK v3, v5.6) : chargement, interstitiels, vidéos récompensées,
@@ -39,8 +40,8 @@ export class GamePixAdService extends AdService {
       sdk.loading?.(50)
       // Langue lue une fois, dès le démarrage (même si le joueur a déjà choisi la sienne).
       try {
-        const lang = sdk.lang?.()
-        this.#lang = typeof lang === 'string' && /^[a-z]{2}([-_][a-z]{2})?$/i.test(lang) ? lang.slice(0, 2).toLowerCase() : null
+        const lang = readLanguageTag(sdk.lang?.())
+        this.#lang = lang === null ? null : lang.slice(0, 2).toLowerCase()
       } catch {
         this.#lang = null
       }

@@ -51,6 +51,7 @@
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads'
 import { availableParallelism } from 'node:os'
 import { fileURLToPath } from 'node:url'
+import { argumentsOrExit, readCheckLevelsArguments } from './arguments.mjs'
 
 const ANGLES = [10, 20, 30, 40, 50, 60, 70]
 /** Temps de visée avant chaque tir (pas de 1/30 s) : 1,5 s. */
@@ -428,27 +429,15 @@ async function checkLevel(pool, id, rank, meta, { engine, boss: forced }) {
   return { id, stable, destroyedAtRest: destroyed, solved: run.solved, shotsUsed: run.plan.length, score: run.score, plan: run.plan, tolerance: first.tolerance, way: run.way }
 }
 
-function parseRange(arg, max) {
-  if (!arg) return Array.from({ length: max }, (_, i) => i + 1)
-  return arg.split(',').flatMap((part) => {
-    const [a, b] = part.split('-').map(Number)
-    return Array.from({ length: (b || a) - a + 1 }, (_, i) => a + i)
-  })
-}
-
 if (isMainThread) {
-  const args = process.argv.slice(2)
-  const get = (k) => (args.includes(k) ? args[args.indexOf(k) + 1] : undefined)
-  const track = ['heroic', 'duke'].includes(get('--track')) ? get('--track') : 'campaign'
-  const ids = parseRange(get('--levels'), track === 'duke' ? 5 : 100)
-  const difficulty = get('--difficulty') || 'hard'
-  const engine = get('--engine') === 'trebuchet' ? 'trebuchet' : 'catapult'
-  const ammo = get('--ammo') === 'stone' ? 'stone' : 'all'
-  const demo = args.includes('--demo')
-  // --boss (v6.2) : face à un général, le viser d'abord dès la première manière.
-  const boss = args.includes('--boss')
+  // Arguments lus à la porte (v6.3.1, voir arguments.mjs) : un argument inconnu, répété ou
+  // illisible arrête le contrôle (code 2) avant le premier niveau, au lieu d'en contrôler
+  // d'autres, ou aucun, et de passer. --boss (v6.2) : face à un général, le viser d'abord ;
   // --workers (v6.2) : moins de cœurs à la fois, pour une machine qui chauffe.
-  const workers = Math.max(1, Math.min(Number(get('--workers')) || availableParallelism(), availableParallelism()))
+  const { track, ids, difficulty, engine, ammo, demo, boss, workers } = argumentsOrExit(
+    () => readCheckLevelsArguments(process.argv.slice(2), availableParallelism()),
+    'Usage : node scripts/check-levels.mjs [--levels 1-10 | --levels 10,20,30] [--difficulty easy|normal|hard] [--engine trebuchet] [--ammo stone] [--track heroic|duke] [--workers 4] [--boss] [--demo]',
+  )
   const t0 = Date.now()
   const pool = new ReplayPool(workers, { difficulty, engine, demo, ammo, track })
   // Les plus longs d'abord (grands sièges) : ils ne finissent pas seuls, à la fin.
@@ -481,6 +470,8 @@ if (isMainThread) {
   const G = await loadGame()
   parentPort.on('message', ({ task, args }) => {
     try {
+      // Message du fil principal : la tâche est cherchée dans les champs propres de TASKS (v6.3.1).
+      if (typeof task !== 'string' || !Object.hasOwn(TASKS, task)) throw new TypeError(`unknown task (${typeof task})`)
       parentPort.postMessage({ result: TASKS[task](G, args) })
     } catch (e) {
       parentPort.postMessage({ error: e?.stack ?? String(e) })

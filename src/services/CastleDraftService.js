@@ -1,7 +1,8 @@
 import { CastleCode, emptyDesign, STORAGE_KEYS } from '../game/editor/CastleDesign.js'
+import { TEXT_LIMITS } from '../config/limits.js'
 
 /** Longueur maximale d'un code de château mémorisé (au-delà, il est ignoré). */
-const MAX_CODE = 4000
+const MAX_CODE = TEXT_LIMITS.castleCode
 
 /**
  * Ce que l'atelier de châteaux (v4.0) garde sur l'appareil (v6.2, sorti de

@@ -1,5 +1,8 @@
 import { Guard } from '../core/utils/Guard.js'
+import { orElse, readChoice } from '../core/utils/input.js'
 import { EventBus } from '../core/utils/EventBus.js'
+import { LIST_LIMITS } from '../config/limits.js'
+import { readLanguageTag } from './outsideValues.js'
 
 const PARAM = /\{(\w+)\}/g
 const INTL_LOCALES = Object.freeze({ fr: 'fr-FR', en: 'en-GB', id: 'id-ID' })
@@ -102,20 +105,26 @@ export class I18nService extends EventBus {
   }
 
   /**
-   * Choisit la langue initiale : paramètre d'URL ?lang=, puis langue du navigateur.
+   * Choisit la langue initiale : paramètre d'URL ?lang=, puis langue du portail
+   * et du navigateur. Ces langues viennent de l'extérieur (v6.3.1) : chacune est
+   * lue comme une étiquette de langue, et une valeur d'un autre type (un objet
+   * au `toString` piégé, un nombre) est ignorée au lieu d'arrêter le démarrage.
    * @param {string} search ex. location.search
-   * @param {readonly string[]} browserLanguages ex. navigator.languages
+   * @param {readonly unknown[]} browserLanguages ex. [langue du portail, ...navigator.languages]
    * @param {string} defaultLocale
    */
   static detect(search, browserLanguages, available, defaultLocale) {
     try {
-      const fromUrl = new URLSearchParams(search).get('lang')
-      if (fromUrl && available.includes(fromUrl)) return fromUrl
+      const fromUrl = orElse(() => readChoice(new URLSearchParams(search).get('lang'), available, 'lang'), null)
+      if (fromUrl !== null) return fromUrl
     } catch {
       /* URL invalide : on ignore */
     }
-    for (const lang of browserLanguages || []) {
-      const short = String(lang).slice(0, 2).toLowerCase()
+    const languages = Array.isArray(browserLanguages) ? browserLanguages.slice(0, LIST_LIMITS.languages) : []
+    for (const value of languages) {
+      const tag = readLanguageTag(value)
+      if (tag === null) continue
+      const short = tag.slice(0, 2).toLowerCase()
       if (available.includes(short)) return short
       if (short === 'ms' && available.includes('id')) return 'id' // malais → indonésien
     }

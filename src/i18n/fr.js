@@ -913,6 +913,7 @@ export default {
     share: 'Partager',
     clear: 'Tout effacer',
     verifyFirst: 'Prenez d’abord votre château vous-même pour pouvoir le partager.',
+    ammoError: 'Un nombre entier de 0 à {max}.',
     canvasLabel: 'Zone de construction. Touchez pour poser la pièce choisie. Au clavier : flèches gauche et droite pour déplacer le curseur, Entrée pour poser, Suppr pour retirer.',
     partsLabel: 'Pièces',
     materialLabel: 'Matériau',
