@@ -1,4 +1,4 @@
-import { skySprites, scratchCanvas } from './skySprites.js'
+import { beamOf, skySprites, scratchCanvas } from './skySprites.js'
 
 /**
  * Ciels vivants (v6.3) : les effets, un par nom (voir skyConfig.js).
@@ -136,6 +136,48 @@ function sun(sky) {
       ctx.globalAlpha = clamp01(cfg.glow * (1 - pulse + pulse * Math.sin(t * 1.2)) * Math.min(1.3, k) * (1 - 0.7 * sky.veil))
       const sp = skySprites()
       ctx.drawImage(cfg.warm ? sp.sunsetGlow : sp.sunGlow, p.x - r, p.y - r, 2 * r, 2 * r)
+    },
+  }
+}
+
+/**
+ * Rais de lumière (v6.4) : des faisceaux doux partent du soleil et respirent,
+ * chacun à son rythme, comme une lumière filtrée par l'air et les nuages ; ils
+ * pâlissent quand un nuage voile le soleil. Pour les peintures dont les rayons,
+ * trop doux, ne se lisent pas (les photographies). Réglages (`sun.shafts`) :
+ * count (nombre), spread (éventail [de, à], en degrés, l'axe des y vers le bas),
+ * width (largeur au loin [min, max], part de la largeur de la peinture), reach
+ * (longueur, part de la largeur), alpha (force).
+ */
+function shafts(sky) {
+  const cfg = sky.cfg.sun.shafts
+  const r = sky.rand
+  const [a0, a1] = cfg.spread
+  const list = Array.from({ length: cfg.count }, (_, i) => {
+    const q = (i + 0.5 + (r.next() - 0.5) * 0.7) / cfg.count
+    return { a: ((a0 + (a1 - a0) * q) * Math.PI) / 180, w: r.range(cfg.width[0], cfg.width[1]), len: r.range(0.7, 1), ph: r.next() * TAU, f: r.range(0.07, 0.18), sway: r.range(0.01, 0.025) }
+  })
+  return {
+    /** Les rais (v6.5 : le fond WebGL2 les dessine à l'identique, voir gl/GpuBackdrop.js). */
+    beams: Object.freeze(list.map((b) => Object.freeze(b))),
+    draw(ctx, view, t, motion, k) {
+      const s = sky.data.sun
+      if (!s) return
+      const p = view.map(s.u, s.v)
+      const img = beamOf(sky.cfg.sun.tint)
+      const L = cfg.reach * view.iw
+      const base = cfg.alpha * Math.min(1.3, k) * (1 - 0.85 * sky.veil)
+      ctx.globalCompositeOperation = 'screen'
+      for (const b of list) {
+        const breathe = 0.5 + 0.5 * Math.sin(t * b.f * TAU + b.ph)
+        ctx.globalAlpha = clamp01(base * (0.2 + 0.8 * breathe * breathe))
+        ctx.save()
+        ctx.translate(p.x, p.y)
+        ctx.rotate(b.a + b.sway * Math.sin(t * 0.07 + b.ph) - Math.PI / 2)
+        const w = b.w * view.iw
+        ctx.drawImage(img, -w / 2, 0, w, L * b.len)
+        ctx.restore()
+      }
     },
   }
 }
@@ -1105,7 +1147,7 @@ function snow(sky) {
 
 /** Les effets, par nom. */
 export const EFFECTS = /* @__PURE__ */ Object.freeze({
-  moon, stars, meteors, sun, rays, flare, veil, lightning, glints, diamond, dust, fireflies,
+  moon, stars, meteors, sun, shafts, rays, flare, veil, lightning, glints, diamond, dust, fireflies,
   shadows, gusts, leaves, scud, mist, fogroll, veils, haze, devil,
   falls, ripples, wisps, lava, smoke, embers, ash, motes, rain, snow,
 })

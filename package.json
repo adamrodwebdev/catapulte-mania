@@ -1,6 +1,6 @@
 {
   "name": "catapulte-mania",
-  "version": "6.3.0",
+  "version": "6.4.0",
   "private": true,
   "description": "Jeu de catapulte médiéval 100 % front-end (Vue 3 + Vite + Matter.js) : 40 niveaux, pouvoirs spéciaux, multilingue (FR / EN / ID) et accessible.",
   "type": "module",
@@ -18,9 +18,13 @@
     "build:gamedistribution": "vite build --mode gamedistribution",
     "build:gamepix": "vite build --mode gamepix",
     "build:y8": "vite build --mode y8",
+    "build:playgama": "vite build --mode playgama",
     "build:standalone": "vite build --mode standalone",
     "release:portals": "node scripts/release-portals.mjs",
     "preview": "vite preview",
+    "assets": "node scripts/private-assets.mjs",
+    "assets:lock": "node scripts/private-assets.mjs --lock",
+    "pretest": "node scripts/private-assets.mjs",
     "test": "node --test \"tests/**/*.test.js\"",
     "check:levels": "node scripts/check-levels.mjs",
     "portraits": "node scripts/portraits/encode.mjs",
@@ -33,7 +37,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.9",
-    "eslint": "^10.1.0",
-    "vite": "^8.3.0"
+    "eslint": "^10.15.0",
+    "vite": "^8.3.8"
   }
 }

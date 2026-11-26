@@ -55,10 +55,10 @@ export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSIO
 /**
  * Plateforme visée par ce build (v3.5, v5.6) : 'web' (notre site, sans publicité),
  * un portail avec son SDK ('crazygames', 'poki', 'gamedistribution', 'gamepix',
- * 'y8'), ou 'standalone' (portails sans SDK : itch.io, Newgrounds). Constante
+ * 'y8', 'playgama'), ou 'standalone' (portails sans SDK : itch.io, Newgrounds). Constante
  * remplacée au build.
  */
-export const TARGETS = Object.freeze(['web', 'crazygames', 'poki', 'gamedistribution', 'gamepix', 'y8', 'standalone'])
+export const TARGETS = Object.freeze(['web', 'crazygames', 'poki', 'gamedistribution', 'gamepix', 'y8', 'playgama', 'standalone'])
 export const TARGET = typeof __TARGET__ !== 'undefined' && TARGETS.includes(__TARGET__) ? __TARGET__ : 'web'
 /**
  * Identifiants donnés par le tableau de bord du portail (GameDistribution : gameId ;

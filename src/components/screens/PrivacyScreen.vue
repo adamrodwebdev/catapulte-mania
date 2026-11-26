@@ -23,7 +23,7 @@ const sections = IS_PORTAL ? ['data', 'storage', 'portal', 'rights'] : ['data', 
       <section class="panel help__card" aria-labelledby="privacy-publisher">
         <h2 id="privacy-publisher" class="panel__title">{{ t('privacy.publisherTitle') }}</h2>
         <p>{{ t('privacy.publisher', { name: LEGAL.publisher, version: APP_VERSION }) }}</p>
-        <p v-if="LEGAL.contact">{{ t('privacy.contact') }} <a :href="`mailto:${LEGAL.contact}`">{{ LEGAL.contact }}</a></p>
+        <p v-if="LEGAL.contact">{{ t('privacy.contact') }} <a v-if="app.state.externalLinks" :href="`mailto:${LEGAL.contact}`">{{ LEGAL.contact }}</a><span v-else>{{ LEGAL.contact }}</span></p>
       </section>
     </div>
   </main>

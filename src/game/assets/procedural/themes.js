@@ -14,7 +14,7 @@
 export const THEMES = Object.freeze({
   1: { skyTop: '#7fb2dc', skyBottom: '#f5dcae', sun: '#fff1c4', far: '#86a873', farDark: '#6b8c5c', grass: '#5c8a3b', dirt: '#7a5636', castle: '#8fa58a', night: false },
   2: { skyTop: '#93acc4', skyBottom: '#e3e6e2', sun: '#fffdf0', far: '#8e97a6', farDark: '#727c8d', grass: '#5f7d45', dirt: '#6d5a48', castle: '#9097a4', night: false },
-  3: { skyTop: '#3f2c5c', skyBottom: '#ef9653', sun: '#ffd27a', far: '#5b3a5a', farDark: '#432a47', grass: '#4d5e32', dirt: '#5a3f2c', castle: '#4b2f4c', night: false, sunAt: [0.78, 0.42] },
+  3: { skyTop: '#3f2c5c', skyBottom: '#ef9653', sun: '#ffd27a', far: '#5b3a5a', farDark: '#432a47', grass: '#4d5e32', dirt: '#5a3f2c', castle: '#4b2f4c', night: false, sunAt: [0.78, 0.42], cloudVeil: [255, 206, 160] },
   4: { skyTop: '#0d1430', skyBottom: '#3c3c6e', sun: '#e9edf7', far: '#1f2446', farDark: '#161a36', grass: '#2f4a30', dirt: '#3b2e28', castle: '#262b52', night: true },
   // v3 : chapitres 5 à 10, chacun avec son climat (brume, sable, neige, pluie…).
   5: { skyTop: '#7f9a8f', skyBottom: '#d9e0c8', sun: '#f4f1d0', far: '#5f7a5a', farDark: '#4b6347', grass: '#4e6b3a', dirt: '#4a3d2e', castle: '#6f7f6a', night: false, weather: 'fog' },

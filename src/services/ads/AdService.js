@@ -10,7 +10,9 @@ import { RewardTicket } from './RewardTicket.js'
  * portail. Le build de notre site utilise NoAdService : aucun script tiers.
  *
  * Événements : `pause` (une pub commence : couper le son, bloquer les commandes)
- * et `resume` (elle est finie ou a échoué).
+ * et `resume` (elle est finie ou a échoué). Leur argument dit d'où vient la pause :
+ * rien pour nos publicités, `'platform'` quand la plateforme l'impose (v6.4 :
+ * onglet caché, publicité qu'elle lance d'elle-même).
  */
 export class AdService extends EventBus {
   /** Identifiant de la plateforme. */
@@ -70,7 +72,25 @@ export class AdService extends EventBus {
   /** Progression globale du joueur, de 0 à 100 (statistiques du portail). */
   reportProgress(percent) {} // eslint-disable-line no-unused-vars
 
-  /** Stockage synchronisé de la plateforme (interface de localStorage) ou null. */
+  /** Fin d'un niveau, gagné ou perdu (v6.4 : étapes des niveaux pour Playgama). */
+  levelEnded(won) {} // eslint-disable-line no-unused-vars
+
+  /**
+   * Le jeu peut-il montrer des liens vers l'extérieur (partage, courriel) ?
+   * Playgama les interdit (v6.4).
+   */
+  get externalLinksAllowed() {
+    return true
+  }
+
+  /**
+   * La plateforme tient-elle le jeu en pause (au démarrage ; ensuite, événements
+   * `pause` / `resume` avec `'platform'`) ?
+   */
+  get platformPaused() {
+    return false
+  }
+
   /**
    * Le portail demande-t-il de couper le son ? (événement `mute` à chaque changement)
    */
@@ -86,6 +106,7 @@ export class AdService extends EventBus {
     return null
   }
 
+  /** Stockage synchronisé de la plateforme (interface de localStorage) ou null. */
   get cloudStorage() {
     return null
   }

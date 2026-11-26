@@ -18,6 +18,7 @@ export async function createAdService() {
     else if (__TARGET__ === 'gamedistribution') service = new (await import('./GameDistributionAdService.js')).GameDistributionAdService()
     else if (__TARGET__ === 'gamepix') service = new (await import('./GamePixAdService.js')).GamePixAdService()
     else if (__TARGET__ === 'y8') service = new (await import('./Y8AdService.js')).Y8AdService()
+    else if (__TARGET__ === 'playgama') service = new (await import('./PlaygamaAdService.js')).PlaygamaAdService()
     if (!service) return new NoAdService()
     await service.init()
     return service

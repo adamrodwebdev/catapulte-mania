@@ -10,7 +10,8 @@ import { PAINTED_PLUMES } from '../assets/procedural/palette.js'
  * - elle couvre toute la vue ; sa ligne de sol (`ground`, part de la hauteur de
  *   l'image) se pose sur le sol du monde, la couture cachée sous l'herbe (à
  *   défaut, son horizon se cale un peu au-dessus du sol), et elle défile
- *   lentement avec la caméra (parallaxe) ;
+ *   lentement avec la caméra (parallaxe) ; sur une vue étroite, elle se cadre
+ *   sur son centre d'intérêt (`focus`, v6.4) ;
  * - elle apparaît en fondu (pas de saut entre le décor dessiné et la peinture),
  *   sauf là où rien ne bouge (v6.2 : l'atelier, `fadeMs` 0, la montre d'un coup) ;
  * - le vent arrache des panaches à ses sommets (points donnés par le manifeste,
@@ -19,20 +20,42 @@ import { PAINTED_PLUMES } from '../assets/procedural/palette.js'
  * Tant qu'elle n'est pas prête (ou sans image pour ce chapitre), le décor
  * procédural est dessiné à la place.
  */
+/** Largeur des peintures allégées (px, v6.4 ; voir scripts/backgrounds/encode.mjs). */
+export const LITE_WIDTH = 1600
+
+/**
+ * La version allégée d'une peinture suffit-elle (v6.4) ? Oui sur un appareil à
+ * peu de mémoire (4 Go ou moins), ou quand la peinture, à l'écran, ne dépasse
+ * guère sa largeur (agrandie de 25 % au plus : une peinture le supporte).
+ * La peinture couvre la largeur de la vue (avec de quoi défiler) et, en
+ * portrait, toute sa hauteur jusqu'au sol : sa largeur affichée suit alors la hauteur.
+ * @param {{ viewW: number, viewH: number, dpr?: number, memory?: number }} env
+ */
+export function liteFor({ viewW, viewH, dpr = 1, memory } = {}) {
+  if (Number.isFinite(memory) && memory <= 4) return true
+  if (!(viewW > 0 && viewH > 0)) return false
+  const needed = Math.max(viewW * 1.15, viewH * 2.3) * Math.min(2, Math.max(1, dpr || 1))
+  return needed <= LITE_WIDTH * 1.25
+}
+
 export class BackgroundArt {
   /** @type {Record<number, { url: string, horizon?: number, peaks?: Array<{x:number,y:number,kind?:string}> }>} */
   #manifest
   #entries = new Map()
   /** Durée du fondu d'apparition (ms) ; 0 : d'un coup. */
   #fadeMs
+  /** La version allégée suffit-elle, au moment où une peinture se charge (v6.4) ? */
+  #lite
 
   /**
-   * @param {Record<number, object>} manifest chapitre → { url, horizon, peaks }
-   * @param {{ fadeMs?: number }} [opts] durée du fondu d'apparition (v6.2)
+   * @param {Record<number, object>} manifest chapitre → { url, lite, horizon, peaks }
+   * @param {{ fadeMs?: number, lite?: () => boolean }} [opts] durée du fondu d'apparition (v6.2) ;
+   *   choix de la version allégée (v6.4, voir liteFor)
    */
-  constructor(manifest = {}, { fadeMs = 350 } = {}) {
+  constructor(manifest = {}, { fadeMs = 350, lite = () => false } = {}) {
     this.#manifest = { ...manifest }
     this.#fadeMs = fadeMs
+    this.#lite = lite
   }
 
   /** Ajoute ou remplace le fond d'un chapitre (outils, essais). */
@@ -74,7 +97,7 @@ export class BackgroundArt {
           resolve(false)
         }
       })
-      e.img.src = meta.url
+      e.img.src = meta.lite && this.#lite() ? meta.lite : meta.url
       this.#entries.set(chapter, e)
     }
     return e
@@ -100,6 +123,20 @@ export class BackgroundArt {
    * @returns {{ x0: number, y0: number, w: number, h: number }} placement (pour les panaches)
    */
   draw(ctx, art, camera, { parallax = 0.12 } = {}) {
+    const placed = this.place(art, camera, { parallax })
+    ctx.save()
+    ctx.globalAlpha = art.alpha
+    ctx.drawImage(art.img, placed.x0, placed.y0, placed.w, placed.h)
+    ctx.restore()
+    return placed
+  }
+
+  /**
+   * Où la peinture se pose dans la vue (repère écran, px CSS), sans la dessiner
+   * (v6.5 : le fond WebGL2 la dessine lui-même, voir gl/GpuBackdrop.js).
+   * @returns {{ x0: number, y0: number, w: number, h: number }}
+   */
+  place(art, camera, { parallax = 0.12 } = {}) {
     const { img, meta } = art
     const viewW = camera.viewW
     const viewH = camera.viewH
@@ -123,11 +160,12 @@ export class BackgroundArt {
     }
     if (y0 + h < groundY) y0 = groundY - h
     const pan = (camera.x - WORLD.WIDTH / 2) * camera.scale * parallax
-    const x0 = Math.max(viewW - w, Math.min(0, (viewW - w) / 2 - pan))
-    ctx.save()
-    ctx.globalAlpha = art.alpha
-    ctx.drawImage(img, x0, y0, w, h)
-    ctx.restore()
+    // v6.4 : sur une vue étroite (téléphone en portrait), la peinture se cadre sur son
+    // centre d'intérêt (`focus`, part de sa largeur : le volcan, le grand sommet) plutôt
+    // que sur son milieu ; sur une vue large, rien ne change.
+    const narrow = Math.max(0, Math.min(1, (w / viewW - 1.15) / 1.5))
+    const focus = 0.5 + ((meta.focus ?? 0.5) - 0.5) * narrow
+    const x0 = Math.max(viewW - w, Math.min(0, viewW / 2 - focus * w - pan))
     return { x0, y0, w, h }
   }
 

@@ -5,6 +5,11 @@ import { THEMES } from '../assets/procedural/themes.js'
 import { PEAK_PLUMES } from '../assets/procedural/palette.js'
 import { SkyLibrary } from '../sky/SkyLibrary.js'
 import { PAINTED } from '../assets/backgrounds.js'
+import { skySprites } from '../sky/skySprites.js'
+
+/** Effets du ciel vivant que le fond WebGL2 dessine lui-même (v6.5, voir gl/GpuBackdrop.js). */
+const GPU_EFFECTS = Object.freeze(new Set(['shafts', 'mist']))
+const NO_EFFECTS = Object.freeze(new Set())
 
 /**
  * Décor (v6.2, sorti du Renderer) : ciel, chaînes lointaines et collines en
@@ -18,6 +23,11 @@ export class BackdropPainter {
   #skies = PAINTED ? new SkyLibrary() : null
   /** Le ciel vivant dessiné à la dernière image (ou null). */
   sky = null
+  /** Ciel vivant permis (v6.4 : figé sur un appareil qui peine ; la peinture reste). */
+  livingSky = true
+
+  /** Image du fond WebGL2, réutilisée d'une image à l'autre (v6.5). */
+  #frame = { img: null, placed: null, time: 0, shafts: null, mist: null }
 
   /** Dégradés verticaux des terrains : créés une fois (ils ne dépendent que de la hauteur du sol). */
   #gradients = new Map()
@@ -40,7 +50,7 @@ export class BackdropPainter {
    * @param {number} dpr
    * @param {number} pixel taille d'un pixel écran en unités monde
    */
-  draw(ctx, scene, backgroundArt, assets, dpr, pixel) {
+  draw(ctx, scene, backgroundArt, assets, dpr, pixel, gpu = null) {
     const { camera, theme, time, animate } = scene
     this.sky = null
     const windBase = scene.wind?.field.base ?? 0
@@ -56,19 +66,29 @@ export class BackdropPainter {
       camera.apply(ctx, dpr, 0.45)
       assets.draw(ctx, 'scene.far', { w: WORLD.WIDTH, h: 400, pixel, extra: { theme, castle: !scene.versus, time, animate, wind: windBase } })
     }
+    // v6.5 (prototype) : le fond WebGL2, une fois la peinture apparue, la dessine sous le canevas
+    // (transparent) avec ses rais et sa brume ; sinon tout reste en 2D.
+    const onGpu = Boolean(art && art.alpha >= 1 && gpu?.ready)
+    if (!onGpu) gpu?.hide()
     if (art) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      const placed = backgroundArt.draw(ctx, art, camera)
+      let placed
+      if (onGpu) {
+        ctx.clearRect(0, 0, camera.viewW, camera.viewH)
+        placed = backgroundArt.place(art, camera)
+      } else placed = backgroundArt.draw(ctx, art, camera)
       backgroundArt.plumes(ctx, art, placed, { time, wind: windBase, animate: animate !== false })
       // Ciel vivant (v6.3) : une fois la peinture lue et apparue, il l'anime.
-      const sky = art.alpha >= 1 ? (this.#skies?.for(theme, art.img, art.meta.ground ?? 1) ?? null) : null
+      const sky = art.alpha >= 1 && this.livingSky ? (this.#skies?.for(theme, art.img, art.meta.ground ?? 1) ?? null) : null
+      const look = { animate: animate !== false, highContrast: Boolean(scene.highContrast) }
       if (sky) {
         const view = skyView(camera, placed, art.img)
         const motion = animate !== false && !scene.highContrast
         if (motion) sky.update(time, view, { wind: windBase })
-        sky.draw(ctx, view, { animate: animate !== false, highContrast: Boolean(scene.highContrast) })
+        if (onGpu) gpu.draw(gpuFrame(this.#frame, art, placed, sky, view, look))
+        sky.draw(ctx, view, { ...look, except: onGpu ? GPU_EFFECTS : NO_EFFECTS })
         this.sky = sky
-      }
+      } else if (onGpu) gpu.draw(gpuFrame(this.#frame, art, placed, null, null, look))
       assets.draw(ctx, 'scene.sky', { ...skyState, extra: { ...skyState.extra, overlay: true, skyWeather: Boolean(sky?.replaces('weather')) } })
     }
     camera.apply(ctx, dpr, 0.75)
@@ -170,4 +190,43 @@ function skyView(camera, placed, img) {
     u: w / 1440,
     map: (u, v) => ({ x: x0 + u * w, y: y0 + v * h }),
   }
+}
+
+/**
+ * Ce que le fond WebGL2 dessine à cette image (v6.5) : la peinture, et, quand le ciel vivant
+ * les a, ses rais et ses bandes de brume, aux mêmes places et vitesses qu'en 2D.
+ */
+function gpuFrame(frame, art, placed, sky, view, look) {
+  frame.img = art.img
+  frame.placed = placed
+  frame.time = sky ? sky.time(look) : 0
+  frame.shafts = null
+  frame.mist = null
+  if (!sky) return frame
+  const cfg = sky.cfg
+  const sun = sky.data.sun
+  const shafts = cfg.fx.includes('shafts') ? sky.effect('shafts') : null
+  if (shafts && sun) {
+    frame.shafts = {
+      sun: view.map(sun.u, sun.v),
+      tint: cfg.sun.tint,
+      reach: cfg.sun.shafts.reach * view.iw,
+      alpha: cfg.sun.shafts.alpha * (1 - 0.85 * sky.veil),
+      scale: view.iw,
+      beams: shafts.beams,
+    }
+  }
+  if (cfg.fx.includes('mist') && cfg.mist) {
+    const tex = cfg.banks ? skySprites().banks : skySprites().mist
+    frame.mist = {
+      tint: cfg.banks ? [250, 255, 250] : [255, 255, 255],
+      bands: cfg.mist.map(([v, speed, alpha, scale]) => ({
+        y: view.map(0, v).y,
+        h: tex.height * scale * view.u,
+        alpha,
+        offset: sky.dir * sky.t * speed * view.u,
+      })),
+    }
+  }
+  return frame
 }

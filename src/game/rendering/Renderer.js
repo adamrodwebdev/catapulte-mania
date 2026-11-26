@@ -1,5 +1,6 @@
 import { WindLayer } from './WindLayer.js'
-import { BackgroundArt } from './BackgroundArt.js'
+import { BackgroundArt, liteFor } from './BackgroundArt.js'
+import { GpuBackdrop } from './gl/GpuBackdrop.js'
 import { BACKGROUND_ART } from '../assets/backgrounds.js'
 import { drawAim, drawTrebAim, drawTrajectory } from './AimPainter.js'
 import { WorldHudPainter } from './WorldHudPainter.js'
@@ -42,6 +43,9 @@ export class Renderer {
   #lighting = new LightingPainter()
   /** Ciel, plans du décor, fond peint, sol, terrains (v6.2, voir BackdropPainter.js). */
   #backdrop = new BackdropPainter()
+  /** Taille de la vue (px CSS), pour le choix de la peinture (v6.4). */
+  #cssW = 0
+  #cssH = 0
   /** Particules (v6.2, voir effects/ParticlePainter.js). */
   #particles = new ParticlePainter()
   /** Défenseurs assommés (v6.0) : les particules empruntent le dessin des personnages. */
@@ -50,6 +54,8 @@ export class Renderer {
   #poses = new Map()
   /** Cap des carreaux de baliste (v6.2) : gardé quand ils ne font plus que trembler. */
   #bolts = new BoltHeadings()
+  /** Fond WebGL2 sous le canevas (v6.5, prototype), ou null. */
+  #gpu = null
   /** Fonds peints des chapitres (v6.2, voir BackgroundArt.js). */
   art
   dpr = 1
@@ -59,11 +65,24 @@ export class Renderer {
    * @param {import('../assets/AssetRegistry.js').AssetRegistry} assets
    * @param {{ artFadeMs?: number }} [opts] fondu d'apparition des fonds peints (v6.2 : 0 pour une vue immobile)
    */
-  constructor(canvas, assets, { artFadeMs = 350 } = {}) {
+  constructor(canvas, assets, { artFadeMs = 350, gpu = false } = {}) {
     this.#canvas = canvas
-    this.#ctx = canvas.getContext('2d', { alpha: false })
+    // v6.5 (prototype) : un fond WebGL2 sous le canevas, qui devient alors transparent.
+    this.#gpu = gpu ? GpuBackdrop.attach(canvas) : null
+    this.#ctx = canvas.getContext('2d', { alpha: this.#gpu !== null })
     this.#assets = assets
-    this.art = new BackgroundArt(BACKGROUND_ART, { fadeMs: artFadeMs })
+    // Version allégée de la peinture quand elle suffit à cette vue (v6.4, voir liteFor).
+    // Avant le premier redimensionnement (préchargement dès l'ouverture), la taille du canevas à l'écran.
+    this.art = new BackgroundArt(BACKGROUND_ART, {
+      fadeMs: artFadeMs,
+      lite: () =>
+        liteFor({
+          viewW: this.#cssW || canvas.clientWidth || globalThis.innerWidth || 0,
+          viewH: this.#cssH || canvas.clientHeight || globalThis.innerHeight || 0,
+          dpr: this.#cssW ? this.dpr : globalThis.devicePixelRatio || 1,
+          memory: globalThis.navigator?.deviceMemory,
+        }),
+    })
   }
 
   get assets() {
@@ -84,10 +103,33 @@ export class Renderer {
     return this.#backdrop.sky?.chapter ?? null
   }
 
+  /** Le ciel vivant s'anime-t-il ? (v6.4 : figé, la peinture reste, sur un appareil qui peine) */
+  get livingSky() {
+    return this.#backdrop.livingSky
+  }
+
+  set livingSky(on) {
+    this.#backdrop.livingSky = Boolean(on)
+  }
+
   resize(cssW, cssH, dpr) {
+    this.#cssW = cssW
+    this.#cssH = cssH
     this.dpr = Math.min(2, Math.max(1, dpr || 1))
     this.#canvas.width = Math.round(cssW * this.dpr)
     this.#canvas.height = Math.round(cssH * this.dpr)
+    this.#gpu?.resize(cssW, cssH, this.dpr)
+  }
+
+  /** Le fond WebGL2 dessine-t-il ? (v6.5) */
+  get gpuBackdrop() {
+    return this.#gpu?.ready === true
+  }
+
+  /** Retire le fond WebGL2 (fin de partie). */
+  dispose() {
+    this.#gpu?.dispose()
+    this.#gpu = null
   }
 
   /**
@@ -108,7 +150,7 @@ export class Renderer {
     const assets = this.#assets
 
     // Décor : ciel, plans en parallaxe ou fond peint, haies et camp, sol, saison, terrains (v6.2, voir BackdropPainter.js).
-    this.#backdrop.draw(ctx, scene, this.art, assets, this.dpr, pixel)
+    this.#backdrop.draw(ctx, scene, this.art, assets, this.dpr, pixel, this.#gpu)
 
     const order = { block: 0, barrel: 1, target: 2, projectile: 3, flyer: 4 }
     const list = [...scene.entities].sort((a, b) => order[a.kind] - order[b.kind])

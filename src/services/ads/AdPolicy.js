@@ -8,10 +8,14 @@ import { Guard } from '../../core/utils/Guard.js'
  *   dans la session (on ne coupe pas une première découverte).
  * - Au moins `minIntervalMs` (3 min, règle CrazyGames) entre deux interstitiels.
  * - Une vidéo récompensée, choisie par le joueur, repousse le prochain interstitiel.
+ * - Le dernier tir contre une vidéo (v6.4) : une fois par niveau et par session, pas à
+ *   chaque défaite (règle Playgama : jamais « +1 vie » à chaque vie perdue).
  */
 export class AdPolicy {
   #last = -Infinity
   #levels = 0
+  /** Niveaux où le dernier tir a déjà été proposé dans cette session. */
+  #lastShot = new Set()
 
   /**
    * @param {{ minIntervalMs?: number, graceLevels?: number, now?: () => number }} [opts]
@@ -35,5 +39,15 @@ export class AdPolicy {
   /** Une publicité (quelle qu'elle soit) vient d'être montrée. */
   shown() {
     this.#last = this.now()
+  }
+
+  /** Le dernier tir contre une vidéo est-il encore proposable pour ce niveau ? */
+  canOfferLastShot(level) {
+    return !this.#lastShot.has(String(level))
+  }
+
+  /** Le dernier tir vient d'être proposé pour ce niveau (vidéo vue ou non). */
+  lastShotOffered(level) {
+    this.#lastShot.add(String(level))
   }
 }

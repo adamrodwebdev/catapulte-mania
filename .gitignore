@@ -9,13 +9,19 @@ coverage/
 .idea/
 *.local
 .scratch/
-# Peintures d'origine des fonds (lourdes) : seuls les WebP encodés sont versionnés.
+# Nos composants (règle du 2026-11-26) : les maîtres sont dans le dépôt privé des sources, les
+# fichiers compilés dans adamrodwebdev/private-assets (catapulte-mania/), copiés à la génération
+# par scripts/private-assets.mjs d'après private-assets.lock.json.
 art/backgrounds/*.png
-# Candidates FLUX (nos sources, dépôt privé) et peintures Dola (licence non commerciale) :
-# jamais dans ce dépôt public.
-art/backgrounds-flux/
-art/backgrounds-dola/
-# Générateurs Blender et bible visuelle v7 : nos composants, dans le dépôt privé des sources.
+art/portraits/*.png
+src/game/assets/backgrounds/*.webp
+src/game/story/portraits.data.js
+docs/store/**/*.png
+docs/store/**/*.jpg
+docs/store/**/*.mp4
+# Candidates FLUX et anciennes peintures (licence non commerciale) : jamais dans ce dépôt.
+art/backgrounds-*/
+# Générateurs Blender et bible visuelle v7 : dans le dépôt privé des sources.
 art/v7/
 docs/v7/
 .netlify/
@@ -25,4 +31,5 @@ release/
 dist-gamedistribution/
 dist-gamepix/
 dist-y8/
+dist-playgama/
 dist-standalone/

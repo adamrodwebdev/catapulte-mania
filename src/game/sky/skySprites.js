@@ -121,6 +121,42 @@ function fallStreaks(w, h, seed) {
   return c
 }
 
+/**
+ * Rai de lumière (v6.4) : un faisceau doux, étroit près du soleil, évasé au loin,
+ * qui pâlit en s'éloignant ; blanc (teinté à l'usage, voir beamOf).
+ */
+function beam() {
+  const w = 64
+  const h = 512
+  const strip = canvas(w, h)
+  const g = strip.getContext('2d')
+  const gx = g.createLinearGradient(0, 0, w, 0)
+  gx.addColorStop(0, 'rgba(255,255,255,0)')
+  gx.addColorStop(0.25, 'rgba(255,255,255,0.35)')
+  gx.addColorStop(0.5, 'rgba(255,255,255,1)')
+  gx.addColorStop(0.75, 'rgba(255,255,255,0.35)')
+  gx.addColorStop(1, 'rgba(255,255,255,0)')
+  g.fillStyle = gx
+  g.fillRect(0, 0, w, h)
+  g.globalCompositeOperation = 'destination-in'
+  const gy = g.createLinearGradient(0, 0, 0, h)
+  gy.addColorStop(0, 'rgba(0,0,0,0)')
+  gy.addColorStop(0.08, 'rgba(0,0,0,0.85)')
+  gy.addColorStop(0.4, 'rgba(0,0,0,0.45)')
+  gy.addColorStop(1, 'rgba(0,0,0,0)')
+  g.fillStyle = gy
+  g.fillRect(0, 0, w, h)
+  // Le faisceau s'évase : chaque tranche un peu plus large que la précédente.
+  const W = 128
+  const c = canvas(W, h)
+  const out = c.getContext('2d')
+  for (let y = 0; y < h; y += 4) {
+    const ww = W * (0.12 + 0.88 * (y / h))
+    out.drawImage(strip, 0, y, w, 4, (W - ww) / 2, y, ww, 4)
+  }
+  return c
+}
+
 function build() {
   return {
     glow: sprite(64, [[0, 'rgba(255,255,255,1)'], [0.25, 'rgba(255,255,255,0.45)'], [1, 'rgba(255,255,255,0)']]),
@@ -150,6 +186,7 @@ function build() {
       snow: strip(1024, 90, 43, { count: 60, y: [0.25, 0.75], rx: [80, 340], ry: [2.5, 9.5], alpha: [0.08, 0.2] }),
     },
     fallStreaks: fallStreaks(64, 128, 71),
+    beam: beam(),
   }
 }
 
@@ -159,6 +196,25 @@ let cache = null
 export function skySprites() {
   cache ??= build()
   return cache
+}
+
+const beams = new Map()
+
+/** Un rai de lumière de la couleur donnée [r, g, b] (v6.4 ; gardé pour les fois suivantes). */
+export function beamOf(rgb) {
+  const key = rgb.join(',')
+  let c = beams.get(key)
+  if (!c) {
+    const b = skySprites().beam
+    c = canvas(b.width, b.height)
+    const g = c.getContext('2d')
+    g.drawImage(b, 0, 0)
+    g.globalCompositeOperation = 'source-in'
+    g.fillStyle = `rgb(${key})`
+    g.fillRect(0, 0, c.width, c.height)
+    beams.set(key, c)
+  }
+  return c
 }
 
 /** Un canevas de travail (tampon d'un effet). */

@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import { SKY_CHAPTERS, SKY_ORDER, SKY_BEDS } from '../src/game/sky/skyConfig.js'
 import { EFFECTS } from '../src/game/sky/effects.js'
 import { LivingSky } from '../src/game/sky/LivingSky.js'
-import { fallsMask, findStars, findSun, grassMask, isSnow, isWater, lavaMask, rayMasks, spotsWhere } from '../src/game/sky/paintingAnalysis.js'
+import { fallsMask, findStars, findSun, grassMask, isSnow, isWater, lavaMask, rayMasks, spotsWhere, waterTest } from '../src/game/sky/paintingAnalysis.js'
+import { PAINTERS } from '../src/game/assets/procedural/painters.js'
 import { ambienceProfile, AMBIENCE_PROFILES } from '../src/game/audio/AmbienceDirector.js'
 
 /* ---------- Ciels vivants (v6.3) ---------- */
@@ -27,7 +28,7 @@ const alphaAt = (m, x, y, w = m.w) => m.rgba[(y * w + x) * 4 + 3]
 
 test('v6.3 : chaque chapitre a son ciel vivant, des effets connus, rangés, et les réglages qu’ils lisent', () => {
   const needs = {
-    sun: ['sun'], rays: ['sun'], flare: ['sun'], dust: ['sun'], diamond: ['sun'], moon: ['moon'], mist: ['mist'], shadows: ['shadows'],
+    sun: ['sun'], shafts: ['sun'], rays: ['sun'], flare: ['sun'], dust: ['sun'], diamond: ['sun'], moon: ['moon'], mist: ['mist'], shadows: ['shadows'],
     gusts: ['gusts'], leaves: ['leaves'], fogroll: ['fogroll'], ripples: ['water'], wisps: ['wisps'], haze: ['haze'], veils: ['veils'],
     devil: ['devil'], glints: ['snow', 'glints'], falls: ['falls'], smoke: ['crater'], fireflies: ['hill', 'fireflies'],
   }
@@ -185,4 +186,159 @@ test('v6.3 : ambiance : à l’Orage peint, le tonnerre suit les éclairs (plus 
   assert.equal(ambienceProfile(2, true).bed, 'falls')
   assert.equal(ambienceProfile(2, false).bed, undefined)
   assert.deepEqual(ambienceProfile(1, true).voices, AMBIENCE_PROFILES[1].voices)
+})
+
+/* ---------- Ciels vivants sur les photographies (v6.4) ---------- */
+
+/** Un document de synthèse : des canevas qui acceptent tout et ne dessinent rien (sprites sous Node). */
+function fakeDocument() {
+  const stub = new Proxy({}, { get: (_, k) => (k === 'addColorStop' ? () => {} : () => stub), set: () => true })
+  return { createElement: () => ({ width: 1, height: 1, getContext: () => stub }) }
+}
+
+/** Un contexte qui relève les méthodes appelées (et garde les propriétés posées). */
+function recorder() {
+  const calls = []
+  const gradient = { addColorStop() {} }
+  const ctx = new Proxy(
+    {},
+    {
+      get: (t, k) =>
+        k in t
+          ? t[k]
+          : () => {
+              calls.push(k)
+              return String(k).startsWith('create') ? gradient : undefined
+            },
+      set: (t, k, v) => {
+        t[k] = v
+        return true
+      },
+    },
+  )
+  return { ctx, calls }
+}
+
+test('v6.4 : rais de lumière : réglés là où les rayons ne se lisent plus, dans leur éventail, voilés par un nuage', () => {
+  let chapters = 0
+  for (let c = 1; c <= 10; c++) {
+    const cfg = SKY_CHAPTERS[c]
+    if (!cfg.fx.includes('shafts')) continue
+    chapters++
+    const s = cfg.sun.shafts
+    assert.ok(s.count >= 3 && s.spread[0] < s.spread[1] && s.width[0] <= s.width[1] && s.reach > 0 && s.alpha > 0 && s.alpha <= 0.3, `chapitre ${c}`)
+    assert.ok(!cfg.fx.includes('rays'), `chapitre ${c} : pas de rayons peints lus en plus`)
+  }
+  assert.ok(chapters >= 4, 'les chapitres ensoleillés')
+  const saved = globalThis.document
+  globalThis.document = fakeDocument()
+  try {
+    const sky = new LivingSky(1, SKY_CHAPTERS[1], { sun: { u: 0.6, v: 0.07, r: 0.02 } }, {})
+    const shafts = sky.effect('shafts')
+    const draw = (veil) => {
+      sky.veil = veil
+      const rec = { angles: [], alphas: [], images: 0 }
+      const ctx = {
+        save() {},
+        restore() {},
+        translate() {},
+        rotate: (a) => rec.angles.push(a),
+        drawImage: () => rec.images++,
+        set globalAlpha(v) {
+          rec.alphas.push(v)
+        },
+        globalCompositeOperation: 'source-over',
+      }
+      shafts.draw(ctx, view(), 4, true, 1)
+      rec.mode = ctx.globalCompositeOperation
+      return rec
+    }
+    const clear = draw(0)
+    const { count, spread } = SKY_CHAPTERS[1].sun.shafts
+    assert.equal(clear.images, count, 'un faisceau par rai')
+    assert.equal(clear.mode, 'screen', 'la lumière éclaircit sans brûler')
+    for (const a of clear.angles) {
+      const deg = ((a + Math.PI / 2) * 180) / Math.PI
+      assert.ok(deg >= spread[0] - 3 && deg <= spread[1] + 3, `angle ${deg.toFixed(1)}°`)
+    }
+    const veiled = draw(1)
+    assert.ok(Math.max(...veiled.alphas) < Math.max(...clear.alphas) * 0.3, 'un nuage voile le soleil : les rais pâlissent')
+    // Sans soleil lu, rien.
+    const none = new LivingSky(1, SKY_CHAPTERS[1], {}, {}).effect('shafts')
+    let drawn = 0
+    none.draw({ save() {}, restore() {}, drawImage: () => drawn++ }, view(), 4, true, 1)
+    assert.equal(drawn, 0)
+  } finally {
+    globalThis.document = saved
+  }
+})
+
+test('v6.4 : photographies : étoiles faibles, eau teintée de brume, lave dans ses zones (et orange)', () => {
+  // Un ciel de nuit photographié : deux étoiles faibles, trop pâles pour le seuil des peintures.
+  const faint = canvasOf(200, 100, [22, 24, 60], (x, y) => ((x === 50 && y === 20) || (x === 150 && y === 30) ? [90, 95, 130] : null))
+  assert.equal(findStars(faint, 1, () => 0.5).length, 0, 'trop faibles pour un ciel peint')
+  const found = findStars(faint, 1, () => 0.5, { min: 48, contrast: 22 })
+  assert.equal(found.length, 2)
+  assert.ok(found.every((s) => s.b > 0.5), 'leur éclat se mesure à leur seuil')
+  const kept = findStars(faint, 1, () => 0.5, { min: 48, contrast: 22, avoid: [[0.25, 0.2, 0.03]] })
+  assert.deepEqual(
+    kept.map((s) => Math.round(s.u * 200)),
+    [150],
+    'un disque écarté (la lune, le bord d’un nuage)',
+  )
+  assert.equal(findStars(faint, 1, () => 0.5, { min: 48, contrast: 22, top: 0.25 }).length, 1, 'seulement dans la zone lue')
+
+  // Une mare sous une brume verte : claire mais teintée ; le test des peintures la manquait.
+  const pond = canvasOf(90, 60, [60, 90, 50], (x, y) => (y > 40 ? [170, 215, 140] : null))
+  assert.equal(spotsWhere(pond, { from: 0.6 }, isWater).length, 0)
+  const tinted = spotsWhere(pond, { from: 0.6 }, waterTest({ min: 125, sat: 120 }))
+  assert.ok(tinted.length > 20 && tinted.every((p) => p.v > 0.6), `eau : ${tinted.length}`)
+
+  // Lave : le ciel rougi par l'éruption n'en est pas ; le cœur blanc reste orange.
+  const field = canvasOf(40, 40, [40, 30, 30], (x, y) => (y < 10 ? [255, 120, 20] : y > 30 ? [255, 250, 30] : null))
+  assert.ok(alphaAt(lavaMask(field), 5, 5) > 0, 'sans zones : tout ce qui est chaud')
+  const zoned = lavaMask(field, { areas: [[0, 0.7, 1, 1]] })
+  assert.equal(alphaAt(zoned, 5, 5), 0, 'hors zone')
+  assert.ok(alphaAt(zoned, 5, 35) > 200, 'dans la zone')
+  assert.ok(zoned.spots.length > 0 && zoned.spots.every((s) => s.v >= 0.7), 'les braises partent de la lave')
+  assert.ok(zoned.rgba[(35 * 40 + 5) * 4 + 1] <= 190, 'orange, pas citron')
+})
+
+test('v6.4 : sur une peinture, les nuages qui montrent le vent sont des voiles doux, pas des nuages dessinés', () => {
+  const state = (overlay) => ({ w: 1280, h: 720, extra: { theme: 1, viewW: 1280, viewH: 720, time: 0, animate: false, overlay } })
+  const drawn = recorder()
+  PAINTERS['scene.sky'](drawn.ctx, state(false))
+  assert.ok(drawn.calls.filter((c) => c === 'ellipse').length >= 7 * 5, 'décor dessiné : ses nuages')
+  const saved = globalThis.document
+  globalThis.document = fakeDocument()
+  try {
+    const painted = recorder()
+    PAINTERS['scene.sky'](painted.ctx, state(true))
+    assert.equal(painted.calls.filter((c) => c === 'ellipse').length, 0, 'aucun nuage dessiné sur la peinture')
+    assert.equal(painted.calls.filter((c) => c === 'drawImage').length, 4, 'quatre voiles, qui dérivent avec le vent')
+  } finally {
+    globalThis.document = saved
+  }
+})
+
+/* ---------- Fond WebGL2 (v6.5, prototype) ---------- */
+
+test('v6.5 : le ciel vivant laisse au fond WebGL2 les effets qu’il dessine, et lui donne ses rais', async () => {
+  const { GpuBackdrop } = await import('../src/game/rendering/gl/GpuBackdrop.js')
+  assert.equal(GpuBackdrop.attach({ parentNode: null }), null, 'sans document ni parent : pas de fond WebGL2, le rendu 2D garde tout')
+  const sky = new LivingSky(2, SKY_CHAPTERS[2], { sun: { u: 0.37, v: 0.03, r: 0.02 } }, {})
+  const beams = sky.effect('shafts').beams
+  assert.equal(beams.length, SKY_CHAPTERS[2].sun.shafts.count)
+  assert.ok(Object.isFrozen(beams) && beams.every((b) => Object.isFrozen(b)), 'lus par le fond, jamais modifiés')
+  const drawn = []
+  const ctx = new Proxy({}, { get: (_, k) => (k === 'drawImage' ? (...a) => drawn.push(a) : () => {}), set: () => true })
+  const saw = []
+  for (const [name, fx] of [['shafts', sky.effect('shafts')], ['mist', sky.effect('mist')]]) {
+    fx.draw = () => saw.push(name)
+  }
+  sky.draw(ctx, view(), { except: new Set(['shafts', 'mist']) })
+  assert.deepEqual(saw, [], 'rais et brume passent au fond WebGL2')
+  sky.draw(ctx, view())
+  assert.deepEqual(saw.sort(), ['mist', 'shafts'], 'sans fond WebGL2, le 2D les dessine')
+  assert.equal(sky.time({ animate: false }), 3.2, 'temps figé en mouvement réduit')
 })

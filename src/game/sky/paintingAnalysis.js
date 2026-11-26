@@ -22,14 +22,19 @@ export const lumAt = (data, i) => 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 
  * @param {{ w: number, h: number, data: Uint8ClampedArray }} px peinture à 1280 px de large
  * @param {number} ground ligne de sol de la peinture (part de la hauteur)
  * @param {() => number} rand hasard (phases du scintillement)
+ * @param {{ min?: number, contrast?: number, top?: number, avoid?: Array<[number, number, number]> }} [opts]
+ *  min : luminance minimale ; contrast : écart minimal avec l'entourage ; top : bas de la zone
+ *  lue (part de la ligne de sol) ; avoid : disques écartés [u, v, rayon en part de la largeur]
+ *  (la lune, le bord éclairé d'un nuage). v6.4 : les ciels photographiés ont des étoiles
+ *  plus faibles que les ciels peints.
  */
-export function findStars({ w, h, data }, ground, rand) {
+export function findStars({ w, h, data }, ground, rand, { min = 150, contrast = 55, top = 0.62, avoid = [] } = {}) {
   const lum = (x, y) => lumAt(data, (y * w + x) * 4)
   const out = []
-  for (let y = 4; y < h * ground * 0.62; y++) {
+  for (let y = 4; y < h * ground * top; y++) {
     for (let x = 4; x < w - 4; x++) {
       const l = lum(x, y)
-      if (l < 150) continue
+      if (l < min) continue
       let max = true
       for (let dy = -2; dy <= 2 && max; dy++) {
         for (let dx = -2; dx <= 2; dx++) {
@@ -41,8 +46,11 @@ export function findStars({ w, h, data }, ground, rand) {
       }
       if (!max) continue
       const ring = (lum(x - 4, y) + lum(x + 4, y) + lum(x, y - 4) + lum(x, y + 4)) / 4
-      if (l - ring < 55) continue
-      out.push({ u: x / w, v: y / h, b: clamp01((l - ring) / 150), ph: rand() * TAU, f: 0.25 + 0.65 * rand() })
+      if (l - ring < contrast) continue
+      const u = x / w
+      const v = y / h
+      if (avoid.some(([au, av, ar]) => Math.hypot(u - au, ((v - av) * h) / w) < ar)) continue
+      out.push({ u, v, b: clamp01((l - ring) / (contrast * 2.7)), ph: rand() * TAU, f: 0.25 + 0.65 * rand() })
     }
   }
   return out.sort((a, b) => b.b - a.b).slice(0, 90)
@@ -51,19 +59,24 @@ export function findStars({ w, h, data }, ground, rand) {
 /**
  * Lave : les pixels chauds (rouge fort, bleu faible), en masque lumineux, et
  * quelques points d'où partent les braises.
+ * @param {{ areas?: Array<[number, number, number, number]> | null }} [opts] areas : zones lues
+ *  [u0, v0, u1, v1] (v6.4 : le ciel rougi par l'éruption n'est pas de la lave)
  * @returns {{ w: number, h: number, rgba: Uint8ClampedArray, spots: Array<{u:number,v:number}> }}
  */
-export function lavaMask({ w, h, data }) {
+export function lavaMask({ w, h, data }, { areas = null } = {}) {
   const rgba = new Uint8ClampedArray(w * h * 4)
   const spots = []
+  const inside = (x, y) => !areas || areas.some(([u0, v0, u1, v1]) => x >= u0 * w && x <= u1 * w && y >= v0 * h && y <= v1 * h)
   for (let i = 0; i < w * h; i++) {
+    if (!inside(i % w, Math.floor(i / w))) continue
     const r = data[i * 4]
     const g = data[i * 4 + 1]
     const b = data[i * 4 + 2]
     const score = clamp01((r - b - 95) / 110) * clamp01((r - 150) / 70)
     if (score <= 0) continue
     rgba[i * 4] = 255
-    rgba[i * 4 + 1] = Math.min(255, 110 + g * 0.55)
+    // Orange, jamais jaune-vert : le cœur blanc d'une éruption photographiée virerait au citron (v6.4).
+    rgba[i * 4 + 1] = Math.min(190, 110 + g * 0.4)
     rgba[i * 4 + 2] = 40
     rgba[i * 4 + 3] = Math.round(255 * score)
     if (score > 0.55 && i % 7 === 0) spots.push({ u: (i % w) / w, v: Math.floor(i / w) / h })
@@ -216,8 +229,17 @@ export function spotsWhere({ w, h, data }, { from, to = 1, maxU = 1 }, test) {
   return out
 }
 
-/** Eau calme : claire, grise, lisse (de part et d'autre comme dessus et dessous). */
-export const isWater = (l, sat, near) => l >= 170 && l <= 248 && sat <= 30 && Math.abs(near(3, 0) - l) <= 6 && Math.abs(near(-3, 0) - l) <= 6 && Math.abs(near(0, 2) - l) <= 8 && Math.abs(near(0, -2) - l) <= 8
+/**
+ * Eau calme : claire, grise, lisse (de part et d'autre comme dessus et dessous).
+ * v6.4 : seuils réglables (`min`, `max` de luminance, `sat` de saturation, `flat` :
+ * écart permis avec les voisins) : dans une brume teintée, l'eau prend la couleur
+ * de l'air, et une photographie la ride de reflets.
+ */
+export const waterTest =
+  ({ min = 170, max = 248, sat: maxSat = 30, flat = 6 } = {}) =>
+  (l, sat, near) =>
+    l >= min && l <= max && sat <= maxSat && Math.abs(near(3, 0) - l) <= flat && Math.abs(near(-3, 0) - l) <= flat && Math.abs(near(0, 2) - l) <= flat + 2 && Math.abs(near(0, -2) - l) <= flat + 2
+export const isWater = waterTest()
 /** Neige au soleil : très claire et grise. */
 export const isSnow = (l, sat) => l >= 232 && sat <= 26
 

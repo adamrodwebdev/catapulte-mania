@@ -60,7 +60,7 @@ async function share() {
       <span class="cup-medal cup-medal--bronze" aria-hidden="true"><AppIcon name="trophy" :size="16" /></span>{{ cup.trophies.bronze }}
       <span class="visually-hidden">{{ t('cup.trophiesA11y', { gold: cup.trophies.gold, silver: cup.trophies.silver, bronze: cup.trophies.bronze }) }}</span>
     </p>
-    <div v-if="cup.medal" class="share">
+    <div v-if="cup.medal && app.state.externalLinks" class="share">
       <button type="button" class="btn" :disabled="shareState.state === 'busy'" @click="share"><AppIcon name="users" />{{ t('cup.share') }}</button>
       <p v-if="shareState.state === 'copied'" class="share__done" role="status">{{ t('daily.copied') }}</p>
       <p v-else-if="shareState.state === 'shared'" class="share__done" role="status">{{ t('daily.shared') }}</p>

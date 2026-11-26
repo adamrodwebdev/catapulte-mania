@@ -1,4 +1,5 @@
 import { EventBus } from '../core/utils/EventBus.js'
+import { FrameGuard } from './feel/FrameGuard.js'
 import { clamp } from '../core/utils/math.js'
 import { GameSession, STATE } from './GameSession.js'
 import { AssetRegistry } from './assets/AssetRegistry.js'
@@ -54,7 +55,8 @@ export class GameController extends EventBus {
   #highContrast = false
   #hudTimer = 0
   /** Durée moyenne d'une image (ms), pour alléger les effets sur un appareil lent. */
-  #frameAvg = 16.7
+  /** Garde de fluidité (v6.4) : moins de particules, puis ciel vivant figé, sur un appareil qui peine. */
+  #frames = new FrameGuard()
   #handlers = {}
   /** Relecture d'une partie (« Bats mon tir ») : le joueur regarde, les commandes sont coupées. */
   #replayer = null
@@ -83,13 +85,14 @@ export class GameController extends EventBus {
     return c
   }
 
-  constructor(canvas, level, { difficulty, completedLevels, settings, reducedMotion, audio, ambience = null, haptics, effects, mode, continueOffer = false, engine = 'catapult', replay = null, season = null, translate = null, luck = 0 }, registry) {
+  constructor(canvas, level, { difficulty, completedLevels, settings, reducedMotion, audio, ambience = null, haptics, effects, mode, continueOffer = false, engine = 'catapult', replay = null, season = null, translate = null, luck = 0, gpuBackdrop = false }, registry) {
     super()
     this.#canvas = canvas
     this.#audio = audio
     this.#ambience = ambience
     this.#haptics = haptics
-    this.#renderer = new Renderer(canvas, registry)
+    // v6.5 (prototype) : fond WebGL2 sous le canevas quand on le demande (?gl=1).
+    this.#renderer = new Renderer(canvas, registry, { gpu: gpuBackdrop })
     // Fond peint du chapitre (v6.2) : chargé dès l'ouverture, pendant l'introduction du niveau.
     this.#renderer.art.preload(level.chapter)
     this.session = new GameSession(level, {
@@ -196,9 +199,10 @@ export class GameController extends EventBus {
       this.#raf = requestAnimationFrame(frame)
       const dt = now - this.#last
       this.#last = now
-      // Appareil qui peine (moins de ~45 images/s en continu) : moins de particules.
-      this.#frameAvg = this.#frameAvg * 0.97 + Math.min(dt, 100) * 0.03
-      if (this.#frameAvg > 22 && this.session.particles.density > 0.55) this.session.particles.density = 0.55
+      // Appareil qui peine (moins de ~45 images/s en continu) : moins de particules, puis ciel figé.
+      const strain = this.#frames.update(dt)
+      if (strain >= 1 && this.session.particles.density > 0.55) this.session.particles.density = 0.55
+      if (strain >= 2 && this.#renderer.livingSky) this.#renderer.livingSky = false
       if (!this.#paused) {
         if (this.#replayer && !this.#replayer.done) this.#replayer.advance(dt)
         else this.session.update(dt)
@@ -584,6 +588,7 @@ export class GameController extends EventBus {
     cv.removeEventListener('wheel', h.wheel)
     document.removeEventListener('visibilitychange', h.visibility)
     this.session.destroy()
+    this.#renderer.dispose()
     this.clear()
   }
 }

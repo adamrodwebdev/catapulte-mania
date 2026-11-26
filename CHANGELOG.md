@@ -2,6 +2,89 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [6.4.0] – 2026-10-18
+### Playgama
+- **Nouvelle version pour Playgama** (`npm run build:playgama`, paquet d'envoi avec
+  `npm run release:portals -- --only playgama`) : le Bridge v2 est chargé avant le jeu
+  et initialisé avant tout ; langue de la plateforme (anglais à défaut) ; sauvegarde
+  par la plateforme (une lecture groupée au démarrage, écritures groupées) ; « jeu
+  prêt » dès que l'écran titre répond ; étapes des niveaux (début, pause, reprise,
+  réussi, raté).
+- **Publicités** : interstitiel seulement entre deux niveaux, le premier une fois deux
+  niveaux terminés, puis deux minutes au moins entre deux ; vidéos récompensées à la
+  demande, récompense seulement quand la vidéo est vue en entier. Avec un bloqueur de
+  publicités, aucune vidéo n'est proposée et rien n'attend une publicité ; une
+  publicité qui ne s'ouvre pas en 12 s est abandonnée. Vérifié dans l'outil de test
+  de Playgama : interstitiel, vidéo fermée trop tôt, vue en entier, en échec, bloqueur.
+- **Pause de la plateforme** (onglet caché, cadre qui perd la main, publicité qu'elle
+  lance) : la partie s'arrête et le son se coupe sous un rideau « Jeu en pause ».
+- **Aucun lien vers l'extérieur** sur Playgama (partage, courriel) ; la page ne garde
+  ni référencement ni aperçus de partage ; écran de chargement sans texte, le même dans
+  toutes les langues.
+- **Couvertures** (carré 800×800, portrait 1080×1920, paysage 1920×1080) : une scène du
+  jeu mise en scène (la tour qui vole en éclats, la pierre enflammée, la catapulte au
+  premier plan) devant le couchant peint, le soleil à l'écart de l'éclat, sous le titre en or.
+- Publié dans la Sandbox de Playgama (`playgama.ai/play/zifjwuawwwnzl2`).
+
+### Fonds peints : dix photographies sous licence commerciale, sur notre site et sur Playgama
+- **Dix nouveaux fonds photoréalistes**, générés avec FLUX.1 [schnell] (licence
+  Apache 2.0, usage commercial permis), deux candidates par chapitre comparées dans le
+  jeu ; textes, graines et empreintes des modèles dans `docs/PEINTURES.md`. Les
+  peintures Dola (usage privé et non commercial seulement) quittent le jeu.
+- **Ciels vivants replacés** peinture par peinture. Nouveaux **rais de lumière** : des
+  faisceaux doux partent du soleil et respirent, pâlissent quand un nuage le voile
+  (chapitres 1, 2, 3, 7 et 8) ; les nuages qui montrent le vent deviennent des
+  **voiles doux** sur les peintures ; étoiles, mares et lave lues avec des seuils
+  propres à chaque photographie (le ciel rougi par l'éruption n'est plus pris pour de
+  la lave, la fontaine du volcan reste orange sous sa fumée).
+- **Téléphone en portrait** : chaque fond se cadre sur son centre d'intérêt (le grand
+  sommet, la cascade, le volcan) au lieu de son milieu.
+- **Dans le build Playgama** : les peintures (et leurs versions allégées) sont copiées
+  dans `backgrounds/` à côté d'index.html et chargées chapitre par chapitre.
+  `CTC_PAINTED=off` les retire (de notre site aussi) ; la démo et les autres portails
+  gardent le décor dessiné.
+- **Versions allégées** (1600 px, `npm run backgrounds` les produit) : chargées quand
+  elles suffisent à la vue (téléphone à l'horizontale, cadre d'un portail) ou sur un
+  appareil à peu de mémoire ; le service worker ne les pré-charge pas, il les garde à
+  leur première utilisation.
+- **Garde de fluidité** : un appareil qui peine perd d'abord des particules, puis son
+  ciel vivant se fige (la peinture reste) ; la décision vaut pour toute la visite.
+- **Mesuré** (vrai moteur de rendu, téléphone 844 × 390 à densité 2, processeur ralenti
+  6 fois, nouvelles peintures) : la peinture et son ciel vivant coûtent 18 à 39 % de
+  moins par image que le décor dessiné (8 à 13 ms contre 11,5 à 18 ms en moyenne).
+
+### Corrigé
+- **Langue** : modifier un réglage enregistrait aussi la langue par défaut (le
+  français), qui prenait ensuite le pas sur celle du portail. Seule une langue choisie
+  par le joueur est enregistrée.
+- **Dernier tir contre une vidéo** : proposé une fois par niveau et par session, plus à
+  chaque défaite.
+- Le build d'un portail ne contient plus que l'adresse du kit de ce portail.
+
+### Sécurité
+- **Outils de développement à jour** (7 alertes Dependabot, 1 élevée, 5 moyennes,
+  1 faible, toutes dans les outils, aucune dans le jeu publié) : Vite 8.3.8 (failles du
+  serveur de développement et de launch-editor), ESLint 10.15 qui apporte minimatch 11
+  (déni de service par motifs). `npm audit`, dépendances de développement comprises : 0.
+- **Configuration de build** : les versions portails n'ont plus l'option
+  `inlineDynamicImports`, inutile avec le format `iife` sous Vite 8 ; la démo passe à
+  `codeSplitting: false` (l'ancienne option est dépréciée). Même résultat : un seul script.
+
+### Nos composants hors du dépôt public
+- **Fonds des chapitres, portraits et kits des portails** : ce sont nos composants, ils
+  quittent ce dépôt public (règle du 26 novembre 2026). Les fichiers compilés sont dans un
+  dépôt privé ; `scripts/private-assets.mjs` les copie avant le serveur, chaque build et les
+  tests, d'après un verrou public (`private-assets.lock.json` : commit, taille et SHA-256 de
+  chaque fichier), et arrête tout en nommant chaque fichier manquant ou altéré. La CI les lit
+  avec un jeton en lecture seule, donné à cette seule étape. Les maîtres (peintures, portraits)
+  sont dans le dépôt privé des sources ; le script de paquets des portails y prend ses images.
+
+### Prototype (désactivé par défaut)
+- **Fond WebGL2** (`?gl=1`) : la peinture, ses rais de lumière et sa brume dessinés par
+  la carte graphique sous le canevas du jeu, repli en 2D sans WebGL2 ou si le contexte
+  est perdu. Mesuré au chapitre 2 (téléphone 844 × 390, processeur ralenti 6 fois) :
+  14,3 ms par image contre 17,5 en 2D ; 3,1 ko compressés dans le module du rendu.
+
 ## [6.3.0] – 2026-10-17
 ### Ciels vivants
 - **Les fonds peints s'animent** (`src/game/sky/`), chacun selon sa peinture,

@@ -24,6 +24,12 @@ jobs:
           node-version: 22
       - name: Installer les dépendances
         run: npm install --no-audit --no-fund
+      # Fonds des chapitres et portraits : nos composants, dans le dépôt privé (verrou public).
+      # Le jeton en lecture seule ne sert qu'à cette étape ; il n'est jamais affiché.
+      - name: Composants privés
+        run: npm run assets
+        env:
+          PRIVATE_ASSETS_TOKEN: ${{ secrets.PRIVATE_ASSETS_TOKEN }}
       - name: Tests automatiques
         run: npm test
       - name: Style du code

@@ -355,6 +355,7 @@ export default {
     hint: 'Hint (video)',
     hintGranted: 'Hint: the trajectory is shown for this shot.',
     playing: 'Ad playing… The game resumes right after.',
+    paused: 'Game paused',
     offerTitle: 'Out of ammunition!',
     offerText: { one: '{count} defender is still standing. One last shot to finish the job?', other: '{count} defenders are still standing. One last shot to finish the job?' },
     extraShot: 'Watch a video: +1 shot',

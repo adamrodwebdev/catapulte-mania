@@ -58,12 +58,15 @@ const STORAGE_KEY = 'settings'
 export class SettingsService extends EventBus {
   #storage
   #values
+  /** La langue a-t-elle été choisie (et donc enregistrée) ? Sinon on ne l'enregistre pas. */
+  #languageChosen
 
   /** @param {import('./StorageService.js').StorageService} storage */
   constructor(storage) {
     super()
     this.#storage = storage
     const stored = storage.readJson(STORAGE_KEY)
+    this.#languageChosen = Boolean(stored && typeof stored.language === 'string')
     this.#values = {}
     for (const [key, def] of Object.entries(DEFINITIONS)) {
       try {
@@ -95,7 +98,11 @@ export class SettingsService extends EventBus {
     const valid = DEFINITIONS[key].validate(value, key)
     if (this.#values[key] === valid) return
     this.#values[key] = valid
-    this.#storage.writeJson(STORAGE_KEY, this.#values)
+    if (key === 'language') this.#languageChosen = true
+    // La langue n'est enregistrée qu'une fois choisie : sinon la plateforme ou le navigateur décident.
+    const out = { ...this.#values }
+    if (!this.#languageChosen) delete out.language
+    this.#storage.writeJson(STORAGE_KEY, out)
     this.emit('change', { key, value: valid })
   }
 
@@ -104,7 +111,8 @@ export class SettingsService extends EventBus {
     return { ...this.#values }
   }
 
+  /** Réglages par défaut ; la langue affichée reste celle du joueur (v6.4). */
   reset() {
-    for (const [key, def] of Object.entries(DEFINITIONS)) this.set(key, def.fallback)
+    for (const [key, def] of Object.entries(DEFINITIONS)) if (key !== 'language') this.set(key, def.fallback)
   }
 }

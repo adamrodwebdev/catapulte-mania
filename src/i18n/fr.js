@@ -355,6 +355,7 @@ export default {
     hint: 'Indice (vidéo)',
     hintGranted: 'Indice : la trajectoire s’affiche pour ce tir.',
     playing: 'Publicité en cours… Le jeu reprend juste après.',
+    paused: 'Jeu en pause',
     offerTitle: 'Plus de munitions !',
     offerText: { one: 'Il reste {count} défenseur. Un dernier tir pour finir le travail ?', other: 'Il reste {count} défenseurs. Un dernier tir pour finir le travail ?' },
     extraShot: 'Regarder une vidéo : +1 tir',

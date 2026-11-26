@@ -19,6 +19,11 @@
  * de pixel art (Aseprite, Piskel, LibreSprite…) ; ce script régénère
  * src/game/story/portraits.data.js. Aucune dépendance : le PNG est décodé ici
  * (8 bits par canal, non entrelacé).
+ *
+ * Nos composants (règle du 2026-11-26) : les maîtres PNG sont dans le dépôt privé
+ * des sources, et portraits.data.js n'est plus versionné ici. Après un encodage :
+ * le copier dans private-assets/catapulte-mania/ (même chemin), le pousser, puis
+ * `npm run assets:lock`.
  */
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'

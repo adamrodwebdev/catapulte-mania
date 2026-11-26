@@ -1,5 +1,5 @@
 import { SKY_CHAPTERS } from './skyConfig.js'
-import { fallsMask, findStars, findSun, grassMask, isSnow, isWater, lavaMask, rayMasks, spotsWhere } from './paintingAnalysis.js'
+import { fallsMask, findStars, findSun, grassMask, isSnow, lavaMask, rayMasks, spotsWhere, waterTest } from './paintingAnalysis.js'
 import { maskCanvas } from './skySprites.js'
 import { LivingSky } from './LivingSky.js'
 import { SeededRandom } from '../../core/utils/SeededRandom.js'
@@ -130,12 +130,12 @@ function readSteps(cfg, img, ground) {
   const pxSmall = () => (small ??= pixels(img, 640))
   if (has('stars')) {
     const rand = new SeededRandom(7)
-    queue.push(() => (data.stars = findStars(px(), ground, () => rand.next())))
+    queue.push(() => (data.stars = findStars(px(), ground, () => rand.next(), cfg.stars)))
   }
   if (has('lightning')) queue.push(() => (data.flash = flashLayer(img, ground)))
   if (has('lava')) {
     queue.push(() => {
-      const m = lavaMask(px())
+      const m = lavaMask(px(), cfg.lava)
       data.lava = maskCanvas(m.rgba, m.w, m.h)
       data.spots = m.spots
     })
@@ -169,7 +169,7 @@ function readSteps(cfg, img, ground) {
   if (has('ripples')) {
     queue.push(() => {
       const { from, to, areas } = cfg.water
-      data.water = spotsWhere(pxSmall(), { from, to }, isWater).filter((p) => areas.some(([u0, v0, u1, v1]) => p.u >= u0 && p.u <= u1 && p.v >= v0 && p.v <= v1))
+      data.water = spotsWhere(pxSmall(), { from, to }, waterTest(cfg.water)).filter((p) => areas.some(([u0, v0, u1, v1]) => p.u >= u0 && p.u <= u1 && p.v >= v0 && p.v <= v1))
     })
   }
   if (has('glints')) queue.push(() => (data.snow = spotsWhere(pxSmall(), cfg.snow, isSnow)))
