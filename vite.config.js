@@ -21,6 +21,10 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { buildCsp } from './build/csp.js'
 import { buildServiceWorker, PUBLIC_PRECACHE } from './build/sw.js'
+import { privateAssetsPlugin } from './scripts/private-assets.mjs'
+
+/** Racine du dépôt : les composants privés y sont copiés avant le serveur et chaque génération. */
+const ROOT = fileURLToPath(new URL('.', import.meta.url))
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
 const LANGS = ['fr', 'en', 'id']
@@ -249,6 +253,7 @@ export default defineConfig(({ mode }) => {
   return {
     base: './',
     plugins: [
+      privateAssetsPlugin(ROOT),
       vue(),
       siteUrlPlugin(siteUrl),
       cspPlugin(target),

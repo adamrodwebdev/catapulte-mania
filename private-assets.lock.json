@@ -1,0 +1,112 @@
+{
+  "repository": "adamrodwebdev/private-assets",
+  "folder": "catapulte-mania",
+  "commit": "b6bfda5a98203977bd24ee0ffa44b630b71e0e5b",
+  "files": [
+    {
+      "path": "src/game/assets/backgrounds/chapter-1-lite.webp",
+      "size": 122222,
+      "sha256": "4dc0597e3990c1f32b4f3b0c30f2d4d6bb432691862fd62076e314128a137d22"
+    },
+    {
+      "path": "src/game/assets/backgrounds/chapter-1.webp",
+      "size": 242430,
+      "sha256": "353135b9047e370a5c7033c8d4757535b391289461dba4e1151e39422b04d900"
+    },
+    {
+      "path": "src/game/assets/backgrounds/chapter-10-lite.webp",
+      "size": 64638,
+      "sha256": "6c0254ba901eb0e487d070c958c47c112fafa17ca6e6cef778f0aed435336465"
+    },
+    {
+      "path": "src/game/assets/backgrounds/chapter-10.webp",
+      "size": 132594,
+      "sha256": "510cfe03791c92a23d65236d3084dcc7f077fd2c3542fa349d3670d7f97fe328"
+    },
+    {
+      "path": "src/game/assets/backgrounds/chapter-2-lite.webp",
+      "size": 203394,
+      "sha256": "996832a8e5cef3be807d165d445bb42fc753b820fc10107d147b3291f1e679c5"
+    },
+    {
+      "path": "src/game/assets/backgrounds/chapter-2.webp",
+      "size": 390316,
+      "sha256": "c246c7ea34959494f43720c430002e475be1ccc2f22fee3197bfb99b808fd34e"
+    },
+    {
+      "path": "src/game/assets/backgrounds/chapter-3-lite.webp",
+      "size": 30250,
+      "sha256": "7773e55c1093c48c73bcacb3fbd3f193b1e9c1817400d463a910d695e35e1880"
+    },
+    {
+      "path": "src/game/assets/backgrounds/chapter-3.webp",
+      "size": 49300,
+      "sha256": "f01de0a0df2b63632e620c6e9b239a7e89629c5ba248f43d5271eb46d6358207"
+    },
+    {
+      "path": "src/game/assets/backgrounds/chapter-4-lite.webp",
+      "size": 28962,
+      "sha256": "af05b7fa0c71b4caaaff727430f63319d327c7833f48d5b0e6797ea91c681c22"
+    },
+    {
+      "path": "src/game/assets/backgrounds/chapter-4.webp",
+      "size": 48688,
+      "sha256": "93bd62cd2a89559f1e141b3e1a2a1fdab82a71018e5def5699059c5a6832ef5f"
+    },
+    {
+      "path": "src/game/assets/backgrounds/chapter-5-lite.webp",
+      "size": 50056,
+      "sha256": "0e6c7d471b87f7f03192e8aa46d8dbc7da9b545c083daac735586ccc36746ab3"
+    },
+    {
+      "path": "src/game/assets/backgrounds/chapter-5.webp",
+      "size": 95380,
+      "sha256": "0d334195cf6ad79fff4d945ea04d3a65f67fd3ffcd90698297503819910e3b5e"
+    },
+    {
+      "path": "src/game/assets/backgrounds/chapter-6-lite.webp",
+      "size": 44320,
+      "sha256": "7bfc06db0bee972908faefc93eeefb56b480dd31b3ac27ace93833cdd2e2429c"
+    },
+    {
+      "path": "src/game/assets/backgrounds/chapter-6.webp",
+      "size": 79956,
+      "sha256": "4a05b26876efe8c63aa85715cfb87accfd21115d474b681c530dbeb1ce59cbd7"
+    },
+    {
+      "path": "src/game/assets/backgrounds/chapter-7-lite.webp",
+      "size": 90552,
+      "sha256": "3e79b0ac311980d1b52e3c77b71947c5ce2fc85b7a90667e142ebaf69d3e05e2"
+    },
+    {
+      "path": "src/game/assets/backgrounds/chapter-7.webp",
+      "size": 171674,
+      "sha256": "411f272bf9c9701ed9144cc089780d432cbe6b4ea974a9905c48bee62c91bfe3"
+    },
+    {
+      "path": "src/game/assets/backgrounds/chapter-8-lite.webp",
+      "size": 162202,
+      "sha256": "2462a8e4bf38aaaefc332d9b8567b06492e6397d290b18a4d967aa55a7b2d92d"
+    },
+    {
+      "path": "src/game/assets/backgrounds/chapter-8.webp",
+      "size": 329750,
+      "sha256": "1234b182fe5b88a64821ff7af1a1f99edc359afe310760aab7545190c410b258"
+    },
+    {
+      "path": "src/game/assets/backgrounds/chapter-9-lite.webp",
+      "size": 32602,
+      "sha256": "e4eba2b843e25f5d3a53dff483b3c8f4c2ad28239bf2be2b6b8ee72b6aa1c6e7"
+    },
+    {
+      "path": "src/game/assets/backgrounds/chapter-9.webp",
+      "size": 56064,
+      "sha256": "87a79bdf0e534e5b8a03087eda9becf619983bd55dc2133c9a8dfa4b3c9060ab"
+    },
+    {
+      "path": "src/game/story/portraits.data.js",
+      "size": 72787,
+      "sha256": "b20c708e869c4edaa02caeed84ec4fdb236dac1e53cc0d73e9ee745dcdeb50d5"
+    }
+  ]
+}

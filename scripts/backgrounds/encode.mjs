@@ -8,6 +8,11 @@
  *   marque, rien à rogner ; le jeu dessine son sol sur leur bas (`ground`) ;
  * - l'image garde sa largeur (2560 px au plus) et est encodée en WebP.
  *
+ * Nos composants (règle du 2026-11-26) : les PNG maîtres sont dans le dépôt privé
+ * des sources, et les WebP produits ici ne sont pas versionnés dans ce dépôt public.
+ * Après un encodage : copier les WebP dans private-assets/catapulte-mania/ (mêmes
+ * chemins), les pousser, puis `npm run assets:lock`.
+ *
  * Après un nouvel encodage, vérifiez dans src/game/assets/backgrounds.js la
  * ligne de sol de chaque peinture (`ground`) et ses sommets (`peaks`), et dans
  * src/game/sky/skyConfig.js la place de ce que le ciel vivant anime.

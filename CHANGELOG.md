@@ -70,6 +70,15 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), num
   `inlineDynamicImports`, inutile avec le format `iife` sous Vite 8 ; la démo passe à
   `codeSplitting: false` (l'ancienne option est dépréciée). Même résultat : un seul script.
 
+### Nos composants hors du dépôt public
+- **Fonds des chapitres, portraits et kits des portails** : ce sont nos composants, ils
+  quittent ce dépôt public (règle du 26 novembre 2026). Les fichiers compilés sont dans un
+  dépôt privé ; `scripts/private-assets.mjs` les copie avant le serveur, chaque build et les
+  tests, d'après un verrou public (`private-assets.lock.json` : commit, taille et SHA-256 de
+  chaque fichier), et arrête tout en nommant chaque fichier manquant ou altéré. La CI les lit
+  avec un jeton en lecture seule, donné à cette seule étape. Les maîtres (peintures, portraits)
+  sont dans le dépôt privé des sources ; le script de paquets des portails y prend ses images.
+
 ### Prototype (désactivé par défaut)
 - **Fond WebGL2** (`?gl=1`) : la peinture, ses rais de lumière et sa brume dessinés par
   la carte graphique sous le canevas du jeu, repli en 2D sans WebGL2 ou si le contexte

@@ -6,7 +6,8 @@
  *
  * Pour chaque portail, le dossier release/<portail>/ contient :
  *   - <portail>-game.zip : le jeu (index.html à la racine), prêt à téléverser ;
- *   - les images de la fiche aux formats du portail (docs/store/portals/) ;
+ *   - les images de la fiche aux formats du portail (dépôt privé private-assets,
+ *     catapulte-mania/store/portals/ ; les textes restent dans docs/store/portals/LISTINGS/) ;
  *   - les captures de jeu communes ;
  *   - LISTING.md : les textes de la fiche et la marche à suivre.
  *
@@ -19,6 +20,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statS
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { deflateRawSync } from 'node:zlib'
+import { FOLDER, localCheckout } from './private-assets.mjs'
 
 const args = process.argv.slice(2)
 const arg = (k) => (args.includes(k) ? args[args.indexOf(k) + 1] : '')
@@ -43,7 +45,14 @@ const VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.u
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const OUT = join(ROOT, 'release')
-const STORE = join(ROOT, 'docs/store/portals')
+/** Les textes des fiches restent ici ; les images et vidéos sont nos composants, dans le dépôt privé. */
+const LISTINGS = join(ROOT, 'docs/store/portals/LISTINGS')
+const PRIVATE = localCheckout(ROOT, process.env)
+if (!PRIVATE) {
+  throw new Error('images des fiches introuvables : cloner adamrodwebdev/private-assets à côté du dossier du jeu, ou PRIVATE_ASSETS_DIR')
+}
+const STORE = join(PRIVATE, FOLDER, 'store/portals')
+if (!existsSync(join(STORE, 'screenshots'))) throw new Error(`images des fiches introuvables dans ${STORE}`)
 
 /* ---------- Zip minimal (sans dépendance) ---------- */
 const CRC = new Uint32Array(256).map((_, n) => {
@@ -125,7 +134,7 @@ for (const p of PLATFORMS.filter((p) => !only || p.id === only)) {
   const n = zipDir(built.get(key), join(dir, zipName))
   if (existsSync(join(STORE, p.id))) cpSync(join(STORE, p.id), join(dir, 'images'), { recursive: true })
   cpSync(join(STORE, 'screenshots'), join(dir, 'screenshots'), { recursive: true })
-  if (existsSync(join(STORE, 'LISTINGS', `${p.id}.md`))) cpSync(join(STORE, 'LISTINGS', `${p.id}.md`), join(dir, 'LISTING.md'))
+  if (existsSync(join(LISTINGS, `${p.id}.md`))) cpSync(join(LISTINGS, `${p.id}.md`), join(dir, 'LISTING.md'))
   const kb = Math.round(statSync(join(dir, zipName)).size / 1024)
   const missing = (p.id === 'gamedistribution' && !ids.gd) || (p.id === 'y8' && !ids.y8Game) ? ' — SANS identifiant : publicité désactivée' : ''
   console.log(`✓ ${p.id} : ${n} fichiers, ${kb} Ko${missing}`)
