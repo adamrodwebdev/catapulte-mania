@@ -11,6 +11,13 @@ coverage/
 .scratch/
 # Peintures d'origine des fonds (lourdes) : seuls les WebP encodés sont versionnés.
 art/backgrounds/*.png
+# Candidates FLUX (nos sources, dépôt privé) et peintures Dola (licence non commerciale) :
+# jamais dans ce dépôt public.
+art/backgrounds-flux/
+art/backgrounds-dola/
+# Générateurs Blender et bible visuelle v7 : nos composants, dans le dépôt privé des sources.
+art/v7/
+docs/v7/
 .netlify/
 dist-crazygames/
 dist-poki/

@@ -60,14 +60,40 @@ jobs:
           uploadArtifacts: true
           temporaryPublicStorage: true
 
+  # Depuis la v6.2 (châteaux assemblés), les 100 niveaux d'un seul tenant dépassaient
+  # deux heures : le contrôle était annulé à chaque fois sans rien prouver. Ils passent
+  # en lots parallèles ; le dernier job résume leur verdict. Les niveaux à plusieurs tirs
+  # coûtent cher au solveur (sur le runner de GitHub, un cœur par niveau : le 40 prend
+  # 57 min, le 39 environ 88, le 37 plus de 90) : 31 à 40 passent par paires, chacun sur
+  # son cœur, et la limite monte à 150 min.
   levels:
-    name: Les 100 niveaux sont gagnables
+    name: Niveaux ${{ matrix.levels }}
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        levels: ['1-10', '11-20', '21-30', '31-32', '33-34', '35-36', '37-38', '39-40', '41-50', '51-60', '61-70', '71-80', '81-90', '91-100']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund
-      - run: npm run check:levels
+      - run: node scripts/check-levels.mjs --levels ${{ matrix.levels }}
+
+  levels-all:
+    name: Les 100 niveaux sont gagnables
+    needs: levels
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verdict des lots
+        env:
+          RESULT: ${{ needs.levels.result }}
+        run: |
+          if [ "$RESULT" != "success" ]; then
+            echo "Un lot de niveaux a échoué ou n'a pas fini (résultat : $RESULT)."
+            exit 1
+          fi
+          echo "Les 100 niveaux sont gagnables."
